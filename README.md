@@ -44,6 +44,35 @@ Without `DATABASE_URL` the app still runs and stores everything on the device ("
 Sections grow as you write near the bottom. Lasso to move or delete strokes. Text boxes accept
 `$LaTeX$`.
 
+## Ask AI from padSync (Mac bridge)
+
+The side panel's **Ask AI** box queues your question with the section (rendered image + source
+text + hidden solution). A small bridge on your Mac picks it up, runs **Claude Code** or **Codex**
+locally (on your subscription), and streams the answer back into the panel. Jobs asked while the
+Mac is off wait until the bridge comes back.
+
+1. padSync → *Settings* → *Device tokens* → **Create token**, then copy it.
+2. On the Mac, in this repo (Node ≥ 22.18; `claude` and/or `codex` logged in):
+
+   ```bash
+   pbpaste | node bridge/padsync-bridge.ts setup --server https://pad-sync.vercel.app
+   node bridge/padsync-bridge.ts install   # runs in the background via launchd, starts at login
+   node bridge/padsync-bridge.ts status    # check agents + token
+   ```
+
+   Logs: `~/Library/Logs/padsync-bridge.log`. `uninstall` removes the launchd agent.
+
+**Device tokens** (`src/server/tokens.ts`):
+- 256-bit random tokens with a `psd_` prefix. The server stores only their SHA-256, and the
+  plaintext is shown once.
+- Scoped to `/api/bridge/*`: a token can claim and answer jobs, but it can't sync, read notebooks,
+  list jobs, or create or revoke tokens. A request that sends a token to a session-only endpoint
+  gets 403, even if it also has a session cookie.
+- Revocation takes effect on the next request; a running bridge exits when its token is rejected.
+- The bridge reads the token from stdin (never argv), stores it in `~/.config/padsync/bridge.json`
+  (mode 600), requires https, refuses redirects, and runs agents read-only (Claude: `Read` only;
+  Codex: `--sandbox read-only`) in a throwaway directory.
+
 ## Architecture
 
 ```
@@ -68,7 +97,6 @@ iPad PWA ─┐                         ┌─ Mac browser (side panel, follow i
 - Canvas import: list courses and files, then pull lecture PDFs, slides and problem sheets.
 - PDF import with `pdf_crop` blocks (lecture excerpts placed in sections).
 - Remote MCP server (`/api/mcp`) so Claude Code / Codex can read the current section and import payloads.
-- Mac bridge daemon: an *Ask* button that runs `claude -p` / `codex exec`, with answers in the side panel.
 - Realtime ping (Ably / Neon Realtime) in place of the 2 s poll; timed tests; PDF export.
 
 ## Development
@@ -77,4 +105,6 @@ iPad PWA ─┐                         ┌─ Mac browser (side panel, follow i
 npm install
 npm run dev        # http://localhost:3000; reach it from the iPad via your Mac's LAN IP
 npm run build && npm run lint
+npm test           # vitest: tokens, auth scoping, job queue (PGlite), bridge lib + end-to-end
+npm run typecheck  # app + bridge
 ```

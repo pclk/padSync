@@ -1,10 +1,11 @@
 import type { NextRequest } from "next/server";
-import { isAuthed } from "@/server/auth";
+import { sessionLogin } from "@/server/auth";
+import { bearerToken } from "@/server/tokens";
 
 // Verifies the server's Canvas token. Course/file import builds on the same client next.
 
 export async function POST(req: NextRequest) {
-  if (!isAuthed(req)) return Response.json({ ok: false, error: "Sign in first" }, { status: 401 });
+  if (bearerToken(req.headers) || !sessionLogin(req)) return Response.json({ ok: false, error: "Sign in first" }, { status: 401 });
   const token = process.env.CANVAS_TOKEN;
   const base = process.env.CANVAS_BASE_URL ?? "https://canvas.nus.edu.sg";
   if (!token) return Response.json({ ok: false, error: "CANVAS_TOKEN not set" });

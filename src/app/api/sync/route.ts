@@ -1,7 +1,6 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { isAuthed } from "@/server/auth";
-import { getSql } from "@/server/db";
+import { requireSession } from "@/server/guard";
 
 // One endpoint does push and pull. Writes are last-writer-wins per entity on the hlc; every
 // accepted write takes a new seq, and clients pull "everything after my cursor".
@@ -49,9 +48,9 @@ interface Row {
 }
 
 export async function POST(req: NextRequest) {
-  const sql = await getSql();
-  if (!sql) return Response.json({ error: "database not configured" }, { status: 503 });
-  if (!isAuthed(req)) return Response.json({ error: "unauthorized" }, { status: 401 });
+  const auth = await requireSession(req);
+  if (auth instanceof Response) return auth;
+  const { sql } = auth;
 
   const parsed = body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: parsed.error.issues.slice(0, 5) }, { status: 400 });

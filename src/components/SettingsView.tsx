@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { deviceId, deviceKind } from "@/lib/db";
 import { useSyncStatus } from "@/lib/hooks";
 import { requestSync, resetCursor } from "@/lib/sync";
+import { DeviceTokens } from "./DeviceTokens";
 
 interface Status {
   db: boolean;
@@ -91,6 +92,8 @@ export default function SettingsView() {
         )}
         {authError && <p className="mt-2 text-rose-700">{authError}</p>}
       </section>
+
+      {status?.authed && <DeviceTokens />}
 
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="mb-3 font-semibold text-slate-800">NUS Canvas</h2>

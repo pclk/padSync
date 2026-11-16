@@ -4,8 +4,10 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { useEffect, useState } from "react";
 import { copySectionImage, sectionSource, sectionStats } from "@/lib/export";
 import { renderMarkdown } from "@/lib/markdown";
+
 import { insertSectionAfter, logEvent, setDeleted, swapSectionOrder } from "@/lib/store";
 import type { PresenceEntity, SectionEntity } from "@/lib/types";
+import { AskPanel } from "./AskPanel";
 
 interface Props {
   notebookId: string;
@@ -93,7 +95,7 @@ export function SidePanel(p: Props) {
               Copy question text
             </button>
           </div>
-          <p className="mt-2 text-xs text-slate-500">Sending to Claude Code / Codex arrives with the Mac bridge. For now, copy and paste.</p>
+          <AskPanel key={current.id} notebookId={p.notebookId} section={current} sectionEl={() => p.sectionEl(current.id)} />
 
           {stats && (
             <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
