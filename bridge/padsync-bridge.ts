@@ -9,9 +9,9 @@
 //   node bridge/padsync-bridge.ts uninstall
 
 import { spawnSync } from "node:child_process";
-import { mkdtemp, rm, unlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, unlink, writeFile } from "node:fs/promises";
 import { homedir, hostname, tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   AGENTS,
@@ -117,7 +117,7 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
         abort.abort();
       }
     } catch (e) {
-      if (e instanceof ApiError && e.status === 409) abort.abort(); // reclaimed or finished elsewhere
+      if (e instanceof ApiError && (e.status === 409 || e.status === 401)) abort.abort(); // reclaimed, finished elsewhere, or token revoked
       else log(`progress update failed: ${(e as Error).message}`);
     }
   };
@@ -194,6 +194,8 @@ async function install() {
   if (!(await loadConfig())) throw new Error("run setup first");
   const script = resolve(fileURLToPath(import.meta.url));
   const logFile = join(homedir(), "Library", "Logs", "padsync-bridge.log");
+  await mkdir(dirname(plistPath()), { recursive: true });
+  await mkdir(dirname(logFile), { recursive: true });
   await writeFile(plistPath(), launchdPlist({ node: process.execPath, script, path: process.env.PATH ?? "/usr/bin:/bin", logFile }));
   const domain = `gui/${process.getuid?.() ?? 501}`;
   spawnSync("launchctl", ["bootout", domain, plistPath()], { stdio: "ignore" });

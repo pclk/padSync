@@ -45,6 +45,7 @@ let base: string;
 let bridge: ChildProcess | null = null;
 let logs = "";
 let session: string;
+let disconnect = false;
 
 async function startBridge() {
   const { sql } = await freshDb();
@@ -88,7 +89,9 @@ beforeEach(async () => {
   configureAuthEnv();
   session = sessionCookie();
   logs = "";
+  disconnect = false;
   server = createServer(async (inReq, out) => {
+    if (disconnect) { inReq.socket.destroy(); return; }
     const chunks: Buffer[] = [];
     for await (const c of inReq) chunks.push(c as Buffer);
     const url = new URL(inReq.url!, base);
@@ -126,6 +129,37 @@ describe("bridge end to end", () => {
     await cancelRoute(req(`/api/jobs/${id}/cancel`, { method: "POST", session }), params({ id }));
     await waitFor(async () => logs, (l) => l.includes("cancelled by user"));
     expect((await job(id)).status).toBe("cancelled");
+  });
+
+  it("stops a running agent and exits 2 after revocation", async () => {
+    const token = await startBridge();
+    const id = await ask("HANG please");
+    await waitFor(() => job(id), (j) => j.output.length > 0);
+    const exited = new Promise<number | null>((r) => bridge!.on("exit", r));
+    await (await getSql())!.query(`update device_tokens set revoked_at = now()`);
+    expect(await exited).toBe(2);
+    expect(logs).not.toContain(token);
+  });
+
+  it("abandons a job after ownership is lost (409)", async () => {
+    await startBridge();
+    const id = await ask("HANG please");
+    await waitFor(() => job(id), (j) => j.output.length > 0);
+    await (await getSql())!.query(`update jobs set claimed_by = 'other' where id = $1`, [id]);
+    const next = await ask("next question");
+    await waitFor(() => job(next), (j) => j.status === "done", 20000);
+    expect((await job(id)).output).toBe("Checking line 3");
+  });
+
+  it("backs off on network failures and recovers without leaking its token", async () => {
+    disconnect = true;
+    const token = await startBridge();
+    await waitFor(async () => logs, (l) => l.includes("retrying in 6s"));
+    expect(bridge!.exitCode).toBeNull();
+    disconnect = false;
+    const id = await ask("recover");
+    await waitFor(() => job(id), (j) => j.status === "done");
+    expect(logs).not.toContain(token);
   });
 
   it("exits with code 2 when its token is revoked", async () => {

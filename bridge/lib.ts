@@ -9,6 +9,8 @@ import { dirname, join } from "node:path";
 
 export type Agent = "claude" | "codex";
 export const AGENTS: Agent[] = ["claude", "codex"];
+/** Server-side cap on a job's answer (src/server/jobs.ts MAX_OUTPUT). */
+export const MAX_OUTPUT = 200_000;
 
 export interface ClaimedJob {
   id: string;
@@ -166,8 +168,8 @@ export function agentCommand(agent: Agent, cfg: Pick<BridgeConfig, "claudeBin" |
   if (agent === "claude") {
     return {
       bin: cfg.claudeBin ?? "claude",
-      // Read-only: the agent may read the job files, nothing else. Prompt arrives on stdin.
-      args: ["-p", "--output-format", "stream-json", "--verbose", "--allowedTools", "Read", "--disallowedTools", "Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch"],
+      // Restrict built-in tools and ignore ambient MCP servers. Prompt arrives on stdin.
+      args: ["-p", "--output-format", "stream-json", "--verbose", "--tools", "Read", "--strict-mcp-config", "--allowedTools", "Read", "--disallowedTools", "Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch"],
       parse: parseClaudeLine,
     };
   }
@@ -192,10 +194,15 @@ export interface RunResult {
   error?: string;
 }
 
+/** The agent inherits the user's environment minus padSync's own credentials. */
+export function agentEnv(env: Env = process.env): Env {
+  return Object.fromEntries(Object.entries(env).filter(([k]) => !k.startsWith("PADSYNC_")));
+}
+
 export function runAgent(opts: RunOptions): Promise<RunResult> {
   const { command } = opts;
   return new Promise((resolve) => {
-    const child = spawn(command.bin, command.args, { cwd: opts.cwd, env: opts.env ?? process.env, stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn(command.bin, command.args, { cwd: opts.cwd, env: (opts.env ?? agentEnv()) as NodeJS.ProcessEnv, stdio: ["pipe", "pipe", "pipe"] });
     let streamed = "";
     let final: string | undefined;
     let error: string | undefined;
@@ -354,6 +361,6 @@ export class BridgeApi {
   }
 
   update(jobId: string, u: { output?: string; status?: "done" | "error"; error?: string }) {
-    return this.call<{ status: string; cancelled: boolean }>("POST", `/api/bridge/jobs/${encodeURIComponent(jobId)}`, u);
+    return this.call<{ status: string; cancelled: boolean }>("POST", `/api/bridge/jobs/${encodeURIComponent(jobId)}`, { ...u, ...(u.output === undefined ? {} : { output: u.output.slice(0, MAX_OUTPUT) }) });
   }
 }

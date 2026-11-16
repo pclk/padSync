@@ -70,8 +70,13 @@ Mac is off wait until the bridge comes back.
   gets 403, even if it also has a session cookie.
 - Revocation takes effect on the next request; a running bridge exits when its token is rejected.
 - The bridge reads the token from stdin (never argv), stores it in `~/.config/padsync/bridge.json`
-  (mode 600), requires https, refuses redirects, and runs agents read-only (Claude: `Read` only;
-  Codex: `--sandbox read-only`) in a throwaway directory.
+  (mode 600), requires https, and refuses redirects. Agents run in a throwaway directory without
+  padSync's credentials in their environment. Claude gets only the `Read` tool and no MCP servers
+  (`--tools Read --strict-mcp-config`); Codex runs with `--sandbox read-only`.
+- Limits: this is tool restriction, not filesystem isolation. A read-capable agent can still
+  read files your user can (including the bridge config), and two processes sharing one token
+  aren't told apart. See [docs/bridge-review.md](docs/bridge-review.md).
+- Cookie-authenticated writes are also refused when `Origin` is another site (CSRF hardening).
 
 ## Architecture
 

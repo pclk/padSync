@@ -69,6 +69,11 @@ export function bearerToken(headers: Headers): string | null {
   return m ? m[1] : null;
 }
 
+/** True for any Bearer Authorization header, well-formed or not: such callers never get session access. */
+export function hasBearerScheme(headers: Headers): boolean {
+  return /^Bearer(?:\s|$)/i.test(headers.get("authorization") ?? "");
+}
+
 export async function createDeviceToken(sql: Sql, name: string, createdBy: string) {
   const token = generateToken();
   const id = "dt_" + randomBytes(9).toString("base64url");

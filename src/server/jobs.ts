@@ -5,14 +5,14 @@ import type { Sql } from "./db";
 
 // AI jobs: the iPad/Mac queue a question about a section; the Mac bridge claims it, runs
 // Claude Code or Codex locally, and streams the answer back. Claiming and every state change are
-// single SQL statements, so two bridges can never run the same job.
+// single SQL statements. Stale reclaim can overlap execution during network partitions.
 
 export const AGENTS = ["claude", "codex"] as const;
 export type Agent = (typeof AGENTS)[number];
 export type JobStatus = "queued" | "running" | "done" | "error" | "cancelled";
 
 /** A running job whose bridge went quiet this long is handed to the next claim. The bridge
- *  heartbeats every few seconds (an empty update), so only a dead bridge goes quiet. */
+ *  heartbeats every few seconds (an empty update), but network outages can also make a live bridge appear stale. */
 export const STALE_AFTER_S = 600;
 export const MAX_OUTPUT = 200_000;
 const MAX_IMAGE = 3_000_000; // data URL chars; keeps requests under Vercel's 4.5 MB limit
