@@ -10,6 +10,8 @@ interface Status {
   db: boolean;
   auth: boolean;
   authed: boolean;
+  login: string | null;
+  allowed: string;
   canvas: { configured: boolean; expiresAt: string | null };
 }
 
@@ -22,8 +24,7 @@ interface CanvasCheck {
 export default function SettingsView() {
   const sync = useSyncStatus();
   const [status, setStatus] = useState<Status | null>(null);
-  const [password, setPassword] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
+  const [authError] = useState(() => new URLSearchParams(window.location.search).get("auth_error"));
   const [canvas, setCanvas] = useState<CanvasCheck | null>(null);
 
   const load = () =>
@@ -36,13 +37,13 @@ export default function SettingsView() {
     void load();
   }, []);
 
-  const login = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const res = await fetch("/api/auth", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password }) });
-    setMsg(res.ok ? "Signed in on this device." : res.status === 503 ? "PADSYNC_PASSWORD is not set on the server." : "Wrong password.");
-    setPassword("");
+  useEffect(() => {
+    if (status?.authed) requestSync(0);
+  }, [status?.authed]);
+
+  const logout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
     await load();
-    requestSync(0);
   };
 
   const checkCanvas = async () => {
@@ -74,16 +75,21 @@ export default function SettingsView() {
       <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="mb-3 font-semibold text-slate-800">Sign in</h2>
         {status && !status.auth ? (
-          <p className="text-slate-600">Set <code>PADSYNC_PASSWORD</code> in the Vercel project to enable sync.</p>
+          <p className="text-slate-600">
+            Set <code>GITHUB_CLIENT_ID</code>, <code>GITHUB_CLIENT_SECRET</code> and <code>SESSION_SECRET</code> in the Vercel project to enable sync.
+          </p>
         ) : status?.authed ? (
-          <p className="text-emerald-700">This device is signed in.</p>
+          <div className="flex items-center justify-between">
+            <p className="text-emerald-700">Signed in as @{status.login}</p>
+            <button className="rounded-lg border px-3 py-1.5" onClick={logout}>Sign out</button>
+          </div>
         ) : (
-          <form onSubmit={login} className="flex gap-2">
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="padSync password" className="flex-1 rounded-lg border px-3 py-2" />
-            <button className="rounded-lg bg-slate-900 px-4 py-2 font-medium text-white">Sign in</button>
-          </form>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-slate-600">Only @{status?.allowed ?? "…"} can sign in.</p>
+            <a href="/api/auth/github?next=/settings" className="rounded-lg bg-slate-900 px-4 py-2 font-medium text-white">Sign in with GitHub</a>
+          </div>
         )}
-        {msg && <p className="mt-2 text-slate-600">{msg}</p>}
+        {authError && <p className="mt-2 text-rose-700">{authError}</p>}
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-4">

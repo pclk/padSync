@@ -18,13 +18,17 @@ No AirDrop, no Handoff, no PDF round trip.
 
    | Name | Value |
    | --- | --- |
-   | `PADSYNC_PASSWORD` | any long password; each device signs in once on *Settings* |
+   | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | from a GitHub OAuth app (see below) |
+   | `SESSION_SECRET` | random string, e.g. `openssl rand -base64 32`; changing it signs all devices out |
+   | `ALLOWED_GITHUB_LOGIN` | optional, defaults to `pclk`; the only account allowed in |
    | `CANVAS_TOKEN` | NUS Canvas access token (Account → Settings → Approved Integrations) |
    | `CANVAS_TOKEN_EXPIRES` | e.g. `2026-12-16T00:00:00+08:00` (NUS caps tokens at 30 days) |
    | `CANVAS_BASE_URL` | optional, defaults to `https://canvas.nus.edu.sg` |
 
-3. On the iPad: open the site in Safari → Share → *Add to Home Screen*, open it from there, sign in
-   on *Settings*. Do the same in the Mac browser.
+3. Create a GitHub OAuth app (GitHub → Settings → Developer settings → OAuth Apps → New):
+   homepage `https://<your-domain>`, callback `https://<your-domain>/api/auth/github/callback`.
+4. On the iPad: open the site in Safari → Share → *Add to Home Screen*, open it from there, and
+   tap *Sign in with GitHub* on *Settings*. Do the same in the Mac browser.
 
 Without `DATABASE_URL` the app still runs and stores everything on the device ("Local only").
 

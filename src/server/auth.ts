@@ -1,18 +1,25 @@
 import "server-only";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { NextRequest } from "next/server";
 
-// Single-user auth: one password (PADSYNC_PASSWORD), exchanged once per device for a
-// long-lived httpOnly cookie. Changing the password signs every device out.
+// GitHub OAuth, single user. Only ALLOWED_GITHUB_LOGIN (default "pclk") may sign in. The session
+// is a signed cookie: base64url({login, exp}).hmac, keyed by SESSION_SECRET. Rotating the
+// secret signs every device out.
 
-export const COOKIE = "padsync_session";
+export const SESSION_COOKIE = "padsync_session";
+export const STATE_COOKIE = "padsync_oauth_state";
+const SESSION_DAYS = 365;
 
-export function authConfigured() {
-  return !!process.env.PADSYNC_PASSWORD;
+export function allowedLogin() {
+  return (process.env.ALLOWED_GITHUB_LOGIN ?? "pclk").toLowerCase();
 }
 
-export function sessionToken() {
-  return createHmac("sha256", process.env.PADSYNC_PASSWORD ?? "").update("padsync-session-v1").digest("hex");
+export function authConfigured() {
+  return !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET && process.env.SESSION_SECRET);
+}
+
+function sign(payload: string) {
+  return createHmac("sha256", process.env.SESSION_SECRET ?? "").update(payload).digest("base64url");
 }
 
 function safeEqual(a: string, b: string) {
@@ -20,14 +27,41 @@ function safeEqual(a: string, b: string) {
   return x.length === y.length && timingSafeEqual(x, y);
 }
 
-export function checkPassword(password: string) {
-  return authConfigured() && safeEqual(password, process.env.PADSYNC_PASSWORD!);
+export function createSession(login: string) {
+  const payload = Buffer.from(JSON.stringify({ login, exp: Date.now() + SESSION_DAYS * 86_400_000 })).toString("base64url");
+  return `${payload}.${sign(payload)}`;
+}
+
+export function sessionLogin(req: NextRequest): string | null {
+  if (!authConfigured()) return null;
+  const raw = req.cookies.get(SESSION_COOKIE)?.value;
+  if (!raw) return null;
+  const [payload, sig] = raw.split(".");
+  if (!payload || !sig || !safeEqual(sig, sign(payload))) return null;
+  try {
+    const { login, exp } = JSON.parse(Buffer.from(payload, "base64url").toString()) as { login: string; exp: number };
+    return exp > Date.now() && login.toLowerCase() === allowedLogin() ? login : null;
+  } catch {
+    return null;
+  }
 }
 
 export function isAuthed(req: NextRequest) {
-  if (!authConfigured()) return false;
-  const cookie = req.cookies.get(COOKIE)?.value;
-  const bearer = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  const token = sessionToken();
-  return (!!cookie && safeEqual(cookie, token)) || (!!bearer && safeEqual(bearer, token));
+  return sessionLogin(req) !== null;
+}
+
+export function newState() {
+  return randomBytes(16).toString("base64url");
+}
+
+export function cookie(name: string, value: string, req: NextRequest, maxAgeSec: number) {
+  const secure = req.nextUrl.protocol === "https:" ? "; Secure" : "";
+  return `${name}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSec}${secure}`;
+}
+
+export const SESSION_MAX_AGE = SESSION_DAYS * 86_400;
+
+/** Only same-site relative paths, so the login flow can't be turned into an open redirect. */
+export function safeNext(next: string | null) {
+  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
 }
