@@ -1,0 +1,410 @@
+"use client";
+
+import { useLiveQuery } from "dexie-react-hooks";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { InkController, type Selection, type ToolState } from "@/ink/controller";
+import { db, deviceId, deviceKind } from "@/lib/db";
+import { useStoredState } from "@/lib/hooks";
+import { addTextBox, insertSectionAfter, liveSections, logEvent, putEntities } from "@/lib/store";
+import { PAGE_WIDTH, type NotebookEntity, type PresenceData, type PresenceEntity } from "@/lib/types";
+import { SectionView } from "./SectionView";
+import { SidePanel } from "./SidePanel";
+import { Toolbar } from "./Toolbar";
+
+const TOOLBAR_H = 56;
+const PANEL_W = 360;
+const MIN_ZOOM = 0.4;
+const MAX_ZOOM = 3;
+const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
+
+const DEFAULT_TOOL: ToolState = { kind: "pen", penColor: "#111827", penSize: 3.4, hlColor: "#facc15", hlSize: 22, eraserSize: 24 };
+
+export default function NotebookEditor() {
+  const id = useSearchParams().get("id") ?? "";
+  if (!id) return <Missing />;
+  return <Editor key={id} notebookId={id} />;
+}
+
+function Missing() {
+  return (
+    <div className="p-10 text-slate-600">
+      Notebook not found. <Link href="/" className="text-blue-700 underline">Back to library</Link>
+    </div>
+  );
+}
+
+function Editor({ notebookId }: { notebookId: string }) {
+  const kind = deviceKind();
+  const isIpad = kind === "ipad";
+  const notebook = useLiveQuery(() => db.entities.get(notebookId), [notebookId]) as NotebookEntity | undefined;
+  const sections = useLiveQuery(() => liveSections(notebookId), [notebookId]);
+
+  const [tool, setToolState] = useStoredState<ToolState>("padsync.tool", DEFAULT_TOOL);
+  const [panelOpen, setPanelOpen] = useStoredState("padsync.panel", !isIpad);
+  const [follow, setFollow] = useStoredState("padsync.follow", !isIpad);
+  const [zoom, setZoom] = useState(() => (isIpad ? 1 : fitZoom(panelOpen)));
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const [dragging, setDragging] = useState<Set<string> | null>(null);
+  const [editingText, setEditingText] = useState<string | null>(null);
+  const [currentId, setCurrentId] = useState<string | null>(null);
+
+  const wrapRef = useRef<HTMLDivElement>(null); // the page, scaled by transform; logical coords
+  const pinchRef = useRef<HTMLDivElement>(null); // sizer around it, transformed during a pinch
+  const [pageH, setPageH] = useState(0);
+  const liveRef = useRef<HTMLCanvasElement>(null);
+  const els = useRef(new Map<string, HTMLElement>());
+  const zoomAnchor = useRef<{ lx: number; ly: number; cx: number; cy: number } | null>(null);
+
+  const controller = useMemo(
+    () =>
+      new InkController(notebookId, tool, {
+        onSelection: setSelection,
+        onDragging: setDragging,
+        onTextCreate: async (sectionId, x, y) => {
+          const tid = await addTextBox(notebookId, sectionId, x, y);
+          setEditingText(tid);
+          void logEvent(notebookId, sectionId, "text_create", { id: tid });
+        },
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [notebookId],
+  );
+  useLayoutEffect(() => {
+    controller.configure(tool, zoom);
+  }, [controller, tool, zoom]);
+
+  const undoState = useSyncExternalStore(
+    (fn) => controller.undo.subscribe(fn),
+    () => `${controller.undo.canUndo}:${controller.undo.canRedo}`,
+    () => "false:false",
+  );
+  const [canUndo, canRedo] = undoState.split(":").map((v) => v === "true");
+
+  const setTool = useCallback(
+    (t: ToolState) => {
+      if (t.kind !== tool.kind) controller.setSelection(null);
+      setToolState(t);
+      void logEvent(notebookId, null, "tool", { kind: t.kind, color: t.kind === "highlighter" ? t.hlColor : t.penColor });
+    },
+    [controller, notebookId, setToolState, tool.kind],
+  );
+
+  const undo = useCallback(async () => {
+    const label = await controller.undo.undo();
+    if (label) void logEvent(notebookId, null, "undo", { label });
+  }, [controller, notebookId]);
+  const redo = useCallback(async () => {
+    const label = await controller.undo.redo();
+    if (label) void logEvent(notebookId, null, "redo", { label });
+  }, [controller, notebookId]);
+
+  useEffect(() => {
+    controller.attachLive(liveRef.current);
+    const onResize = () => controller.resizeLive();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [controller]);
+
+  useEffect(() => {
+    void logEvent(notebookId, null, "open", { device: kind });
+    const vis = () => void logEvent(notebookId, null, "visibility", { state: document.visibilityState });
+    document.addEventListener("visibilitychange", vis);
+    return () => document.removeEventListener("visibilitychange", vis);
+  }, [notebookId, kind]);
+
+  // --- zoom, anchored so the point under the fingers/cursor stays put -------------------------
+  const zoomAt = useCallback(
+    (next: number, lx: number, ly: number, cx: number, cy: number) => {
+      zoomAnchor.current = { lx, ly, cx, cy };
+      setZoom(clampZoom(next));
+    },
+    [],
+  );
+
+  useLayoutEffect(() => {
+    const a = zoomAnchor.current;
+    const wrap = wrapRef.current;
+    if (!a || !wrap) return;
+    zoomAnchor.current = null;
+    const r = wrap.getBoundingClientRect();
+    window.scrollBy(r.left + a.lx * zoom - a.cx, r.top + a.ly * zoom - a.cy);
+    void logEvent(notebookId, null, "zoom", { zoom });
+  }, [zoom, notebookId]);
+
+  const resetZoom = () => {
+    const z = isIpad ? 1 : fitZoom(panelOpen);
+    const wrap = wrapRef.current!;
+    const r = wrap.getBoundingClientRect();
+    const cy = TOOLBAR_H + 10;
+    zoomAt(z, 0, (cy - r.top) / zoom, r.left, cy);
+  };
+
+  // Trackpad pinch on the Mac arrives as ctrl+wheel.
+  useEffect(() => {
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const wrap = wrapRef.current;
+      if (!wrap) return;
+      const r = wrap.getBoundingClientRect();
+      const z = controller.zoom;
+      zoomAt(z * Math.exp(-e.deltaY * 0.01), (e.clientX - r.left) / z, (e.clientY - r.top) / z, e.clientX, e.clientY);
+    };
+    window.addEventListener("wheel", onWheel, { passive: false });
+    return () => window.removeEventListener("wheel", onWheel);
+  }, [controller, zoomAt]);
+
+  // --- touch: Pencil never scrolls; one finger scrolls natively; two fingers pinch/pan;
+  //     two-finger tap = undo, three-finger tap = redo ---------------------------------------
+  useEffect(() => {
+    let pinch: { d0: number; m0: [number, number]; m: [number, number]; s: number; rect: DOMRect; page: DOMRect; z: number } | null = null;
+    let tap: { n: number; t: number; moved: boolean; start: [number, number][] } | null = null;
+
+    const direct = (list: TouchList) => [...list].filter((t) => t.touchType !== "stylus");
+    const mid = (a: Touch, b: Touch): [number, number] => [(a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2];
+    const dist = (a: Touch, b: Touch) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
+    const onStart = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      if ([...e.touches].some((t) => t.touchType === "stylus")) {
+        if (target.closest(".ink-surface")) e.preventDefault();
+        return;
+      }
+      const fingers = direct(e.touches);
+      if (fingers.length >= 2 && !tap) tap = { n: fingers.length, t: performance.now(), moved: false, start: fingers.map((f) => [f.clientX, f.clientY]) };
+      else if (tap) tap.n = Math.max(tap.n, fingers.length);
+      if (fingers.length === 1) tap = null;
+      if (fingers.length === 2 && pinchRef.current && wrapRef.current && !controller.isDrawing()) {
+        const [a, b] = fingers;
+        const rect = pinchRef.current.getBoundingClientRect();
+        const page = wrapRef.current.getBoundingClientRect();
+        pinch = { d0: dist(a, b), m0: mid(a, b), m: mid(a, b), s: 1, rect, page, z: controller.zoom };
+      }
+    };
+
+    const onMove = (e: TouchEvent) => {
+      if ([...e.touches].some((t) => t.touchType === "stylus")) {
+        if ((e.target as HTMLElement).closest(".ink-surface")) e.preventDefault();
+        return;
+      }
+      const fingers = direct(e.touches);
+      if (tap) {
+        tap.moved ||= fingers.some((f, i) => tap!.start[i] && Math.hypot(f.clientX - tap!.start[i][0], f.clientY - tap!.start[i][1]) > 12);
+      }
+      if (!pinch || fingers.length !== 2) return;
+      e.preventDefault();
+      const [a, b] = fingers;
+      pinch.m = mid(a, b);
+      pinch.s = clampZoom(pinch.z * (dist(a, b) / pinch.d0)) / pinch.z;
+      const { rect, m0, m, s } = pinch;
+      const px = m0[0] - rect.left, py = m0[1] - rect.top;
+      const wrap = pinchRef.current!;
+      wrap.style.transformOrigin = "0 0";
+      wrap.style.transform = `translate(${m[0] - rect.left - px * s}px, ${m[1] - rect.top - py * s}px) scale(${s})`;
+    };
+
+    const onEnd = (e: TouchEvent) => {
+      const fingers = direct(e.touches);
+      if (pinch && fingers.length < 2) {
+        const { page, m0, m, s, z } = pinch;
+        pinch = null;
+        const wrap = pinchRef.current;
+        if (wrap) wrap.style.transform = "";
+        if (Math.abs(s - 1) > 0.01 || Math.hypot(m[0] - m0[0], m[1] - m0[1]) > 2) {
+          zoomAt(z * s, (m0[0] - page.left) / z, (m0[1] - page.top) / z, m[0], m[1]);
+        }
+      }
+      if (tap && fingers.length === 0) {
+        const quick = performance.now() - tap.t < 280 && !tap.moved;
+        if (quick && tap.n === 2) void undo();
+        if (quick && tap.n === 3) void redo();
+        tap = null;
+      }
+    };
+
+    const opts = { passive: false } as const;
+    window.addEventListener("touchstart", onStart, opts);
+    window.addEventListener("touchmove", onMove, opts);
+    window.addEventListener("touchend", onEnd);
+    window.addEventListener("touchcancel", onEnd);
+    return () => {
+      window.removeEventListener("touchstart", onStart);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onEnd);
+      window.removeEventListener("touchcancel", onEnd);
+    };
+  }, [controller, zoomAt, undo, redo]);
+
+  // --- keyboard (Mac) ---------------------------------------------------------------------
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.tagName === "TEXTAREA" || t.tagName === "INPUT") return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        void (e.shiftKey ? redo() : undo());
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const map: Record<string, ToolState["kind"]> = { p: "pen", h: "highlighter", e: "eraser", l: "lasso", t: "text" };
+      const k = map[e.key.toLowerCase()];
+      if (k) setTool({ ...tool, kind: k });
+      if ((e.key === "Backspace" || e.key === "Delete") && controller.selection) void controller.deleteSelection();
+      if (e.key === "Escape") controller.setSelection(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [controller, undo, redo, setTool, tool]);
+
+  // --- current section + presence ---------------------------------------------------------
+  const lastPresence = useRef(0);
+  const presenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentRef = useRef<string | null>(null);
+  const followingScroll = useRef(0);
+
+  const publishPresence = useCallback(() => {
+    const sid = currentRef.current;
+    const el = sid ? els.current.get(sid) : undefined;
+    const offsetY = el ? (TOOLBAR_H - el.getBoundingClientRect().top) / controller.zoom : 0;
+    const data: PresenceData = { device: deviceId(), deviceKind: kind, sectionId: sid, offsetY: Math.round(offsetY), at: Date.now() };
+    lastPresence.current = Date.now();
+    void putEntities([{ id: `presence-${deviceId()}`, kind: "presence", notebookId, parentId: "", data, hlc: "", deleted: 0, dirty: 1 }]);
+  }, [controller, kind, notebookId]);
+
+  useEffect(() => {
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const probe = TOOLBAR_H + (window.innerHeight - TOOLBAR_H) * 0.3;
+        let found: string | null = null;
+        for (const [sid, el] of els.current) {
+          const r = el.getBoundingClientRect();
+          if (r.top <= probe && r.bottom >= probe) found = sid;
+        }
+        if (found && found !== currentRef.current) {
+          currentRef.current = found;
+          setCurrentId(found);
+          void logEvent(notebookId, found, "focus", {});
+        }
+        // Only the device being written on reports where it is; a following Mac stays quiet.
+        if (performance.now() - followingScroll.current < 1500) return;
+        if (presenceTimer.current) clearTimeout(presenceTimer.current);
+        const wait = Math.max(0, 800 - (Date.now() - lastPresence.current));
+        presenceTimer.current = setTimeout(publishPresence, wait);
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [notebookId, publishPresence, sections?.length]);
+
+  const presences = useLiveQuery(() => db.entities.where("kind").equals("presence").toArray(), []) as PresenceEntity[] | undefined;
+  const ipad = useMemo(() => {
+    const others = (presences ?? []).filter((p) => p.data.deviceKind === "ipad" && p.data.device !== deviceId());
+    return others.sort((a, b) => b.data.at - a.data.at)[0] ?? null;
+  }, [presences]);
+
+  useEffect(() => {
+    if (!follow || !ipad || ipad.notebookId !== notebookId || !ipad.data.sectionId || controller.isDrawing()) return;
+    const el = els.current.get(ipad.data.sectionId);
+    if (!el) return;
+    const delta = el.getBoundingClientRect().top + ipad.data.offsetY * controller.zoom - TOOLBAR_H;
+    if (Math.abs(delta) < 4) return;
+    followingScroll.current = performance.now();
+    window.scrollBy({ top: delta, behavior: "smooth" });
+  }, [follow, ipad, notebookId, controller]);
+
+  const loaded = sections !== undefined && notebook !== undefined;
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setPageH(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [loaded]);
+
+  const registerEl = useCallback((sid: string, el: HTMLElement | null) => {
+    if (el) els.current.set(sid, el);
+    else els.current.delete(sid);
+  }, []);
+
+  const jump = (sid: string) => {
+    const el = els.current.get(sid);
+    if (el) window.scrollBy({ top: el.getBoundingClientRect().top - TOOLBAR_H - 12, behavior: "smooth" });
+  };
+
+  if (notebook === undefined || sections === undefined) return <div className="p-10 text-slate-400">Loading…</div>;
+  if (!notebook || notebook.deleted) return <Missing />;
+
+  const current = sections.find((s) => s.id === currentId) ?? sections[0] ?? null;
+  const showPanel = panelOpen;
+
+  return (
+    <div className="editor min-h-screen bg-slate-200/70" style={{ paddingTop: TOOLBAR_H + 16, paddingRight: showPanel ? PANEL_W : 0 }}>
+      <Toolbar
+        title={notebook.data.title}
+        tool={tool}
+        setTool={setTool}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={undo}
+        onRedo={redo}
+        zoom={zoom}
+        onZoomReset={resetZoom}
+        panelOpen={showPanel}
+        onTogglePanel={() => setPanelOpen(!panelOpen)}
+      />
+
+      <div ref={pinchRef} className="mx-auto mb-[50vh]" style={{ width: PAGE_WIDTH * zoom, height: pageH * zoom }}>
+      <div ref={wrapRef} className="page-wrap flex flex-col gap-6" style={{ width: PAGE_WIDTH, transform: `scale(${zoom})`, transformOrigin: "0 0" }}>
+        {sections.map((s, i) => (
+          <SectionView
+            key={s.id}
+            section={s}
+            index={i}
+            controller={controller}
+            zoom={zoom}
+            selection={selection}
+            draggingIds={dragging}
+            editingTextId={editingText}
+            setEditingTextId={setEditingText}
+            registerEl={registerEl}
+            textMode={tool.kind === "text"}
+          />
+        ))}
+        <button
+          className="mx-auto rounded-xl border-2 border-dashed border-slate-400 px-8 py-4 text-slate-500 hover:bg-white"
+          onClick={() => insertSectionAfter(notebookId, sections[sections.length - 1] ?? null, sections)}
+        >
+          + Blank page
+        </button>
+      </div>
+      </div>
+
+      <canvas ref={liveRef} className="pointer-events-none fixed inset-0 z-30 h-screen w-screen" />
+
+      {showPanel && (
+        <SidePanel
+          notebookId={notebookId}
+          sections={sections}
+          current={current}
+          sectionEl={(sid) => els.current.get(sid)}
+          follow={follow}
+          setFollow={setFollow}
+          ipad={ipad}
+          onJump={jump}
+        />
+      )}
+    </div>
+  );
+}
+
+function fitZoom(withPanel: boolean) {
+  if (typeof window === "undefined") return 1;
+  const avail = window.innerWidth - (withPanel ? PANEL_W : 0) - 32;
+  return clampZoom(Math.min(1, avail / PAGE_WIDTH));
+}

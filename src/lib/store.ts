@@ -1,0 +1,125 @@
+import { nanoid } from "nanoid";
+import { db, deviceId } from "./db";
+import { hlcNow } from "./hlc";
+import { requestSync } from "./sync";
+import {
+  SCREEN_HEIGHT,
+  type Entity,
+  type EntityKind,
+  type NotebookData,
+  type NotebookEntity,
+  type PadEvent,
+  type SectionData,
+  type SectionEntity,
+  type StrokeEntity,
+  type TextBoxData,
+  type TextBoxEntity,
+} from "./types";
+
+// All local writes go through here: stamp a fresh clock, mark dirty, schedule a push.
+
+export async function putEntities(entities: Entity[]) {
+  if (!entities.length) return;
+  const device = deviceId();
+  const stamped = entities.map((e) => ({ ...e, hlc: hlcNow(device), dirty: 1 as const }));
+  await db.entities.bulkPut(stamped);
+  requestSync();
+}
+
+export function newEntity<K extends EntityKind, D>(kind: K, notebookId: string, parentId: string, data: D, id = nanoid()): Entity<K, D> {
+  return { id, kind, notebookId, parentId, data, hlc: "", deleted: 0, dirty: 1 };
+}
+
+export async function setDeleted(ids: string[], deleted: boolean) {
+  const rows = (await db.entities.bulkGet(ids)).filter((e): e is Entity => !!e);
+  await putEntities(rows.map((e) => ({ ...e, deleted: deleted ? 1 : 0 })));
+}
+
+export async function updateData<D>(id: string, patch: (data: D) => D) {
+  const row = await db.entities.get(id);
+  if (!row) return;
+  await putEntities([{ ...row, data: patch(row.data as D) }]);
+}
+
+export async function createNotebook(title: string, sections: Omit<SectionData, "order" | "createdAt">[] = [], description?: string) {
+  const now = Date.now();
+  const nb = newEntity<"notebook", NotebookData>("notebook", "", "", { title, description, createdAt: now });
+  nb.notebookId = nb.id;
+  const secs = (sections.length ? sections : [blankSection()]).map((s, i) =>
+    newEntity<"section", SectionData>("section", nb.id, "", { ...s, order: i + 1, createdAt: now }),
+  );
+  await putEntities([nb, ...secs]);
+  await logEvent(nb.id, null, "notebook_create", { sections: secs.length });
+  return nb.id;
+}
+
+export function blankSection(): Omit<SectionData, "order" | "createdAt"> {
+  return { blocks: [], template: "dots", minHeight: SCREEN_HEIGHT };
+}
+
+export async function insertSectionAfter(notebookId: string, after: SectionEntity | null, sorted: SectionEntity[]) {
+  const idx = after ? sorted.findIndex((s) => s.id === after.id) : sorted.length - 1;
+  const prev = sorted[idx]?.data.order ?? 0;
+  const next = sorted[idx + 1]?.data.order ?? prev + 2;
+  const sec = newEntity<"section", SectionData>("section", notebookId, "", {
+    ...blankSection(),
+    order: (prev + next) / 2,
+    createdAt: Date.now(),
+  });
+  await putEntities([sec]);
+  return sec.id;
+}
+
+export async function swapSectionOrder(a: SectionEntity, b: SectionEntity) {
+  await putEntities([
+    { ...a, data: { ...a.data, order: b.data.order } },
+    { ...b, data: { ...b.data, order: a.data.order } },
+  ]);
+}
+
+export async function addTextBox(notebookId: string, sectionId: string, x: number, y: number) {
+  const tb = newEntity<"textbox", TextBoxData>("textbox", notebookId, sectionId, { x, y, w: 420, text: "", fontSize: 20, color: "#1f2937" });
+  await putEntities([tb]);
+  return tb.id;
+}
+
+export async function moveStrokes(strokes: StrokeEntity[], dx: number, dy: number) {
+  await putEntities(
+    strokes.map((s) => {
+      const pts = s.data.pts.slice();
+      for (let i = 0; i < pts.length; i += 6) {
+        pts[i] += dx;
+        pts[i + 1] += dy;
+      }
+      return { ...s, data: { ...s.data, pts } };
+    }),
+  );
+}
+
+export async function logEvent(notebookId: string, sectionId: string | null, type: string, data: Record<string, unknown> = {}) {
+  const ev: PadEvent = { id: nanoid(), notebookId, sectionId, type, t: Date.now(), device: deviceId(), data, synced: 0 };
+  await db.events.add(ev);
+  requestSync();
+}
+
+export async function listNotebooks() {
+  return (await db.entities.where("kind").equals("notebook").toArray()).filter((n) => !n.deleted) as NotebookEntity[];
+}
+
+export function liveSections(notebookId: string) {
+  return db.entities
+    .where("[notebookId+kind]")
+    .equals([notebookId, "section"])
+    .toArray()
+    .then((rows) => (rows.filter((r) => !r.deleted) as SectionEntity[]).sort((a, b) => a.data.order - b.data.order));
+}
+
+export function liveChildren<T extends Entity>(sectionId: string, kind: EntityKind) {
+  return db.entities
+    .where("[parentId+kind]")
+    .equals([sectionId, kind])
+    .toArray()
+    .then((rows) => rows.filter((r) => !r.deleted) as T[]);
+}
+
+export type { TextBoxEntity };
