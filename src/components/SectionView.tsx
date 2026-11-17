@@ -11,6 +11,7 @@ import { highlight, renderInline, renderMarkdown } from "@/lib/markdown";
 import { liveChildren, logEvent, putEntities, setDeleted, updateData } from "@/lib/store";
 import { PAGE_WIDTH, SPACE_PX, type Block, type SectionData, type SectionEntity, type StrokeEntity, type TextBoxData, type TextBoxEntity } from "@/lib/types";
 
+import { PdfBackground } from "./PdfBackground";
 import { StudyBlock } from "./StudyBlocks";
 
 // iOS caps canvas area; 2.95 keeps a full-width tile under 4096px wide.
@@ -83,9 +84,10 @@ export const SectionView = memo(function SectionView(p: Props) {
       className={`paper template-${section.data.template} relative mx-auto bg-white shadow-sm`}
       style={{ width: PAGE_WIDTH, height }}
     >
+      {section.data.pdf && <PdfBackground page={section.data.pdf} />}
       {margin && <MarginColumn margin={margin} width={marginPx} />}
       <div ref={contentRef} className="section-content absolute top-0 px-14 pt-8 pb-6" style={{ left: margin?.side === "left" ? marginPx : 0, right: margin && margin.side !== "left" ? marginPx : 0 }}>
-        <SectionHeader section={section} index={p.index} />
+        {!section.data.pdf && <SectionHeader section={section} index={p.index} />}
         <Blocks blocks={section.data.blocks} />
       </div>
 

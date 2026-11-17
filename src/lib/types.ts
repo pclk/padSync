@@ -42,6 +42,7 @@ export interface LectureSource {
 }
 
 export interface SectionData {
+  pdf?: import("./pdf-meta").PdfPage;
   importApplication?: { key: string; title: string; appliedAt: number };
   sources?: LectureSource[];
   order: number;

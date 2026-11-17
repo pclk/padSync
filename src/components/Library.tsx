@@ -1,4 +1,5 @@
 "use client";
+import PdfImport from "./PdfImport";
 
 import { useRef, useState } from "react";
 import { selectNotebooks, type LibrarySort } from "@/lib/library";
@@ -68,6 +69,7 @@ export default function Library() {
         </nav>
       </header>
 
+      <PdfImport />
       <section className="mb-6" aria-labelledby="library-title">
         <h2 id="library-title" className="text-2xl font-semibold tracking-tight">Your notebooks</h2>
         <p className="mt-1 text-sm text-slate-500">A place to write, practise, and bring your notes together.</p>

@@ -1,3 +1,4 @@
+import { pdfImage } from "./pdf";
 import { toCanvas } from "html-to-image";
 import { strokeBox, unionBox } from "@/ink/geometry";
 import { paintStrokes } from "@/ink/render";
@@ -26,20 +27,27 @@ export async function sectionPng(section: SectionEntity, sectionEl: HTMLElement,
   }
   const inkBottom = unionBox(strokes.map(strokeBox))?.maxY ?? 0;
   const textBottom = texts.reduce((m, t) => Math.max(m, t.data.y + 60), 0);
-  const height = Math.ceil(Math.min(sectionEl.offsetHeight, Math.max(contentBottom, inkBottom, textBottom) + 48));
+  const height = Math.ceil(Math.min(sectionEl.offsetHeight, Math.max(section.data.pdf?.height ?? 0, contentBottom, inkBottom, textBottom) + 48));
 
   const canvas = await toCanvas(sectionEl, {
     width: PAGE_WIDTH,
     height,
     pixelRatio: scale,
-    backgroundColor: "#ffffff",
-    style: { boxShadow: "none" },
+    backgroundColor: section.data.pdf ? "transparent" : "#ffffff",
+    style: { boxShadow: "none", ...(section.data.pdf ? { backgroundColor: "transparent" } : {}) },
     filter: (node) =>
       !(node instanceof HTMLCanvasElement) &&
-      !(node instanceof HTMLElement && (node.classList.contains("ink-surface") || (omit.notes && node.dataset.textbox) || (omit.images && node.dataset.blockImage))),
+      !(node instanceof HTMLElement && (node.hasAttribute("data-pdf-background") || node.classList.contains("ink-surface") || (omit.notes && node.dataset.textbox) || (omit.images && node.dataset.blockImage))),
   });
   const ctx = canvas.getContext("2d")!;
   ctx.setTransform(canvas.width / PAGE_WIDTH, 0, 0, canvas.width / PAGE_WIDTH, 0, 0);
+  if (section.data.pdf) {
+    // Composite under DOM text boxes and ink, even for a page outside the viewport.
+    ctx.globalCompositeOperation = "destination-over";
+    ctx.drawImage(await pdfImage(section.data.pdf),0,0,PAGE_WIDTH,section.data.pdf.height);
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0,0,PAGE_WIDTH,height);
+    ctx.globalCompositeOperation = "source-over";
+  }
   paintStrokes(ctx, strokes);
   return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob failed"))), "image/png"));
 }
@@ -53,6 +61,7 @@ export async function sectionSource(section: SectionEntity, includeSolution = fa
   const d = section.data;
   const lines: string[] = [];
   const head = [d.title, d.marks != null ? `[${d.marks} marks]` : null].filter(Boolean).join(" ");
+  if (d.pdf) lines.push(`PDF: ${d.pdf.name}, page ${d.pdf.page}`, d.pdf.text);
   if (head) lines.push(`## ${head}`);
   for (const b of d.blocks) {
     if (b.type === "markdown") lines.push(b.text);

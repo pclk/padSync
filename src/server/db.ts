@@ -48,6 +48,7 @@ export function setSqlForTests(sql: Sql | null) {
 export async function migrate(sql: Sql) {
   // Cold starts pay for this, so on Neon it is one HTTP round trip rather than one per statement.
   const ddl = [
+    `create table if not exists notebook_pdfs (id text primary key, owner text not null, notebook_id text not null, object_key text not null unique, name text not null, size integer not null, page_count integer not null, sha256 text not null, upload_id text not null, ready boolean not null default false, created_at timestamptz not null default now())`,
     `create table if not exists sync_config (id integer primary key check(id=1), debounce_ms integer not null check(debounce_ms between 100 and 10000))`,
     `alter table sync_config add column if not exists visible_poll_ms integer not null default 2000 check(visible_poll_ms between 100 and 30000)`,
     `alter table sync_config add column if not exists hidden_poll_ms integer not null default ${DEFAULT_SYNC_CONFIG.hiddenPollMs} check(hidden_poll_ms between 0 and 120000)`,
