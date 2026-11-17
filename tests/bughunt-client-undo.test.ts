@@ -14,12 +14,16 @@ it("serializes overlapping undo and redo writes", async () => {
   const stack = new UndoStack();
   const calls: string[] = [];
   let release!: () => void;
-  stack.push({ label: "stroke", undo: async () => { calls.push("undo"); await new Promise<void>((r) => { release = r; }); }, redo: async () => { calls.push("redo"); } });
+  const gate = new Promise<void>((r) => (release = r));
+  stack.push({ label: "stroke", undo: async () => { calls.push("undo"); await gate; calls.push("undone"); }, redo: async () => { calls.push("redo"); } });
+  // Redo is requested while the undo write is still in flight.
   const undo = stack.undo();
-  await Promise.resolve();
   const redo = stack.redo();
+  await new Promise((r) => setTimeout(r, 0));
+  expect(calls).toEqual(["undo"]);
   release();
   await Promise.all([undo, redo]);
-  expect(calls).toEqual(["undo", "redo"]);
+  expect(calls).toEqual(["undo", "undone", "redo"]);
+  expect(await redo).toBe("stroke");
   expect(stack.canUndo).toBe(true);
 });
