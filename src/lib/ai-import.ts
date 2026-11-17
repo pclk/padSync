@@ -72,7 +72,7 @@ export function importJobBody(c: ImportConfig, files: BundleFile[], uploads: Upl
     notebookId: "",
     sectionId: null,
     agent: c.agent,
-    question: (c.request.trim() || "Make study material from the attached lecture notes, following the goals in request.md.").slice(0, 4000),
+    question: (c.request.trim() || "Make study material from the attached lecture notes, following the goals in request.md.").slice(0, 4000).replace(/[\uD800-\uDBFF]$/, ""),
     context: "",
     image: null,
     files,
