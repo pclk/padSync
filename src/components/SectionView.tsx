@@ -169,7 +169,7 @@ function BlockView({ block }: { block: Block }) {
       return (
         <figure className="my-3" style={{ width: `${(block.width ?? 0.6) * 100}%` }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={block.src} alt={block.alt ?? ""} className="w-full rounded" draggable={false} />
+          <img src={block.src} alt={block.alt ?? ""} data-block-image="1" className="w-full rounded" draggable={false} />
           {block.caption && <figcaption className="mt-1 text-sm text-slate-500">{block.caption}</figcaption>}
         </figure>
       );
@@ -262,6 +262,7 @@ function TextBox({ tb, editing, interactive, onEdit, onDone, zoom }: { tb: TextB
 
   return (
     <div
+      data-textbox="1"
       className={`textbox absolute z-10 rounded p-1 leading-snug ${interactive ? "cursor-move ring-1 ring-slate-300 hover:ring-blue-400" : "pointer-events-none"}`}
       style={style}
       onDoubleClick={onEdit}
@@ -326,6 +327,7 @@ function TextEditor({ tb, style, onDone }: { tb: TextBoxEntity; style: React.CSS
 
   return (
     <textarea
+      data-textbox="1"
       ref={ref}
       className="textbox-edit absolute z-20 resize-none rounded border border-blue-400 bg-white/90 p-1 leading-snug outline-none"
       style={style}

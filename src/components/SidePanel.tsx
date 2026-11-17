@@ -6,11 +6,14 @@ import { copySectionImage, sectionSource, sectionStats } from "@/lib/export";
 import { renderMarkdown } from "@/lib/markdown";
 import { useShowCopyButtons } from "@/lib/settings";
 import { insertSectionAfter, logEvent, setDeleted, swapSectionOrder } from "@/lib/store";
+import type { Selection } from "@/ink/controller";
 import type { PresenceEntity, SectionEntity } from "@/lib/types";
 import { AskPanel } from "./AskPanel";
 
 interface Props {
   notebookId: string;
+  notebookTitle: string;
+  selection: Selection | null;
   sections: SectionEntity[];
   current: SectionEntity | null;
   sectionEl: (id: string) => HTMLElement | undefined;
@@ -98,7 +101,7 @@ export function SidePanel(p: Props) {
               </button>
             </div>
           )}
-          <AskPanel key={current.id} notebookId={p.notebookId} section={current} sectionEl={() => p.sectionEl(current.id)} />
+          <AskPanel key={current.id} notebookId={p.notebookId} notebookTitle={p.notebookTitle} sections={p.sections} section={current} sectionEl={p.sectionEl} lasso={p.selection} />
 
           {stats && (
             <dl className="mt-4 grid grid-cols-3 gap-2 text-center">

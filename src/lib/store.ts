@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import { db, deviceId } from "./db";
 import { hlcNow, hlcObserve } from "./hlc";
+import { applyPatch, type SectionChange } from "./roundtrip";
 import { requestSync } from "./sync";
 import {
   SCREEN_HEIGHT,
@@ -128,3 +129,20 @@ export function liveChildren<T extends Entity>(sectionId: string, kind: EntityKi
 }
 
 export type { TextBoxEntity };
+
+/** Applies reviewed AI changes: patches existing sections, appends new ones. Never deletes. */
+export async function applyNotebookChanges(notebookId: string, changes: SectionChange[]) {
+  const sorted = await liveSections(notebookId);
+  const rows: Entity[] = [];
+  for (const c of changes) {
+    if (c.kind !== "update") continue;
+    const row = sorted.find((s) => s.id === c.id);
+    if (row) rows.push({ ...row, data: applyPatch(row.data, c.patch) });
+  }
+  let order = sorted.at(-1)?.data.order ?? 0;
+  const now = Date.now();
+  for (const c of changes) if (c.kind === "add") rows.push(newEntity<"section", SectionData>("section", notebookId, "", { ...c.data, order: ++order, createdAt: now }));
+  await putEntities(rows);
+  if (rows.length) await logEvent(notebookId, null, "ai_apply", { updated: changes.filter((c) => c.kind === "update").length, added: changes.filter((c) => c.kind === "add").length });
+  return rows.length;
+}

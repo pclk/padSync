@@ -105,10 +105,12 @@ export async function migrate(sql: Sql) {
       finished_at timestamptz
     )`,
     `alter table jobs add column if not exists options jsonb not null default '{}'::jsonb`,
+    `alter table jobs add column if not exists files jsonb`,
+    `alter table jobs add column if not exists result_files jsonb`,
     `create index if not exists jobs_queue_idx on jobs (status, created_at)`,
     `create index if not exists jobs_section_idx on jobs (section_id, created_at)`,
     // Jobs finished before image/context were dropped on completion (see jobs.ts).
-    `update jobs set image = null, context = '' where status in ('done', 'error', 'cancelled') and (image is not null or context <> '')`,
+    `update jobs set image = null, context = '', files = null where status in ('done', 'error', 'cancelled') and (image is not null or context <> '' or files is not null)`,
   ];
   if (sql.batch) await sql.batch(ddl);
   else for (const text of ddl) await sql.query(text);

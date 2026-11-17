@@ -422,6 +422,8 @@ function Editor({ notebookId }: { notebookId: string }) {
       {showPanel && (
         <SidePanel
           notebookId={notebookId}
+          notebookTitle={notebook.data.title}
+          selection={selection}
           sections={sections}
           current={current}
           sectionEl={(sid) => els.current.get(sid)}
