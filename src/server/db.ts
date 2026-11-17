@@ -163,7 +163,7 @@ export async function migrate(sql: Sql) {
     // Jobs finished before image/context were dropped on completion (see jobs.ts).
     `update jobs set image = null, context = '', files = null where status in ('done', 'error', 'cancelled') and (image is not null or context <> '' or files is not null)`,
     // Retain replay bytes only for the latest turn of a live thread.
-    `update jobs j set chat_files=null where thread_id is not null and
+    `update jobs j set chat_files=null where thread_id is not null and chat_files is not null and
       (not exists(select 1 from chat_threads t where t.id=j.thread_id and deleted_at is null)
        or turn < (select max(turn) from jobs where thread_id=j.thread_id))`,
     `delete from chat_input_parts p where not exists(

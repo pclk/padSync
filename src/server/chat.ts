@@ -255,7 +255,7 @@ export async function chatJobContext(sql: Sql, jobId: string) {
 async function pruneReplay(sql: Sql, key: string, deleted = false) {
   await sql.query(
     `update jobs set chat_files = null
-    where thread_id = $1 and ($2 or turn < (select max(turn) from jobs where thread_id = $1))`,
+    where thread_id = $1 and chat_files is not null and ($2 or turn <(select max(turn) from jobs where thread_id = $1))`,
     [key, deleted],
   );
   await sql.query(
