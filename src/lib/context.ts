@@ -58,6 +58,8 @@ export interface SectionInput {
   notes: string[];
   /** Latest write to the section, its ink or its text (ms). */
   lastActivity: number;
+  /** Full revision of the section and its ink/text (hlc strings, counts); for signatures only. */
+  revision?: string;
   render?: Raster | null;
   /** Why there is no render, when it was left out on purpose. */
   renderNote?: string;
@@ -127,23 +129,48 @@ export function slug(s: string | undefined, fallback = "section") {
 
 const IMAGE_EXT: Record<string, BundleMime> = { png: "image/png", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp" };
 
-/** Embedded `data:` images become files named by section id and block index, so a returned
- *  notebook.json that still points at them can be mapped back to the original image. */
-export function assetPath(sectionId: string, blockIndex: number, src: string): string | null {
-  const m = /^data:image\/(png|jpeg|gif|webp);base64,/.exec(src);
-  if (!m || !/^[A-Za-z0-9_-]{1,60}$/.test(sectionId)) return null;
-  return `assets/${sectionId}-${blockIndex}.${m[1] === "jpeg" ? "jpg" : m[1]}`;
+/** 53-bit string hash (cyrb53): synchronous, so the browser and tests agree without crypto.subtle. */
+export function contentHash(str: string) {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
 }
 
-/** Every asset path the current notebook could have exported, with its data URL. */
+/**
+ * Every image block gets a reference named by section id and a hash of its src. Embedded
+ * (`data:`) images are written under that path; remote ones only use it when images are excluded,
+ * so the URL itself isn't shared. A returned notebook.json that still points at a reference maps
+ * back to exactly that image, and to nothing if the image was replaced meanwhile.
+ */
+export function imageRef(sectionId: string, src: string): string | null {
+  if (!/^[A-Za-z0-9_-]{1,60}$/.test(sectionId)) return null;
+  const m = /^data:image\/(png|jpeg|gif|webp);base64,/.exec(src);
+  if (m) return `assets/${sectionId}-${contentHash(src)}.${m[1] === "jpeg" ? "jpg" : m[1]}`;
+  if (src.startsWith("https:")) return `assets/${sectionId}-${contentHash(src)}.url`;
+  return null;
+}
+
+/** The path an embedded image is written to, or null when it is not a file (remote, svg, …). */
+export function assetPath(sectionId: string, src: string): string | null {
+  const p = imageRef(sectionId, src);
+  return p && !p.endsWith(".url") ? p : null;
+}
+
+/** Every image reference the current notebook could have exported, with its src. */
 export function assetMap(sections: Pick<SectionInput, "id" | "data">[]): Map<string, string> {
   const map = new Map<string, string>();
   for (const s of sections)
-    s.data.blocks.forEach((b, i) => {
-      if (b.type !== "image") return;
-      const p = assetPath(s.id, i, b.src);
+    for (const b of s.data.blocks) {
+      if (b.type !== "image") continue;
+      const p = imageRef(s.id, b.src);
       if (p) map.set(p, b.src);
-    });
+    }
   return map;
 }
 
@@ -172,8 +199,9 @@ function blockMarkdown(b: Block, assetRef: string | null, imagesIncluded: boolea
   if (b.type === "divider") return "---";
   if (b.type === "image") {
     const cap = b.caption ? `\n\n_${b.caption}_` : "";
+    if (!imagesIncluded) return `[image: ${b.alt || "figure"}]${cap}`;
     if (!b.src.startsWith("data:")) return `![${b.alt ?? ""}](${b.src})${cap}`;
-    if (imagesIncluded && assetRef) return `![${b.alt ?? ""}](${assetRef})${cap}`;
+    if (assetRef) return `![${b.alt ?? ""}](${assetRef})${cap}`;
     return `[image: ${b.alt || "figure"}${imagesIncluded ? " (not included: size limit)" : ""}]${cap}`;
   }
   return null; // answer space
@@ -195,12 +223,13 @@ export function buildBundle(input: BundleInput, o: ContextOptions): Bundle {
   if (!sel) {
     if (o.images)
       for (const s of picked)
-        s.data.blocks.forEach((b, i) => {
-          const p = b.type === "image" ? assetPath(s.id, i, b.src) : null;
-          if (!p || b.type !== "image") return;
+        for (const b of s.data.blocks) {
+          const p = b.type === "image" ? assetPath(s.id, b.src) : null;
+          // The same image twice in a section is one file (paths must be unique).
+          if (!p || b.type !== "image" || binaries.some((x) => x.file.path === p)) continue;
           const mime = IMAGE_EXT[/^data:image\/(\w+)/.exec(b.src)![1]];
           binaries.push({ file: { path: p, mime, base64: b.src.slice(b.src.indexOf(",") + 1) }, tokens: 800, label: `image in section ${indexOf.get(s.id)! + 1}` });
-        });
+        }
     if (o.renders)
       for (const s of picked)
         if (s.render) binaries.push({ file: { path: renderPath(indexOf.get(s.id)!, s.data.title), mime: "image/png", base64: s.render.base64 }, tokens: imageTokens(s.render), label: `render of section ${indexOf.get(s.id)! + 1}` });
@@ -223,6 +252,8 @@ export function buildBundle(input: BundleInput, o: ContextOptions): Bundle {
       kept.add(b.file.path);
     } else skipped.push(`${b.label} (size limit)`);
   }
+  // A selection that is only an image must not go out as an empty shell.
+  if (sel && !sel.text?.trim() && !kept.has("selection.png")) return empty(`The selected area is too large to send (over ${kb(maxBytes)}). Lasso a smaller area.`);
   for (const s of picked) if (o.renders && !sel && !s.render) skipped.push(`render of section ${indexOf.get(s.id)! + 1} (${s.renderNote ?? "not on screen"})`);
 
   const files = [...textFiles(kept), ...binaries.filter((b) => kept.has(b.file.path)).map((b) => b.file)];
@@ -247,18 +278,20 @@ function notebookText(input: BundleInput, picked: SectionInput[], o: ContextOpti
     md.push(`<!-- ${meta.join(" · ")} -->`);
     const render = renderPath(i, d.title);
     if (kept.has(render)) md.push(`![Render of section ${i + 1}: the printed content plus my handwriting](${render})`);
-    d.blocks.forEach((b, bi) => {
-      const p = b.type === "image" ? assetPath(s.id, bi, b.src) : null;
+    for (const b of d.blocks) {
+      const p = b.type === "image" ? assetPath(s.id, b.src) : null;
       const text = blockMarkdown(b, p && kept.has(p) ? p : null, o.images);
       if (text != null && text.trim()) md.push(text);
-    });
+    }
     if (o.notes && s.notes.some((n) => n.trim())) md.push("### My typed notes", ...s.notes.filter((n) => n.trim()));
     if (o.solutions && d.solution) md.push("### Reference solution (hidden from student)", d.solution);
 
-    const blocks = d.blocks.map((b, bi) => {
+    const blocks = d.blocks.map((b) => {
       if (b.type !== "image") return b;
-      const p = assetPath(s.id, bi, b.src);
-      return p ? { ...b, src: p } : b; // the path is mapped back on return, so the JSON stays small
+      // Embedded images always travel as their reference (mapped back on return, keeps the JSON
+      // small); remote URLs only when images are included.
+      const ref = imageRef(s.id, b.src);
+      return ref && (b.src.startsWith("data:") || !o.images) ? { ...b, src: ref } : b;
     });
     json.sections.push({
       id: s.id,
@@ -325,11 +358,12 @@ export function kb(bytes: number) {
 }
 
 /**
- * Changes whenever anything the bundle depends on changes (any write to a section, its ink or its
- * text bumps lastActivity), so a previewed bundle is only sent while it is still current.
+ * Changes whenever anything the bundle depends on changes: any write to a section, its ink or its
+ * text gets a new hlc (full string, not just its millisecond), so a previewed bundle is only sent
+ * while it is still current.
  */
-export function bundleSignature(title: string, sections: Pick<SectionInput, "id" | "lastActivity">[], selectionKey: unknown, o: ContextOptions) {
-  return JSON.stringify([title, sections.map((s) => [s.id, s.lastActivity]), selectionKey ?? null, o]);
+export function bundleSignature(title: string, sections: Pick<SectionInput, "id" | "lastActivity" | "revision">[], selectionKey: unknown, o: ContextOptions) {
+  return JSON.stringify([title, sections.map((s) => [s.id, s.revision ?? s.lastActivity]), selectionKey ?? null, o]);
 }
 
 export interface AskRequest {

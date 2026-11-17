@@ -5,10 +5,17 @@ import { db } from "./db";
 import { liveChildren } from "./store";
 import { PAGE_WIDTH, type SectionEntity, type StrokeEntity, type TextBoxEntity } from "./types";
 
+export interface RenderOmit {
+  /** Leave typed text boxes out of the image. */
+  notes?: boolean;
+  /** Leave images embedded in the printed content out of the image. */
+  images?: boolean;
+}
+
 // Renders a section (content + typed text + ink) to a PNG, cropped to what is actually on it.
-export async function sectionPng(section: SectionEntity, sectionEl: HTMLElement, scale = 2): Promise<Blob> {
+export async function sectionPng(section: SectionEntity, sectionEl: HTMLElement, scale = 2, omit: RenderOmit = {}): Promise<Blob> {
   const strokes = await liveChildren<StrokeEntity>(section.id, "stroke");
-  const texts = await liveChildren<TextBoxEntity>(section.id, "textbox");
+  const texts = omit.notes ? [] : await liveChildren<TextBoxEntity>(section.id, "textbox");
   const content = sectionEl.querySelector<HTMLElement>(".section-content");
   let contentBottom = 0;
   if (content) {
@@ -26,7 +33,9 @@ export async function sectionPng(section: SectionEntity, sectionEl: HTMLElement,
     pixelRatio: scale,
     backgroundColor: "#ffffff",
     style: { boxShadow: "none" },
-    filter: (node) => !(node instanceof HTMLCanvasElement) && !(node instanceof HTMLElement && node.classList.contains("ink-surface")),
+    filter: (node) =>
+      !(node instanceof HTMLCanvasElement) &&
+      !(node instanceof HTMLElement && (node.classList.contains("ink-surface") || (omit.notes && node.dataset.textbox) || (omit.images && node.dataset.blockImage))),
   });
   const ctx = canvas.getContext("2d")!;
   ctx.setTransform(canvas.width / PAGE_WIDTH, 0, 0, canvas.width / PAGE_WIDTH, 0, 0);
