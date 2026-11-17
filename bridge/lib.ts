@@ -5,7 +5,7 @@
 import { spawn } from "node:child_process";
 import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, extname, join, relative, resolve, sep } from "node:path";
 
 export type Agent = "claude" | "codex";
 export const AGENTS: Agent[] = ["claude", "codex"];
@@ -17,6 +17,18 @@ export interface JobOptions {
   model?: string;
   effort?: string;
   webSearch?: boolean;
+  /** The agent may write changed copies into out/. */
+  allowEdits?: boolean;
+  /** Claude also gets Bash, in Claude Code's sandbox. */
+  allowCode?: boolean;
+}
+
+/** A file of the job's context bundle (src/lib/context.ts), or one the agent wrote to out/. */
+export interface JobFile {
+  path: string;
+  mime: string;
+  text?: string;
+  base64?: string;
 }
 
 export interface ClaimedJob {
@@ -28,6 +40,8 @@ export interface ClaimedJob {
   options?: JobOptions;
   context: string;
   image: string | null;
+  /** When present, the job's inputs; context and image are then ignored. */
+  files?: JobFile[];
 }
 
 export interface BridgeConfig {
@@ -95,19 +109,52 @@ export const JOB_DIR_PREFIX = "padsync-job-";
 export const IMAGE_FILE = "section.png";
 export const CONTEXT_FILE = "context.md";
 
+export const OUT_DIR = "out";
+/** Same rule as the server (src/lib/context.ts BUNDLE_PATH_RE): one optional folder, no leading dot. */
+export const BUNDLE_PATH_RE = /^(?:[A-Za-z0-9][A-Za-z0-9._-]{0,63}\/)?[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
+/** What may come back from out/ (src/server/jobs.ts resultFilesSchema). */
+export const MAX_RESULT_FILES = 20;
+export const MAX_RESULT_BYTES = 2_000_000;
+
 export interface JobDir {
   dir: string;
   /** Absolute paths of the inputs that exist for this job. */
   image?: string;
   context?: string;
+  /** Bundle jobs: the input files (relative to dir) and the empty folder for changed copies. */
+  files?: { path: string; mime: string }[];
+  out?: string;
+}
+
+/** Resolves a bundle path inside `dir`, or throws: nothing from a job may land outside it. */
+export function safeJoin(dir: string, path: string) {
+  if (!BUNDLE_PATH_RE.test(path)) throw new Error(`unsafe file name in job: ${JSON.stringify(path.slice(0, 120))}`);
+  const full = resolve(dir, path);
+  const rel = relative(dir, full);
+  if (!rel || rel.startsWith("..") || rel.split(sep).includes("..")) throw new Error(`file escapes the job folder: ${path}`);
+  return full;
 }
 
 /** Creates a fresh 0700 directory under `root` holding the job's inputs. Removes it again on failure. */
-export async function prepareJobDir(job: Pick<ClaimedJob, "image" | "context">, root: string = tmpdir()): Promise<JobDir> {
+export async function prepareJobDir(job: Pick<ClaimedJob, "image" | "context" | "files">, root: string = tmpdir()): Promise<JobDir> {
   // realpath: macOS tmpdir() is behind the /var -> /private/var symlink; give agents the real path.
   const dir = await realpath(await mkdtemp(join(root, JOB_DIR_PREFIX)));
   try {
     const out: JobDir = { dir };
+    if (job.files?.length) {
+      out.files = [];
+      for (const f of job.files) {
+        if (f.path.split("/")[0] === OUT_DIR) throw new Error("job inputs may not be in out/");
+        const full = safeJoin(dir, f.path);
+        await mkdir(dirname(full), { recursive: true, mode: 0o700 });
+        const body = f.base64 !== undefined ? Buffer.from(f.base64, "base64") : (f.text ?? "");
+        await writeFile(full, body, { mode: 0o600, flag: "wx" }); // wx: never overwrite or follow a link
+        out.files.push({ path: f.path, mime: f.mime });
+      }
+      out.out = join(dir, OUT_DIR);
+      await mkdir(out.out, { mode: 0o700 });
+      return out;
+    }
     if (job.image) {
       out.image = join(dir, IMAGE_FILE);
       await writeFile(out.image, decodePngDataUrl(job.image), { mode: 0o600, flag: "wx" });
@@ -134,7 +181,7 @@ export async function removeJobDir(dir: string): Promise<boolean> {
 }
 
 /** Runs `fn` with the job's inputs on disk and always removes them afterwards, even if `fn` throws. */
-export async function withJobDir<T>(job: Pick<ClaimedJob, "image" | "context">, fn: (d: JobDir) => Promise<T>, root?: string): Promise<T> {
+export async function withJobDir<T>(job: Pick<ClaimedJob, "image" | "context" | "files">, fn: (d: JobDir) => Promise<T>, root?: string): Promise<T> {
   const d = await prepareJobDir(job, root);
   try {
     return await fn(d);
@@ -158,6 +205,123 @@ export async function sweepStaleJobDirs(maxAgeMs: number, root: string = tmpdir(
     if (await removeJobDir(path)) removed++;
   }
   return removed;
+}
+
+const MIME_BY_EXT: Record<string, string> = {
+  ".md": "text/markdown", ".markdown": "text/markdown", ".json": "application/json",
+  ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp",
+  ".pdf": "application/pdf",
+};
+const isBinary = (mime: string) => mime.startsWith("image/") || mime === "application/pdf";
+
+export interface CollectedFiles {
+  files: JobFile[];
+  /** Files left behind, with why. */
+  skipped: string[];
+}
+
+/**
+ * Reads what the agent wrote to out/: regular files only (symlinks are not followed), at most one
+ * folder deep, safe names, text that is valid UTF-8, within the count and size caps.
+ */
+export async function collectOutFiles(outDir: string): Promise<CollectedFiles> {
+  const files: JobFile[] = [];
+  const skipped: string[] = [];
+  let total = 0;
+  const visit = async (rel: string, depth: number) => {
+    const names = (await readdir(join(outDir, rel)).catch(() => [] as string[])).sort();
+    for (const name of names) {
+      const path = rel ? `${rel}/${name}` : name;
+      const st = await lstat(join(outDir, path)).catch(() => null);
+      if (!st) continue;
+      if (st.isDirectory()) {
+        if (depth === 0 && BUNDLE_PATH_RE.test(name)) await visit(path, 1);
+        else skipped.push(`${path}/ (folders can be one level deep)`);
+        continue;
+      }
+      if (!st.isFile()) {
+        skipped.push(`${path} (not a regular file)`);
+        continue;
+      }
+      if (!BUNDLE_PATH_RE.test(path)) {
+        skipped.push(`${path} (unsupported file name)`);
+        continue;
+      }
+      if (files.length >= MAX_RESULT_FILES) {
+        skipped.push(`${path} (more than ${MAX_RESULT_FILES} files)`);
+        continue;
+      }
+      // Cheap size check before reading: base64 grows by 4/3.
+      if (total + st.size > MAX_RESULT_BYTES) {
+        skipped.push(`${path} (over the ${MAX_RESULT_BYTES / 1_000_000} MB total)`);
+        continue;
+      }
+      const mime = MIME_BY_EXT[extname(name).toLowerCase()] ?? "text/plain";
+      const buf = await readFile(join(outDir, path));
+      let file: JobFile;
+      if (isBinary(mime)) file = { path, mime, base64: buf.toString("base64") };
+      else {
+        try {
+          file = { path, mime, text: new TextDecoder("utf-8", { fatal: true }).decode(buf) };
+        } catch {
+          skipped.push(`${path} (binary file)`);
+          continue;
+        }
+      }
+      const size = (file.text?.length ?? 0) + (file.base64?.length ?? 0);
+      if (total + size > MAX_RESULT_BYTES) {
+        skipped.push(`${path} (over the ${MAX_RESULT_BYTES / 1_000_000} MB total)`);
+        continue;
+      }
+      total += size;
+      files.push(file);
+    }
+  };
+  await visit("", 0);
+  return { files, skipped };
+}
+
+/** Images Codex gets attached with --image (it cannot view a file it was only told about). */
+export function attachedImages(files: JobDir["files"]): string[] {
+  return (files ?? []).filter((f) => f.mime === "image/png" || f.mime === "image/jpeg").map((f) => f.path).slice(0, 8);
+}
+
+const FILE_ROLES: [RegExp, string][] = [
+  [/^README\.md$/, "what each file is and how to return changes; read it first"],
+  [/^notebook\.md$/, "the chosen sections: printed content, my typed notes, and possibly reference solutions I have NOT seen"],
+  [/^notebook\.json$/, "the same sections in padSync's format, with ids"],
+  [/^selection\.md$/, "the part of the notebook I selected"],
+  [/^selection\.png$/, "an image of the selected area, with my handwriting"],
+  [/^renders\//, "a render of a section: printed content plus my handwriting"],
+  [/^assets\//, "an image embedded in a section"],
+];
+
+/** Prompt for a bundle job: names the files by absolute path; never includes their content. */
+export function buildBundlePrompt(question: string, d: Pick<JobDir, "dir" | "files" | "out">, agent: Agent, options: JobOptions = {}) {
+  const attached = new Set(agent === "codex" ? attachedImages(d.files) : []);
+  const list = (d.files ?? []).map((f) => {
+    const role = FILE_ROLES.find(([re]) => re.test(f.path))?.[1] ?? "input";
+    return "- `" + join(d.dir, f.path) + "`: " + role + (attached.has(f.path) ? " (also attached)" : "");
+  });
+  const edits = options.allowEdits && d.out;
+  return [
+    "You are helping me (a university student) with work from my iPad notebook in padSync.",
+    `The material is in files in your working directory \`${d.dir}\`:\n${list.join("\n")}\n` +
+      "Use your file tools to read what you need before answering. The files are not repeated in this message.",
+    `My question:\n${question}`,
+    [
+      "Guidelines:",
+      "- Answer the question directly and refer to specific parts of my work.",
+      "- If a reference solution is provided, use it to check me, but do not reveal it in full unless I ask for the solution. Point to the first mistake and give a hint instead.",
+      "- Format with Markdown; write maths in LaTeX using $...$ and $$...$$.",
+      edits
+        ? "- If my request needs changes to the material, do not edit the files in place: write changed copies to `" + d.out + "/` under the same relative path (e.g. `" + d.out + "/notebook.json`, keeping each section's id). Put any other files you make there too, and say in your answer what you wrote. Write nothing outside that folder."
+        : "- Do not create or modify any files.",
+      options.allowCode && agent === "claude" ? "- You may run code (e.g. to check a calculation) with Bash in this folder." : null,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  ].join("\n\n");
 }
 
 export function buildAgentPrompt(question: string, files: Omit<JobDir, "dir">, agent: Agent = "claude") {
@@ -269,14 +433,29 @@ export function cleanOptions(agent: Agent, o: JobOptions = {}): JobOptions {
     model: typeof o.model === "string" && MODEL_RE.test(o.model) ? o.model : undefined,
     effort: effort && EFFORTS[agent].includes(effort) ? effort : undefined,
     webSearch: o.webSearch === true,
+    allowEdits: o.allowEdits === true,
+    allowCode: o.allowEdits === true && o.allowCode === true,
   };
 }
 
-export function agentCommand(agent: Agent, cfg: Pick<BridgeConfig, "claudeBin" | "codexBin">, hasImage: boolean, options?: JobOptions): AgentCommand {
+/** Claude Code's own sandbox for Bash (Seatbelt on macOS): commands can't write outside the cwd. */
+export const CLAUDE_SANDBOX_SETTINGS = JSON.stringify({ sandbox: { enabled: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false } });
+
+/**
+ * `images`: true for a legacy job's section.png, or the relative paths Codex should get attached.
+ * Edits stay inside the job folder: Claude via acceptEdits (cwd only), Codex via workspace-write.
+ */
+export function agentCommand(agent: Agent, cfg: Pick<BridgeConfig, "claudeBin" | "codexBin">, images: boolean | string[], options?: JobOptions): AgentCommand {
   const o = cleanOptions(agent, options);
   if (agent === "claude") {
     const web = o.webSearch ? ["WebSearch", "WebFetch"] : [];
-    const denied = ["Bash", "Edit", "Write", "NotebookEdit", ...(o.webSearch ? [] : ["WebFetch", "WebSearch"])];
+    const edit = o.allowEdits ? ["Write", "Edit"] : [];
+    const code = o.allowCode ? ["Bash"] : [];
+    const tools = ["Read", ...(o.allowEdits ? ["Glob", "Grep"] : []), ...edit, ...code, ...web];
+    // Write/Edit are available but not pre-approved: acceptEdits approves them inside the cwd only,
+    // and anything outside would need a prompt, which print mode denies.
+    const allowed = tools.filter((t) => !edit.includes(t));
+    const denied = ["Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch"].filter((t) => !tools.includes(t));
     return {
       bin: cfg.claudeBin ?? "claude",
       // Restrict built-in tools and ignore ambient MCP servers. Prompt arrives on stdin.
@@ -284,18 +463,21 @@ export function agentCommand(agent: Agent, cfg: Pick<BridgeConfig, "claudeBin" |
         "-p", "--output-format", "stream-json", "--verbose",
         ...(o.model ? ["--model", o.model] : []),
         ...(o.effort ? ["--effort", o.effort] : []),
-        "--tools", ["Read", ...web].join(","), "--strict-mcp-config",
-        "--allowedTools", "Read", ...web,
+        ...(o.allowEdits ? ["--permission-mode", "acceptEdits"] : []),
+        ...(o.allowCode ? ["--settings", CLAUDE_SANDBOX_SETTINGS] : []),
+        "--tools", tools.join(","), "--strict-mcp-config",
+        "--allowedTools", ...allowed,
         "--disallowedTools", ...denied,
       ],
       parse: parseClaudeLine,
     };
   }
   // --search is a top-level codex flag, so it goes before `exec`.
-  const args = [...(o.webSearch ? ["--search"] : []), "exec", "--json", "--skip-git-repo-check", "--sandbox", "read-only", "--output-last-message", "final.md"];
+  const sandbox = o.allowEdits ? "workspace-write" : "read-only";
+  const args = [...(o.webSearch ? ["--search"] : []), "exec", "--json", "--skip-git-repo-check", "--sandbox", sandbox, "--output-last-message", "final.md"];
   if (o.model) args.push("--model", o.model);
   if (o.effort) args.push("-c", `model_reasoning_effort="${o.effort}"`);
-  if (hasImage) args.push("--image", IMAGE_FILE);
+  for (const img of images === true ? [IMAGE_FILE] : images || []) args.push("--image", img);
   return { bin: cfg.codexBin ?? "codex", args, parse: parseCodexLine, finalFile: "final.md" };
 }
 
@@ -482,7 +664,7 @@ export class BridgeApi {
     return this.call<{ job: ClaimedJob | null }>("POST", "/api/bridge/claim", { agents, info });
   }
 
-  update(jobId: string, u: { output?: string; status?: "done" | "error"; error?: string }, opts?: { signal?: AbortSignal; timeoutMs?: number }) {
+  update(jobId: string, u: { output?: string; status?: "done" | "error"; error?: string; files?: JobFile[] }, opts?: { signal?: AbortSignal; timeoutMs?: number }) {
     return this.call<{ status: string; cancelled: boolean }>("POST", `/api/bridge/jobs/${encodeURIComponent(jobId)}`, { ...u, ...(u.output === undefined ? {} : { output: u.output.slice(0, MAX_OUTPUT) }) }, opts);
   }
 }

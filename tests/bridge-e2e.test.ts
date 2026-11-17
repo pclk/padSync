@@ -13,6 +13,8 @@ import { POST as cancelRoute } from "@/app/api/jobs/[id]/cancel/route";
 import { GET as getJobRoute } from "@/app/api/jobs/[id]/route";
 import { POST as createJobRoute } from "@/app/api/jobs/route";
 import { getSql } from "@/server/db";
+import { DEFAULT_CONTEXT, buildBundle } from "@/lib/context";
+import { parseReturnedNotebook } from "@/lib/roundtrip";
 import { createDeviceToken } from "@/server/tokens";
 import { PNG_DATA_URL, configureAuthEnv, freshDb, params, req, sessionCookie } from "./helpers/env";
 
@@ -29,6 +31,21 @@ const sawContext = fs.existsSync("context.md") && fs.readFileSync("context.md", 
 const byPath = prompt.includes("\`" + process.cwd() + "/section.png\`") && !prompt.includes("base64");
 const out = (o) => process.stdout.write(JSON.stringify(o) + "\\n");
 out({ type: "system", subtype: "init" });
+if (fs.existsSync("notebook.json")) {
+  // Bundle job: edit a copy into out/, as the prompt asks. Also try to smuggle a link out.
+  if (prompt.includes("FAIL")) { console.error("agent blew up"); process.exit(3); }
+  const nb = JSON.parse(fs.readFileSync("notebook.json", "utf8"));
+  nb.sections[0].title = "Edited by AI";
+  nb.sections.push({ title: "Extra practice", blocks: [{ type: "markdown", text: "Try $x^2$." }] });
+  fs.writeFileSync("out/notebook.json", JSON.stringify(nb));
+  fs.writeFileSync("out/notes.md", "# Summary");
+  fs.symlinkSync("/etc/hosts", "out/link.md");
+  const tools = process.argv[process.argv.indexOf("--tools") + 1];
+  const listed = prompt.includes("\`" + process.cwd() + "/notebook.md\`") && !prompt.includes("Edited") && !prompt.includes("Evaluate");
+  if (prompt.includes("HANG")) await new Promise((r) => setTimeout(r, 60000));
+  out({ type: "result", subtype: "success", is_error: false, result: "tools=" + tools + " listed=" + listed + " mode=" + process.argv[process.argv.indexOf("--permission-mode") + 1] });
+  process.exit(0);
+}
 out({ type: "assistant", message: { content: [{ type: "text", text: "Checking line 3" }] } });
 if (prompt.includes("HANG")) await new Promise((r) => setTimeout(r, 60000));
 await new Promise((r) => setTimeout(r, 4000)); // long enough to observe a progress flush
@@ -78,9 +95,15 @@ async function ask(question: string) {
   return ((await res.json()) as { job: { id: string } }).job.id;
 }
 
+async function askBundle(question: string, files: unknown[]) {
+  const res = await createJobRoute(req("/api/jobs", { body: { notebookId: "nb", sectionId: "s", agent: "claude", question, files, options: { allowEdits: true } }, session }));
+  expect(res.status).toBe(201);
+  return ((await res.json()) as { job: { id: string } }).job.id;
+}
+
 async function job(id: string) {
   const res = await getJobRoute(req(`/api/jobs/${id}`, { session }), params({ id }));
-  return ((await res.json()) as { job: { status: string; output: string; error: string | null } }).job;
+  return ((await res.json()) as { job: { status: string; output: string; error: string | null; resultFiles: { path: string; text?: string }[] } }).job;
 }
 
 async function waitFor<T>(fn: () => Promise<T>, ok: (v: T) => boolean, ms = 15_000): Promise<T> {
@@ -211,5 +234,48 @@ describe("bridge end to end", () => {
     const code = await new Promise<number | null>((r) => bridge!.on("exit", r));
     expect(code).toBe(2);
     expect(logs).toContain("device token was rejected");
+  });
+  describe("context bundles", () => {
+    const files = () => {
+      const sections = [{ id: "s1", data: { order: 1, title: "Q1", blocks: [{ type: "markdown", text: "Evaluate $x$" }], template: "plain", minHeight: 500, createdAt: 0 } }];
+      const b = buildBundle({ title: "NB", sections: sections.map((s) => ({ ...s, notes: [], lastActivity: 0, render: { base64: PNG_DATA_URL.split(",")[1], width: 1, height: 1 } })) as never }, DEFAULT_CONTEXT);
+      return { b, sections };
+    };
+
+    it("writes the bundle to the temp dir, returns the agent's out/ copies, and removes the dir", async () => {
+      await startBridge();
+      const { b, sections } = files();
+      const id = await askBundle("Rename Q1", b.files);
+      const done = await waitFor(() => job(id), (j) => j.status === "done");
+      expect(done.output).toContain("tools=Read,Glob,Grep,Write,Edit listed=true mode=acceptEdits");
+      expect(done.output).toContain("link.md (not a regular file)");
+      expect(done.resultFiles.map((f) => f.path).sort()).toEqual(["notebook.json", "notes.md"]);
+      const nb = done.resultFiles.find((f) => f.path === "notebook.json")!;
+      const parsed = parseReturnedNotebook(nb.text!, sections as never);
+      expect(parsed.problems).toEqual([]);
+      expect(parsed.changes.map((c) => c.kind)).toEqual(["update", "add"]);
+      expect(parsed.changes[0]).toMatchObject({ kind: "update", id: "s1", fields: ["title"], patch: { title: "Edited by AI" } });
+      expect(await leftovers()).toEqual([]);
+    });
+
+    it("returns no files and removes the dir when the agent fails", async () => {
+      await startBridge();
+      const id = await askBundle("FAIL now", files().b.files);
+      const done = await waitFor(() => job(id), (j) => j.status === "error");
+      expect(done.error).toMatch(/exited with code 3/);
+      expect(done.resultFiles).toEqual([]);
+      await waitFor(leftovers, (l) => l.length === 0);
+    });
+
+    it("removes the dir when a bundle job is cancelled", async () => {
+      await startBridge();
+      const id = await askBundle("HANG please", files().b.files);
+      await waitFor(() => job(id), (j) => j.status === "running");
+      await waitFor(leftovers, (l) => l.length === 1);
+      await cancelRoute(req(`/api/jobs/${id}/cancel`, { method: "POST", session }), params({ id }));
+      await waitFor(async () => logs, (l) => l.includes("cancelled by user"));
+      await waitFor(leftovers, (l) => l.length === 0);
+      expect((await job(id)).resultFiles).toEqual([]);
+    });
   });
 });

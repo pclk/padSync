@@ -19,8 +19,11 @@ import {
   BridgeApi,
   LAUNCHD_LABEL,
   agentCommand,
+  attachedImages,
   buildAgentPrompt,
+  buildBundlePrompt,
   cleanOptions,
+  collectOutFiles,
   configPath,
   launchdPlist,
   loadConfig,
@@ -33,6 +36,7 @@ import {
   type Agent,
   type BridgeConfig,
   type ClaimedJob,
+  type JobFile,
 } from "./lib.ts";
 
 const VERSION = "0.1.0";
@@ -113,7 +117,7 @@ function reportStopped(api: BridgeApi, jobId: string, output = "") {
 
 async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
   const o = cleanOptions(job.agent, job.options);
-  const how = [o.model, o.effort && `effort ${o.effort}`, o.webSearch && "web search"].filter(Boolean).join(", ");
+  const how = [o.model, o.effort && `effort ${o.effort}`, o.webSearch && "web search", o.allowEdits && "edits", o.allowCode && "code", job.files?.length && `${job.files.length} files`].filter(Boolean).join(", ");
   log(`job ${job.id} (${job.agent}${how ? `: ${how}` : ""}): ${job.question.slice(0, 80)}`);
   const abort = new AbortController();
   const onShutdown = () => abort.abort();
@@ -148,16 +152,30 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
   }, FLUSH_MS);
 
   try {
-    const result = await withJobDir(job, (files) =>
-      runAgent({
-        cwd: files.dir,
-        prompt: buildAgentPrompt(job.question, files, job.agent),
-        command: agentCommand(job.agent, cfg, !!files.image, job.options),
+    // Inputs and the agent's out/ share the job folder, so withJobDir's clean-up covers both,
+    // whether the agent succeeds, fails, times out or is cancelled.
+    const { result, files } = await withJobDir(job, async (d) => {
+      const bundle = !!d.files;
+      // Only bundle jobs have an out/ to write to; a legacy job stays read-only whatever it asks.
+      const runOpts = bundle ? o : { ...o, allowEdits: false, allowCode: false };
+      const result = await runAgent({
+        cwd: d.dir,
+        prompt: bundle ? buildBundlePrompt(job.question, d, job.agent, runOpts) : buildAgentPrompt(job.question, d, job.agent),
+        command: agentCommand(job.agent, cfg, bundle ? attachedImages(d.files) : !!d.image, runOpts),
         timeoutMs: JOB_TIMEOUT_MS,
         onText: (t) => (latest = t),
         signal: abort.signal,
-      }),
-    );
+      });
+      let files: JobFile[] = [];
+      if (result.status === "done" && d.out && runOpts.allowEdits) {
+        // A failure here must not cost the answer.
+        const got = await collectOutFiles(d.out).catch((e: Error) => ({ files: [] as JobFile[], skipped: [`all files (${e.message})`] }));
+        files = got.files;
+        if (got.skipped.length) result.output += `\n\n_Not returned from out/: ${got.skipped.join("; ")}._`;
+        if (files.length) log(`job ${job.id} returned ${files.length} file(s)`);
+      }
+      return { result, files };
+    });
     clearInterval(ticker);
     await flushing;
     if (result.status === "cancelled") {
@@ -165,7 +183,16 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
       if (shutdown.signal.aborted) await reportStopped(api, job.id, result.output);
       return;
     }
-    await api.update(job.id, result.status === "done" ? { output: result.output, status: "done" } : { output: result.output, status: "error", error: result.error });
+    if (result.status !== "done") await api.update(job.id, { output: result.output, status: "error", error: result.error });
+    else if (!files.length) await api.update(job.id, { output: result.output, status: "done" });
+    else {
+      // Keep the answer even if padSync refuses the files (e.g. an older server).
+      await api.update(job.id, { output: result.output, status: "done", files }).catch((e) => {
+        if (!(e instanceof ApiError) || e.status !== 400) throw e;
+        log(`job ${job.id}: server refused the returned files: ${e.message}`);
+        return api.update(job.id, { output: `${result.output}\n\n_The files the agent wrote could not be returned: ${e.message}_`, status: "done" });
+      });
+    }
     log(`job ${job.id} ${result.status}${result.error ? `: ${result.error}` : ""}`);
   } catch (e) {
     log(`job ${job.id} failed: ${(e as Error).message}`);
