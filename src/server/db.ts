@@ -107,10 +107,23 @@ export async function migrate(sql: Sql) {
     `alter table jobs add column if not exists options jsonb not null default '{}'::jsonb`,
     `alter table jobs add column if not exists files jsonb`,
     `alter table jobs add column if not exists result_files jsonb`,
+    `alter table jobs add column if not exists kind text not null default 'ask'`,
+    `alter table jobs add column if not exists uploads jsonb`,
+    `
+    create table if not exists job_inputs (
+      job_id text not null,
+      path text not null,
+      part integer not null,
+      data text not null,
+      primary key (job_id, path, part)
+    )`,
     `create index if not exists jobs_queue_idx on jobs (status, created_at)`,
     `create index if not exists jobs_section_idx on jobs (section_id, created_at)`,
     // Jobs finished before image/context were dropped on completion (see jobs.ts).
     `update jobs set image = null, context = '', files = null where status in ('done', 'error', 'cancelled') and (image is not null or context <> '' or files is not null)`,
+    // Imports abandoned mid-upload (tab closed), and parts left by jobs that already finished.
+    `update jobs set status = 'cancelled', finished_at = now(), updated_at = now(), files = null where status = 'uploading' and updated_at < now() - interval '1 day'`,
+    `delete from job_inputs where job_id not in (select id from jobs where status in ('uploading', 'queued', 'running'))`,
   ];
   if (sql.batch) await sql.batch(ddl);
   else for (const text of ddl) await sql.query(text);

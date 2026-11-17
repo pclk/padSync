@@ -8,8 +8,9 @@ export async function GET(req: NextRequest) {
   if (auth instanceof Response) return auth;
   const sectionId = req.nextUrl.searchParams.get("sectionId") ?? undefined;
   const notebookId = req.nextUrl.searchParams.get("notebookId") ?? undefined;
-  if (!sectionId && !notebookId) return Response.json({ error: "sectionId or notebookId required" }, { status: 400 });
-  const [jobs, bridgeSeenAt] = await Promise.all([listJobs(auth.sql, { sectionId, notebookId }), lastBridgeActivity(auth.sql)]);
+  const kind = req.nextUrl.searchParams.get("kind") === "import" ? "import" : undefined;
+  if (!sectionId && !notebookId && !kind) return Response.json({ error: "sectionId, notebookId or kind=import required" }, { status: 400 });
+  const [jobs, bridgeSeenAt] = await Promise.all([listJobs(auth.sql, { sectionId, notebookId, kind }), lastBridgeActivity(auth.sql)]);
   return Response.json({ jobs, bridgeSeenAt });
 }
 

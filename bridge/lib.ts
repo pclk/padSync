@@ -32,8 +32,18 @@ export interface JobFile {
   base64?: string;
 }
 
+/** A large input declared by the job and fetched in base64 parts (src/lib/uploads.ts). */
+export interface UploadSpec {
+  path: string;
+  mime: string;
+  size: number;
+  parts: number;
+}
+
 export interface ClaimedJob {
   id: string;
+  /** "import": make a padSync notebook from the attached lecture files. Default "ask". */
+  kind?: "ask" | "import";
   notebookId: string;
   sectionId: string | null;
   agent: Agent;
@@ -43,6 +53,8 @@ export interface ClaimedJob {
   image: string | null;
   /** When present, the job's inputs; context and image are then ignored. */
   files?: JobFile[];
+  /** Inputs too large for the claim response; fetch them with fetchUploads. */
+  uploads?: UploadSpec[];
 }
 
 export interface BridgeConfig {
@@ -320,6 +332,10 @@ export function attachedImages(files: JobDir["files"]): string[] {
 }
 
 const FILE_ROLES: [RegExp, string][] = [
+  [/^INSTRUCTIONS\.md$/, "the padSync format and how to use it; read it first and follow it exactly"],
+  [/^request\.md$/, "what I asked for, and the original names of the attached files"],
+  [/^lectures\/.*\.(pptx|docx)$/, "lecture material (an Office file: a zip of XML; extract its text and images with a command)"],
+  [/^lectures\//, "lecture material"],
   [/^README\.md$/, "what each file is and how to return changes; read it first"],
   [/^notebook\.md$/, "the chosen sections: printed content, my typed notes, and possibly reference solutions I have NOT seen"],
   [/^notebook\.json$/, "the same sections in padSync's format, with ids"],
@@ -354,6 +370,38 @@ export function buildBundlePrompt(question: string, d: Pick<JobDir, "dir" | "fil
     ]
       .filter(Boolean)
       .join("\n"),
+  ].join("\n\n");
+}
+
+export const IMPORT_RESULT = "padsync.json";
+export const IMPORT_FIGURES = "figures";
+
+/** Prompt for an import job: read the lecture files and INSTRUCTIONS.md, write out/padsync.json. */
+export function buildImportPrompt(question: string, d: Pick<JobDir, "dir" | "files" | "out">, agent: Agent, options: JobOptions = {}) {
+  const attached = new Set(agent === "codex" ? attachedImages(d.files) : []);
+  const files = d.files ?? [];
+  const list = files.map((f) => {
+    const role = FILE_ROLES.find(([re]) => re.test(f.path))?.[1] ?? "input";
+    return "- `" + join(d.dir, f.path) + "`: " + role + (attached.has(f.path) ? " (also attached)" : "");
+  });
+  const out = d.out ?? join(d.dir, OUT_DIR);
+  const canRun = agent === "codex" || options.allowCode === true;
+  const office = files.some((f) => /\.(pptx|docx)$/.test(f.path));
+  return [
+    "You are preparing study material for me (a university student) in padSync, an iPad app where I write with an Apple Pencil on top of what you make.",
+    `The material is in files in your working directory \`${d.dir}\`:\n${list.join("\n")}\n` +
+      "Use your file tools to read all of it (every page of PDFs, every image and slide) before you start. The files are not repeated in this message." +
+      (agent === "codex" ? " If you cannot read a PDF directly, extract its text with a command (e.g. `pdftotext -layout`, or Python)." : "") +
+      (office && !canRun ? " Office files (.pptx/.docx) need a command to extract, which you may not run here: say so in your answer if you could not read one." : ""),
+    `My request:\n${question}`,
+    [
+      "What to produce:",
+      "- ONE JSON object in the format described in INSTRUCTIONS.md, written to `" + join(out, IMPORT_RESULT) + "`. Do not paste the JSON into your reply.",
+      "- To include a figure from the material, save it as PNG or JPEG under `" + join(out, IMPORT_FIGURES) + "/` and reference it as \"" + IMPORT_FIGURES + "/<name>.png\" in an image block.",
+      "- Do not modify the input files, and write nothing outside `" + out + "/`.",
+      canRun ? "- Before finishing, check that the file parses as JSON (e.g. `python3 -m json.tool` or `node -e`)." : "- Double-check the JSON escaping (backslashes in LaTeX) before finishing.",
+      "- Then reply with a short summary: the sections you made, and anything you could not read.",
+    ].join("\n"),
   ].join("\n\n");
 }
 
@@ -697,7 +745,38 @@ export class BridgeApi {
     return this.call<{ job: ClaimedJob | null }>("POST", "/api/bridge/claim", { agents, info });
   }
 
+  input(jobId: string, path: string, part: number, opts?: { signal?: AbortSignal }) {
+    return this.call<{ data: string }>("GET", `/api/bridge/jobs/${encodeURIComponent(jobId)}/inputs?path=${encodeURIComponent(path)}&part=${part}`, undefined, { ...opts, timeoutMs: 120_000 });
+  }
+
   update(jobId: string, u: { output?: string; status?: "done" | "error"; error?: string; files?: JobFile[] }, opts?: { signal?: AbortSignal; timeoutMs?: number }) {
     return this.call<{ status: string; cancelled: boolean }>("POST", `/api/bridge/jobs/${encodeURIComponent(jobId)}`, { ...u, ...(u.output === undefined ? {} : { output: u.output.slice(0, MAX_OUTPUT) }) }, opts);
   }
+}
+
+/**
+ * Fetches a job's declared uploads part by part and returns them as ordinary job files, so they go
+ * through prepareJobDir like any other input. Each part and file must be exactly its declared size.
+ */
+export async function fetchUploads(api: Pick<BridgeApi, "input">, job: Pick<ClaimedJob, "id" | "uploads">, signal?: AbortSignal, onProgress?: (done: number, total: number) => void): Promise<JobFile[]> {
+  const uploads = job.uploads ?? [];
+  const total = uploads.reduce((n, u) => n + u.size, 0);
+  let done = 0;
+  const out: JobFile[] = [];
+  for (const u of uploads) {
+    if (!BUNDLE_PATH_RE.test(u.path)) throw new Error(`unsafe file name in job: ${JSON.stringify(u.path.slice(0, 120))}`);
+    const parts: string[] = [];
+    for (let i = 0; i < u.parts; i++) {
+      signal?.throwIfAborted();
+      const { data } = await api.input(job.id, u.path, i, { signal });
+      if (typeof data !== "string" || !/^[A-Za-z0-9+/]*=*$/.test(data)) throw new Error(`part ${i} of ${u.path} is not base64`);
+      parts.push(data);
+      done += data.length;
+      onProgress?.(done, total);
+    }
+    const base64 = parts.join("");
+    if (base64.length !== u.size) throw new Error(`${u.path} arrived with ${base64.length} of ${u.size} characters`);
+    out.push({ path: u.path, mime: u.mime, base64 });
+  }
+  return out;
 }

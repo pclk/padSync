@@ -22,9 +22,11 @@ import {
   attachedImages,
   buildAgentPrompt,
   buildBundlePrompt,
+  buildImportPrompt,
   cleanOptions,
   collectOutFiles,
   configPath,
+  fetchUploads,
   launchdPlist,
   loadConfig,
   maskToken,
@@ -47,6 +49,8 @@ const FLUSH_MS = 1000;
 // and it keeps the job from looking stale (and being reclaimed) during long thinking.
 const HEARTBEAT_MS = 5000;
 const JOB_TIMEOUT_MS = 15 * 60_000;
+// Reading a whole lecture and writing notes takes longer than answering a question.
+const IMPORT_TIMEOUT_MS = 30 * 60_000;
 // A job directory this old cannot belong to a live job (they time out after JOB_TIMEOUT_MS).
 const STALE_JOB_DIR_MS = 60 * 60_000;
 // On SIGTERM/SIGINT: how long the "bridge stopped" report may take, and the hard exit after that.
@@ -116,8 +120,10 @@ function reportStopped(api: BridgeApi, jobId: string, output = "") {
 }
 
 async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
-  const o = cleanOptions(job.agent, job.options);
-  const how = [o.model, o.effort && `effort ${o.effort}`, o.webSearch && "web search", o.allowEdits && "edits", o.allowCode && "code", job.files?.length && `${job.files.length} files`].filter(Boolean).join(", ");
+  const isImport = job.kind === "import";
+  // An import's result is a file in out/, so it may always write there.
+  const o = cleanOptions(job.agent, isImport ? { ...job.options, allowEdits: true } : job.options);
+  const how = [isImport && "import", o.model, o.effort && `effort ${o.effort}`, o.webSearch && "web search", o.allowEdits && "edits", o.allowCode && "code", (job.files?.length || job.uploads?.length) && `${(job.files?.length ?? 0) + (job.uploads?.length ?? 0)} files`].filter(Boolean).join(", ");
   log(`job ${job.id} (${job.agent}${how ? `: ${how}` : ""}): ${job.question.slice(0, 80)}`);
   const abort = new AbortController();
   const onShutdown = () => abort.abort();
@@ -152,6 +158,13 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
   }, FLUSH_MS);
 
   try {
+    // Large inputs come in parts; once fetched they are ordinary job files for withJobDir.
+    if (job.uploads?.length) {
+      latest = "_Fetching the attached files…_";
+      const fetched = await fetchUploads(api, job, abort.signal, (done, total) => (latest = `_Fetching the attached files… ${Math.round((done / total) * 100)}%_`));
+      job = { ...job, files: [...(job.files ?? []), ...fetched] };
+      latest = "";
+    }
     // Inputs and the agent's out/ share the job folder, so withJobDir's clean-up covers both,
     // whether the agent succeeds, fails, times out or is cancelled.
     const { result, files } = await withJobDir(job, async (d) => {
@@ -160,9 +173,9 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
       const runOpts = bundle ? o : { ...o, allowEdits: false, allowCode: false };
       const result = await runAgent({
         cwd: d.dir,
-        prompt: bundle ? buildBundlePrompt(job.question, d, job.agent, runOpts) : buildAgentPrompt(job.question, d, job.agent),
+        prompt: isImport ? buildImportPrompt(job.question, d, job.agent, runOpts) : bundle ? buildBundlePrompt(job.question, d, job.agent, runOpts) : buildAgentPrompt(job.question, d, job.agent),
         command: agentCommand(job.agent, cfg, bundle ? attachedImages(d.files) : !!d.image, runOpts),
-        timeoutMs: JOB_TIMEOUT_MS,
+        timeoutMs: isImport ? IMPORT_TIMEOUT_MS : JOB_TIMEOUT_MS,
         onText: (t) => (latest = t),
         signal: abort.signal,
       });
@@ -195,6 +208,14 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
     }
     log(`job ${job.id} ${result.status}${result.error ? `: ${result.error}` : ""}`);
   } catch (e) {
+    clearInterval(ticker);
+    await flushing;
+    // Stopped while fetching the uploads: cancelled by the user (nothing to report) or shutdown.
+    if (abort.signal.aborted) {
+      if (shutdown.signal.aborted) await reportStopped(api, job.id);
+      else log(`job ${job.id} cancelled while fetching its files`);
+      return;
+    }
     log(`job ${job.id} failed: ${(e as Error).message}`);
     await api.update(job.id, { status: "error", error: (e as Error).message }).catch(() => {});
   } finally {
