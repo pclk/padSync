@@ -3,9 +3,10 @@
 // only erasable syntax.
 
 import { spawn } from "node:child_process";
-import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { constants as fsc } from "node:fs";
+import { chmod, lstat, mkdir, mkdtemp, open, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
-import { dirname, extname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 
 export type Agent = "claude" | "codex";
 export const AGENTS: Agent[] = ["claude", "codex"];
@@ -220,15 +221,30 @@ export interface CollectedFiles {
   skipped: string[];
 }
 
+/** True when `path` is a real directory (not a link) whose resolved path is exactly `expected`. */
+async function isOwnDir(path: string, expected: string) {
+  const st = await lstat(path).catch(() => null);
+  return !!st?.isDirectory() && (await realpath(path).catch(() => "")) === expected;
+}
+
 /**
- * Reads what the agent wrote to out/: regular files only (symlinks are not followed), at most one
- * folder deep, safe names, text that is valid UTF-8, within the count and size caps.
+ * Reads what the agent wrote to out/: regular files only (symlinks are not followed, and out/ or a
+ * subfolder replaced by a link is refused), at most one folder deep, safe names, text that is valid
+ * UTF-8, within the count and size caps. Each file is opened with O_NOFOLLOW and must be the same
+ * inode that was listed, so swapping an entry between listing and reading doesn't redirect it.
  */
 export async function collectOutFiles(outDir: string): Promise<CollectedFiles> {
   const files: JobFile[] = [];
   const skipped: string[] = [];
   let total = 0;
+  const root = await realpath(dirname(outDir)).then((d) => join(d, basename(outDir))).catch(() => "");
+  if (!(await lstat(outDir).catch(() => null))) return { files, skipped };
+  if (!root || !(await isOwnDir(outDir, root))) return { files, skipped: ["out/ (not a folder inside the job folder)"] };
   const visit = async (rel: string, depth: number) => {
+    if (!(await isOwnDir(join(outDir, rel), rel ? join(root, rel) : root))) {
+      skipped.push(`${rel}/ (not a folder inside the job folder)`);
+      return;
+    }
     const names = (await readdir(join(outDir, rel)).catch(() => [] as string[])).sort();
     for (const name of names) {
       const path = rel ? `${rel}/${name}` : name;
@@ -257,7 +273,11 @@ export async function collectOutFiles(outDir: string): Promise<CollectedFiles> {
         continue;
       }
       const mime = MIME_BY_EXT[extname(name).toLowerCase()] ?? "text/plain";
-      const buf = await readFile(join(outDir, path));
+      const buf = await readNoFollow(join(outDir, path), st.ino, st.dev, MAX_RESULT_BYTES - total);
+      if (!buf) {
+        skipped.push(`${path} (changed while being read)`);
+        continue;
+      }
       let file: JobFile;
       if (isBinary(mime)) file = { path, mime, base64: buf.toString("base64") };
       else {
@@ -279,6 +299,19 @@ export async function collectOutFiles(outDir: string): Promise<CollectedFiles> {
   };
   await visit("", 0);
   return { files, skipped };
+}
+
+/** Reads a file without following a final symlink, only if it is still the listed inode and fits. */
+async function readNoFollow(path: string, ino: number, dev: number, maxBytes: number): Promise<Buffer | null> {
+  const fh = await open(path, fsc.O_RDONLY | fsc.O_NOFOLLOW | fsc.O_NONBLOCK).catch(() => null);
+  if (!fh) return null;
+  try {
+    const st = await fh.stat();
+    if (!st.isFile() || st.ino !== ino || st.dev !== dev || st.size > maxBytes) return null;
+    return await fh.readFile();
+  } finally {
+    await fh.close();
+  }
 }
 
 /** Images Codex gets attached with --image (it cannot view a file it was only told about). */

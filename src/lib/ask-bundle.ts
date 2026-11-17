@@ -1,6 +1,6 @@
 import type { Box } from "@/ink/geometry";
 import { MAX_BUNDLE_BYTES, pickSections, type ContextOptions, type Raster, type SectionInput, type SelectionInput } from "./context";
-import { sectionPng } from "./export";
+import { sectionPng, type RenderOmit } from "./export";
 import { db } from "./db";
 import type { SectionEntity, StrokeEntity, TextBoxEntity } from "./types";
 
@@ -34,10 +34,13 @@ export async function gatherSections(sections: SectionEntity[]): Promise<Section
         db.entities.where("[parentId+kind]").equals([s.id, "stroke"]).toArray() as Promise<StrokeEntity[]>,
         db.entities.where("[parentId+kind]").equals([s.id, "textbox"]).toArray() as Promise<TextBoxEntity[]>,
       ]);
-      let lastActivity = hlcTime(s.hlc);
-      for (const x of [...strokes, ...texts]) lastActivity = Math.max(lastActivity, hlcTime(x.hlc));
+      // hlc strings sort as clocks and every write gets a fresh one, so the latest child stamp plus
+      // the counts identifies the section's state; the wall-clock ms alone can collide.
+      let latest = "";
+      for (const x of [...strokes, ...texts]) if (x.hlc > latest) latest = x.hlc;
+      const lastActivity = Math.max(hlcTime(s.hlc), hlcTime(latest));
       const notes = texts.filter((t) => !t.deleted).sort((a, b) => a.data.y - b.data.y).map((t) => t.data.text);
-      return { id: s.id, data: s.data, notes, lastActivity };
+      return { id: s.id, data: s.data, notes, lastActivity, revision: `${s.hlc}|${latest}|${strokes.length}|${texts.length}` };
     }),
   );
 }
@@ -62,7 +65,8 @@ export async function addRenders(inputs: SectionInput[], sections: SectionEntity
       continue;
     }
     // One at a time: rendering every section at once can exhaust memory on the iPad.
-    const render = await sectionPng(sec, el, scale).then(toRaster, () => null);
+    // The render honours the toggles too: excluded notes or images must not leak through pixels.
+    const render = await sectionPng(sec, el, scale, { notes: !o.notes, images: !o.images }).then(toRaster, () => null);
     used += render?.base64.length ?? 0;
     out.push({ ...input, render, renderNote: render ? undefined : "could not render" });
   }
@@ -70,8 +74,8 @@ export async function addRenders(inputs: SectionInput[], sections: SectionEntity
 }
 
 /** The render cropped to the lasso box (plus a margin), so a selection shows its context. */
-export async function cropSelection(section: SectionEntity, el: HTMLElement, box: Box, scale = 2): Promise<Raster> {
-  const full = await createImageBitmap(await sectionPng(section, el, scale));
+export async function cropSelection(section: SectionEntity, el: HTMLElement, box: Box, scale = 2, omit: RenderOmit = {}): Promise<Raster> {
+  const full = await createImageBitmap(await sectionPng(section, el, scale, omit));
   const pad = 24;
   const x0 = Math.max(0, Math.floor((box.minX - pad) * scale));
   const y0 = Math.max(0, Math.floor((box.minY - pad) * scale));

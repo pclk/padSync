@@ -27,16 +27,16 @@ remembered per device.
 | Selection | off until something is selected | Uses the highlighted text in a section (captured on `selectionchange`) and/or the current lasso selection (crop of the render around the lassoed ink). Only the selection's section is sent, plus the selection files. |
 | Recent only | off | Keeps only sections with activity (section edit, ink, typed text) in the last 24 h. |
 | Handwriting renders | on | One PNG per section. Off = text only. |
-| Typed notes | on | Text boxes. |
+| Typed notes | on | Text boxes. Off also hides them in the renders. |
 | Hidden solutions | on (existing "use solution") | Solutions go to the AI but it is told not to reveal them. |
-| Embedded images | on | `data:` images inside blocks become `assets/` files. Off = replaced by `[image: alt]`. |
+| Embedded images | on | `data:` images inside blocks become `assets/` files. Off = replaced by `[image: alt]`, remote URLs included, and left out of the renders. |
 | Let AI edit a copy | on | The agent may write changed copies to `out/`. Off = read-only, as before. |
 | Allow running code | off | Claude also gets `Bash` (in Claude Code's sandbox); Codex always runs commands in its own sandbox (`workspace-write` when editing, `read-only` otherwise). |
 | Preview | — | Lists exactly the files that will be written (path, size), the Markdown text, thumbnails, the size/token estimate and anything skipped for size. |
 
 The summary line ("4 sections · 3 renders · ~12k tokens · 820 KB") is always visible before
 sending. The preview and the send use **the same bundle object**: once built, the bundle is cached
-against a signature of (options, section hlcs, selection), and Send posts that cached bundle. If the
+against a signature of (options, full hlc revisions of each section and its ink/text, selection), and Send posts that cached bundle. If the
 inputs change, the bundle is rebuilt and the preview refreshes.
 
 ## Format decision: Markdown + JSON + PNG, not PDF
@@ -49,7 +49,7 @@ notebook.md        all included sections: headings, Markdown + LaTeX source, cod
                    solutions (if included), links to renders/ and assets/
 notebook.json      the same sections in padSync's import format, each with its `id`
 renders/01-q1.png  per-section render: printed content + handwriting (scale 1, scale 2 for a single section)
-assets/…           embedded images from blocks
+assets/…           embedded images, named <sectionId>-<hash of src>.<ext>
 selection.md/.png  only for scope = Selection
 ```
 
@@ -97,3 +97,20 @@ time limits are in both text files.
   capped at 1,600 per image.
 - Claude's Bash sandbox (`--settings {"sandbox":{"enabled":true}}`) was not exercised against a
   real agent here (no paid prompts). Running code stays opt-in.
+
+## Second opinion (GPT-6.1 Sol) and fixes
+
+Sol agreed with Markdown + JSON + PNG and the set of controls, and found five issues, all fixed:
+
+1. `collectOutFiles` followed an `out/` replaced by a symlink, and had an lstat→read race. Now
+   `out/` and any subfolder must be real directories whose realpath is inside the job folder;
+   files are opened with `O_NOFOLLOW` and must be the inode that was listed.
+2. Asset paths used the block index, so an image replaced during the job resolved to the new one.
+   References are now content-addressed (`<sectionId>-<hash>`): a replaced image is reported and
+   that section is skipped, never swapped.
+3. With *embedded images* or *typed notes* off, remote image URLs and the renders still carried
+   them. Remote URLs become references, and renders leave out text boxes / block images.
+4. Preview signatures used the hlc's milliseconds only; same-ms edits collided. They now use the
+   full hlc strings plus child counts.
+5. A lasso-only selection over the size limit produced a bundle with no content. It now refuses
+   with "Lasso a smaller area".

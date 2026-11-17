@@ -23,6 +23,8 @@ import {
   MAX_BUNDLE_BYTES,
   RECENT_MS,
   assetPath,
+  contentHash,
+  imageRef,
   buildBundle,
   bundleSignature,
   jobRequestBody,
@@ -39,6 +41,7 @@ import { PNG_DATA_URL, configureAuthEnv, freshDb, params, req, sessionCookie } f
 import type { SectionData } from "@/lib/types";
 
 const PNG_B64 = PNG_DATA_URL.split(",")[1];
+const IMG = `assets/s2-${contentHash(PNG_DATA_URL)}.png`;
 const NOW = 1_800_000_000_000;
 
 function section(id: string, d: Partial<SectionData> = {}, extra: Partial<SectionInput> = {}): SectionInput {
@@ -72,9 +75,9 @@ describe("defaults", () => {
     const b = build();
     expect(b.error).toBeUndefined();
     expect(b.sectionIds).toEqual(["s1", "s2", "s3"]);
-    expect(b.files.map((f) => f.path)).toEqual(["README.md", "notebook.md", "notebook.json", "assets/s2-1.png", "renders/01-key-idea.png", "renders/02-q1.png", "renders/03-q2.png"]);
+    expect(b.files.map((f) => f.path)).toEqual(["README.md", "notebook.md", "notebook.json", IMG, "renders/01-key-idea.png", "renders/02-q1.png", "renders/03-q2.png"]);
     const md = file(b, "notebook.md")!.text!;
-    for (const s of ["## 1. Key idea", "## 2. Q1 [3 marks]", "## 3. Q2", "my typed note", "SECRET-SOLUTION", "```py\nprint(1)\n```", "![graph](assets/s2-1.png)", "](renders/02-q1.png)", "tags: ibp", "time limit: 5 min"]) expect(md).toContain(s);
+    for (const s of ["## 1. Key idea", "## 2. Q1 [3 marks]", "## 3. Q2", "my typed note", "SECRET-SOLUTION", "```py\nprint(1)\n```", `![graph](${IMG})`, "](renders/02-q1.png)", "tags: ibp", "time limit: 5 min"]) expect(md).toContain(s);
     expect(b.skipped).toEqual([]);
   });
 
@@ -86,7 +89,7 @@ describe("defaults", () => {
     expect(json.sections.map((s: { id: string }) => s.id)).toEqual(["s1", "s2", "s3"]);
     expect(json.sections[1]).toMatchObject({ title: "Q1", marks: 3, solution: "SECRET-SOLUTION", tags: ["ibp"], timeLimitMinutes: 5 });
     // The embedded image is a file, not a data URL repeated inside the JSON.
-    expect(json.sections[1].blocks[1].src).toBe("assets/s2-1.png");
+    expect(json.sections[1].blocks[1].src).toBe(IMG);
     expect(file(b, "notebook.json")!.text).not.toContain("base64");
   });
 });
@@ -201,9 +204,13 @@ describe("size limits and file names", () => {
   });
 
   it("only data images with a safe section id become assets", () => {
-    expect(assetPath("s1", 0, "data:image/svg+xml;base64,AAAA")).toBeNull();
-    expect(assetPath("../x", 0, PNG_DATA_URL)).toBeNull();
-    expect(assetPath("s1", 2, "data:image/jpeg;base64,AAAA")).toBe("assets/s1-2.jpg");
+    expect(assetPath("s1", "data:image/svg+xml;base64,AAAA")).toBeNull();
+    expect(assetPath("../x", PNG_DATA_URL)).toBeNull();
+    expect(assetPath("s1", "data:image/jpeg;base64,AAAA")).toMatch(/^assets\/s1-[a-z0-9]+\.jpg$/);
+    expect(assetPath("s1", "https://x.test/a.png")).toBeNull(); // remote: a reference, never a file
+    expect(imageRef("s1", "https://x.test/a.png")).toMatch(/\.url$/);
+    // Content-addressed: a different image gets a different name.
+    expect(assetPath("s1", PNG_DATA_URL)).not.toBe(assetPath("s1", "data:image/png;base64,AAAA"));
   });
 });
 
@@ -454,7 +461,7 @@ describe("bridge: job dir for bundles", () => {
     expect(after(agentCommand("codex", {}, [], { allowEdits: true }).args, "--sandbox")).toBe("workspace-write");
     expect(after(agentCommand("codex", {}, [], {}).args, "--sandbox")).toBe("read-only");
     const imgs = attachedImages(build().files);
-    expect(imgs).toEqual(["assets/s2-1.png", "renders/01-key-idea.png", "renders/02-q1.png", "renders/03-q2.png"]);
+    expect(imgs).toEqual([IMG, "renders/01-key-idea.png", "renders/02-q1.png", "renders/03-q2.png"]);
     expect(agentCommand("codex", {}, imgs, {}).args.filter((a) => a === "--image")).toHaveLength(4);
   });
 });
@@ -478,5 +485,52 @@ describe("controls render", () => {
     for (const f of b.files) expect(prev).toContain(f.path);
     // notebook.md is open by default and shown verbatim (escaped).
     expect(prev).toContain("## 2. Q1 [3 marks]");
+  });
+});
+
+describe("fixes after second opinion", () => {
+  it("images off also hides remote URLs, and they still round-trip", () => {
+    const secs = [section("s1", { blocks: [{ type: "image", src: "https://private.test/x.png", alt: "x" }] })];
+    const b = build({ images: false, renders: false }, secs);
+    expect(JSON.stringify(b.files)).not.toContain("private.test");
+    expect(file(build({ renders: false }, secs), "notebook.md")!.text).toContain("https://private.test/x.png");
+    const back = parseReturnedNotebook(file(b, "notebook.json")!.text!, secs.map(({ id, data }) => ({ id, data })));
+    expect(back).toEqual({ changes: [], problems: [] });
+  });
+
+  it("the same embedded image twice in a section is one file", () => {
+    const img = { type: "image" as const, src: PNG_DATA_URL };
+    const b = build({ renders: false }, [section("s1", { blocks: [img, img] })]);
+    expect(b.files.filter((f) => f.path.startsWith("assets/"))).toHaveLength(1);
+    expect(newJobSchema.safeParse({ notebookId: "n", sectionId: null, agent: "claude", question: "q", files: b.files }).success).toBe(true);
+  });
+
+  it("an image replaced while the job ran is not silently swapped in", () => {
+    const b = build({ renders: false });
+    const live = nb().map(({ id, data }) => ({ id, data }));
+    live[1].data = { ...live[1].data, blocks: live[1].data.blocks.map((x) => (x.type === "image" ? { ...x, src: "data:image/png;base64,AAAA" } : x)) };
+    const r = parseReturnedNotebook(file(b, "notebook.json")!.text!, live);
+    expect(r.changes).toEqual([]);
+    expect(r.problems[0]).toMatch(/not one that was sent/);
+  });
+
+  it("signatures use full revisions, so same-millisecond edits still differ", () => {
+    const s = nb().map((x) => ({ ...x, revision: "1800000000000-0001-dev" }));
+    const t = s.map((x, i) => (i ? x : { ...x, revision: "1800000000000-0002-dev" }));
+    expect(bundleSignature("T", s, null, opts())).not.toBe(bundleSignature("T", t, null, opts()));
+  });
+
+  it("refuses an out/ that is a symlink, even to a folder inside tmp", async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), "padsync-outlink-")));
+    await mkdir(join(root, "elsewhere", "sub"), { recursive: true });
+    await writeFile(join(root, "elsewhere", "secret.md"), "x");
+    await mkdir(join(root, "job", "out"), { recursive: true });
+    await symlink(join(root, "elsewhere", "sub"), join(root, "job", "out", "sub"));
+    const linkOut = join(root, "job2-out");
+    await symlink(join(root, "elsewhere"), linkOut);
+    expect((await collectOutFiles(linkOut)).files).toEqual([]);
+    const got = await collectOutFiles(join(root, "job", "out"));
+    expect(got.files).toEqual([]);
+    expect(got.skipped[0]).toMatch(/sub/);
   });
 });
