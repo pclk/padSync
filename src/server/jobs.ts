@@ -241,8 +241,8 @@ export async function cancelJob(sql: Sql, id: string): Promise<Job | null> {
   const rows = await sql.query<Row>(
     `with c as (
        update jobs set status = 'cancelled', updated_at = now(), finished_at = now(), image = null, context = '', files = null
-       where id = $1 and status in ('uploading', 'queued', 'running') returning ${PUBLIC_COLS}
-     ), d as (delete from job_inputs where job_id in (select id from c))
+       where id = $1 and status in ('uploading', 'queued', 'running') returning ${PUBLIC_COLS}, thread_id
+     ), keep_inputs as (insert into chat_input_parts(job_id,path,part,data) select p.job_id,p.path,p.part,p.data from job_inputs p join c on c.id=p.job_id where c.thread_id is not null on conflict do nothing), d as (delete from job_inputs where job_id in (select id from c))
      select * from c`,
     [id],
   );

@@ -135,3 +135,16 @@ it("Regeneration reuses uploaded attachment parts after bridge completion", asyn
     )[0].data,
   ).toBe("QQ==");
 });
+
+it("Cancelled chat turns retain uploaded attachments for regeneration", async () => {
+  const { putJobInput, cancelJob } = await import("@/server/jobs");
+  const t = (await thread())!;
+  const a = (await c.createTurn(sql, t.id, {
+    question: "read",
+    files: [],
+    uploads: [{ path: "scan.png", mime: "image/png", size: 4, parts: 1 }],
+  }))!;
+  await putJobInput(sql, a.jobId, { path: "scan.png", part: 0, data: "QQ==" });
+  await cancelJob(sql, a.jobId);
+  expect((await c.regenerate(sql, t.id, 1))?.status).toBe("queued");
+});

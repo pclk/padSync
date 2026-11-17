@@ -190,7 +190,7 @@ export async function regenerate(sql: Sql, key: string, n: number) {
   );
   if (created && r.uploads?.length) {
     await sql.query(
-      `insert into job_inputs(job_id,path,part,data) select $1,p.path,p.part,p.data from chat_input_parts p join jobs j on j.id=p.job_id where j.thread_id=$2 and j.turn=$3 on conflict do nothing`,
+      `insert into job_inputs(job_id,path,part,data) select $1,p.path,p.part,p.data from (select * from chat_input_parts union all select * from job_inputs) p join jobs j on j.id=p.job_id where j.thread_id=$2 and j.turn=$3 on conflict do nothing`,
       [created.jobId, key, n],
     );
     await sql.query(
