@@ -144,7 +144,7 @@ export function AskPanel({ notebookId, section, sectionEl }: { notebookId: strin
   const bridgeOnline = bridgeSeenAt && now - new Date(bridgeSeenAt).getTime() < BRIDGE_ONLINE_MS;
 
   return (
-    <div className="mt-4">
+    <div>
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Ask AI</h3>
         <span className={`flex items-center gap-1.5 text-xs ${bridgeOnline ? "text-emerald-700" : "text-slate-400"}`}>

@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { chmod, mkdtemp, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, realpath, utimes, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -26,12 +26,13 @@ let prompt = "";
 for await (const c of process.stdin) prompt += c;
 const sawImage = fs.existsSync("section.png") && fs.readFileSync("section.png").subarray(1, 4).toString() === "PNG";
 const sawContext = fs.existsSync("context.md") && fs.readFileSync("context.md", "utf8").includes("Evaluate");
+const byPath = prompt.includes("\`" + process.cwd() + "/section.png\`") && !prompt.includes("base64");
 const out = (o) => process.stdout.write(JSON.stringify(o) + "\\n");
 out({ type: "system", subtype: "init" });
 out({ type: "assistant", message: { content: [{ type: "text", text: "Checking line 3" }] } });
 if (prompt.includes("HANG")) await new Promise((r) => setTimeout(r, 60000));
 await new Promise((r) => setTimeout(r, 4000)); // long enough to observe a progress flush
-out({ type: "result", subtype: "success", is_error: false, result: "image=" + sawImage + " context=" + sawContext + " q=" + /My question:\\n(.*)/.exec(prompt)[1] });
+out({ type: "result", subtype: "success", is_error: false, result: "image=" + sawImage + " context=" + sawContext + " paths=" + byPath + " q=" + /My question:\\n(.*)/.exec(prompt)[1] });
 `;
 
 const routes: [string, RegExp, (r: NextRequest, id?: string) => Promise<Response>][] = [
@@ -46,6 +47,9 @@ let bridge: ChildProcess | null = null;
 let logs = "";
 let session: string;
 let disconnect = false;
+let jobTmp = "";
+let lastEnv: NodeJS.ProcessEnv = process.env;
+const leftovers = async () => (await readdir(jobTmp)).filter((n) => n.startsWith("padsync-job-"));
 
 async function startBridge() {
   const { sql } = await freshDb();
@@ -54,10 +58,14 @@ async function startBridge() {
   const fakeClaude = join(dir, "fake-claude.mjs");
   await writeFile(fakeClaude, FAKE_CLAUDE);
   await chmod(fakeClaude, 0o755);
+  // The bridge's os.tmpdir(), so the test can see every job directory it creates.
+  jobTmp = join(await realpath(dir), "tmp");
+  await mkdir(jobTmp);
   const cfg = join(dir, "bridge.json");
   await writeFile(cfg, JSON.stringify({ server: base, token, agents: ["claude"], claudeBin: fakeClaude }), { mode: 0o600 });
+  lastEnv = { ...process.env, TMPDIR: jobTmp, PADSYNC_BRIDGE_CONFIG: cfg, PADSYNC_SERVER: "", PADSYNC_TOKEN: "" };
   bridge = spawn(process.execPath, [join(__dirname, "..", "bridge", "padsync-bridge.ts"), "run"], {
-    env: { ...process.env, PADSYNC_BRIDGE_CONFIG: cfg, PADSYNC_SERVER: "", PADSYNC_TOKEN: "" },
+    env: lastEnv,
     stdio: ["ignore", "pipe", "pipe"],
   });
   bridge.stdout!.on("data", (d) => (logs += d));
@@ -118,7 +126,8 @@ describe("bridge end to end", () => {
     const streaming = await waitFor(() => job(id), (j) => j.status === "running" && j.output.includes("Checking line 3"));
     expect(streaming.output).toBe("Checking line 3");
     const done = await waitFor(() => job(id), (j) => j.status === "done");
-    expect(done.output).toBe("image=true context=true q=Is line 3 right?");
+    expect(done.output).toBe("image=true context=true paths=true q=Is line 3 right?");
+    expect(await leftovers()).toEqual([]);
     expect(logs).not.toMatch(/psd_[A-Za-z0-9_-]{20,}/); // never logs the full token
   });
 
@@ -129,6 +138,38 @@ describe("bridge end to end", () => {
     await cancelRoute(req(`/api/jobs/${id}/cancel`, { method: "POST", session }), params({ id }));
     await waitFor(async () => logs, (l) => l.includes("cancelled by user"));
     expect((await job(id)).status).toBe("cancelled");
+    await waitFor(leftovers, (l) => l.length === 0, 8000);
+  });
+
+  it("on SIGTERM stops the agent, removes its job folder, reports the job and exits", async () => {
+    await startBridge();
+    const id = await ask("HANG please");
+    await waitFor(() => job(id), (j) => j.status === "running" && j.output.length > 0);
+    expect(await leftovers()).toHaveLength(1);
+    const exited = new Promise<number | null>((r) => bridge!.on("exit", r));
+    bridge!.kill("SIGTERM");
+    expect(await exited).toBe(0);
+    expect(await leftovers()).toEqual([]);
+    const j = await job(id);
+    expect(j.status).toBe("error");
+    expect(j.error).toMatch(/bridge was stopped/);
+  });
+
+  it("removes job folders an earlier, killed bridge left behind", async () => {
+    await startBridge();
+    await waitFor(async () => logs, (l) => l.includes("polling"));
+    bridge!.kill("SIGKILL");
+    const stale = join(jobTmp, "padsync-job-stale");
+    await mkdir(stale);
+    await writeFile(join(stale, "context.md"), "old solution");
+    const old = new Date(Date.now() - 2 * 3600_000);
+    await utimes(stale, old, old);
+    const fresh = join(jobTmp, "padsync-job-fresh");
+    await mkdir(fresh);
+    bridge = spawn(process.execPath, [join(__dirname, "..", "bridge", "padsync-bridge.ts"), "run"], { env: lastEnv, stdio: ["ignore", "pipe", "pipe"] });
+    bridge.stdout!.on("data", (d) => (logs += d));
+    await waitFor(async () => logs, (l) => l.includes("removed 1 job folder"));
+    expect((await leftovers()).sort()).toEqual(["padsync-job-fresh"]);
   });
 
   it("stops a running agent and exits 2 after revocation", async () => {

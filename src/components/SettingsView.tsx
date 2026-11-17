@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { deviceId, deviceKind } from "@/lib/db";
 import { useSyncStatus } from "@/lib/hooks";
+import { useShowCopyButtons } from "@/lib/settings";
 import { requestSync, resetCursor } from "@/lib/sync";
 import { DeviceTokens } from "./DeviceTokens";
 
@@ -24,6 +25,7 @@ interface CanvasCheck {
 
 export default function SettingsView() {
   const sync = useSyncStatus();
+  const [showCopy, setShowCopy] = useShowCopyButtons();
   const [status, setStatus] = useState<Status | null>(null);
   const [authError] = useState(() => new URLSearchParams(window.location.search).get("auth_error"));
   const [canvas, setCanvas] = useState<CanvasCheck | null>(null);
@@ -94,6 +96,17 @@ export default function SettingsView() {
       </section>
 
       {status?.authed && <DeviceTokens />}
+
+      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
+        <h2 className="mb-3 font-semibold text-slate-800">Notebook</h2>
+        <label className="flex items-center justify-between gap-3">
+          <span>
+            <span className="block text-slate-800">Show copy buttons</span>
+            <span className="block text-xs text-slate-500">&ldquo;Copy as image&rdquo; and &ldquo;Copy question text&rdquo; in the side panel, for pasting into a chat by hand. Ask AI through the Mac bridge doesn&rsquo;t need them.</span>
+          </span>
+          <input type="checkbox" className="h-4 w-4 shrink-0" checked={showCopy} onChange={(e) => setShowCopy(e.target.checked)} />
+        </label>
+      </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="mb-3 font-semibold text-slate-800">NUS Canvas</h2>

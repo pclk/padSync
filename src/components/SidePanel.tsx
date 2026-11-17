@@ -4,7 +4,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { useEffect, useState } from "react";
 import { copySectionImage, sectionSource, sectionStats } from "@/lib/export";
 import { renderMarkdown } from "@/lib/markdown";
-
+import { useShowCopyButtons } from "@/lib/settings";
 import { insertSectionAfter, logEvent, setDeleted, swapSectionOrder } from "@/lib/store";
 import type { PresenceEntity, SectionEntity } from "@/lib/types";
 import { AskPanel } from "./AskPanel";
@@ -29,6 +29,7 @@ export function SidePanel(p: Props) {
   const { current } = p;
   const [toast, setToast] = useState<string | null>(null);
   const [showSolution, setShowSolution] = useState(false);
+  const [showCopy] = useShowCopyButtons();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 5000);
@@ -87,14 +88,16 @@ export function SidePanel(p: Props) {
               {idx + 1} / {p.sections.length}
             </span>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <button className="rounded-lg bg-slate-900 px-3 py-2 font-medium text-white hover:bg-slate-700" onClick={copyImage}>
-              Copy as image
-            </button>
-            <button className="rounded-lg border border-slate-300 bg-white px-3 py-2 hover:bg-slate-100" onClick={copySource}>
-              Copy question text
-            </button>
-          </div>
+          {showCopy && (
+            <div className="mb-4 grid grid-cols-2 gap-2" data-testid="copy-buttons">
+              <button className="rounded-lg bg-slate-900 px-3 py-2 font-medium text-white hover:bg-slate-700" onClick={copyImage}>
+                Copy as image
+              </button>
+              <button className="rounded-lg border border-slate-300 bg-white px-3 py-2 hover:bg-slate-100" onClick={copySource}>
+                Copy question text
+              </button>
+            </div>
+          )}
           <AskPanel key={current.id} notebookId={p.notebookId} section={current} sectionEl={() => p.sectionEl(current.id)} />
 
           {stats && (
