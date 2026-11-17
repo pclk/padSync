@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { layoutReducer, panelWidth, nextTickDelay, type LayoutState } from "../src/lib/layout-mode";
+import { layoutReducer, panelWidth, nextTickDelay, type LayoutState } from "@/lib/layout-mode";
 const initial: LayoutState = { mode: "auto", effective: "chat", lastActivityAt: 0, drawingSince: 0 };
 describe("layout-mode reducer", () => {
   it("initializes from recent activity", () => {
@@ -32,7 +32,7 @@ it("panelWidth respects viewport limits", () => {
   expect(panelWidth("drawing", 1440)).toBe(360);
   expect(panelWidth("chat", 1440)).toBe(720);
   expect(panelWidth("chat", 900)).toBe(420);
-  expect(panelWidth("chat", 800)).toBe(320);
+  expect(panelWidth("chat", 800)).toBe(360);
 });
 it("nextTickDelay returns only the remaining deadline", () => {
   expect(nextTickDelay(initial, 0)).toBeNull();

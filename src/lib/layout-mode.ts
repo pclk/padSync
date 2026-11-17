@@ -14,8 +14,10 @@ export function layoutReducer(state: LayoutState, event: LayoutEvent, idleMs = 1
   if (!event.drawing && event.now >= Math.max(state.lastActivityAt + idleMs, state.drawingSince + minDrawingMs)) return { ...state, effective: "chat" };
   return state;
 }
+const DRAWING_W = 360;
 export function panelWidth(effective: PanelMode, viewportWidth: number) {
-  return effective === "drawing" ? 360 : Math.max(0, Math.min(Math.max(420, viewportWidth / 2), viewportWidth - 480));
+  // Chat is never narrower than the drawing width, even on a small window.
+  return effective === "drawing" ? DRAWING_W : Math.max(DRAWING_W, Math.min(Math.max(420, viewportWidth / 2), viewportWidth - 480));
 }
 export function nextTickDelay(state: LayoutState, now: number, idleMs = 15000, minDrawingMs = 4000): number | null {
   return state.mode !== "auto" || state.effective !== "drawing" ? null : Math.max(0, Math.max(state.lastActivityAt + idleMs, state.drawingSince + minDrawingMs) - now);
