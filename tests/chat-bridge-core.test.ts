@@ -51,3 +51,22 @@ it("Unknown resume retries once with history.md and never retries a failed fresh
     { resume: false, history: true },
   ]);
 });
+
+it("chat uploads are fetched, written into the job directory and named in the prompt", async () => {
+  const { fetchUploads, withJobDir, buildBundlePrompt } =
+    await import("../bridge/lib");
+  const { readFile } = await import("node:fs/promises");
+  const files = await fetchUploads(
+    { input: async () => ({ data: "QQ==" }) },
+    {
+      id: "chat",
+      uploads: [
+        { path: "scan.pdf", mime: "application/pdf", size: 4, parts: 1 },
+      ],
+    },
+  );
+  await withJobDir({ files, image: null, context: "" }, async (d) => {
+    expect(await readFile(`${d.dir}/scan.pdf`, "utf8")).toBe("A");
+    expect(buildBundlePrompt("read", d, "claude")).toContain("scan.pdf");
+  });
+});

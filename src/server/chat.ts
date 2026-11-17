@@ -77,9 +77,18 @@ export async function patchThread(
 }
 export async function deleteThread(sql: Sql, key: string) {
   await sql.query(
-    `with t as (update chat_threads set deleted_at=now(),updated_at=now() where id=$1 returning id), j as (update jobs set status='cancelled',finished_at=now(),updated_at=now(),files=null,image=null,context='' where thread_id in(select id from t) and status in('uploading','queued','running') returning id) delete from job_inputs where job_id in(select id from j)`,
+    `with t as (
+       update chat_threads set deleted_at = now(), updated_at = now()
+       where id = $1 returning id
+     ), j as (
+       update jobs set status = 'cancelled', finished_at = now(), updated_at = now(),
+         files = null, image = null, context = ''
+       where thread_id in (select id from t) and status in ('uploading','queued','running')
+       returning id
+     ) delete from job_inputs where job_id in (select id from j)`,
     [key],
   );
+  await pruneReplay(sql, key, true);
 }
 export async function getTurns(
   sql: Sql,
@@ -146,7 +155,15 @@ export async function createTurn(
     ...uploads,
   ];
   const rows = await sql.query<{ id: string }>(
-    `with t as (update chat_threads set next_turn=next_turn+1,updated_at=now(),last_message_at=now(),title=case when next_turn=0 and title='' then left(split_part($3,E'\\n',1),60) else title end where id=$1 and deleted_at is null and ($10::int is null or next_turn=$10) returning *) insert into jobs(id,kind,thread_id,turn,notebook_id,agent,question,options,files,chat_files,uploads,status,chat_context,attachments) select $2,'chat',id,next_turn,notebook_id,agent,$3,coalesce($4::jsonb,options),$5::jsonb,$5::jsonb,$6::jsonb,$7,$8::jsonb,$9::jsonb from t returning id`,
+    `with t as (
+       update chat_threads set next_turn = next_turn + 1, updated_at = now(), last_message_at = now(),
+         title = case when next_turn = 0 and title = '' then left(split_part($3,E'\\n',1),60) else title end
+       where id = $1 and deleted_at is null and ($10::int is null or next_turn = $10)
+       returning *
+     ) insert into jobs(id, kind, thread_id, turn, notebook_id, agent, question, options,
+         files, chat_files, uploads, status, chat_context, attachments)
+       select $2, 'chat', id, next_turn, notebook_id, agent, $3, coalesce($4::jsonb,options),
+         $5::jsonb, $5::jsonb, $6::jsonb, $7, $8::jsonb, $9::jsonb from t returning id`,
     [
       key,
       id(),
@@ -161,6 +178,7 @@ export async function createTurn(
     ],
   );
   if (!rows.length) return null;
+  await pruneReplay(sql, key);
   return (await getTurns(sql, key, undefined, "", rows[0].id))[0];
 }
 export async function regenerate(sql: Sql, key: string, n: number) {
@@ -176,6 +194,7 @@ export async function regenerate(sql: Sql, key: string, n: number) {
   );
   if (!rows.length) return null;
   const r = rows[0];
+  const parts = await replayParts(sql, key, n);
   const created = await createTurn(
     sql,
     key,
@@ -189,10 +208,7 @@ export async function regenerate(sql: Sql, key: string, n: number) {
     n,
   );
   if (created && r.uploads?.length) {
-    await sql.query(
-      `insert into job_inputs(job_id,path,part,data) select $1,p.path,p.part,p.data from (select * from chat_input_parts union all select * from job_inputs) p join jobs j on j.id=p.job_id where j.thread_id=$2 and j.turn=$3 on conflict do nothing`,
-      [created.jobId, key, n],
-    );
+    await copyParts(sql, created.jobId, parts);
     await sql.query(
       `update jobs set status='queued' where id=$1 and (select count(*) from job_inputs where job_id=$1)=(select coalesce(sum((u->>'parts')::int),0) from jsonb_array_elements(uploads) u)`,
       [created.jobId],
@@ -233,4 +249,86 @@ export async function chatJobContext(sql: Sql, jobId: string) {
     [j.thread_id, j.turn],
   );
   return { thread, history };
+}
+
+/** Active jobs keep operational inputs; only the latest turn keeps a replay copy. */
+async function pruneReplay(sql: Sql, key: string, deleted = false) {
+  await sql.query(
+    `update jobs set chat_files = null
+    where thread_id = $1 and ($2 or turn < (select max(turn) from jobs where thread_id = $1))`,
+    [key, deleted],
+  );
+  await sql.query(
+    `delete from chat_input_parts where job_id in (
+    select id from jobs where thread_id = $1
+      and ($2 or turn < (select max(turn) from jobs where thread_id = $1)))`,
+    [key, deleted],
+  );
+  if (deleted)
+    await sql.query(
+      `delete from job_inputs where job_id in (select id from jobs where thread_id = $1)`,
+      [key],
+    );
+}
+type ReplayPart = { path: string; part: number; data: string };
+async function replayParts(sql: Sql, key: string, n: number) {
+  return sql.query<ReplayPart>(
+    `select distinct p.path, p.part, p.data
+    from (select * from chat_input_parts union all select * from job_inputs) p
+    join jobs j on j.id = p.job_id where j.thread_id = $1 and j.turn = $2`,
+    [key, n],
+  );
+}
+async function copyParts(sql: Sql, jobId: string, parts: ReplayPart[]) {
+  for (const p of parts)
+    await sql.query(
+      `insert into job_inputs(job_id,path,part,data)
+    values($1,$2,$3,$4) on conflict do nothing`,
+      [jobId, p.path, p.part, p.data],
+    );
+}
+export async function editTurn(
+  sql: Sql,
+  key: string,
+  n: number,
+  question: string,
+) {
+  const source = (
+    await sql.query<{
+      chat_files: z.infer<typeof newTurnSchema>["files"] | null;
+      uploads: { parts: number }[] | null;
+      attachments: unknown[];
+      chat_context: z.infer<typeof newTurnSchema>["context"];
+      options: z.infer<typeof jobOptionsSchema>;
+    }>(
+      `select chat_files, uploads, attachments, chat_context, options from jobs
+    where thread_id=$1 and turn=$2`,
+      [key, n],
+    )
+  )[0];
+  if (!source || !(await getThread(sql, key))) return null;
+  const parts = await replayParts(sql, key, n);
+  if (
+    (source.chat_files === null && source.attachments.length > 0) ||
+    parts.length !== (source.uploads ?? []).reduce((sum, u) => sum + u.parts, 0)
+  )
+    throw new Error(
+      "Original inputs are no longer available. Re-attach the files and rebuild the notebook context before resending.",
+    );
+  const fork = await forkThread(sql, key, n - 1);
+  if (!fork) return null;
+  const next = await createTurn(sql, fork.id, {
+    question,
+    files: source.chat_files ?? [],
+    uploads: source.uploads ?? [],
+    context: source.chat_context ?? undefined,
+    options: source.options,
+  });
+  if (next && parts.length) {
+    await copyParts(sql, next.jobId, parts);
+    await sql.query(`update jobs set status='queued' where id=$1`, [
+      next.jobId,
+    ]);
+  }
+  return getThread(sql, fork.id);
 }

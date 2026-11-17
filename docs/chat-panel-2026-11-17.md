@@ -262,3 +262,28 @@ Client (pure modules, no DOM library needed):
 - `SidePanel` gets two new props from `NotebookEditor`: `mode: PanelMode` and `width: number`
   (px). `NotebookEditor` owns the layout state and the panel width; `SidePanel` owns what's in
   it (the Chat and Section tabs).
+
+### Replay retention and edit endpoint
+
+`from` offsets and `Turn.outputOffset` count Unicode code points (PostgreSQL
+`length`), not UTF-16 units. Clients use `pollCursor(turns)` and `mergeTurns`.
+
+Replay bundles (`chat_files`) and archived upload parts are retained only for the
+latest turn of each live thread. Earlier turns retain their question, context
+options/section IDs, attachment metadata, and results. Active jobs retain their
+operational inputs until completion; finishing an older job does not archive its
+parts again. Thread deletion drops all replay data and operational upload parts.
+Migration removes pre-existing older/deleted replay copies.
+
+`POST /api/chat/threads/[id]/turns/[turn]/edit` accepts `{ question }`, forks done
+history through turn − 1, and queues the edited question with that turn's original
+options, context, bundle and upload parts. Returns `{ thread }` (201). If the
+original bytes are unavailable or incomplete it returns 409 with a message asking
+the user to re-attach files and rebuild context. This bounds replay storage by
+thread count without retaining megabytes for every message or silently sending
+an edit with missing inputs. Edits of older text-only turns remain possible.
+
+`uploadSpecs(files)` validates image/PDF attachments and creates the upload
+manifest. `uploadTurnInputs(jobId, files, { onProgress, signal })` sends parts via
+PUT to the existing job inputs endpoint with two retries for network/5xx/408
+errors, handles a lost final acknowledgement, and cancels incomplete uploads.

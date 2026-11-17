@@ -148,3 +148,86 @@ it("Cancelled chat turns retain uploaded attachments for regeneration", async ()
   await cancelJob(sql, a.jobId);
   expect((await c.regenerate(sql, t.id, 1))?.status).toBe("queued");
 });
+
+it("three turns retain only latest replay data; deletion drops all replay", async () => {
+  const t = (await thread())!;
+  for (let i = 0; i < 3; i++)
+    await c.createTurn(sql, t.id, {
+      question: "read",
+      files: [{ path: "x.md", mime: "text/markdown", text: "bundle" }],
+      uploads: [],
+    });
+  expect(
+    await sql.query(
+      "select turn from jobs where thread_id=$1 and chat_files is not null order by turn",
+      [t.id],
+    ),
+  ).toEqual([{ turn: 3 }]);
+  await c.deleteThread(sql, t.id);
+  expect(
+    await sql.query(
+      "select id from jobs where thread_id=$1 and chat_files is not null",
+      [t.id],
+    ),
+  ).toEqual([]);
+});
+it("edit forks history and replays original inputs; expired replay returns conflict", async () => {
+  const t = (await thread())!;
+  await c.createTurn(sql, t.id, {
+    question: "read",
+    files: [{ path: "x.md", mime: "text/markdown", text: "bundle" }],
+    uploads: [],
+  });
+  const fork = (await c.editTurn(sql, t.id, 1, "edited"))!;
+  expect((await c.getTurns(sql, fork.id))[0].question).toBe("edited");
+  await turn(t.id);
+  await expect(c.editTurn(sql, t.id, 1, "again")).rejects.toThrow(/re-attach/i);
+});
+
+it("uploaded replay is bounded across completion, migration and thread deletion", async () => {
+  const { putJobInput } = await import("@/server/jobs");
+  const { migrate } = await import("@/server/db");
+  const t = (await thread())!;
+  const ids: string[] = [];
+  for (let i = 0; i < 3; i++) {
+    const a = (await c.createTurn(sql, t.id, {
+      question: "read",
+      files: [],
+      uploads: [{ path: "x.pdf", mime: "application/pdf", size: 4, parts: 1 }],
+    }))!;
+    ids.push(a.jobId);
+    await putJobInput(sql, a.jobId, { path: "x.pdf", part: 0, data: "QQ==" });
+    await claimJob(sql, "b", ["claude"], ["chat"]);
+    await updateJob(sql, a.jobId, "b", { status: "done" });
+  }
+  expect(await sql.query("select job_id from chat_input_parts")).toEqual([
+    { job_id: ids[2] },
+  ]);
+  await sql.query("insert into chat_input_parts values($1,'x.pdf',0,'QQ==')", [
+    ids[0],
+  ]);
+  await migrate(sql);
+  expect(await sql.query("select job_id from chat_input_parts")).toEqual([
+    { job_id: ids[2] },
+  ]);
+  await c.deleteThread(sql, t.id);
+  expect(await sql.query("select * from chat_input_parts")).toEqual([]);
+  expect(await sql.query("select * from job_inputs")).toEqual([]);
+});
+it("server code point deltas merge correctly across emoji polls", async () => {
+  const { pollCursor, mergeTurns } = await import("@/lib/chat-api");
+  const t = (await thread())!;
+  const a = (await turn(t.id))!;
+  await claimJob(sql, "b", ["claude"], ["chat"]);
+  let turns: import("@/lib/chat-types").Turn[] = [];
+  for (const output of ["😀", "😀𝑥", "😀𝑥 text"]) {
+    await updateJob(sql, a.jobId, "b", { output });
+    const incoming = await c.getTurns(sql, t.id, undefined, pollCursor(turns));
+    // PGlite transactions can share a millisecond; make ordering explicit for the client.
+    incoming[0].updatedAt = String(
+      turns.length ? Number(turns[0].updatedAt) + 1 : 1,
+    );
+    turns = mergeTurns(turns, incoming);
+    expect(turns[0].output).toBe(output);
+  }
+});

@@ -287,7 +287,8 @@ export async function resetCursor() {
 export function emitRemoteActivity(applied: Omit<Entity, "dirty">[], ownDevice = deviceId(), at = Date.now()) {
   const notebooks = new Map<string, Set<ActivityKind>>();
   for (const e of applied) {
-    if (hlcDevice(e.hlc) === ownDevice) continue;
+    const wall = Number(e.hlc.split("-")[0]);
+    if (!Number.isFinite(wall) || wall < at - 120_000 || wall > at || hlcDevice(e.hlc) === ownDevice) continue;
     const kind = e.kind === 'textbox' ? 'text' : e.kind === 'stroke' ? 'stroke' : e.kind === 'section' ? 'section' : null;
     if (!kind) continue;
     const kinds = notebooks.get(e.notebookId) ?? new Set<ActivityKind>();

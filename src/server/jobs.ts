@@ -241,8 +241,15 @@ export async function cancelJob(sql: Sql, id: string): Promise<Job | null> {
   const rows = await sql.query<Row>(
     `with c as (
        update jobs set status = 'cancelled', updated_at = now(), finished_at = now(), image = null, context = '', files = null
-       where id = $1 and status in ('uploading', 'queued', 'running') returning ${PUBLIC_COLS}, thread_id
-     ), keep_inputs as (insert into chat_input_parts(job_id,path,part,data) select p.job_id,p.path,p.part,p.data from job_inputs p join c on c.id=p.job_id where c.thread_id is not null on conflict do nothing), d as (delete from job_inputs where job_id in (select id from c))
+       where id = $1 and status in ('uploading', 'queued', 'running') returning ${PUBLIC_COLS}, thread_id, turn
+     ), keep_inputs as (
+       insert into chat_input_parts(job_id, path, part, data)
+       select p.job_id, p.path, p.part, p.data from job_inputs p join c on c.id = p.job_id
+       where c.thread_id is not null
+         and c.turn = (select max(turn) from jobs where thread_id = c.thread_id)
+         and exists(select 1 from chat_threads where id = c.thread_id and deleted_at is null)
+       on conflict do nothing
+     ), d as (delete from job_inputs where job_id in (select id from c))
      select * from c`,
     [id],
   );
@@ -294,8 +301,18 @@ export async function updateJob(sql: Sql, id: string, deviceId: string, u: z.inf
        files = case when $5::text is not null then null else files end,
        result_files = coalesce($8::jsonb, result_files)
      where id = $1 and claimed_by = $2 and status = 'running'
-     returning id, status, thread_id, agent
-     ), session_update as (update chat_threads set agent_session = jsonb_build_object('agent', u.agent, 'sessionId', $9::text), updated_at = now() from u where chat_threads.id = u.thread_id and $9::text is not null and u.status = 'done'), keep_inputs as (insert into chat_input_parts(job_id,path,part,data) select p.job_id,p.path,p.part,p.data from job_inputs p join u on u.id=p.job_id where u.thread_id is not null and $5::text is not null on conflict do nothing), d as (delete from job_inputs where job_id in (select id from u) and $5::text is not null)
+     returning id, status, thread_id, agent, turn
+     ), session_update as (
+       update chat_threads set agent_session = jsonb_build_object('agent', u.agent, 'sessionId', $9::text), updated_at = now()
+       from u where chat_threads.id = u.thread_id and $9::text is not null and u.status = 'done'
+     ), keep_inputs as (
+       insert into chat_input_parts(job_id, path, part, data)
+       select p.job_id, p.path, p.part, p.data from job_inputs p join u on u.id = p.job_id
+       where u.thread_id is not null and $5::text is not null
+         and u.turn = (select max(turn) from jobs where thread_id = u.thread_id)
+         and exists(select 1 from chat_threads where id = u.thread_id and deleted_at is null)
+       on conflict do nothing
+     ), d as (delete from job_inputs where job_id in (select id from u) and $5::text is not null)
      select status from u`,
     [id, deviceId, u.output ?? null, u.append ?? null, u.status ?? null, u.error ?? null, MAX_OUTPUT, u.files ? JSON.stringify(u.files) : null, u.sessionId ?? null],
   );
