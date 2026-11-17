@@ -12,6 +12,11 @@ import { createNotebook, listNotebooks, putEntities } from "@/lib/store";
 import type { NotebookEntity, PresenceEntity, SectionData } from "@/lib/types";
 import { SyncBadge } from "./SyncBadge";
 import { Icon, Logo } from "./Icons";
+import { Dialog } from "./Dialog";
+import { deferredAction } from "@/lib/deferred";
+
+/** How long the "Undo" toast stays after deleting a notebook; the delete is written after it. */
+export const UNDO_MS = 6000;
 
 export default function Library() {
   const router = useRouter();
@@ -30,6 +35,31 @@ export default function Library() {
     catch { setError("Could not save your change on this device. Please try again."); }
     finally { pending.current = false; setBusy(false); }
   };
+  const [renaming, setRenaming] = useState<NotebookEntity | null>(null);
+  const [confirming, setConfirming] = useState<NotebookEntity | null>(null);
+  const [deleted, setDeleted] = useState<NotebookEntity | null>(null);
+  // The delete is only written once the undo window closes, so undo never reaches sync (the
+  // server removes stored PDFs as soon as it sees a deleted notebook). Until then it is hidden.
+  const commitDelete = async (nb: NotebookEntity) => {
+    setDeleted((d) => (d?.id === nb.id ? null : d));
+    try {
+      const row = ((await db.entities.get(nb.id)) as NotebookEntity | undefined) ?? nb;
+      await putEntities([{ ...row, deleted: 1 }]);
+    } catch {
+      setError(`Could not delete “${nb.data.title}” on this device. Please try again.`);
+      return;
+    }
+    // The server removes stored PDFs of deleted notebooks; this device's copy goes now.
+    const secs = await db.entities.where("[notebookId+kind]").equals([nb.id, "section"]).toArray();
+    for (const id of new Set(secs.flatMap((s) => (s.data as SectionData).pdf?.documentId ?? []))) await forgetPdf(id).catch(() => {});
+  };
+  const [deletion] = useState(() => deferredAction(commitDelete, UNDO_MS));
+  // Leaving the library or closing the tab ends the undo window early.
+  useEffect(() => {
+    const flush = () => void deletion.flush();
+    window.addEventListener("pagehide", flush);
+    return () => { window.removeEventListener("pagehide", flush); flush(); };
+  }, [deletion]);
   // Clears stored PDFs of notebooks deleted on any device, including before this fix shipped.
   useEffect(() => { void sweepStoredPdfs(); }, []);
   const notebooks = useLiveQuery(listNotebooks, []);
@@ -44,25 +74,30 @@ export default function Library() {
     return ps.filter((p) => p.data.deviceKind === "ipad" && p.data.device !== deviceId()).sort((a, b) => b.data.at - a.data.at)[0];
   }, []);
 
-  const sorted = selectNotebooks(notebooks ?? [], query, sort);
-  const ipadNb = ipad && notebooks?.find((n) => n.id === ipad.notebookId);
+  const live = deleted ? notebooks?.filter((n) => n.id !== deleted.id) : notebooks;
+  const sorted = selectNotebooks(live ?? [], query, sort);
+  const ipadNb = ipad && live?.find((n) => n.id === ipad.notebookId);
 
   const newBlank = () => mutate(async () => {
     const id = await createNotebook("Untitled notebook");
     router.push(`/notebook?id=${id}`);
   });
 
-  const rename = async (nb: NotebookEntity) => {
-    const title = prompt("Rename notebook", nb.data.title);
-    if (title?.trim()) await mutate(async () => { await putEntities([{ ...nb, data: { ...nb.data, title: title.trim() } }]); });
+  const rename = async (nb: NotebookEntity, title: string) => {
+    setRenaming(null);
+    if (title && title !== nb.data.title) await mutate(async () => { await putEntities([{ ...nb, data: { ...nb.data, title } }]); });
   };
 
-  const remove = async (nb: NotebookEntity) => {
-    if (!confirm(`Delete “${nb.data.title}”?`)) return;
-    await mutate(async () => { await putEntities([{ ...nb, deleted: 1 }]); });
-    // The server removes stored PDFs of deleted notebooks; this device's copy goes now.
-    const secs = await db.entities.where("[notebookId+kind]").equals([nb.id, "section"]).toArray();
-    for (const id of new Set(secs.flatMap((s) => (s.data as SectionData).pdf?.documentId ?? []))) await forgetPdf(id).catch(() => {});
+  const remove = (nb: NotebookEntity) => {
+    setConfirming(null);
+    setError("");
+    setDeleted(nb);
+    void deletion.schedule(nb);
+  };
+
+  const undoDelete = () => {
+    deletion.undo();
+    setDeleted(null);
   };
 
   return (
@@ -85,7 +120,7 @@ export default function Library() {
           <h2 id="library-title" className="text-3xl font-semibold tracking-tight text-slate-900">Your notebooks</h2>
           <p className="mt-1 text-sm text-slate-500">A place to write, practise, and bring your notes together.</p>
         </div>
-        {!!notebooks?.length && (
+        {!!live?.length && (
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             <label className="relative min-w-0 flex-1 sm:w-64 sm:flex-none">
               <span className="sr-only">Search notebooks</span>
@@ -112,8 +147,8 @@ export default function Library() {
 
       <PdfImport />
 
-      {!!notebooks?.length && <p role="status" className="mb-3 mt-8 text-xs font-medium uppercase tracking-wide text-slate-400">{sorted.length} of {notebooks.length} notebooks</p>}
-      {notebooks === undefined ? <p role="status" className="py-12 text-center text-slate-500">Loading notebooks…</p> : notebooks.length > 0 && sorted.length === 0 ? (
+      {!!live?.length && <p role="status" className="mb-3 mt-8 text-xs font-medium uppercase tracking-wide text-slate-400">{sorted.length} of {live.length} notebooks</p>}
+      {live === undefined ? <p role="status" className="py-12 text-center text-slate-500">Loading notebooks…</p> : live.length > 0 && sorted.length === 0 ? (
         <div className="card p-10 text-center">
           <h3 className="font-medium text-slate-900">No matching notebooks</h3>
           <p className="mt-2 text-sm text-slate-500">Try another title or clear your search to see all your notebooks.</p>
@@ -144,13 +179,54 @@ export default function Library() {
                 </div>
               </Link>
               <div className="absolute bottom-2.5 right-2 flex gap-0.5">
-                <button disabled={busy} aria-label={`Rename ${nb.data.title}`} title="Rename" onClick={() => rename(nb)} className="icon-btn h-8 w-8"><Icon name="edit" /></button>
-                <button disabled={busy} aria-label={`Delete ${nb.data.title}`} title="Delete" onClick={() => remove(nb)} className="icon-btn h-8 w-8 hover:!bg-rose-50 hover:!text-rose-600"><Icon name="trash" /></button>
+                <button disabled={busy} aria-label={`Rename ${nb.data.title}`} title="Rename" onClick={() => setRenaming(nb)} className="icon-btn h-8 w-8"><Icon name="edit" /></button>
+                <button disabled={busy} aria-label={`Delete ${nb.data.title}`} title="Delete" onClick={() => setConfirming(nb)} className="icon-btn h-8 w-8 hover:!bg-rose-50 hover:!text-rose-600"><Icon name="trash" /></button>
               </div>
             </li>
           ))}
         </ul>
       )}
+
+      {renaming && <RenameDialog notebook={renaming} onCancel={() => setRenaming(null)} onRename={(title) => rename(renaming, title)} />}
+      {confirming && <DeleteDialog notebook={confirming} onCancel={() => setConfirming(null)} onDelete={() => remove(confirming)} />}
+      {deleted && <UndoToast key={deleted.id} title={deleted.data.title} onUndo={undoDelete} />}
     </main>
+  );
+}
+
+export function RenameDialog({ notebook, onCancel, onRename }: { notebook: NotebookEntity; onCancel: () => void; onRename: (title: string) => void }) {
+  const [title, setTitle] = useState(notebook.data.title);
+  return (
+    <Dialog title="Rename notebook" onClose={onCancel} onSubmit={() => { if (title.trim()) onRename(title.trim()); }}>
+      <label className="mt-4 block">
+        <span className="sr-only">Notebook title</span>
+        <input data-autofocus value={title} onChange={(e) => setTitle(e.target.value)} className="field" />
+      </label>
+      <div className="mt-5 flex justify-end gap-2">
+        <button type="button" onClick={onCancel} className="btn btn-secondary">Cancel</button>
+        <button type="submit" disabled={!title.trim()} className="btn btn-primary">Rename</button>
+      </div>
+    </Dialog>
+  );
+}
+
+export function DeleteDialog({ notebook, onCancel, onDelete }: { notebook: NotebookEntity; onCancel: () => void; onDelete: () => void }) {
+  return (
+    <Dialog title={`Delete “${notebook.data.title}”?`} onClose={onCancel} onSubmit={onDelete}>
+      <p className="mt-2 break-words text-sm text-slate-500">The notebook and its pages are removed from all your devices. You can undo this for a few seconds.</p>
+      <div className="mt-5 flex justify-end gap-2">
+        <button type="button" onClick={onCancel} className="btn btn-secondary">Cancel</button>
+        <button type="submit" data-autofocus className="btn btn-secondary !border-rose-200 !text-rose-700 hover:!bg-rose-50"><Icon name="trash" />Delete</button>
+      </div>
+    </Dialog>
+  );
+}
+
+export function UndoToast({ title, onUndo }: { title: string; onUndo: () => void }) {
+  return (
+    <div role="status" className="card fixed bottom-6 left-1/2 z-40 flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 items-center gap-3 py-2 pl-4 pr-2 text-sm text-slate-700 shadow-lift">
+      <span className="min-w-0 flex-1 truncate">Deleted “{title}”</span>
+      <button type="button" onClick={onUndo} className="btn btn-sm btn-ghost font-semibold !text-brand-700">Undo</button>
+    </div>
   );
 }
