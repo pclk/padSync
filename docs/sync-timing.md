@@ -2,16 +2,16 @@
 
 The sync engine now coalesces writes from the first trigger rather than restarting a trailing timer on every trigger. A later trigger cannot delay an existing deadline. This bounds continuous-writing delays while retaining batching. Requests remain serialized, writes arriving during a request get a follow-up, and queued changes retain the existing HLC acknowledgement protection. HTTP sync attempts time out after 15 seconds. Failed attempts back off from 2 to 60 seconds, including under continuing edits. Returning online or to a visible tab resets the retry deadline. Hidden tabs default to a 15-second poll interval; visible tabs default to 2 seconds. Polling deadlines can send writes before their debounce expires.
 
-GitHub login `pclk` is the admin (case insensitive), based on the authenticated signed session, not client input. Only this admin can PUT global sync timing settings. Browser session, CSRF origin and bearer-token separation checks remain in force. Values are integer milliseconds from 100 through 10000; the default is 400. The setting persists in Postgres and applies to new clients within approximately a minute while online, via a separate configuration GET. No existing auth admission rules were broadened.
+GitHub login `pclk` is the admin (case insensitive), based on the authenticated signed session, not client input. Only this admin can PUT global sync timing settings. Browser session, CSRF origin and bearer-token separation checks remain in force. Values are integer milliseconds from 0 through 10000; the default is 400. The setting persists in Postgres and applies to new clients within approximately a minute while online, via a separate configuration GET. No existing auth admission rules were broadened.
 
 Settings exposes four global integer millisecond controls:
 
 | Control | Default | Range | Effect |
 | --- | ---: | ---: | --- |
-| Send delay | 400 | 100–10000 | Coalesces local edits before upload |
-| Visible receive interval | 2000 | 100–30000 | Checks for remote edits after each completed sync |
-| Hidden receive interval | 15000 | 1000–120000 | Checks while the browser keeps a hidden tab running |
-| Initial retry delay | 2000 | 250–30000 | Initial failure backoff, doubling up to 60000 ms |
+| Send delay | 400 | 0–10000 | Coalesces local edits before upload |
+| Visible receive interval | 2000 | 0–30000 | Checks for remote edits after each completed sync |
+| Hidden receive interval | 15000 | 0–120000 | Checks while the browser keeps a hidden tab running |
+| Initial retry delay | 2000 | 0–30000 | Initial failure backoff, doubling up to 60000 ms |
 
 The fast preset fills in 100 / 250 / 2000 / 500 ms respectively; the default preset restores the values above. Presets require saving. Saving immediately updates the current tab and advances an existing poll when appropriate, without postponing queued writes or bypassing failure backoff. Other online devices refresh within about a minute or on returning to the tab. Partial API updates preserve unspecified settings, including when an older client saves only debounce. Additive schema migrations retain existing debounce values.
 
@@ -29,3 +29,5 @@ Settings shows actual sync request counts and local requestSync triggers from th
 6. Fix the existing server sequence commit-order gap before broad multi-user concurrency: concurrent transactions can allocate sequence numbers before commit, letting a cursor pass a late-committing row. Use a transactionally ordered change log or another proven cursor protocol; lowering debounce does not fix it.
 
 No live production database was changed during development. Tests use PGlite and fake timers. Browser multi-device latency and actual cloud load still need measurement.
+
+All timing controls accept zero: sending and retrying have no intentional delay, and zero receive intervals start the next serialized request as soon as the previous one completes. Browser timer throttling still applies. Positive retry delays double on repeated failures; zero stays zero. Existing database constraints are migrated to accept zero without changing saved values. The request-count replay returns Infinity for zero polling because response duration is not modeled.

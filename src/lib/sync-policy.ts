@@ -1,5 +1,5 @@
 export const DEFAULT_DEBOUNCE_MS = 400;
-export const MIN_DEBOUNCE_MS = 100;
+export const MIN_DEBOUNCE_MS = 0;
 export const MAX_DEBOUNCE_MS = 10000;
 export const VISIBLE_POLL_MS = 2000;
 export const HIDDEN_POLL_MS = 15000;
@@ -8,10 +8,10 @@ export function validDebounce(value: unknown): value is number {
 }
 
 export const SYNC_FIELDS = {
-  debounceMs: { label: 'Send delay', min: 100, max: 10000, default: DEFAULT_DEBOUNCE_MS, help: 'Wait after the first local edit before sending a batch.' },
-  visiblePollMs: { label: 'Receive interval while visible', min: 100, max: 30000, default: VISIBLE_POLL_MS, help: 'How often each visible device checks for changes from the other device. Lower this to receive edits sooner.' },
-  hiddenPollMs: { label: 'Receive interval while hidden', min: 1000, max: 120000, default: HIDDEN_POLL_MS, help: 'Checks while the tab is hidden. iPadOS and browsers may throttle or suspend background tabs regardless of this value.' },
-  retryBaseMs: { label: 'Initial retry delay', min: 250, max: 30000, default: 2000, help: 'Wait after a failed sync. Repeated failures double this delay up to 60 seconds; returning online retries immediately.' },
+  debounceMs: { label: 'Send delay', min: 0, max: 10000, default: DEFAULT_DEBOUNCE_MS, help: 'Wait after the first local edit before sending a batch. Zero sends without an intentional delay.' },
+  visiblePollMs: { label: 'Receive interval while visible', min: 0, max: 30000, default: VISIBLE_POLL_MS, help: 'How often each visible device checks for changes from the other device. Lower this to receive edits sooner. Zero checks again as soon as the previous request finishes.' },
+  hiddenPollMs: { label: 'Receive interval while hidden', min: 0, max: 120000, default: HIDDEN_POLL_MS, help: 'Checks while the tab is hidden. Zero checks again after each completed request. iPadOS and browsers may throttle or suspend background tabs regardless of this value.' },
+  retryBaseMs: { label: 'Initial retry delay', min: 0, max: 30000, default: 2000, help: 'Wait after a failed sync. Zero retries without an intentional delay. For positive values, repeated failures double this delay up to 60 seconds; returning online retries immediately.' },
 } as const;
 export type SyncConfig = { [K in keyof typeof SYNC_FIELDS]: number };
 export const DEFAULT_SYNC_CONFIG: SyncConfig = { debounceMs: DEFAULT_DEBOUNCE_MS, visiblePollMs: VISIBLE_POLL_MS, hiddenPollMs: HIDDEN_POLL_MS, retryBaseMs: 2000 };
@@ -29,6 +29,8 @@ export function normalizeSyncConfig(value: Partial<SyncConfig>): SyncConfig {
 /** Replay a local edit trace with the actual first-edit coalescing policy. No network latency,
  * pagination, retries or visibility transitions: request counts, not CPU or billing predictions. */
 export function replaySyncRequests(edits: readonly number[], start: number, end: number, debounceMs: number, pollMs = VISIBLE_POLL_MS) {
+  // With zero polling, request count depends on response time, which this model omits.
+  if (pollMs <= 0) return Infinity;
   let due = start + pollMs, requests = 0;
   for (const edit of edits) {
     if (edit < start || edit > end) continue;

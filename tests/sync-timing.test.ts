@@ -114,3 +114,12 @@ it('uses the configured interval for successful hidden-tab receives',async()=>{
  await vi.advanceTimersByTimeAsync(1);
  expect(fetchMock.mock.calls.filter(c=>c[0]==='/api/sync')).toHaveLength(2);
 });
+
+it('sends edits with zero delay and retains all zero controls',async()=>{
+ fetchMock.mockImplementation(async(url:string)=>url==='/api/sync-config'?Response.json({debounceMs:0,visiblePollMs:0,hiddenPollMs:0,retryBaseMs:0}):Response.json({changes:[],cursor:0,more:false}));
+ sync.setSyncConfig({debounceMs:0,visiblePollMs:0,hiddenPollMs:0,retryBaseMs:0});
+ sync.requestSync(); await vi.advanceTimersByTimeAsync(0);
+ expect(fetchMock.mock.calls.filter(c=>c[0]==='/api/sync')).toHaveLength(1);
+ expect(sync.getSyncTiming()).toMatchObject({debounceMs:0,visiblePollMs:0,hiddenPollMs:0,retryBaseMs:0});
+ expect(replaySyncRequests([],0,1000,0,0)).toBe(Infinity);
+});
