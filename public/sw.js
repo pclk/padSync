@@ -3,7 +3,7 @@
 // offline data lives in IndexedDB.
 
 const CACHE = "padsync-v1";
-const SHELL = ["/", "/notebook", "/import", "/prompt", "/settings"];
+const SHELL = ["/", "/notebook", "/import", "/settings"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

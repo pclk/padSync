@@ -45,8 +45,7 @@ export default function Library() {
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">padSync</h1>
         <SyncBadge />
         <nav className="ml-auto flex gap-2 text-sm">
-          <Link href="/prompt" className="rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100">AI prompt</Link>
-          <Link href="/import" className="rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100">Import</Link>
+          <Link href="/import" className="rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100">AI import</Link>
           <Link href="/settings" className="rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100">Settings</Link>
           <button onClick={newBlank} className="rounded-lg bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-700">New notebook</button>
         </nav>
@@ -63,8 +62,7 @@ export default function Library() {
         <div className="rounded-2xl border-2 border-dashed border-slate-300 p-12 text-center text-slate-500">
           <p className="mb-4">No notebooks yet.</p>
           <p className="text-sm">
-            Generate a prompt on <Link href="/prompt" className="text-blue-700 underline">AI prompt</Link>, paste the reply into{" "}
-            <Link href="/import" className="text-blue-700 underline">Import</Link>, or start a blank notebook.
+            Drop your lecture notes into <Link href="/import" className="text-blue-700 underline">AI import</Link> to get notes and practice to write on, or start a blank notebook.
           </p>
         </div>
       ) : (
