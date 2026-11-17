@@ -2,6 +2,7 @@ import { emitActivity, setInking, whenIdle } from "@/lib/activity";
 import { db, deviceId } from "@/lib/db";
 import { logEvent, moveStrokes, newEntity, putEntities, setDeleted } from "@/lib/store";
 import { STROKE_STRIDE, type StrokeData, type StrokeEntity } from "@/lib/types";
+import { isStrayDot, type Contact } from "./filters";
 import { dataBox, hitStrokes, lassoStrokes, strokeBox, unionBox, type Box } from "./geometry";
 import { paintStroke, strokePath, cachedPath, seedPath } from "./render";
 import { UndoStack } from "./undo";
@@ -34,7 +35,7 @@ export interface Selection {
 }
 
 type Gesture =
-  | { type: "ink"; sec: SectionHandle; rect: DOMRect; data: StrokeData; predicted: number[]; t0: number; pointerId: number }
+  | { type: "ink"; sec: SectionHandle; rect: DOMRect; data: StrokeData; predicted: number[]; t0: number; contact: Contact; pointerId: number }
   | { type: "erase"; sec: SectionHandle; rect: DOMRect; last: [number, number]; erased: Set<string>; at: [number, number]; pointerId: number }
   | { type: "lasso"; sec: SectionHandle; rect: DOMRect; poly: number[][]; pointerId: number }
   | { type: "drag"; sec: SectionHandle; rect: DOMRect; start: [number, number]; dx: number; dy: number; strokes: StrokeEntity[]; pointerId: number };
@@ -54,6 +55,13 @@ export interface ControllerCallbacks {
 }
 
 const round = (v: number, f: number) => Math.round(v * f) / f;
+
+/**
+ * Predicted events extend the live stroke towards where the Pencil is going. Only the nearest are
+ * used: far predictions overshoot on direction changes and at the stroke end, where the line then
+ * visibly retracts when the prediction is dropped.
+ */
+const MAX_PREDICTED = 2;
 
 export class InkController {
   tool: ToolState;
@@ -195,7 +203,7 @@ export class InkController {
         input: e.pointerType,
         device: deviceId(),
       };
-      const g: Extract<Gesture, { type: "ink" }> = { type: "ink", sec, rect, data, predicted: [], t0: e.timeStamp, pointerId: e.pointerId };
+      const g: Extract<Gesture, { type: "ink" }> = { type: "ink", sec, rect, data, predicted: [], t0: e.timeStamp, contact: { durationMs: 0, maxPressure: 0 }, pointerId: e.pointerId };
       this.setGesture(g);
       this.addPoints(g, [e]);
     }
@@ -224,11 +232,15 @@ export class InkController {
 
     if (g.type === "ink") {
       this.addPoints(g, evs);
-      const predicted = e.getPredictedEvents?.() ?? [];
+      const predicted = (e.getPredictedEvents?.() ?? []).slice(0, MAX_PREDICTED);
+      const pts = g.data.pts;
+      // Predictions carry the last real pressure and time, so they can't change the line's width.
+      const lastP = pts[pts.length - 4];
+      const lastT = pts[pts.length - 1];
       g.predicted = [];
       for (const p of predicted) {
         const [x, y] = this.local(p, g.rect);
-        g.predicted.push(x, y, p.pressure || 0.5, 0, 0, 0);
+        g.predicted.push(round(x, 100), round(y, 100), lastP, 0, 0, lastT);
       }
     } else if (g.type === "erase") {
       for (const ev of evs) {
@@ -295,6 +307,9 @@ export class InkController {
   private addPoints(g: Extract<Gesture, { type: "ink" }>, evs: PointerEvent[]) {
     const pts = g.data.pts;
     for (const ev of evs) {
+      // Tracked for every event, stored or not: a held dot has duplicate points but real duration.
+      g.contact.durationMs = Math.max(g.contact.durationMs, ev.timeStamp - g.t0);
+      if (ev.pointerType === "pen") g.contact.maxPressure = Math.max(g.contact.maxPressure, ev.pressure);
       const [x, y] = this.local(ev, g.rect);
       const n = pts.length;
       // Drop exact duplicates (pointerup often repeats the last move).
@@ -313,6 +328,8 @@ export class InkController {
 
   private async commitInk(g: Extract<Gesture, { type: "ink" }>) {
     if (!g.data.pts.length) return;
+    // Pencil bounce, a resting tip or a cancelled Scribble touch: not ink.
+    if (isStrayDot(g.data, g.contact)) return;
     const stroke = newEntity<"stroke", StrokeData>("stroke", this.notebookId, g.sec.id, g.data);
     const path = strokePath(g.data);
     this.pending.set(stroke.id, { data: g.data, path, sec: g.sec, until: performance.now() + 1500 });
@@ -413,7 +430,9 @@ export class InkController {
     if (g?.type === "ink" && g.data.pts.length) {
       toSection(g.rect);
       const data = g.predicted.length ? { ...g.data, pts: g.data.pts.concat(g.predicted) } : g.data;
-      paintStroke(ctx, data, strokePath(data, false));
+      // Drawn exactly as it will be committed (last: true puts the end on the tip rather than
+      // trailing behind it), so lifting the Pencil doesn't visibly change the stroke.
+      paintStroke(ctx, data, strokePath(data));
     } else if (g?.type === "erase") {
       toSection(g.rect);
       ctx.beginPath();

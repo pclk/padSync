@@ -1,5 +1,6 @@
 import { getStroke, type StrokeOptions } from "perfect-freehand";
 import { STROKE_STRIDE, type StrokeData, type StrokeEntity } from "@/lib/types";
+import { smoothPressure } from "./filters";
 
 // Stroke geometry lives in section-local coordinates (1 unit = 1 CSS px at zoom 1).
 // The outline polygon is computed once per (id, hlc) and cached as a Path2D.
@@ -8,20 +9,35 @@ export function strokeOptions(d: Pick<StrokeData, "tool" | "size" | "input">, la
   if (d.tool === "highlighter") {
     return { size: d.size, thinning: 0, smoothing: 0.5, streamline: 0.4, simulatePressure: false, last, start: { cap: false }, end: { cap: false } };
   }
+  if (d.input === "pen") {
+    // Pencil pressure arrives smoothed (smoothPressure), so it can drive width without wobble.
+    // Slightly less thinning and more streamline than before keep pen lines as calm as mouse ones.
+    return {
+      size: d.size,
+      thinning: 0.5,
+      smoothing: 0.6,
+      streamline: 0.45,
+      simulatePressure: false,
+      easing: (t) => Math.sin((t * Math.PI) / 2),
+      last,
+    };
+  }
   return {
     size: d.size,
     thinning: 0.55,
     smoothing: 0.5,
     streamline: 0.32,
-    simulatePressure: d.input !== "pen",
+    simulatePressure: true,
     easing: (t) => Math.sin((t * Math.PI) / 2),
     last,
   };
 }
 
-export function toInput(pts: number[]): number[][] {
+/** perfect-freehand input; Pencil pressure is filtered here, at render time, never in storage. */
+export function toInput(pts: number[], input?: string): number[][] {
+  const pressure = input === "pen" ? smoothPressure(pts) : null;
   const out: number[][] = [];
-  for (let i = 0; i < pts.length; i += STROKE_STRIDE) out.push([pts[i], pts[i + 1], pts[i + 2]]);
+  for (let i = 0, j = 0; i < pts.length; i += STROKE_STRIDE, j++) out.push([pts[i], pts[i + 1], pressure ? pressure[j] : pts[i + 2]]);
   return out;
 }
 
@@ -44,11 +60,11 @@ export function strokePath(d: StrokeData, last = true): Path2D {
   if (d.pts.length === STROKE_STRIDE) {
     // A tap: draw a dot.
     const p = new Path2D();
-    const r = d.tool === "highlighter" ? d.size / 2 : (d.size * (0.35 + 0.5 * (d.input === "pen" ? d.pts[2] : 0.5))) / 2;
+    const r = d.tool === "highlighter" ? d.size / 2 : (d.size * (0.35 + 0.5 * (d.input === "pen" ? smoothPressure(d.pts)[0] : 0.5))) / 2;
     p.arc(d.pts[0], d.pts[1], Math.max(r, 0.8), 0, Math.PI * 2);
     return p;
   }
-  return outlineToPath(getStroke(toInput(d.pts), strokeOptions(d, last)));
+  return outlineToPath(getStroke(toInput(d.pts, d.input), strokeOptions(d, last)));
 }
 
 const pathCache = new Map<string, Path2D>();
