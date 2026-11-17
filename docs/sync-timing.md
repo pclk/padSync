@@ -78,3 +78,40 @@ writer does not allocate a sequence before its predecessor commits, and that a c
 winner is returned even when normal cursor pulls exclude it. Without that variable the suite skips.
 
 The fast preset retains moderate outage polling and failure retry intervals; only the local send window is shorter than the default. Existing saved configuration is preserved when code defaults change.
+
+## On-device debug menu
+
+Settings → Diagnostics → **Show sync debug menu** enables an overlay on every app screen.
+This is a device-local preference: enable it separately on the iPad and Mac. Expand/collapse the
+bottom-right button to keep the notebook usable. It shows browser visibility and focus, PWA mode,
+online state, realtime connection state, the next request deadline, effective polling and failure
+backoff. A hidden-state warning explains that realtime currently disconnects while hidden.
+
+For each of the last 40 sync attempts, the overlay shows the trigger (local edit, notification,
+poll, wake, retry or backlog), scheduled wait, timer lateness, local queue read, upload encoding,
+HTTP-to-headers, response body download/JSON, local storage application and total request time.
+Server phases are sent in `Server-Timing` only for opted-in debug requests: auth/database bootstrap,
+parse, entity write, conflict readback, events, pull, serialization and total. These are nested
+measurements, not additive independent costs. Backend region/build are shown when available.
+The first server bootstrap can include schema initialization; timings do not isolate platform
+cold starts or distinguish outbound network time from inbound network time.
+
+The bounded 150-event log includes visibility transitions, realtime access HTTP status/duration,
+reconnection, deliberately suspended subscriptions, local entity saves and ink canvas painting.
+Sender/receiver entity IDs and HLC versions let you match the same change across devices. Received
+edit age uses the sender's HLC wall time and can be distorted or negative due to clock skew; it is
+not a measured end-to-end latency. Ink paint events measure canvas work and elapsed time since
+received storage application; they do not prove physical screen presentation. Only rendered canvas
+tiles report paint events. Local saves made inside a larger transaction may not have committed yet.
+
+To diagnose a slow update, enable recording on both devices, reproduce one edit, then select the
+receiving request with nonzero applied entities and inspect the preceding visibility/realtime
+events. **Copy trace** or **Download trace** exports local JSON; matching version IDs helps compare
+the two exports. No notebook text, ink points, tokens, cookies or sealed query credentials are
+recorded. Recording is in memory, bounded and cleared on disable or page reload. The panel refreshes
+four times per second while enabled; it performs no polling or sync requests of its own. **Sync now**
+is an explicit manual request. Debug instrumentation has some overhead, so turn it off after capture.
+
+Diagnostics intentionally preserve the existing visibility/sync policy and saved timing values.
+In particular, the trace can establish whether a slow Mac/iPad was considered hidden and relying
+on its hidden poll interval before making a policy change.

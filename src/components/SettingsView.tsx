@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { deviceId, deviceKind } from "@/lib/db";
 import { useSyncStatus } from "@/lib/hooks";
-import { useShowCopyButtons } from "@/lib/settings";
+import { useShowCopyButtons, useSyncDebug } from "@/lib/settings";
 import { requestSync, resetCursor, stopSync } from "@/lib/sync";
 import { SyncTimingSettings } from "./SyncTimingSettings";
 import { DeviceTokens } from "./DeviceTokens";
@@ -27,6 +27,7 @@ interface CanvasCheck {
 export default function SettingsView() {
   const sync = useSyncStatus();
   const [showCopy, setShowCopy] = useShowCopyButtons();
+  const [syncDebug, setSyncDebug] = useSyncDebug();
   const [status, setStatus] = useState<Status | null>(null);
   const [authError] = useState(() => new URLSearchParams(window.location.search).get("auth_error"));
   const [canvas, setCanvas] = useState<CanvasCheck | null>(null);
@@ -75,6 +76,15 @@ export default function SettingsView() {
           <button className="rounded-lg border px-3 py-1.5" onClick={() => requestSync(0)}>Sync now</button>
           <button className="rounded-lg border px-3 py-1.5" onClick={() => resetCursor()}>Re-download everything</button>
         </div>
+      </section>
+
+      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
+        <h2 className="mb-3 font-semibold text-slate-800">Diagnostics</h2>
+        <label className="flex items-center justify-between gap-3">
+          <span><span className="block text-slate-800">Show sync debug menu</span>
+            <span className="block text-xs text-slate-500">Show timing, visibility and realtime diagnostics on this device. Enable separately on the iPad and Mac. Recording stays in memory and stops when switched off.</span></span>
+          <input type="checkbox" className="h-4 w-4 shrink-0" checked={syncDebug} onChange={e => setSyncDebug(e.target.checked)} />
+        </label>
       </section>
 
       <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">

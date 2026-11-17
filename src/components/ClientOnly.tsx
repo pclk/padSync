@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { Suspense, useEffect } from "react";
 import { startSync } from "@/lib/sync";
+import { SyncDebugOverlay } from "./SyncDebugOverlay";
 
 // Every screen reads IndexedDB, so screens render only in the browser. The server sends a
 // static shell, which the service worker caches for offline use.
@@ -26,6 +27,7 @@ export function ClientOnly({ view }: { view: keyof typeof views }) {
   return (
     <Suspense fallback={null}>
       <View />
+      <SyncDebugOverlay />
     </Suspense>
   );
 }

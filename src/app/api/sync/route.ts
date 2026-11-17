@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { requireSession } from "@/server/guard";
+import { syncServerTiming } from "@/server/sync-timing";
 
 // One endpoint does push and pull. Writes are last-writer-wins per entity on the hlc; every
 // accepted write takes a new seq, and clients pull "everything after my cursor".
@@ -48,13 +49,16 @@ interface Row {
 }
 
 export async function POST(req: NextRequest) {
+  const timing = syncServerTiming(req.headers.get("x-padsync-debug") === "1");
   const auth = await requireSession(req);
-  if (auth instanceof Response) return auth;
+  timing.mark("auth");
+  if (auth instanceof Response) return timing.respond(auth);
   const { sql } = auth;
 
   const parsed = body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: parsed.error.issues.slice(0, 5) }, { status: 400 });
   const { since, changes, events } = parsed.data;
+  timing.mark("parse");
 
   // One row per id (the newest), or the upsert fails with "cannot affect row a second time".
   const latest = new Map<string, (typeof changes)[number]>();
@@ -83,6 +87,7 @@ export async function POST(req: NextRequest) {
        where entities.hlc collate "C" < excluded.hlc collate "C"`,
       [JSON.stringify(rows)],
     );
+    timing.mark("write");
     // Fresh statement snapshot sees a concurrent winner that ON CONFLICT waited for.
     // Return it even when its sequence is behind the caller's existing cursor.
     const authoritative = await sql.query<Row>(
@@ -91,6 +96,7 @@ export async function POST(req: NextRequest) {
     );
     const sent = new Map(pushed.map(c => [c.id, c.hlc]));
     lost = authoritative.filter(row => row.hlc > sent.get(row.id)!);
+    timing.mark("conflicts");
   }
 
   if (events.length) {
@@ -104,10 +110,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  timing.mark("events");
   const pulled = (await sql.query(
     `select id, kind, notebook_id, parent_id, data, hlc, deleted, seq from entities where seq > $1 order by seq limit $2`,
     [since, PULL_LIMIT + 1],
   )) as Row[];
+  timing.mark("pull");
   const more = pulled.length > PULL_LIMIT;
   const page = more ? pulled.slice(0, PULL_LIMIT) : pulled;
 
@@ -118,9 +126,11 @@ export async function POST(req: NextRequest) {
   const inPage = new Set(out.map((r) => r.id));
   for (const r of lost) if (!inPage.has(r.id)) out.push(r);
 
-  return Response.json({
+  const response = Response.json({
     changes: out.map((r) => ({ id: r.id, kind: r.kind, notebookId: r.notebook_id, parentId: r.parent_id, data: r.data, hlc: r.hlc, deleted: r.deleted ? 1 : 0 })),
     cursor: page.length ? Number(page[page.length - 1].seq) : since,
     more,
   });
+  timing.mark("serialize");
+  return timing.respond(response);
 }

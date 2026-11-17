@@ -1,3 +1,4 @@
+import { beginSyncDebugRequest, debugNow, parseServerTiming, recordRemoteApplied, recordSyncDebug, syncDebugEnabled, updateSyncDebugRequest } from "./sync-debug";
 import { startRealtime, type RealtimeStatus } from "./sync-realtime";
 import { DEFAULT_DEBOUNCE_MS, validDebounce, DEFAULT_SYNC_CONFIG, normalizeSyncConfig, type SyncConfig } from "./sync-policy";
 import { db, getMeta, setMeta } from "./db";
@@ -33,6 +34,7 @@ let running = false;
 let again = false;
 let started = false;
 let dueAt = Infinity;
+let scheduledReason = "none";
 let failures = 0;
 let retryAt = 0;
 let configCheckedAt = -Infinity;
@@ -43,7 +45,7 @@ const requestTimes: number[] = [];
 let traceTruncated = false;
 export function getSyncTiming() {
   const now = Date.now(), start = Math.max(observedSince, now - 300000);
-  return { ...config, debounceMs, realtimeStatus, effectivePollMs: pollDelay(), start, end: now, edits: editTimes.filter(t => t >= start), requests: requestTimes.filter(t => t >= start).length, traceTruncated };
+  return { ...config, debounceMs, realtimeStatus, effectivePollMs: pollDelay(), start, end: now, edits: editTimes.filter(t => t >= start), requests: requestTimes.filter(t => t >= start).length, traceTruncated, status, running, again, failures, retryAt, nextDueAt: Number.isFinite(dueAt) ? dueAt : null, scheduledReason, configCheckedAt: Number.isFinite(configCheckedAt) ? configCheckedAt : null };
 }
 export function setSyncDebounce(value: number) {
   if (validDebounce(value)) setSyncConfig({ ...config, debounceMs: value });
@@ -87,46 +89,68 @@ function setStatus(s: SyncStatus) {
 }
 
 // A later edit/poll never postpones an earlier deadline. This bounds sustained writing latency.
-function schedule(delay: number) {
+function schedule(delay: number, reason = "poll") {
   if (typeof window === "undefined") return;
   const due = Math.max(Date.now() + delay, retryAt);
-  if (timer && due >= dueAt) return;
+  if (timer && due >= dueAt) {
+    recordSyncDebug('schedule', 'Joined earlier deadline', { trigger: reason, earlierTrigger: scheduledReason, dueInMs: Math.max(0, dueAt - Date.now()) });
+    return;
+  }
   if (timer) clearTimeout(timer);
-  dueAt = due;
-  timer = setTimeout(() => { timer = null; dueAt = Infinity; void runSync(); }, Math.max(0, due - Date.now()));
+  dueAt = due; scheduledReason = reason;
+  const queuedAt = debugNow();
+  recordSyncDebug('schedule', 'Sync scheduled', { trigger: reason, delayMs: delay, dueInMs: Math.max(0, due - Date.now()), visibility: document.visibilityState });
+  timer = setTimeout(() => {
+    const context = { trigger: reason, queueMs: debugNow() - queuedAt, timerLateMs: Math.max(0, Date.now() - due) };
+    timer = null; dueAt = Infinity; void runSync(context);
+  }, Math.max(0, due - Date.now()));
 }
-export function requestSync(delay?: number) {
+export function requestSync(delay?: number, reason = delay === undefined ? "local edit" : "manual") {
   if (typeof window === "undefined") return;
   if (delay === undefined) record(editTimes);
-  schedule(delay ?? debounceMs);
+  recordSyncDebug("trigger", "Sync requested", { trigger: reason, delayMs: delay ?? debounceMs });
+  schedule(delay ?? debounceMs, reason);
 }
 export function startSync() {
   if (started || typeof window === "undefined") return;
   started = true;
-  stopRealtime = startRealtime(() => requestSync(0), next => {
+  stopRealtime = startRealtime(() => requestSync(0, "realtime notification"), next => {
     const wasLive = realtimeStatus === 'live';
     realtimeStatus = next;
+    recordSyncDebug("realtime", "Realtime state", { state: next, visibility: document.visibilityState });
     if (wasLive && next !== 'live') schedule(pollDelay());
     listeners.forEach(listener => listener());
   });
-  const wake = () => { retryAt = 0; configCheckedAt = -Infinity; requestSync(0); };
+  const wake = () => { retryAt = 0; configCheckedAt = -Infinity; requestSync(0, "online / visible wake"); };
+  const stateChanged = () => recordSyncDebug('browser', 'Browser state changed', { visibility: document.visibilityState, online: navigator.onLine, focused: document.hasFocus?.() ?? false });
+  document.addEventListener('visibilitychange', stateChanged);
+  window.addEventListener('focus', stateChanged);
+  window.addEventListener('blur', stateChanged);
+  window.addEventListener('offline', stateChanged);
   window.addEventListener("online", wake);
   const visible = () => { if (document.visibilityState === 'visible') wake(); };
   document.addEventListener("visibilitychange", visible);
   stopWakeListeners = () => {
     window.removeEventListener("online", wake);
+    document.removeEventListener('visibilitychange', stateChanged);
+    window.removeEventListener('focus', stateChanged);
+    window.removeEventListener('blur', stateChanged);
+    window.removeEventListener('offline', stateChanged);
     document.removeEventListener("visibilitychange", visible);
   };
   requestSync(0);
 }
-async function runSync() {
+async function runSync(context = { trigger: "manual", queueMs: 0, timerLateMs: 0 }) {
   if (Date.now() < retryAt) { schedule(retryAt - Date.now()); return; }
-  if (running) { again = true; return; }
+  if (running) { again = true; recordSyncDebug("schedule", "Waiting for in-flight request", { trigger: context.trigger }); return; }
   running = true;
   void refreshConfig();
   try {
     let more = true;
-    while (more) more = await syncOnce();
+    while (more) {
+      more = await syncOnce(context);
+      context = { trigger: "pagination / backlog", queueMs: 0, timerLateMs: 0 };
+    }
   } catch {
     setStatus('error');
   } finally {
@@ -138,76 +162,102 @@ async function runSync() {
     }
     const pending = again;
     again = false;
-    if (pending) schedule(0);
-    else if (started) schedule(retryAt ? Math.max(0, retryAt - Date.now()) : pollDelay());
+    if (pending) schedule(0, "follow-up");
+    else if (started) schedule(retryAt ? Math.max(0, retryAt - Date.now()) : pollDelay(), retryAt ? "retry" : document.visibilityState === "visible" ? "visible poll" : "hidden poll");
   }
 }
 
 /** One push+pull round trip; true when there is more to do. Exported for tests. */
-export async function syncOnce(): Promise<boolean> {
-  if (!navigator.onLine) {
-    setStatus("offline");
-    return false;
-  }
-  const [dirty, events, since] = await Promise.all([
-    db.entities.where("dirty").equals(1).limit(ENTITY_BATCH).toArray(),
-    db.events.where("synced").equals(0).limit(EVENT_BATCH).toArray(),
-    getMeta<number>("cursor").then((c) => c ?? 0),
-  ]);
-  if (status !== "synced" || dirty.length || events.length) setStatus("syncing");
-
-  let res: Response;
+export async function syncOnce(context = { trigger: "manual", queueMs: 0, timerLateMs: 0 }): Promise<boolean> {
+  const trace = beginSyncDebugRequest(context.trigger, context.queueMs, context.timerLateMs);
+  const began = debugNow();
+  let phaseStart = began;
+  let completed = false;
   try {
-    record(requestTimes);
-    res = await fetch("/api/sync", {
-      signal: AbortSignal.timeout(15000),
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        since,
-        changes: dirty.map((e) => ({ ...e, dirty: undefined })),
-        events: events.map((e) => ({ ...e, synced: undefined })),
-      }),
-    });
-  } catch {
-    setStatus("offline");
-    return false;
-  }
-  if (res.status === 401) {
-    setStatus("needs-login");
-    return false;
-  }
-  if (res.status === 503) {
-    setStatus("local-only");
-    return false;
-  }
-  if (!res.ok) {
-    setStatus("error");
-    return false;
-  }
-
-  const body = (await res.json()) as { changes: Omit<Entity, "dirty">[]; cursor: number; more: boolean };
-
-  await db.transaction("rw", db.entities, db.events, db.meta, async () => {
-    // Clear dirty only if the row was not rewritten while the request was in flight.
-    const current = await db.entities.bulkGet(dirty.map((e) => e.id));
-    const acked = dirty.filter((sent, i) => current[i]?.hlc === sent.hlc);
-    if (acked.length) await db.entities.bulkUpdate(acked.map((e) => ({ key: e.id, changes: { dirty: 0 as const } })));
-    if (events.length) await db.events.bulkUpdate(events.map((e) => ({ key: e.id, changes: { synced: 1 as const } })));
-    if (body.changes.length) {
-      const locals = await db.entities.bulkGet(body.changes.map((r) => r.id));
-      const newer = body.changes.filter((remote, i) => {
-        hlcObserve(remote.hlc);
-        const local = locals[i];
-        return !local || remote.hlc > local.hlc;
-      });
-      if (newer.length) await db.entities.bulkPut(newer.map((r) => ({ ...r, dirty: 0 as const })));
+    if (!navigator.onLine) {
+      setStatus("offline");
+      return false;
     }
-    await db.meta.put({ key: "cursor", value: body.cursor });
-  });
+    const [dirty, events, since] = await Promise.all([
+      db.entities.where("dirty").equals(1).limit(ENTITY_BATCH).toArray(),
+      db.events.where("synced").equals(0).limit(EVENT_BATCH).toArray(),
+      getMeta<number>("cursor").then((c) => c ?? 0),
+    ]);
+    updateSyncDebugRequest(trace, { readMs: debugNow() - phaseStart, pushed: dirty.length, events: events.length, since, phase: 'Encode request' });
+    if (status !== "synced" || dirty.length || events.length) setStatus("syncing");
+    phaseStart = debugNow();
+    const payload = JSON.stringify({
+      since, changes: dirty.map(e => ({ ...e, dirty: undefined })),
+      events: events.map(e => ({ ...e, synced: undefined })),
+    });
+    updateSyncDebugRequest(trace, { encodeMs: debugNow() - phaseStart, phase: 'HTTP round trip' });
 
-  setStatus("synced");
-  return body.more || dirty.length === ENTITY_BATCH || events.length === EVENT_BATCH;
+    let res: Response;
+    try {
+      record(requestTimes);
+      phaseStart = debugNow();
+      res = await fetch("/api/sync", {
+        signal: AbortSignal.timeout(15000),
+        method: "POST",
+        headers: { "content-type": "application/json", ...(trace ? { "x-padsync-debug": "1" } : {}) },
+        body: payload,
+      });
+    } catch {
+      updateSyncDebugRequest(trace, { httpMs: debugNow() - phaseStart, phase: 'Network failure / timeout' });
+      setStatus("offline");
+      return false;
+    }
+    updateSyncDebugRequest(trace, { httpMs: debugNow() - phaseStart, status: res.status, server: parseServerTiming(res.headers.get('Server-Timing')), serverRegion: res.headers.get('X-PadSync-Server-Region') ?? undefined, serverBuild: res.headers.get('X-PadSync-Server-Build') ?? undefined, phase: 'Read response body + JSON' });
+    if (res.status === 401) {
+      setStatus("needs-login");
+      return false;
+    }
+    if (res.status === 503) {
+      setStatus("local-only");
+      return false;
+    }
+    if (!res.ok) {
+      setStatus("error");
+      return false;
+    }
+
+    phaseStart = debugNow();
+    const body = (await res.json()) as { changes: Omit<Entity, "dirty">[]; cursor: number; more: boolean };
+
+    updateSyncDebugRequest(trace, { decodeMs: debugNow() - phaseStart, pulled: body.changes.length, cursor: body.cursor, more: body.more, phase: 'Apply to IndexedDB' });
+    phaseStart = debugNow();
+    let applied: typeof body.changes = [];
+    await db.transaction("rw", db.entities, db.events, db.meta, async () => {
+      // Clear dirty only if the row was not rewritten while the request was in flight.
+      const current = await db.entities.bulkGet(dirty.map((e) => e.id));
+      const acked = dirty.filter((sent, i) => current[i]?.hlc === sent.hlc);
+      if (acked.length) await db.entities.bulkUpdate(acked.map((e) => ({ key: e.id, changes: { dirty: 0 as const } })));
+      if (events.length) await db.events.bulkUpdate(events.map((e) => ({ key: e.id, changes: { synced: 1 as const } })));
+      if (body.changes.length) {
+        const locals = await db.entities.bulkGet(body.changes.map((r) => r.id));
+        const newer = body.changes.filter((remote, i) => {
+          hlcObserve(remote.hlc);
+          const local = locals[i];
+          return !local || remote.hlc > local.hlc;
+        });
+        applied = newer;
+        if (newer.length) await db.entities.bulkPut(newer.map((r) => ({ ...r, dirty: 0 as const })));
+      }
+      await db.meta.put({ key: "cursor", value: body.cursor });
+    });
+
+    updateSyncDebugRequest(trace, { applyMs: debugNow() - phaseStart, applied: applied.length, phase: 'Done' });
+    recordRemoteApplied(trace, applied);
+    completed = true;
+    setStatus("synced");
+    return body.more || dirty.length === ENTITY_BATCH || events.length === EVENT_BATCH;
+  } catch (error) {
+    updateSyncDebugRequest(trace, { phase: `Error during ${trace?.phase ?? 'sync'} (${error instanceof Error ? error.name : 'unknown'})` });
+    throw error;
+  } finally {
+    updateSyncDebugRequest(trace, { totalMs: debugNow() - began, ...(!completed && !trace?.phase.startsWith("Error") ? { phase: `${trace?.phase ?? "Failed"} · ${status}` } : {}) });
+    if (trace && syncDebugEnabled()) recordSyncDebug('request', completed ? 'Sync completed' : 'Sync failed', { request: trace.id, trigger: trace.trigger, status, durationMs: debugNow() - began });
+  }
 }
 
 export function stopSync() {

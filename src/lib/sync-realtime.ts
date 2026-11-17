@@ -1,3 +1,4 @@
+import { debugNow, recordSyncDebug } from "./sync-debug";
 import { createRealtimeClient, type MaterializedLiveQuerySubscription, type RealtimeClient, type SealedLiveQuery } from '@neon/realtime/client';
 
 export type RealtimeStatus = 'connecting' | 'live' | 'fallback' | 'disabled' | 'suspended';
@@ -29,16 +30,19 @@ export function startRealtime(onNotify: () => void, onStatus: (status: RealtimeS
     clearTimeout(timer);
     if (active()) timer = setTimeout(fn, delay);
   }
-  function failed() {
+  function failed(reason = 'connection or renewal failed') {
     if (stopped) return;
+    recordSyncDebug('realtime', 'Realtime fallback', { reason });
     clear(); publish('fallback');
     later(() => { void connect(); }, Math.min(60000, 2000 * 2 ** Math.min(failures++, 5)));
   }
   async function capability(): Promise<Capability> {
     request = new AbortController();
+    const began = debugNow();
     const response = await fetch('/api/sync/live', {
       method: 'POST', cache: 'no-store', signal: AbortSignal.any([request.signal, AbortSignal.timeout(10000)]),
     });
+    recordSyncDebug('realtime', 'Realtime access response', { status: response.status, durationMs: debugNow() - began });
     if (!response.ok) throw new Error('Realtime authorization unavailable');
     return response.json();
   }
@@ -64,6 +68,7 @@ export function startRealtime(onNotify: () => void, onStatus: (status: RealtimeS
       const next = await capability();
       if (current !== generation || !active()) return;
       if (!next.enabled) {
+        recordSyncDebug('realtime', 'Realtime not configured on server');
         publish('disabled'); later(() => { void connect(); }, 60000); return;
       }
       // A new login must never reuse the old connection or subscription.
@@ -73,7 +78,7 @@ export function startRealtime(onNotify: () => void, onStatus: (status: RealtimeS
       let signature: string | undefined;
       subscription.onChange(snapshot => {
         if (current !== generation || !active()) return;
-        if (snapshot.status === 'error' || snapshot.status === 'closed') { failed(); return; }
+        if (snapshot.status === 'error' || snapshot.status === 'closed') { failed(snapshot.status === 'error' ? `subscription error: ${snapshot.error?.code ?? "unknown"}` : 'subscription closed'); return; }
         if (snapshot.status !== 'live') { publish('connecting'); return; }
         const wasLive = status === 'live';
         publish('live'); failures = 0;
@@ -84,7 +89,7 @@ export function startRealtime(onNotify: () => void, onStatus: (status: RealtimeS
     } catch { if (current === generation) failed(); }
   }
   const wake = () => { void connect(); };
-  const suspend = () => { clear(); publish('suspended'); };
+  const suspend = () => { recordSyncDebug('realtime', 'Realtime deliberately suspended', { visibility: document.visibilityState, online: navigator.onLine }); clear(); publish('suspended'); };
   const visibility = () => { if (active()) wake(); else suspend(); };
   window.addEventListener('online', wake);
   window.addEventListener('offline', suspend);

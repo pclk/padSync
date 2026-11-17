@@ -3,6 +3,7 @@ import { db, deviceId } from "./db";
 import { hlcNow, hlcObserve } from "./hlc";
 import { applyPatch, type SectionChange } from "./roundtrip";
 import { requestSync } from "./sync";
+import { debugNow, recordSyncDebug, syncDebugEnabled } from "./sync-debug";
 import {
   SCREEN_HEIGHT,
   STROKE_STRIDE,
@@ -27,7 +28,12 @@ export async function putEntities<E extends Entity>(entities: E[]): Promise<E[]>
   // since that version was stamped (the server ignores writes with an older hlc).
   for (const e of entities) if (e.hlc) hlcObserve(e.hlc);
   const stamped = entities.map((e) => ({ ...e, hlc: hlcNow(device), dirty: 1 as const }));
+  const began = debugNow();
   await db.entities.bulkPut(stamped);
+  if (syncDebugEnabled()) recordSyncDebug('local', 'Local entities saved (transaction may still be open)', {
+    durationMs: debugNow() - began, count: stamped.length,
+    versions: stamped.slice(0, 8).map(entity => `${entity.kind}:${entity.id}@${entity.hlc}`).join(', '),
+  });
   requestSync();
   return stamped;
 }

@@ -163,3 +163,37 @@ it('batches edits with the fast preset while keeping moderate fallback and retry
  expect(fetchMock.mock.calls.filter(c=>c[0]==='/api/sync')).toHaveLength(1);
  expect(sync.getSyncTiming()).toMatchObject({visiblePollMs:2000,hiddenPollMs:60000,retryBaseMs:2000});
 });
+
+it('records scheduled wait and request phases only when debug is enabled, without extra requests',async()=>{
+ const debug=await import('@/lib/sync-debug'); debug.setSyncDebugEnabled(true);
+ fetchMock.mockImplementation(async(url:string)=>url==='/api/sync-config'?Response.json({debounceMs:50}):Response.json({changes:[],cursor:7,more:false},{headers:{'Server-Timing':'auth;dur=2, pull;dur=15, total;dur=20'}}));
+ sync.setSyncConfig(FAST_SYNC_CONFIG); sync.requestSync();
+ await vi.advanceTimersByTimeAsync(50);
+ const recorded=debug.getSyncDebugSnapshot().requests;
+ expect(recorded).toHaveLength(1);
+ expect(recorded[0]).toMatchObject({trigger:'local edit',visibility:'visible',queueMs:50,timerLateMs:0,phase:'Done',status:200,pushed:0,pulled:0,cursor:7,server:{auth:2,pull:15,total:20}});
+ for(const key of ['readMs','encodeMs','httpMs','decodeMs','applyMs','totalMs'] as const) expect(recorded[0][key]).toBeGreaterThanOrEqual(0);
+ const calls=fetchMock.mock.calls as unknown as [string,RequestInit][];
+ expect(calls.find(call=>call[0]==='/api/sync')?.[1].headers).toMatchObject({'x-padsync-debug':'1'});
+ debug.setSyncDebugEnabled(false); sync.requestSync(0); await vi.advanceTimersByTimeAsync(0);
+ expect(debug.getSyncDebugSnapshot().requests).toHaveLength(0);
+ expect(calls.filter(call=>call[0]==='/api/sync')).toHaveLength(2);
+ expect((calls.filter(call=>call[0]==='/api/sync').at(-1)![1].headers as Record<string,string>)['x-padsync-debug']).toBeUndefined();
+});
+it('records hidden browser transitions and the hidden poll deadline',async()=>{
+ const debug=await import('@/lib/sync-debug'); debug.setSyncDebugEnabled(true);
+ sync.startSync(); await vi.advanceTimersByTimeAsync(0);
+ Object.assign(document,{visibilityState:'hidden'}); document.dispatchEvent(new Event('visibilitychange'));
+ await vi.advanceTimersByTimeAsync(2000);
+ const snapshot=debug.getSyncDebugSnapshot();
+ expect(snapshot.events.some(event=>event.kind==='browser'&&event.details.visibility==='hidden')).toBe(true);
+ expect(snapshot.events.some(event=>event.message==='Sync scheduled'&&event.details.trigger==='hidden poll'&&event.details.delayMs===60000)).toBe(true);
+ expect(snapshot.requests.at(-1)?.visibility).toBe('hidden');
+});
+it('records response parsing failures with the actual phase',async()=>{
+ const debug=await import('@/lib/sync-debug'); debug.setSyncDebugEnabled(true);
+ fetchMock.mockImplementation(async(url:string)=>url==='/api/sync-config'?Response.json({debounceMs:400}):new Response('invalid JSON'));
+ sync.startSync(); await vi.advanceTimersByTimeAsync(0);
+ expect(debug.getSyncDebugSnapshot().requests[0].phase).toContain('Error during Read response body + JSON (SyntaxError)');
+ expect(sync.getSyncState().status).toBe('error');
+});

@@ -1,4 +1,5 @@
 "use client";
+import { debugNow, recordSyncPaint } from "@/lib/sync-debug";
 
 import { useLiveQuery } from "dexie-react-hooks";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -260,6 +261,7 @@ const InkTile = memo(function InkTile({ top, height, strokes, zoom, hidden, cont
       painted.current = null;
       return;
     }
+    const paintStarted = debugNow();
     const scale = Math.min((window.devicePixelRatio || 1) * zoom, MAX_SCALE);
     const w = Math.round(PAGE_WIDTH * scale);
     const h = Math.round(height * scale);
@@ -279,6 +281,7 @@ const InkTile = memo(function InkTile({ top, height, strokes, zoom, hidden, cont
       paintStrokes(ctx, shown);
     }
     painted.current = { strokes: shown, scale, hidden };
+    recordSyncPaint(delta ?? shown, debugNow() - paintStarted);
     controller.ackPainted((delta ?? shown).map((s) => s.id));
   }, [visible, strokes, zoom, height, top, hidden, controller]);
 

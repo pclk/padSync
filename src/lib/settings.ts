@@ -57,3 +57,7 @@ export function useBoolSetting(key: string, fallback: boolean): [boolean, (v: bo
 }
 
 export const useShowCopyButtons = () => useBoolSetting(SHOW_COPY_BUTTONS_KEY, SHOW_COPY_BUTTONS_DEFAULT);
+
+export const SYNC_DEBUG_KEY = "padsync.syncDebug";
+export const SYNC_DEBUG_DEFAULT = false;
+export const useSyncDebug = () => useBoolSetting(SYNC_DEBUG_KEY, SYNC_DEBUG_DEFAULT);
