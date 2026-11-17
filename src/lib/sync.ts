@@ -31,6 +31,7 @@ let lastSyncedAt = 0;
 const listeners = new Set<() => void>();
 let timer: ReturnType<typeof setTimeout> | null = null;
 let running = false;
+let generation = 0;
 let again = false;
 let started = false;
 let dueAt = Infinity;
@@ -144,10 +145,11 @@ async function runSync(context = { trigger: "manual", queueMs: 0, timerLateMs: 0
   if (Date.now() < retryAt) { schedule(retryAt - Date.now()); return; }
   if (running) { again = true; recordSyncDebug("schedule", "Waiting for in-flight request", { trigger: context.trigger }); return; }
   running = true;
+  const current = generation;
   void refreshConfig();
   try {
     let more = true;
-    while (more) {
+    while (more && current === generation) {
       more = await syncOnce(context);
       context = { trigger: "pagination / backlog", queueMs: 0, timerLateMs: 0 };
     }
@@ -158,11 +160,14 @@ async function runSync(context = { trigger: "manual", queueMs: 0, timerLateMs: 0
     if (status === 'synced') { failures = 0; retryAt = 0; }
     else {
       failures++;
-      retryAt = Date.now() + Math.min(60000, config.retryBaseMs * 2 ** Math.min(failures - 1, 5));
+      retryAt = Date.now() + Math.min(60000, config.retryBaseMs * 2 ** Math.min(failures - 1, 16));
     }
     const pending = again;
     again = false;
-    if (pending) schedule(0, "follow-up");
+    if (current !== generation) {
+      // A stopped run may finish its acknowledgement, but must not continue draining.
+      if (started) schedule(0, "restart");
+    } else if (pending) schedule(0, "follow-up");
     else if (started) schedule(retryAt ? Math.max(0, retryAt - Date.now()) : pollDelay(), retryAt ? "retry" : document.visibilityState === "visible" ? "visible poll" : "hidden poll");
   }
 }
@@ -261,6 +266,7 @@ export async function syncOnce(context = { trigger: "manual", queueMs: 0, timerL
 }
 
 export function stopSync() {
+  generation++;
   started = false; again = false;
   stopWakeListeners?.(); stopWakeListeners = undefined;
   stopRealtime?.(); stopRealtime = undefined;
