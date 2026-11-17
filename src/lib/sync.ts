@@ -1,3 +1,4 @@
+import { DEFAULT_DEBOUNCE_MS, VISIBLE_POLL_MS, HIDDEN_POLL_MS, validDebounce } from "./sync-policy";
 import { db, getMeta, setMeta } from "./db";
 import { hlcObserve } from "./hlc";
 import type { Entity } from "./types";
@@ -9,9 +10,7 @@ import type { Entity } from "./types";
 
 export type SyncStatus = "idle" | "syncing" | "synced" | "offline" | "local-only" | "needs-login" | "error";
 
-const PUSH_DEBOUNCE_MS = 400;
-const POLL_VISIBLE_MS = 2000;
-const POLL_HIDDEN_MS = 15000;
+let debounceMs = DEFAULT_DEBOUNCE_MS;
 // Strokes are a few KB each; keep requests well under Vercel's 4.5 MB body limit.
 const ENTITY_BATCH = 100;
 const EVENT_BATCH = 500;
@@ -23,6 +22,38 @@ let timer: ReturnType<typeof setTimeout> | null = null;
 let running = false;
 let again = false;
 let started = false;
+let dueAt = Infinity;
+let failures = 0;
+let retryAt = 0;
+let configCheckedAt = -Infinity;
+let configLoading = false;
+const observedSince = Date.now();
+const editTimes: number[] = [];
+const requestTimes: number[] = [];
+let traceTruncated = false;
+export function getSyncTiming() {
+  const now = Date.now(), start = Math.max(observedSince, now - 300000);
+  return { debounceMs, start, end: now, edits: editTimes.filter(t => t >= start), requests: requestTimes.filter(t => t >= start).length, traceTruncated };
+}
+export function setSyncDebounce(value: number) {
+  if (validDebounce(value)) debounceMs = value;
+}
+function record(trace: number[]) {
+  const now = Date.now();
+  while (trace.length && trace[0] < now - 300000) trace.shift();
+  trace.push(now);
+  if (trace.length > 10000) { trace.shift(); traceTruncated = true; }
+}
+async function refreshConfig() {
+  if (configLoading || Date.now() - configCheckedAt < 60000 || !navigator.onLine) return;
+  configLoading = true;
+  configCheckedAt = Date.now();
+  try {
+    const res = await fetch('/api/sync-config', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+    if (res.ok) setSyncDebounce((await res.json()).debounceMs);
+  } catch { /* use last known timing until the next refresh */ }
+  finally { configLoading = false; }
+}
 
 export function getSyncState() {
   return { status, lastSyncedAt };
@@ -39,40 +70,51 @@ function setStatus(s: SyncStatus) {
   listeners.forEach((l) => l());
 }
 
-export function requestSync(delay = PUSH_DEBOUNCE_MS) {
+// A later edit/poll never postpones an earlier deadline. This bounds sustained writing latency.
+function schedule(delay: number) {
   if (typeof window === "undefined") return;
+  const due = Math.max(Date.now() + delay, retryAt);
+  if (timer && due >= dueAt) return;
   if (timer) clearTimeout(timer);
-  timer = setTimeout(runSync, delay);
+  dueAt = due;
+  timer = setTimeout(() => { timer = null; dueAt = Infinity; void runSync(); }, Math.max(0, due - Date.now()));
 }
-
+export function requestSync(delay?: number) {
+  if (typeof window === "undefined") return;
+  if (delay === undefined) record(editTimes);
+  schedule(delay ?? debounceMs);
+}
 export function startSync() {
   if (started || typeof window === "undefined") return;
   started = true;
-  pollLoop = () => requestSync(document.visibilityState === "visible" ? POLL_VISIBLE_MS : POLL_HIDDEN_MS);
-  window.addEventListener("online", () => requestSync(0));
-  document.addEventListener("visibilitychange", () => requestSync(0));
+  const wake = () => { retryAt = 0; configCheckedAt = -Infinity; requestSync(0); };
+  window.addEventListener("online", wake);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === 'visible') wake();
+  });
   requestSync(0);
 }
-
-let pollLoop: (() => void) | null = null;
-
 async function runSync() {
-  if (running) {
-    again = true;
-    return;
-  }
+  if (Date.now() < retryAt) { schedule(retryAt - Date.now()); return; }
+  if (running) { again = true; return; }
   running = true;
+  void refreshConfig();
   try {
     let more = true;
     while (more) more = await syncOnce();
+  } catch {
+    setStatus('error');
   } finally {
     running = false;
-    if (again) {
-      again = false;
-      requestSync(0);
-    } else {
-      pollLoop?.();
+    if (status === 'synced') { failures = 0; retryAt = 0; }
+    else {
+      failures++;
+      retryAt = Date.now() + Math.min(60000, 2000 * 2 ** Math.min(failures - 1, 5));
     }
+    const pending = again;
+    again = false;
+    if (pending) schedule(0);
+    else if (started) schedule(document.visibilityState === 'visible' ? VISIBLE_POLL_MS : HIDDEN_POLL_MS);
   }
 }
 
@@ -91,7 +133,9 @@ export async function syncOnce(): Promise<boolean> {
 
   let res: Response;
   try {
+    record(requestTimes);
     res = await fetch("/api/sync", {
+      signal: AbortSignal.timeout(15000),
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({

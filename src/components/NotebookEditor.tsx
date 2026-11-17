@@ -378,6 +378,7 @@ function Editor({ notebookId }: { notebookId: string }) {
   return (
     <div className="editor min-h-screen bg-slate-200/70" style={{ paddingTop: TOOLBAR_H + 16, paddingRight: showPanel ? PANEL_W : 0 }}>
       <Toolbar
+        notebookId={notebookId}
         title={notebook.data.title}
         tool={tool}
         setTool={setTool}

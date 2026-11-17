@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { buildImportPrompt, fetchUploads } from "../bridge/lib";
+import { agentCommand, buildImportPrompt, fetchUploads } from "../bridge/lib";
 import { POST as claim } from "@/app/api/bridge/claim/route";
 import { GET as bridgeInput } from "@/app/api/bridge/jobs/[id]/inputs/route";
 import { POST as bridgeUpdate } from "@/app/api/bridge/jobs/[id]/route";
@@ -27,6 +27,47 @@ import { PNG_DATA_URL, configureAuthEnv, freshDb, params, req, sessionCookie } f
 // figure. The temp dir must be gone afterwards on success, error and cancel.
 
 describe("bridge import helpers", () => {
+  // Import dispatch forces allowEdits so the agent can deliver out/padsync.json.
+  const values = (args: string[], flag: string) => {
+    const start = args.indexOf(flag);
+    if (start < 0) return [];
+    const rest = args.slice(start + 1);
+    const end = rest.findIndex((v) => v.startsWith("--"));
+    return end < 0 ? rest : rest.slice(0, end);
+  };
+
+  it.each([false, true])("Claude import grants file delivery with optional Bash=%s, independently of web", (allowCode) => {
+    for (const webSearch of [false, true]) {
+      const { args } = agentCommand("claude", {}, false, { allowEdits: true, allowCode, webSearch });
+      const tools = ["Read", "Glob", "Grep", "Write", "Edit", ...(allowCode ? ["Bash"] : []), ...(webSearch ? ["WebSearch", "WebFetch"] : [])];
+      expect(values(args, "--tools")).toEqual([tools.join(",")]);
+      expect(values(args, "--allowedTools")).toEqual(tools.filter((t) => !["Write", "Edit"].includes(t)));
+      expect(values(args, "--disallowedTools")).toEqual(["Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch"].filter((t) => !tools.includes(t)));
+      expect(values(args, "--permission-mode")).toEqual(["acceptEdits"]);
+      expect(args).toContain("--strict-mcp-config");
+      expect(args).not.toContain("--dangerously-skip-permissions");
+      if (allowCode) {
+        expect(JSON.parse(values(args, "--settings")[0])).toEqual({ sandbox: { enabled: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false } });
+      } else expect(args).not.toContain("--settings");
+    }
+    const ask = agentCommand("claude", {}, false).args;
+    expect(values(ask, "--tools")).toEqual(["Read"]);
+    expect(ask).not.toContain("--permission-mode");
+  });
+
+  it("Codex import needs workspace writes; code is intrinsic and search remains optional", () => {
+    for (const webSearch of [false, true]) {
+      const args = agentCommand("codex", {}, ["lectures/board.png"], { allowEdits: true, webSearch }).args;
+      expect(args[args.indexOf("--sandbox") + 1]).toBe("workspace-write");
+      expect(args.includes("--search")).toBe(webSearch);
+      if (webSearch) expect(args.indexOf("--search")).toBeLessThan(args.indexOf("exec"));
+      expect(args.slice(-2)).toEqual(["--image", "lectures/board.png"]);
+      expect(args.join(" ")).not.toMatch(/danger-full-access|dangerously/);
+    }
+    const ask = agentCommand("codex", {}, false).args;
+    expect(ask[ask.indexOf("--sandbox") + 1]).toBe("read-only");
+  });
+
   it("fetchUploads reassembles parts and checks sizes", async () => {
     const data: Record<string, string[]> = { "lectures/01-a.pdf": ["AAAA", "BB=="], "lectures/02-b.png": ["CCCC"] };
     const api = { input: async (_id: string, path: string, part: number) => ({ data: data[path][part] }) };
@@ -49,6 +90,8 @@ describe("bridge import helpers", () => {
     expect(claude).toContain("lectures/02-deck.pptx`: lecture material (an Office file");
     expect(claude).toContain("/tmp/padsync-job-x/out/padsync.json");
     expect(claude).toContain("/tmp/padsync-job-x/out/figures/");
+    expect(claude).toMatch(/Read request.md first.*selected PDF page ranges/);
+    expect(claude).toContain("otherwise read all pages");
     expect(claude).toMatch(/you may not run here/); // pptx without allowCode
     expect(buildImportPrompt("x", d, "claude", { allowCode: true })).toMatch(/check that the file parses as JSON/);
     const codex = buildImportPrompt("x", d, "codex");
@@ -64,12 +107,18 @@ let prompt = "";
 for await (const c of process.stdin) prompt += c;
 const out = (o) => process.stdout.write(JSON.stringify(o) + "\\n");
 out({ type: "system", subtype: "init" });
+// Leave partial output behind before failure/cancel to exercise recursive cleanup.
+fs.writeFileSync("out/partial.txt", "unfinished");
 if (prompt.includes("FAIL")) { console.error("agent blew up"); process.exit(3); }
 if (prompt.includes("HANG")) await new Promise((r) => setTimeout(r, 60000));
 const lectures = fs.readdirSync("lectures").sort();
 const pdf = fs.readFileSync("lectures/" + lectures[0]);
 const instructions = fs.readFileSync("INSTRUCTIONS.md", "utf8");
 const request = fs.readFileSync("request.md", "utf8");
+if (prompt.includes(instructions) || prompt.includes(request) || prompt.includes(pdf.toString("base64"))) {
+  console.error("document content was inlined"); process.exit(4);
+}
+fs.unlinkSync("out/partial.txt");
 fs.mkdirSync("out/figures");
 fs.writeFileSync("out/figures/graph.png", Buffer.from(process.env.FAKE_PNG, "base64"));
 fs.writeFileSync("out/padsync.json", JSON.stringify({
@@ -206,7 +255,10 @@ describe("AI import end to end", () => {
     await startBridge();
     const { jobId } = await sendImport({ config: { ...DEFAULT_CONFIG, request: "HANG" }, attachments: [lecture("a.pdf", Buffer.from("%PDF"))], fetch: pageFetch });
     await waitFor(() => job(jobId), (x) => x.status === "running");
-    await waitFor(leftovers, (l) => l.length === 1);
+    await waitFor(async () => {
+      const dirs = await leftovers();
+      return dirs.length === 1 && (await readdir(join(jobTmp, dirs[0], "out")).catch((): string[] => [])).includes("partial.txt");
+    }, Boolean);
     await cancelRoute(req(`/api/jobs/${jobId}/cancel`, { method: "POST", session }), params({ id: jobId }));
     await waitFor(async () => logs, (l) => l.includes("cancelled by user"));
     expect((await job(jobId)).status).toBe("cancelled");

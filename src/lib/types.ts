@@ -34,7 +34,16 @@ export interface NotebookData {
 
 export type Template = "plain" | "dots" | "grid" | "lines";
 
+/** Stable lecture references supplied by the parent provenance integration. */
+export interface LectureSource {
+  attachmentId: string;
+  name?: string;
+  pages?: number[];
+}
+
 export interface SectionData {
+  importApplication?: { key: string; title: string; appliedAt: number };
+  sources?: LectureSource[];
   order: number;
   title?: string;
   blocks: Block[];

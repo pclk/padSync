@@ -47,6 +47,18 @@ export function setSqlForTests(sql: Sql | null) {
 export async function migrate(sql: Sql) {
   // Cold starts pay for this, so on Neon it is one HTTP round trip rather than one per statement.
   const ddl = [
+    `create table if not exists sync_config (id integer primary key check(id=1), debounce_ms integer not null check(debounce_ms between 100 and 10000))`,
+    `create table if not exists lecture_pdfs (
+      id text primary key, owner text not null, notebook_id text not null,
+      name text not null, size integer not null check (size > 0), ready boolean not null default false,
+      created_at timestamptz not null default now()
+    )`,
+    `create index if not exists lecture_pdfs_owner_idx on lecture_pdfs(owner, notebook_id)`,
+    `create table if not exists lecture_pdf_parts (
+      attachment_id text not null references lecture_pdfs(id) on delete cascade,
+      part integer not null, data text not null, primary key(attachment_id, part)
+    )`,
+    `create table if not exists lecture_pdf_notebooks (attachment_id text not null references lecture_pdfs(id) on delete cascade, notebook_id text not null, primary key(attachment_id, notebook_id))`,
     `create sequence if not exists entity_seq`,
     `
     create table if not exists entities (

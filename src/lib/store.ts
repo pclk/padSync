@@ -151,3 +151,70 @@ export async function applyNotebookChanges(notebookId: string, changes: SectionC
   if (rows.length) await logEvent(notebookId, null, "ai_apply", { updated: changes.filter((c) => c.kind === "update").length, added: changes.filter((c) => c.kind === "add").length });
   return rows.length;
 }
+
+
+export interface ImportReceipt {
+  notebookId: string;
+  title: string;
+  sectionIds: string[];
+  appliedAt: number;
+}
+
+/** The receipt, content and event commit together, serialized across tabs by IndexedDB. */
+export async function applyImportedSections(input: {
+  receiptKey: string;
+  destination: { kind: "new" } | { kind: "append"; notebookId: string };
+  title: string;
+  description?: string;
+  sections: Omit<SectionData, "order" | "createdAt">[];
+  importHash: string;
+  legacyHashes: string[];
+  jobId?: string;
+}): Promise<ImportReceipt & { duplicate: boolean }> {
+  const result = await db.transaction("rw", db.entities, db.meta, db.events, async () => {
+    const key = `ai-import-receipt:${input.receiptKey}`;
+    const prior = await db.meta.get(key);
+    if (prior) return { ...(prior.value as ImportReceipt), duplicate: true };
+    const synced = (await db.entities.where("kind").equals("section").toArray() as SectionEntity[]).find(s => s.data.importApplication?.key === input.receiptKey);
+    if (synced) {
+      const receipt: ImportReceipt = { notebookId: synced.notebookId, title: synced.data.importApplication!.title, sectionIds: [synced.id], appliedAt: synced.data.importApplication!.appliedAt };
+      await db.meta.add({ key, value: receipt });
+      return { ...receipt, duplicate: true };
+    }
+    // Honor notebooks imported before receipts existed, including soft-deleted ones.
+    const legacy = (await db.entities.where("kind").equals("notebook").toArray() as NotebookEntity[])
+      .find((n) => n.data.source && input.legacyHashes.includes(n.data.source.importHash));
+    if (legacy) {
+      const receipt: ImportReceipt = { notebookId: legacy.id, title: legacy.data.title, sectionIds: [], appliedAt: legacy.data.source!.importedAt };
+      await db.meta.add({ key, value: receipt });
+      return { ...receipt, duplicate: true };
+    }
+    if (!input.sections.length) throw new Error("No sections selected.");
+    const now = Date.now();
+    let notebook: NotebookEntity;
+    const rows: Entity[] = [];
+    let order = 0;
+    if (input.destination.kind === "append") {
+      const target = await db.entities.get(input.destination.notebookId);
+      if (!target || target.kind !== "notebook" || target.deleted) throw new Error("The destination notebook is no longer available.");
+      notebook = target as NotebookEntity;
+      order = (await liveSections(notebook.id)).at(-1)?.data.order ?? 0;
+    } else {
+      notebook = newEntity("notebook", "", "", { title: input.title, description: input.description, createdAt: now,
+        source: { importHash: input.importHash, importedAt: now, ...(input.jobId ? { jobId: input.jobId } : {}) } });
+      notebook.id = `import-${input.receiptKey}`;
+      notebook.notebookId = notebook.id;
+      rows.push(notebook);
+    }
+    const sections = input.sections.map((s, index) => ({ ...newEntity("section", notebook.id, "", { ...s, importApplication: { key: input.receiptKey, title: notebook.data.title, appliedAt: now }, order: ++order, createdAt: now }), id: `import-${input.receiptKey}-${index}` }));
+    rows.push(...sections);
+    const device = deviceId();
+    await db.entities.bulkPut(rows.map((e) => ({ ...e, hlc: hlcNow(device), dirty: 1 as const })));
+    const receipt: ImportReceipt = { notebookId: notebook.id, title: notebook.data.title, sectionIds: sections.map((s) => s.id), appliedAt: now };
+    await db.events.add({ id: nanoid(), notebookId: notebook.id, sectionId: null, type: "ai_import_apply", t: now, device, data: { sections: sections.length, destination: input.destination.kind }, synced: 0 });
+    await db.meta.add({ key, value: receipt });
+    return { ...receipt, duplicate: false };
+  });
+  requestSync();
+  return result;
+}

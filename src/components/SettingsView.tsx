@@ -6,6 +6,7 @@ import { deviceId, deviceKind } from "@/lib/db";
 import { useSyncStatus } from "@/lib/hooks";
 import { useShowCopyButtons } from "@/lib/settings";
 import { requestSync, resetCursor } from "@/lib/sync";
+import { SyncTimingSettings } from "./SyncTimingSettings";
 import { DeviceTokens } from "./DeviceTokens";
 
 interface Status {
@@ -95,6 +96,7 @@ export default function SettingsView() {
         {authError && <p className="mt-2 text-rose-700">{authError}</p>}
       </section>
 
+      {status?.authed && <SyncTimingSettings />}
       {status?.authed && <DeviceTokens />}
 
       <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">

@@ -8,6 +8,11 @@ export type AttachmentKind = "pdf" | "image" | "text" | "slides" | "document";
 
 export interface AttachmentMeta {
   id: string;
+  persistentId?: string;
+  notebookId?: string;
+  sourceFilename?: string;
+  /** Requested 1-based source pages; the original PDF remains intact. */
+  selectedPages?: number[];
   /** The user's file name: shown, and listed in request.md, but never used as a path. */
   name: string;
   mime: BundleMime;

@@ -394,7 +394,7 @@ export function buildImportPrompt(question: string, d: Pick<JobDir, "dir" | "fil
   return [
     "You are preparing study material for me (a university student) in padSync, an iPad app where I write with an Apple Pencil on top of what you make.",
     `The material is in files in your working directory \`${d.dir}\`:\n${list.join("\n")}\n` +
-      "Use your file tools to read all of it (every page of PDFs, every image and slide) before you start. The files are not repeated in this message." +
+      "Read request.md first and honor its selected PDF page ranges; use only those pages when a selection is supplied, otherwise read all pages. Read the relevant images and slides before you start. Preserve original filenames and page references in your explanations and worked examples. The files are not repeated in this message." +
       (agent === "codex" ? " If you cannot read a PDF directly, extract its text with a command (e.g. `pdftotext -layout`, or Python)." : "") +
       (office && !canRun ? " Office files (.pptx/.docx) need a command to extract, which you may not run here: say so in your answer if you could not read one." : ""),
     `My request:\n${question}`,

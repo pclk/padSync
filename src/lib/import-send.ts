@@ -1,3 +1,5 @@
+import { lectureSources } from "./lecture-sources";
+import { setDraft } from "./import-drafts";
 import { attachmentPaths, type AttachmentMeta } from "./attachments";
 import { importInlineFiles, importJobBody, splitParts, type ImportConfig } from "./ai-import";
 import { base64Length, partsFor, type UploadSpec } from "./uploads";
@@ -7,7 +9,7 @@ import { base64Length, partsFor, type UploadSpec } from "./uploads";
 // so nothing is left half-uploaded for the bridge to pick up.
 
 export interface SendAttachment {
-  meta: Pick<AttachmentMeta, "name" | "mime" | "kind" | "size">;
+  meta: Pick<AttachmentMeta, "name" | "mime" | "kind" | "size" | "persistentId" | "sourceFilename" | "selectedPages">;
   base64: () => Promise<string>;
 }
 
@@ -45,7 +47,7 @@ export async function sendImport(opts: {
   signal?: AbortSignal;
   onProgress?: (p: SendProgress) => void;
   /** Called as soon as the job exists, so the page can track (and cancel) it. */
-  onJob?: (id: string) => void;
+  onJob?: (id: string) => unknown;
 }): Promise<{ jobId: string; status: string }> {
   const f = opts.fetch ?? fetch;
   const signal = opts.signal;
@@ -63,11 +65,11 @@ export async function sendImport(opts: {
   const created = await json(res);
   if (!res.ok || !created.job) throw new SendError(friendlyHttpError(res.status, created.error));
   const jobId = created.job.id;
-  opts.onJob?.(jobId);
 
   let sent = 0;
   let status = "uploading";
   try {
+    await opts.onJob?.(jobId);
     upload: for (const [i, spec] of specs.entries()) {
       signal?.throwIfAborted();
       opts.onProgress?.({ phase: "reading", sent, total });
@@ -166,7 +168,7 @@ export async function startSend(opts: Omit<Parameters<typeof sendImport>[0], "si
   inflight = ac;
   update({ progress: { phase: "creating", sent: 0, total: 0 }, error: null });
   try {
-    await sendImport({ ...opts, signal: ac.signal, onProgress: (progress) => update({ progress }), onJob: (jobId) => update({ jobId }) });
+    await sendImport({ ...opts, signal: ac.signal, onProgress: (progress) => update({ progress }), onJob: async (jobId) => { const sources = lectureSources(opts.attachments.map(a => a.meta)); if (sources.length) await setDraft(`jobSources:${jobId}`, sources); update({ jobId }); } });
     update({ progress: null });
   } catch (e) {
     const offline = typeof navigator !== "undefined" && navigator.onLine === false;
