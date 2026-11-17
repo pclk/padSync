@@ -141,10 +141,35 @@ export async function migrate(sql: Sql) {
       data text not null,
       primary key (job_id, path, part)
     )`,
+    `create table if not exists chat_threads (
+      id text primary key, notebook_id text not null default '', title text not null default '',
+      agent text not null, options jsonb not null default '{}'::jsonb,
+      pinned boolean not null default false, archived boolean not null default false,
+      agent_session jsonb, forked_from jsonb, created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(), last_message_at timestamptz, deleted_at timestamptz,
+      next_turn integer not null default 0
+    )`,
+    `alter table jobs add column if not exists thread_id text`,
+    `alter table jobs add column if not exists turn integer`,
+    `alter table jobs add column if not exists chat_context jsonb`,
+    `alter table jobs add column if not exists chat_files jsonb`,
+    `create table if not exists chat_input_parts (job_id text not null, path text not null, part integer not null, data text not null, primary key(job_id,path,part))`,
+    `alter table jobs add column if not exists attachments jsonb not null default '[]'::jsonb`,
+    `create unique index if not exists jobs_thread_turn_idx on jobs(thread_id, turn) where thread_id is not null`,
+    `create index if not exists jobs_thread_updated_idx on jobs(thread_id, updated_at)`,
+    `create index if not exists chat_threads_list_idx on chat_threads(deleted_at, archived, last_message_at desc)`,
     `create index if not exists jobs_queue_idx on jobs (status, created_at)`,
     `create index if not exists jobs_section_idx on jobs (section_id, created_at)`,
     // Jobs finished before image/context were dropped on completion (see jobs.ts).
     `update jobs set image = null, context = '', files = null where status in ('done', 'error', 'cancelled') and (image is not null or context <> '' or files is not null)`,
+    // Retain replay bytes only for the latest turn of a live thread.
+    `update jobs j set chat_files=null where thread_id is not null and chat_files is not null and
+      (not exists(select 1 from chat_threads t where t.id=j.thread_id and deleted_at is null)
+       or turn < (select max(turn) from jobs where thread_id=j.thread_id))`,
+    `delete from chat_input_parts p where not exists(
+      select 1 from jobs j join chat_threads t on t.id=j.thread_id
+      where j.id=p.job_id and t.deleted_at is null
+        and j.turn=(select max(turn) from jobs where thread_id=j.thread_id))`,
     // Imports abandoned mid-upload (tab closed), and parts left by jobs that already finished.
     `update jobs set status = 'cancelled', finished_at = now(), updated_at = now(), files = null where status = 'uploading' and updated_at < now() - interval '1 day'`,
     `delete from job_inputs where job_id not in (select id from jobs where status in ('uploading', 'queued', 'running'))`,

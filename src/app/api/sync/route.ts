@@ -67,6 +67,8 @@ export async function POST(req: NextRequest) {
     if (!prev || c.hlc > prev.hlc) latest.set(c.id, c);
   }
   const pushed = [...latest.values()];
+  const sentHlc = new Map(pushed.map(c => [c.id, c.hlc]));
+  const sentVersions = JSON.stringify(Object.fromEntries(sentHlc));
 
   // The lock is evaluated before INSERT defaults or conflict updates allocate seq.
   // It is held until this statement's implicit transaction commits.
@@ -90,12 +92,13 @@ export async function POST(req: NextRequest) {
     timing.mark("write");
     // Fresh statement snapshot sees a concurrent winner that ON CONFLICT waited for.
     // Return it even when its sequence is behind the caller's existing cursor.
+    // Filter in Postgres so successful pushes do not download their JSON again.
     const authoritative = await sql.query<Row>(
-      'select id, kind, notebook_id, parent_id, data, hlc, deleted, seq from entities where id = any($1::text[])',
-      [pushed.map(c => c.id)],
+      `select id, kind, notebook_id, parent_id, data, hlc, deleted, seq from entities
+       where id = any($1::text[]) and hlc collate "C" > ($2::jsonb ->> id) collate "C"`,
+      [pushed.map(c => c.id), sentVersions],
     );
-    const sent = new Map(pushed.map(c => [c.id, c.hlc]));
-    lost = authoritative.filter(row => row.hlc > sent.get(row.id)!);
+    lost = authoritative;
     timing.mark("conflicts");
   }
 
@@ -111,9 +114,13 @@ export async function POST(req: NextRequest) {
   }
 
   timing.mark("events");
+  // Keep own rows in the page for cursor/limit accounting, but avoid transferring their
+  // potentially large data from Neon. The version filter below removes these placeholders.
   const pulled = (await sql.query(
-    `select id, kind, notebook_id, parent_id, data, hlc, deleted, seq from entities where seq > $1 order by seq limit $2`,
-    [since, PULL_LIMIT + 1],
+    `select id, kind, notebook_id, parent_id,
+       case when hlc = ($3::jsonb ->> id) then null else data end as data,
+       hlc, deleted, seq from entities where seq > $1 order by seq limit $2`,
+    [since, PULL_LIMIT + 1, sentVersions],
   )) as Row[];
   timing.mark("pull");
   const more = pulled.length > PULL_LIMIT;
@@ -121,7 +128,6 @@ export async function POST(req: NextRequest) {
 
   // The caller already has what it just wrote, so those rows are not echoed back; the cursor
   // still moves past them.
-  const sentHlc = new Map(pushed.map((c) => [c.id, c.hlc]));
   const out = page.filter((r) => sentHlc.get(r.id) !== r.hlc);
   const inPage = new Set(out.map((r) => r.id));
   for (const r of lost) if (!inPage.has(r.id)) out.push(r);

@@ -65,7 +65,7 @@ function resolveImage(src: string, assets: Map<string, string>, returned: Map<st
 /**
  * Compares the agent's notebook.json against the live sections. Only fields present in the
  * returned JSON count, so leaving a field out (e.g. solutions that were not shared) keeps it.
- * Sections with an unknown id are treated as new; nothing is ever deleted.
+ * Sections with an unknown id are ignored; nothing is ever deleted.
  */
 export function parseReturnedNotebook(text: string, current: { id: string; data: SectionData }[], returnedFiles: ReturnedFile[] = []): ParsedChanges {
   let json: unknown;
@@ -86,6 +86,7 @@ export function parseReturnedNotebook(text: string, current: { id: string; data:
 
   parsed.data.sections.forEach((r, ri) => {
     const label = r.title?.trim() || (r.id && byId.get(r.id)?.s.data.title) || `returned section ${ri + 1}`;
+    if (r.id && !byId.has(r.id)) return void problems.push(`"${label}": unknown section id${r.blocks ? "" : "; no blocks"}; skipped.`);
     const hitData = r.id ? byId.get(r.id)?.s.data : undefined;
     let blocks: Block[] | undefined;
     if (r.blocks) {

@@ -288,10 +288,13 @@ const InkTile = memo(function InkTile({ top, height, strokes, zoom, hidden, cont
   useEffect(() => {
     // Release the bitmap when scrolled away; Safari keeps canvas memory until resized.
     const c = canvas.current;
-    if (!visible && c) {
-      c.width = 0;
-      c.height = 0;
-    }
+    return () => {
+      if (c) {
+        c.width = 0;
+        c.height = 0;
+      }
+      painted.current = null;
+    };
   }, [visible]);
 
   return (

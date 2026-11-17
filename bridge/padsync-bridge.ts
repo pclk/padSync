@@ -15,6 +15,9 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   AGENTS,
+  chatHistory,
+  resumeCommand,
+  runChatWithFallback,
   ApiError,
   BridgeApi,
   LAUNCHD_LABEL,
@@ -165,20 +168,37 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
       job = { ...job, files: [...(job.files ?? []), ...fetched] };
       latest = "";
     }
+    if (job.kind === 'chat') job = { ...job, files: job.files?.length ? job.files : [{path:'README.md',mime:'text/markdown',text:'Chat turn. Return changed files in out/ when edits are allowed.'}] };
     // Inputs and the agent's out/ share the job folder, so withJobDir's clean-up covers both,
     // whether the agent succeeds, fails, times out or is cancelled.
     const { result, files } = await withJobDir(job, async (d) => {
       const bundle = !!d.files;
       // Only bundle jobs have an out/ to write to; a legacy job stays read-only whatever it asks.
       const runOpts = bundle ? o : { ...o, allowEdits: false, allowCode: false };
-      const result = await runAgent({
+      let session = job.thread?.agent_session;
+      if (session?.agent !== job.agent) session = null;
+      const historyPath = join(d.dir, '.padsync-chat', 'history.md');
+      const historyPrompt = async () => {
+        await mkdir(dirname(historyPath), { recursive: true, mode: 0o700 });
+        await writeFile(historyPath, chatHistory(job.history ?? []), { mode: 0o600 });
+        return `Read ${historyPath} for the conversation so far.\n\n`;
+      };
+      const basePrompt = isImport ? buildImportPrompt(job.question, d, job.agent, runOpts) : bundle ? buildBundlePrompt(job.question, d, job.agent, runOpts) : buildAgentPrompt(job.question, d, job.agent);
+      const command = agentCommand(job.agent, cfg, bundle ? attachedImages(d.files) : !!d.image, runOpts);
+      const run = (resume: boolean, prefix: string) => runAgent({
         cwd: d.dir,
-        prompt: isImport ? buildImportPrompt(job.question, d, job.agent, runOpts) : bundle ? buildBundlePrompt(job.question, d, job.agent, runOpts) : buildAgentPrompt(job.question, d, job.agent),
-        command: agentCommand(job.agent, cfg, bundle ? attachedImages(d.files) : !!d.image, runOpts),
+        prompt: prefix + basePrompt,
+        command: resume && session ? resumeCommand(command, job.agent, session.sessionId) : command,
         timeoutMs: isImport ? IMPORT_TIMEOUT_MS : JOB_TIMEOUT_MS,
         onText: (t) => (latest = t),
         signal: abort.signal,
       });
+      const result = job.kind === 'chat'
+        ? await runChatWithFallback(!!session, async (resume, history) => {
+          latest = '';
+          return run(resume, history ? await historyPrompt() : '');
+        })
+        : await run(false, '');
       let files: JobFile[] = [];
       if (result.status === "done" && d.out && runOpts.allowEdits) {
         // A failure here must not cost the answer.
@@ -197,13 +217,13 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
       return;
     }
     if (result.status !== "done") await api.update(job.id, { output: result.output, status: "error", error: result.error });
-    else if (!files.length) await api.update(job.id, { output: result.output, status: "done" });
+    else if (!files.length) await api.update(job.id, { output: result.output, status: "done", sessionId: result.sessionId });
     else {
       // Keep the answer even if padSync refuses the files (e.g. an older server).
-      await api.update(job.id, { output: result.output, status: "done", files }).catch((e) => {
+      await api.update(job.id, { output: result.output, status: "done", sessionId: result.sessionId, files }).catch((e) => {
         if (!(e instanceof ApiError) || e.status !== 400) throw e;
         log(`job ${job.id}: server refused the returned files: ${e.message}`);
-        return api.update(job.id, { output: `${result.output}\n\n_The files the agent wrote could not be returned: ${e.message}_`, status: "done" });
+        return api.update(job.id, { output: `${result.output}\n\n_The files the agent wrote could not be returned: ${e.message}_`, status: "done", sessionId: result.sessionId });
       });
     }
     log(`job ${job.id} ${result.status}${result.error ? `: ${result.error}` : ""}`);

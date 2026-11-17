@@ -1,0 +1,208 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  composerAction,
+  createPollScheduler,
+  exportMarkdown,
+  groupThreads,
+  isUnread,
+  pollDelay,
+  readDraft,
+  sortThreads,
+  writeDraft,
+} from "../src/lib/chat-ui";
+import { mergeTurns } from "../src/lib/chat-api";
+import type { ThreadSummary, Turn } from "../src/lib/chat-types";
+const thread = (
+  id: string,
+  overrides: Partial<ThreadSummary> = {},
+): ThreadSummary => ({
+  id,
+  notebookId: "book",
+  title: id,
+  agent: "claude",
+  options: {},
+  pinned: false,
+  archived: false,
+  createdAt: "2026-01-01",
+  updatedAt: "2026-01-01",
+  lastMessageAt: null,
+  turnCount: 1,
+  lastStatus: "done",
+  preview: "",
+  forkedFrom: null,
+  ...overrides,
+});
+const turn = (overrides: Partial<Turn> = {}): Turn => ({
+  jobId: "job",
+  turn: 1,
+  question: "Hello",
+  context: null,
+  attachments: [],
+  agent: "claude",
+  options: {},
+  status: "running",
+  output: "abc",
+  outputOffset: 0,
+  error: null,
+  createdAt: "2026-01-01",
+  updatedAt: "2026-01-01",
+  finishedAt: null,
+  resultFiles: [],
+  ...overrides,
+});
+describe("Chat UI helpers", () => {
+  it("sorts pinned first then recency without mutating, and filters notebook/all/archived", () => {
+    const items = [
+      thread("old"),
+      thread("new", { updatedAt: "2026-02-01", notebookId: "other" }),
+      thread("pin", { pinned: true }),
+      thread("archive", { archived: true }),
+    ];
+    expect(sortThreads(items).map((t) => t.id)).toEqual([
+      "pin",
+      "new",
+      "archive",
+      "old",
+    ]);
+    expect(items[0].id).toBe("old");
+    expect(groupThreads(items, "notebook", "book").map((t) => t.id)).toEqual([
+      "pin",
+      "old",
+    ]);
+    expect(groupThreads(items, "all", "book")).toHaveLength(3);
+    expect(groupThreads(items, "archived", "book")[0].id).toBe("archive");
+  });
+  it("marks updates unread per thread and keeps empty threads read", () => {
+    expect(isUnread(thread("a"), {})).toBe(true);
+    expect(isUnread(thread("a"), { a: "2026-01-01" })).toBe(false);
+    expect(
+      isUnread(thread("a", { updatedAt: "2026-02-01" }), { a: "2026-01-01" }),
+    ).toBe(true);
+    expect(isUnread(thread("a", { turnCount: 0 }), {})).toBe(false);
+  });
+  it("persists separate drafts and tolerates unavailable or corrupt storage", () => {
+    const data = new Map<string, string>();
+    const storage = {
+      getItem: (k: string) => data.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        data.set(k, v);
+      },
+    };
+    writeDraft("a", "hello", storage);
+    writeDraft("b", "other", storage);
+    expect(readDraft("a", storage)).toBe("hello");
+    expect(readDraft("b", storage)).toBe("other");
+    const broken = {
+      getItem() {
+        throw Error();
+      },
+      setItem() {
+        throw Error();
+      },
+    };
+    expect(() => writeDraft("a", "x", broken)).not.toThrow();
+    expect(readDraft("a", broken)).toBe("");
+    data.set("padsync.chat.draft.a", "invalid");
+    expect(readDraft("a", storage)).toBe("");
+  });
+  it("handles Enter, Shift+Enter, command Enter, Escape and IME", () => {
+    expect(composerAction({ key: "Enter" }, false)).toBe("send");
+    expect(composerAction({ key: "Enter", shiftKey: true }, false)).toBe(
+      "none",
+    );
+    expect(
+      composerAction({ key: "Enter", metaKey: true, shiftKey: true }, false),
+    ).toBe("send");
+    expect(composerAction({ key: "Escape" }, true)).toBe("stop");
+    expect(composerAction({ key: "Escape" }, false)).toBe("none");
+    expect(composerAction({ key: "Enter", isComposing: true }, false)).toBe(
+      "none",
+    );
+  });
+  it("merges streaming deltas and ignores duplicate, stale and missing-prefix ticks", () => {
+    const a = turn();
+    const delta = turn({
+      output: "def",
+      outputOffset: 3,
+      updatedAt: "2026-01-02",
+    });
+    const merged = mergeTurns([a], [delta]);
+    expect(merged[0].output).toBe("abcdef");
+    expect(mergeTurns(merged, [delta, a])).toEqual(merged);
+    expect(
+      mergeTurns([a], [turn({ outputOffset: 20, updatedAt: "2026-01-03" })]),
+    ).toEqual([a]);
+  });
+  it("exports readable Markdown including context, attachments and errors", () => {
+    const md = exportMarkdown(thread("Title"), [
+      turn({
+        context: {
+          scope: "section",
+          sectionIds: ["a"],
+          label: "1 section",
+          bytes: 20,
+          tokens: 5,
+        },
+        attachments: [{ path: "file.pdf", mime: "application/pdf", size: 1 }],
+        error: "failed",
+      }),
+    ]);
+    for (const text of [
+      "# Title",
+      "## You",
+      "Hello",
+      "1 section",
+      "file.pdf",
+      "## claude",
+      "abc",
+      "failed",
+    ])
+      expect(md).toContain(text);
+  });
+});
+describe("Chat poll scheduler", () => {
+  afterEach(() => vi.useRealTimers());
+  it("uses active, idle and list intervals", () => {
+    expect(pollDelay("thread", true)).toBe(1500);
+    expect(pollDelay("thread", false)).toBe(15000);
+    expect(pollDelay("list", true)).toBe(30000);
+  });
+  it("never overlaps, pauses while hidden and stops cleanly", async () => {
+    vi.useFakeTimers();
+    let resolve!: () => void;
+    let visible = true;
+    const request = vi.fn(
+      () =>
+        new Promise<void>((r) => {
+          resolve = r;
+        }),
+    );
+    const poll = createPollScheduler(
+      request,
+      () => 1500,
+      () => visible,
+    );
+    poll.refresh();
+    poll.refresh();
+    expect(request).toHaveBeenCalledTimes(1);
+    resolve();
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(request).toHaveBeenCalledTimes(2);
+    visible = false;
+    resolve();
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(request).toHaveBeenCalledTimes(2);
+    poll.refresh();
+    expect(request).toHaveBeenCalledTimes(2);
+    visible = true;
+    poll.refresh();
+    expect(request).toHaveBeenCalledTimes(3);
+    poll.stop();
+    resolve();
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(request).toHaveBeenCalledTimes(3);
+  });
+});

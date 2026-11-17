@@ -2,7 +2,7 @@
 // back to the cached copy; hashed build assets are cache-first. API calls are never cached:
 // offline data lives in IndexedDB.
 
-const CACHE = "padsync-v1";
+const CACHE = "padsync-v2";
 const SHELL = ["/", "/notebook", "/import", "/settings"];
 
 self.addEventListener("install", (event) => {
@@ -21,7 +21,7 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   const url = new URL(req.url);
-  if (req.method !== "GET" || url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
+  if (req.method !== "GET" || url.origin !== self.location.origin || (url.pathname === "/api" || url.pathname.startsWith("/api/"))) return;
 
   if (url.pathname.startsWith("/_next/static/")) {
     event.respondWith(
@@ -29,8 +29,10 @@ self.addEventListener("fetch", (event) => {
         (hit) =>
           hit ||
           fetch(req).then((res) => {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy));
+            if (res.ok) {
+              const copy = res.clone();
+              event.waitUntil(caches.open(CACHE).then((c) => c.put(req, copy)));
+            }
             return res;
           }),
       ),
@@ -38,12 +40,15 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Flight responses and other subresources must never replace an HTML shell.
+  if (req.mode !== "navigate") return;
+
   event.respondWith(
-    fetch(req)
+    fetch(req, { cache: "no-store" })
       .then((res) => {
         if (res.ok) {
           const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(req, copy));
+          event.waitUntil(caches.open(CACHE).then((c) => c.put(req, copy)));
         }
         return res;
       })

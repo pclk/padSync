@@ -5,16 +5,19 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { InkController, type Selection, type ToolState } from "@/ink/controller";
+import { emitActivity } from "@/lib/activity";
 import { db, deviceId, deviceKind } from "@/lib/db";
-import { useStoredState } from "@/lib/hooks";
+import { useLayoutMode, useStoredState } from "@/lib/hooks";
 import { addTextBox, insertSectionAfter, liveSections, logEvent, putEntities } from "@/lib/store";
 import { PAGE_WIDTH, type NotebookEntity, type PresenceData, type PresenceEntity, type SectionEntity } from "@/lib/types";
 import { SectionView } from "./SectionView";
 import { SidePanel } from "./SidePanel";
 import { Toolbar } from "./Toolbar";
 
+const emitLocalText = (notebookId: string) => emitActivity({ notebookId, source: "local", kinds: ["text"], at: Date.now() });
+
 const TOOLBAR_H = 56;
-const PANEL_W = 360;
+
 const MIN_ZOOM = 0.4;
 const MAX_ZOOM = 3;
 const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
@@ -58,7 +61,7 @@ function Editor({ notebookId }: { notebookId: string }) {
   const [tool, setToolState] = useStoredState<ToolState>("padsync.tool", DEFAULT_TOOL);
   const [panelOpen, setPanelOpen] = useStoredState("padsync.panel", !isIpad);
   const [follow, setFollow] = useStoredState("padsync.follow", !isIpad);
-  const [zoom, setZoom] = useState(() => (isIpad ? 1 : fitZoom(panelOpen)));
+  const [zoom, setZoom] = useState(() => (isIpad ? 1 : fitZoom(panelOpen, 360)));
   const [selection, setSelection] = useState<Selection | null>(null);
   const [dragging, setDragging] = useState<Set<string> | null>(null);
   const [editingText, setEditingText] = useState<string | null>(null);
@@ -77,6 +80,7 @@ function Editor({ notebookId }: { notebookId: string }) {
         onDragging: setDragging,
         onTextCreate: async (sectionId, x, y) => {
           const tid = await addTextBox(notebookId, sectionId, x, y);
+          emitLocalText(notebookId);
           setEditingText(tid);
           void logEvent(notebookId, sectionId, "text_create", { id: tid });
         },
@@ -84,6 +88,8 @@ function Editor({ notebookId }: { notebookId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [notebookId],
   );
+  const layout = useLayoutMode(notebookId, controller);
+  const panelWidth = isIpad ? 360 : layout.width;
   useLayoutEffect(() => {
     controller.configure(tool, zoom);
   }, [controller, tool, zoom]);
@@ -149,7 +155,7 @@ function Editor({ notebookId }: { notebookId: string }) {
   }, [zoom, notebookId]);
 
   const resetZoom = () => {
-    const z = isIpad ? 1 : fitZoom(panelOpen);
+    const z = isIpad ? 1 : fitZoom(panelOpen, panelWidth);
     const wrap = wrapRef.current!;
     const r = wrap.getBoundingClientRect();
     const cy = TOOLBAR_H + 10;
@@ -331,7 +337,11 @@ function Editor({ notebookId }: { notebookId: string }) {
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(frame);
+      if (presenceTimer.current) clearTimeout(presenceTimer.current);
+    };
   }, [notebookId, publishPresence, sections?.length]);
 
   const presences = useLiveQuery(() => db.entities.where("kind").equals("presence").toArray(), []) as PresenceEntity[] | undefined;
@@ -349,6 +359,26 @@ function Editor({ notebookId }: { notebookId: string }) {
     followingScroll.current = performance.now();
     window.scrollBy({ top: delta, behavior: "smooth" });
   }, [follow, ipad, notebookId, controller]);
+
+  useLayoutEffect(() => {
+    if (isIpad) return;
+    const entry = [...els.current].find(([, el]) => el.getBoundingClientRect().bottom > TOOLBAR_H);
+    const offset = entry ? (TOOLBAR_H - entry[1].getBoundingClientRect().top) / controller.zoom : 0;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      const next = fitZoom(panelOpen, panelWidth);
+      setZoom(next);
+      requestAnimationFrame(() => {
+        if (entry) window.scrollBy(0, entry[1].getBoundingClientRect().top + offset * next - TOOLBAR_H);
+      });
+    };
+    const end = (event: TransitionEvent) => { if (event.propertyName === "padding-right") finish(); };
+    window.addEventListener("transitionend", end);
+    const timer = setTimeout(finish, 400);
+    return () => { clearTimeout(timer); window.removeEventListener("transitionend", end); };
+  }, [panelWidth, panelOpen, isIpad, controller]);
 
   const loaded = sections !== undefined && notebook !== undefined;
   useLayoutEffect(() => {
@@ -376,9 +406,11 @@ function Editor({ notebookId }: { notebookId: string }) {
   const showPanel = panelOpen;
 
   return (
-    <div className="editor min-h-screen bg-slate-200/70" style={{ paddingTop: TOOLBAR_H + 16, paddingRight: showPanel ? PANEL_W : 0 }}>
+    <div className="editor min-h-screen bg-slate-200/70" style={{ paddingTop: TOOLBAR_H + 16, paddingRight: showPanel ? panelWidth : 0 }}>
+      <style>{` .editor { transition: padding-right 250ms; } .editor > aside { transition: width 250ms; } @media (prefers-reduced-motion: reduce) { .editor, .editor > aside { transition: none; } } `}</style>
       <Toolbar
         notebookId={notebookId}
+        layout={isIpad ? undefined : layout}
         title={notebook.data.title}
         tool={tool}
         setTool={setTool}
@@ -411,7 +443,7 @@ function Editor({ notebookId }: { notebookId: string }) {
         ))}
         <button
           className="mx-auto rounded-xl border-2 border-dashed border-slate-400 px-8 py-4 text-slate-500 hover:bg-white"
-          onClick={() => insertSectionAfter(notebookId, sections[sections.length - 1] ?? null, sections)}
+          onClick={async () => { await insertSectionAfter(notebookId, sections[sections.length - 1] ?? null, sections); emitActivity({ notebookId, source: "local", kinds: ["section"], at: Date.now() }); }}
         >
           + Blank page
         </button>
@@ -423,6 +455,8 @@ function Editor({ notebookId }: { notebookId: string }) {
       {showPanel && (
         <SidePanel
           notebookId={notebookId}
+          mode={isIpad ? "drawing" : layout.effective}
+          width={panelWidth}
           notebookTitle={notebook.data.title}
           selection={selection}
           sections={sections}
@@ -438,8 +472,8 @@ function Editor({ notebookId }: { notebookId: string }) {
   );
 }
 
-function fitZoom(withPanel: boolean) {
+function fitZoom(withPanel: boolean, width: number) {
   if (typeof window === "undefined") return 1;
-  const avail = window.innerWidth - (withPanel ? PANEL_W : 0) - 32;
+  const avail = window.innerWidth - (withPanel ? width : 0) - 32;
   return clampZoom(Math.min(1, avail / PAGE_WIDTH));
 }

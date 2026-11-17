@@ -29,7 +29,8 @@ export function dataBox(d: StrokeData): Box {
     if (y < minY) minY = y;
     if (y > maxY) maxY = y;
   }
-  const pad = d.size;
+  // Tap rendering enforces a 0.8px minimum radius, even for very fine pens.
+  const pad = Math.max(d.size, d.pts.length === STROKE_STRIDE ? 0.8 : 0);
   return { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad };
 }
 

@@ -1,3 +1,5 @@
+import { emitActivity, hlcDevice, type ActivityKind } from "./activity";
+import { deviceId } from "./db";
 import { beginSyncDebugRequest, debugNow, parseServerTiming, recordRemoteApplied, recordSyncDebug, syncDebugEnabled, updateSyncDebugRequest } from "./sync-debug";
 import { startRealtime, type RealtimeStatus } from "./sync-realtime";
 import { DEFAULT_DEBOUNCE_MS, validDebounce, DEFAULT_SYNC_CONFIG, normalizeSyncConfig, type SyncConfig } from "./sync-policy";
@@ -31,6 +33,7 @@ let lastSyncedAt = 0;
 const listeners = new Set<() => void>();
 let timer: ReturnType<typeof setTimeout> | null = null;
 let running = false;
+let generation = 0;
 let again = false;
 let started = false;
 let dueAt = Infinity;
@@ -144,10 +147,11 @@ async function runSync(context = { trigger: "manual", queueMs: 0, timerLateMs: 0
   if (Date.now() < retryAt) { schedule(retryAt - Date.now()); return; }
   if (running) { again = true; recordSyncDebug("schedule", "Waiting for in-flight request", { trigger: context.trigger }); return; }
   running = true;
+  const current = generation;
   void refreshConfig();
   try {
     let more = true;
-    while (more) {
+    while (more && current === generation) {
       more = await syncOnce(context);
       context = { trigger: "pagination / backlog", queueMs: 0, timerLateMs: 0 };
     }
@@ -158,11 +162,14 @@ async function runSync(context = { trigger: "manual", queueMs: 0, timerLateMs: 0
     if (status === 'synced') { failures = 0; retryAt = 0; }
     else {
       failures++;
-      retryAt = Date.now() + Math.min(60000, config.retryBaseMs * 2 ** Math.min(failures - 1, 5));
+      retryAt = Date.now() + Math.min(60000, config.retryBaseMs * 2 ** Math.min(failures - 1, 16));
     }
     const pending = again;
     again = false;
-    if (pending) schedule(0, "follow-up");
+    if (current !== generation) {
+      // A stopped run may finish its acknowledgement, but must not continue draining.
+      if (started) schedule(0, "restart");
+    } else if (pending) schedule(0, "follow-up");
     else if (started) schedule(retryAt ? Math.max(0, retryAt - Date.now()) : pollDelay(), retryAt ? "retry" : document.visibilityState === "visible" ? "visible poll" : "hidden poll");
   }
 }
@@ -248,6 +255,7 @@ export async function syncOnce(context = { trigger: "manual", queueMs: 0, timerL
 
     updateSyncDebugRequest(trace, { applyMs: debugNow() - phaseStart, applied: applied.length, phase: 'Done' });
     recordRemoteApplied(trace, applied);
+    if (applied.some(e => e.kind === "stroke" || e.kind === "textbox" || e.kind === "section")) emitRemoteActivity(applied);
     completed = true;
     setStatus("synced");
     return body.more || dirty.length === ENTITY_BATCH || events.length === EVENT_BATCH;
@@ -261,6 +269,7 @@ export async function syncOnce(context = { trigger: "manual", queueMs: 0, timerL
 }
 
 export function stopSync() {
+  generation++;
   started = false; again = false;
   stopWakeListeners?.(); stopWakeListeners = undefined;
   stopRealtime?.(); stopRealtime = undefined;
@@ -272,4 +281,18 @@ export function stopSync() {
 export async function resetCursor() {
   await setMeta("cursor", 0);
   requestSync(0);
+}
+
+/** One edit signal for each notebook represented in an applied pull batch, including tombstones. */
+export function emitRemoteActivity(applied: Omit<Entity, "dirty">[], ownDevice = deviceId(), at = Date.now()) {
+  const notebooks = new Map<string, Set<ActivityKind>>();
+  for (const e of applied) {
+    const wall = Number(e.hlc.split("-")[0]);
+    if (!Number.isFinite(wall) || wall < at - 120_000 || wall > at || hlcDevice(e.hlc) === ownDevice) continue;
+    const kind = e.kind === 'textbox' ? 'text' : e.kind === 'stroke' ? 'stroke' : e.kind === 'section' ? 'section' : null;
+    if (!kind) continue;
+    const kinds = notebooks.get(e.notebookId) ?? new Set<ActivityKind>();
+    kinds.add(kind); notebooks.set(e.notebookId, kinds);
+  }
+  for (const [notebookId, kinds] of notebooks) emitActivity({notebookId, source:'remote', kinds:[...kinds], at});
 }

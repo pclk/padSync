@@ -1,3 +1,4 @@
+import { emitActivity } from "@/lib/activity";
 import { db, deviceId } from "@/lib/db";
 import { logEvent, moveStrokes, newEntity, putEntities, setDeleted } from "@/lib/store";
 import { STROKE_STRIDE, type StrokeData, type StrokeEntity } from "@/lib/types";
@@ -81,6 +82,17 @@ export class InkController {
   }
 
   attachLive(canvas: HTMLCanvasElement | null) {
+    if (this.live && this.live !== canvas) {
+      this.live.width = 0;
+      this.live.height = 0;
+    }
+    if (!canvas) {
+      cancelAnimationFrame(this.frame);
+      this.frame = 0;
+      this.pending.clear();
+      this.gesture = null;
+      this.hover = null;
+    }
     this.live = canvas;
     // desynchronized hints a low-latency canvas where supported.
     this.ctx = canvas?.getContext("2d", { desynchronized: true }) ?? null;
@@ -240,6 +252,7 @@ export class InkController {
     const ids = [...sel.ids];
     this.setSelection(null);
     await setDeleted(ids, true);
+    emitActivity({ notebookId: this.notebookId, source: "local", kinds: ["stroke"], at: Date.now() });
     this.undo.push({ label: "delete", undo: () => setDeleted(ids, false), redo: () => setDeleted(ids, true) });
     void logEvent(this.notebookId, sel.sectionId, "lasso_delete", { ids });
   }
@@ -271,6 +284,7 @@ export class InkController {
     const [saved] = await putEntities([stroke]);
     seedPath(saved, path);
     const id = stroke.id;
+    emitActivity({ notebookId: this.notebookId, source: "local", kinds: ["stroke"], at: Date.now() });
     this.undo.push({ label: "stroke", undo: () => setDeleted([id], true), redo: () => setDeleted([id], false) });
     const n = g.data.pts.length / STROKE_STRIDE;
     void logEvent(this.notebookId, g.sec.id, "stroke", {
@@ -296,6 +310,7 @@ export class InkController {
   private commitErase(g: Extract<Gesture, { type: "erase" }>) {
     if (!g.erased.size) return;
     const ids = [...g.erased];
+    emitActivity({ notebookId: this.notebookId, source: "local", kinds: ["stroke"], at: Date.now() });
     this.undo.push({ label: "erase", undo: () => setDeleted(ids, false), redo: () => setDeleted(ids, true) });
     void logEvent(this.notebookId, g.sec.id, "erase", { ids });
   }
@@ -322,6 +337,7 @@ export class InkController {
       const rows = (await db.entities.bulkGet(ids)).filter(Boolean) as StrokeEntity[];
       await moveStrokes(rows, ddx, ddy);
     };
+    emitActivity({ notebookId: this.notebookId, source: "local", kinds: ["stroke"], at: Date.now() });
     this.undo.push({ label: "move", undo: () => current(-dx, -dy), redo: () => current(dx, dy) });
     void logEvent(this.notebookId, g.sec.id, "lasso_move", { ids, dx, dy });
   }

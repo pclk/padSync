@@ -13,7 +13,7 @@ export const AGENTS = ["claude", "codex"] as const;
 export type Agent = (typeof AGENTS)[number];
 export type JobStatus = "uploading" | "queued" | "running" | "done" | "error" | "cancelled";
 /** "ask": a question about notebook sections. "import": make a new notebook from lecture files. */
-export const JOB_KINDS = ["ask", "import"] as const;
+export const JOB_KINDS = ["ask", "import", "chat"] as const;
 export type JobKind = (typeof JOB_KINDS)[number];
 
 /** A running job whose bridge went quiet this long is handed to the next claim. The bridge
@@ -114,6 +114,7 @@ export const jobInputSchema = z
 
 export const jobUpdateSchema = z
   .object({
+    sessionId: z.string().min(1).max(200).optional(),
     append: z.string().max(MAX_OUTPUT).optional(),
     output: z.string().max(MAX_OUTPUT).optional(),
     status: z.enum(["done", "error"]).optional(),
@@ -225,8 +226,8 @@ export async function listJobs(sql: Sql, filter: { sectionId?: string; notebookI
   const rows = filter.kind === "import"
     ? await sql.query<Row>(`select ${PUBLIC_COLS} from jobs where kind = 'import' order by created_at desc limit $1`, [limit])
     : filter.sectionId
-    ? await sql.query<Row>(`select ${PUBLIC_COLS} from jobs where section_id = $1 order by created_at desc limit $2`, [filter.sectionId, limit])
-    : await sql.query<Row>(`select ${PUBLIC_COLS} from jobs where notebook_id = $1 order by created_at desc limit $2`, [filter.notebookId ?? "", limit]);
+    ? await sql.query<Row>(`select ${PUBLIC_COLS} from jobs where thread_id is null and section_id = $1 order by created_at desc limit $2`, [filter.sectionId, limit])
+    : await sql.query<Row>(`select ${PUBLIC_COLS} from jobs where thread_id is null and notebook_id = $1 order by created_at desc limit $2`, [filter.notebookId ?? "", limit]);
   return rows.map((r) => toJob(r));
 }
 
@@ -240,7 +241,14 @@ export async function cancelJob(sql: Sql, id: string): Promise<Job | null> {
   const rows = await sql.query<Row>(
     `with c as (
        update jobs set status = 'cancelled', updated_at = now(), finished_at = now(), image = null, context = '', files = null
-       where id = $1 and status in ('uploading', 'queued', 'running') returning ${PUBLIC_COLS}
+       where id = $1 and status in ('uploading', 'queued', 'running') returning ${PUBLIC_COLS}, thread_id, turn
+     ), keep_inputs as (
+       insert into chat_input_parts(job_id, path, part, data)
+       select p.job_id, p.path, p.part, p.data from job_inputs p join c on c.id = p.job_id
+       where c.thread_id is not null
+         and c.turn = (select max(turn) from jobs where thread_id = c.thread_id)
+         and exists(select 1 from chat_threads where id = c.thread_id and deleted_at is null)
+       on conflict do nothing
      ), d as (delete from job_inputs where job_id in (select id from c))
      select * from c`,
     [id],
@@ -249,7 +257,7 @@ export async function cancelJob(sql: Sql, id: string): Promise<Job | null> {
 }
 
 /** What a bridge can run beyond plain questions; an older bridge sends none and never gets imports. */
-export const BRIDGE_FEATURES = ["import"] as const;
+export const BRIDGE_FEATURES = ["import", "chat"] as const;
 
 /** Atomically hands the oldest runnable job to this device (or reclaims a stale one). */
 export async function claimJob(sql: Sql, deviceId: string, agents: readonly Agent[], features: readonly string[] = []): Promise<ClaimedJob | null> {
@@ -257,9 +265,10 @@ export async function claimJob(sql: Sql, deviceId: string, agents: readonly Agen
   const rows = await sql.query<Row>(
     `update jobs set status = 'running', claimed_by = $1, claimed_at = now(), updated_at = now(), output = '', error = null
      where id = (
-       select id from jobs
+       select j.id from jobs j
        where agent = any($2::text[])
          and (kind = 'ask' or kind = any($4::text[]))
+         and (j.thread_id is null or not exists (select 1 from jobs earlier where earlier.thread_id = j.thread_id and earlier.turn < j.turn and earlier.status in ('uploading','queued','running')))
          and (status = 'queued' or (status = 'running' and updated_at < now() - make_interval(secs => $3)))
        order by created_at
        limit 1
@@ -292,10 +301,20 @@ export async function updateJob(sql: Sql, id: string, deviceId: string, u: z.inf
        files = case when $5::text is not null then null else files end,
        result_files = coalesce($8::jsonb, result_files)
      where id = $1 and claimed_by = $2 and status = 'running'
-     returning id, status
+     returning id, status, thread_id, agent, turn
+     ), session_update as (
+       update chat_threads set agent_session = jsonb_build_object('agent', u.agent, 'sessionId', $9::text), updated_at = now()
+       from u where chat_threads.id = u.thread_id and $9::text is not null and u.status = 'done'
+     ), keep_inputs as (
+       insert into chat_input_parts(job_id, path, part, data)
+       select p.job_id, p.path, p.part, p.data from job_inputs p join u on u.id = p.job_id
+       where u.thread_id is not null and $5::text is not null
+         and u.turn = (select max(turn) from jobs where thread_id = u.thread_id)
+         and exists(select 1 from chat_threads where id = u.thread_id and deleted_at is null)
+       on conflict do nothing
      ), d as (delete from job_inputs where job_id in (select id from u) and $5::text is not null)
      select status from u`,
-    [id, deviceId, u.output ?? null, u.append ?? null, u.status ?? null, u.error ?? null, MAX_OUTPUT, u.files ? JSON.stringify(u.files) : null],
+    [id, deviceId, u.output ?? null, u.append ?? null, u.status ?? null, u.error ?? null, MAX_OUTPUT, u.files ? JSON.stringify(u.files) : null, u.sessionId ?? null],
   );
   if (rows[0]) return { ok: true, status: rows[0].status };
   const cur = await sql.query<{ status: JobStatus }>(`select status from jobs where id = $1 and claimed_by = $2`, [id, deviceId]);

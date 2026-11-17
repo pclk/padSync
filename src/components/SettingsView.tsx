@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { deviceId, deviceKind } from "@/lib/db";
-import { useSyncStatus } from "@/lib/hooks";
+import { useStoredState, useSyncStatus } from "@/lib/hooks";
 import { useShowCopyButtons, useSyncDebug } from "@/lib/settings";
 import { requestSync, resetCursor, stopSync } from "@/lib/sync";
 import { SyncTimingSettings } from "./SyncTimingSettings";
@@ -25,6 +25,7 @@ interface CanvasCheck {
 }
 
 export default function SettingsView() {
+  const [idleMs, setIdleMs] = useStoredState("padsync.layoutIdleMs", 15000);
   const sync = useSyncStatus();
   const [showCopy, setShowCopy] = useShowCopyButtons();
   const [syncDebug, setSyncDebug] = useSyncDebug();
@@ -66,6 +67,11 @@ export default function SettingsView() {
       <Link href="/" className="text-slate-500">‹ Library</Link>
       <h1 className="mb-6 mt-2 text-2xl font-semibold text-slate-900">Settings</h1>
 
+      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
+        <h2 className="mb-3 font-semibold">Layout</h2>
+        <p className="text-xs text-slate-500">Starts in Auto by default.</p>
+        <label>Idle delay: {idleMs / 1000} s<input aria-label="Layout idle delay" type="range" min="5" max="120" value={idleMs / 1000} onChange={e => setIdleMs(Number(e.target.value) * 1000)} className="block w-full" /></label>
+      </section>
       <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="mb-3 font-semibold text-slate-800">Sync</h2>
         <Row k="Status" v={sync.status} />

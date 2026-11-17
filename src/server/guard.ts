@@ -12,14 +12,14 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const json = (status: number, error: string) => Response.json({ error }, { status });
 
 export async function requireSession(req: NextRequest): Promise<{ sql: Sql; login: string } | Response> {
-  const sql = await getSql();
-  if (!sql) return json(503, "database not configured");
   if (hasBearerScheme(req.headers)) return json(403, "device tokens cannot use this endpoint");
   // CSRF: the session cookie is SameSite=Lax; also refuse state changes from another origin.
   const origin = req.headers.get("origin");
   if (!SAFE_METHODS.has(req.method) && origin && origin !== req.nextUrl.origin) return json(403, "cross-origin request refused");
   const login = sessionLogin(req);
   if (!login) return json(401, "unauthorized");
+  const sql = await getSql();
+  if (!sql) return json(503, "database not configured");
   return { sql, login };
 }
 
