@@ -44,7 +44,10 @@ marked.use({
     // Payloads come from pasted AI output: never pass raw HTML through.
     html: ({ text }) => escapeHtml(text),
     code: ({ text, lang }) => `<pre class="hljs"><code>${highlight(text, lang)}</code></pre>`,
-    link: ({ href, text }) => (/^https?:/.test(href) ? `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer">${text}</a>` : text),
+    link({ href, tokens }) {
+      const label = this.parser.parseInline(tokens);
+      return /^https?:/.test(href) ? `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer">${label}</a>` : label;
+    },
     image: ({ href, text }) => (/^(https:|data:image\/)/.test(href) ? `<img src="${escapeHtml(href)}" alt="${escapeHtml(text)}">` : ""),
   },
 });

@@ -589,28 +589,41 @@ export function agentEnv(env: Env = process.env): Env {
 
 export function runAgent(opts: RunOptions): Promise<RunResult> {
   const { command } = opts;
+  if (opts.signal?.aborted) return Promise.resolve({ status: "cancelled", output: "" });
+  const cap = (text: string) => text.slice(0, MAX_OUTPUT).replace(/[\uD800-\uDBFF]$/, "");
   return new Promise((resolve) => {
-    const child = spawn(command.bin, command.args, { cwd: opts.cwd, env: (opts.env ?? agentEnv()) as NodeJS.ProcessEnv, stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn(command.bin, command.args, { cwd: opts.cwd, env: (opts.env ?? agentEnv()) as NodeJS.ProcessEnv, stdio: ["pipe", "pipe", "pipe"], detached: process.platform !== "win32" });
     let streamed = "";
     let final: string | undefined;
     let error: string | undefined;
     let stderr = "";
     let buffer = "";
     let settled = false;
+    let killTimer: ReturnType<typeof setTimeout> | undefined;
+    const killTree = (signal: NodeJS.Signals) => {
+      if (!child.pid || child.pid < 1) return;
+      try {
+        if (process.platform !== "win32") process.kill(-child.pid, signal);
+        else child.kill(signal);
+      } catch {}
+    };
     let stopReason: "cancelled" | "timeout" | null = null;
 
     const finish = (r: RunResult) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      clearTimeout(killTimer);
+      if (stopReason) killTree("SIGKILL");
       opts.signal?.removeEventListener("abort", onAbort);
       resolve(r);
     };
     const stop = (reason: "cancelled" | "timeout") => {
       if (stopReason) return;
       stopReason = reason;
-      child.kill("SIGTERM");
-      setTimeout(() => child.exitCode === null && child.kill("SIGKILL"), 3000).unref();
+      killTree("SIGTERM");
+      killTimer = setTimeout(() => killTree("SIGKILL"), 3000);
+      killTimer.unref();
     };
     const onAbort = () => stop("cancelled");
     const timer = setTimeout(() => stop("timeout"), opts.timeoutMs);
@@ -621,10 +634,10 @@ export function runAgent(opts: RunOptions): Promise<RunResult> {
       const u = command.parse(line);
       if (!u) return;
       if (u.text) {
-        streamed = streamed ? `${streamed}\n\n${u.text}` : u.text;
+        streamed = cap(streamed ? `${streamed}\n\n${u.text}` : u.text);
         opts.onText(streamed);
       }
-      if (u.final !== undefined) final = u.final;
+      if (u.final !== undefined) final = cap(u.final);
       if (u.error) error = u.error;
     };
 
@@ -647,8 +660,11 @@ export function runAgent(opts: RunOptions): Promise<RunResult> {
       if (stopReason === "cancelled") return finish({ status: "cancelled", output: streamed });
       if (stopReason === "timeout") return finish({ status: "error", output: streamed, error: `timed out after ${Math.round(opts.timeoutMs / 1000)}s` });
       if (command.finalFile) {
-        const fromFile = await readFile(join(opts.cwd, command.finalFile), "utf8").catch(() => "");
-        if (fromFile.trim()) final = fromFile.trim();
+        const path = safeJoin(opts.cwd, command.finalFile);
+        const st = await lstat(path).catch(() => null);
+        const bytes = st?.isFile() ? await readNoFollow(path, st.ino, st.dev, MAX_OUTPUT * 4) : null;
+        const fromFile = bytes?.toString("utf8") ?? "";
+        if (fromFile.trim()) final = cap(fromFile.trim());
       }
       const output = final ?? streamed;
       if (error || code !== 0) {
@@ -755,7 +771,7 @@ export class BridgeApi {
   }
 
   update(jobId: string, u: { output?: string; status?: "done" | "error"; error?: string; files?: JobFile[] }, opts?: { signal?: AbortSignal; timeoutMs?: number }) {
-    return this.call<{ status: string; cancelled: boolean }>("POST", `/api/bridge/jobs/${encodeURIComponent(jobId)}`, { ...u, ...(u.output === undefined ? {} : { output: u.output.slice(0, MAX_OUTPUT) }) }, opts);
+    return this.call<{ status: string; cancelled: boolean }>("POST", `/api/bridge/jobs/${encodeURIComponent(jobId)}`, { ...u, ...(u.output === undefined ? {} : { output: u.output.slice(0, MAX_OUTPUT).replace(/[\uD800-\uDBFF]$/, "") }) }, opts);
   }
 }
 

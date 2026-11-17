@@ -1,5 +1,5 @@
 import { DOCX_MIME, PPTX_MIME, slug, type BundleMime } from "./context";
-import { MAX_FILE_BYTES, MAX_TOTAL_BYTES, MAX_UPLOAD_FILES, base64Length } from "./uploads";
+import { MAX_FILE_BYTES, MAX_TOTAL_BYTES, MAX_UPLOAD_FILES, MAX_TOTAL_CHARS, base64Length } from "./uploads";
 
 // Lecture notes attached on the AI import page. Pure helpers (no DOM, no IndexedDB): what a file
 // is, the safe name it travels under, and whether the list fits the limits.
@@ -77,7 +77,7 @@ export function checkLimits(list: Pick<AttachmentMeta, "name" | "size">[]): stri
   if (list.length > MAX_UPLOAD_FILES) out.push(`At most ${MAX_UPLOAD_FILES} files per import (you have ${list.length}).`);
   for (const a of list) if (a.size > MAX_FILE_BYTES) out.push(`${a.name} is ${formatBytes(a.size)}; the limit is ${formatBytes(MAX_FILE_BYTES)} per file. Split it or export fewer pages.`);
   const total = list.reduce((n, a) => n + a.size, 0);
-  if (total > MAX_TOTAL_BYTES) out.push(`The files add up to ${formatBytes(total)}; the limit is ${formatBytes(MAX_TOTAL_BYTES)} per import.`);
+  if (total > MAX_TOTAL_BYTES || totalUploadChars(list) > MAX_TOTAL_CHARS) out.push(`The files add up to ${formatBytes(total)}; the limit is ${formatBytes(MAX_TOTAL_BYTES)} per import.`);
   return out;
 }
 
