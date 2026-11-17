@@ -107,7 +107,7 @@ function ReviewChanges({ notebookId, sections, files }: { notebookId: string; se
       </ul>
       {parsed.changes.length > 0 && (
         <button
-          className="mt-2 rounded-lg bg-blue-600 px-3 py-1 font-medium text-white disabled:opacity-40"
+          className="mt-2 rounded-lg bg-blue-600 px-3 py-1 font-medium text-on-accent disabled:opacity-40"
           disabled={!picked.length}
           onClick={async () => {
             const n = await applyNotebookChanges(notebookId, picked);

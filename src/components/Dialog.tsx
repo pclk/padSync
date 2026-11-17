@@ -37,7 +37,7 @@ export function Dialog({ title, onClose, onSubmit, children }: { title: string; 
     else next.focus.focus();
   };
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-backdrop p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <form ref={form} role="dialog" aria-modal="true" aria-labelledby={titleId} onKeyDown={onKeyDown}
         onSubmit={(e) => { e.preventDefault(); onSubmit(); }} className="card w-full max-w-sm p-5 shadow-lift">
         <h2 id={titleId} className="text-base font-semibold text-slate-900">{title}</h2>

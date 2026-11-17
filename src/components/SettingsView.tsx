@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { deviceId, deviceKind } from "@/lib/db";
 import { useStoredState, useSyncStatus } from "@/lib/hooks";
-import { useShowCopyButtons, useSyncDebug } from "@/lib/settings";
+import { useShowCopyButtons, useSyncDebug, useThemePreference } from "@/lib/settings";
+import { THEME_PREFERENCES } from "@/lib/theme";
 import { requestSync, resetCursor, stopSync } from "@/lib/sync";
 import { SyncTimingSettings } from "./SyncTimingSettings";
 import { DeviceTokens } from "./DeviceTokens";
@@ -30,6 +31,7 @@ export default function SettingsView() {
   const sync = useSyncStatus();
   const [showCopy, setShowCopy] = useShowCopyButtons();
   const [syncDebug, setSyncDebug] = useSyncDebug();
+  const [theme, setTheme] = useThemePreference();
   const [status, setStatus] = useState<Status | null>(null);
   const [authError] = useState(() => new URLSearchParams(window.location.search).get("auth_error"));
   const [canvas, setCanvas] = useState<CanvasCheck | null>(null);
@@ -68,6 +70,16 @@ export default function SettingsView() {
       <Link href="/" className="btn btn-ghost -ml-2 px-2"><Icon name="back" className="text-lg" />Library</Link>
       <h1 className="mb-8 mt-4 text-3xl font-semibold tracking-tight text-slate-900">Settings</h1>
 
+      <section className="card mb-5 p-5">
+        <h2 className="mb-3 text-base font-semibold text-slate-900">Appearance</h2>
+        <div className="flex items-center justify-between gap-3">
+          <span><span className="block text-slate-800">Theme</span>
+            <span className="block text-xs text-slate-500">System follows this device&rsquo;s light or dark setting. Pages stay light so ink keeps its colours.</span></span>
+          <div className="segmented shrink-0" role="group" aria-label="Theme">
+            {THEME_PREFERENCES.map((t) => <button key={t} type="button" aria-pressed={theme === t} onClick={() => setTheme(t)}>{THEME_LABELS[t]}</button>)}
+          </div>
+        </div>
+      </section>
       <section className="card mb-5 p-5">
         <h2 className="mb-3 text-base font-semibold text-slate-900">Layout</h2>
         <p className="text-xs text-slate-500">Starts in Auto by default.</p>
@@ -144,6 +156,8 @@ export default function SettingsView() {
     </main>
   );
 }
+
+const THEME_LABELS = { system: "System", light: "Light", dark: "Dark" } as const;
 
 function Row({ k, v }: { k: string; v: string }) {
   return (

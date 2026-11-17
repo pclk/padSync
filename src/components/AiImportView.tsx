@@ -295,7 +295,7 @@ function Step({ n, title, active, done, children }: { n: number; title: string; 
   return (
     <section className={`mb-4 rounded-2xl border bg-white p-5 shadow-card ${active ? "border-brand-300 ring-4 ring-brand-50" : "border-slate-200"}`} data-step={n} data-active={active ? "1" : undefined}>
       <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-slate-900">
-        <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${done ? "bg-emerald-600 text-white" : active ? "bg-brand-600 text-white" : "bg-slate-200 text-slate-600"}`}>{done ? "✓" : n}</span>
+        <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${done ? "bg-emerald-600 text-on-accent" : active ? "bg-brand-600 text-on-accent" : "bg-slate-200 text-slate-600"}`}>{done ? "✓" : n}</span>
         {title}
       </h2>
       {children}

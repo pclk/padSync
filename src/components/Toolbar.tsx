@@ -87,7 +87,7 @@ export function Toolbar(p: Props) {
               aria-label={t.label}
               aria-pressed={tool.kind === t.kind}
               onClick={() => setTool({ ...tool, kind: t.kind })}
-              className={`flex h-11 w-11 items-center justify-center rounded-xl text-xl transition-colors ${tool.kind === t.kind ? "bg-brand-600 text-white shadow-sm" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"}`}
+              className={`flex h-11 w-11 items-center justify-center rounded-xl text-xl transition-colors ${tool.kind === t.kind ? "bg-brand-600 text-on-accent shadow-sm" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"}`}
             >
               <Icon name={t.icon} />
             </button>

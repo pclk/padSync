@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
-/* Brand accent: an ink blue that reads well next to pen colours. `bg-brand-600`, `text-brand-700`… */
+/* Brand accent: an ink blue that reads well next to pen colours. `bg-brand-600`, `text-brand-700`…
+   Every colour here and the Tailwind palette (slate, white, status tints) get dark values below. */
 @theme {
   --color-brand-50: #eef3ff;
   --color-brand-100: #dce6ff;
@@ -10,14 +11,190 @@
   --color-brand-600: #3651e0;
   --color-brand-700: #2b40b8;
   --color-brand-800: #263791;
-  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.06);
-  --shadow-lift: 0 4px 12px rgb(15 23 42 / 0.08), 0 1px 3px rgb(15 23 42 / 0.06);
+  /* Text on a saturated fill (brand, emerald, blue buttons and badges): white in both themes,
+     unlike `text-white`, which follows `--color-white` to the dark surface. */
+  --color-on-accent: #fff;
+  /* The desk behind the pages in the editor, and the dimmed backdrop behind dialogs. */
+  --color-canvas: #e9ebef;
+  --color-backdrop: rgb(15 23 42 / 0.3);
+  --shadow-card: 0 1px 2px var(--shadow-color-soft), 0 1px 3px var(--shadow-color);
+  --shadow-lift: 0 4px 12px var(--shadow-color-strong), 0 1px 3px var(--shadow-color);
+}
+
+/* Semantic chrome tokens. Defined on .paper too, so inside a page they pick up its light palette. */
+:root,
+.paper {
+  --surface: var(--color-white);
+  --surface-muted: var(--color-slate-50);
+  --surface-sunken: var(--color-slate-100);
+  --border: var(--color-slate-200);
+  --border-strong: var(--color-slate-300);
+  --border-hover: var(--color-slate-400);
+  --text: var(--color-slate-900);
+  --text-body: var(--color-slate-700);
+  --text-muted: var(--color-slate-600);
+  --text-faint: var(--color-slate-400);
+  --accent: var(--color-brand-600);
+  --accent-hover: var(--color-brand-700);
+  --accent-ring: var(--color-brand-100);
+  --danger: var(--color-rose-600);
+  --danger-hover: var(--color-rose-700);
+  --danger-bg: var(--color-rose-50);
 }
 
 :root {
+  color-scheme: light;
   --chrome-bg: #f6f7f9;
   --chrome-fg: #0f172a;
+  --shadow-color-soft: rgb(15 23 42 / 0.04);
+  --shadow-color: rgb(15 23 42 / 0.06);
+  --shadow-color-strong: rgb(15 23 42 / 0.08);
+  --shadow-control: rgb(15 23 42 / 0.1);
+  --shadow-primary: rgb(38 55 145 / 0.25);
+  --prose-fg: #111827;
+  --prose-muted: #475569;
+  --prose-rule: #cbd5e1;
+  --prose-code-bg: #f1f5f9;
   accent-color: var(--color-brand-600);
+}
+
+/* Dark chrome. data-theme is set before paint by the inline script in layout.tsx (lib/theme.ts).
+   Remapping the palette (slate inverted, white → surface, light tints → dark tints, dark text
+   shades → light) themes every Tailwind utility in the chrome without touching each component. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --chrome-bg: #0e1117;
+  --chrome-fg: #e6e9ef;
+  --color-white: #161b23;
+  --color-slate-50: #1b212b;
+  --color-slate-100: #222a35;
+  --color-slate-200: #2d3542;
+  --color-slate-300: #3b4453;
+  --color-slate-400: #687385;
+  --color-slate-500: #8a95a6;
+  --color-slate-600: #a5afbe;
+  --color-slate-700: #c0c8d4;
+  --color-slate-800: #d9dee6;
+  --color-slate-900: #edf0f4;
+  --color-slate-950: #f8fafc;
+  --color-brand-50: #172042;
+  --color-brand-100: #1e2a57;
+  --color-brand-200: #2a3a78;
+  --color-brand-300: #3f56a6;
+  --color-brand-500: #7b93ff;
+  --color-brand-600: #4b66ee;
+  --color-brand-700: #a3b5ff;
+  --color-brand-800: #c4d0ff;
+  --color-rose-50: #2c161d;
+  --color-rose-100: #3d1a24;
+  --color-rose-200: #5c2333;
+  --color-rose-600: #fb7185;
+  --color-rose-700: #fb7f96;
+  --color-rose-800: #fda4b4;
+  --color-emerald-50: #10261f;
+  --color-emerald-100: #133528;
+  --color-emerald-200: #1b4d3a;
+  --color-emerald-700: #4ad6a0;
+  --color-emerald-800: #86e5bf;
+  --color-amber-50: #2a2010;
+  --color-amber-100: #3a2b10;
+  --color-amber-200: #574014;
+  --color-amber-700: #f5b544;
+  --color-amber-800: #f8c96d;
+  --color-amber-900: #fbd994;
+  --color-amber-950: #fde8bd;
+  --color-blue-50: #14213b;
+  --color-blue-100: #182a4d;
+  --color-blue-200: #213b6b;
+  --color-blue-700: #8fb4ff;
+  --color-blue-800: #b0caff;
+  --color-blue-900: #cfdeff;
+  --color-sky-50: #102531;
+  --color-sky-700: #6cc8f0;
+  --color-indigo-50: #1a1c3d;
+  --color-indigo-700: #a5abff;
+  --color-violet-800: #c7b2ff;
+  --color-canvas: #090c11;
+  --color-backdrop: rgb(0 0 0 / 0.55);
+  --shadow-color-soft: rgb(0 0 0 / 0.25);
+  --shadow-color: rgb(0 0 0 / 0.3);
+  --shadow-color-strong: rgb(0 0 0 / 0.4);
+  --shadow-control: rgb(0 0 0 / 0.4);
+  --shadow-primary: rgb(0 0 0 / 0.35);
+  --accent-ring: rgb(123 147 255 / 0.3);
+  --prose-fg: #e6e9ef;
+  --prose-muted: #a5afbe;
+  --prose-rule: #3b4453;
+  --prose-code-bg: #222a35;
+  accent-color: var(--color-brand-500);
+}
+
+/* The page paper stays light, so ink, highlighter and template colours look as they were drawn.
+   These are Tailwind's default values (node_modules/tailwindcss/theme.css) and the light tokens
+   above, restored for everything inside a page. */
+:root[data-theme="dark"] .paper {
+  color-scheme: light;
+  color: var(--chrome-fg);
+  --chrome-fg: #0f172a;
+  --color-white: #fff;
+  --color-slate-50: oklch(98.4% 0.003 247.858);
+  --color-slate-100: oklch(96.8% 0.007 247.896);
+  --color-slate-200: oklch(92.9% 0.013 255.508);
+  --color-slate-300: oklch(86.9% 0.022 252.894);
+  --color-slate-400: oklch(70.4% 0.04 256.788);
+  --color-slate-500: oklch(55.4% 0.046 257.417);
+  --color-slate-600: oklch(44.6% 0.043 257.281);
+  --color-slate-700: oklch(37.2% 0.044 257.287);
+  --color-slate-800: oklch(27.9% 0.041 260.031);
+  --color-slate-900: oklch(20.8% 0.042 265.755);
+  --color-slate-950: oklch(12.9% 0.042 264.695);
+  --color-brand-50: #eef3ff;
+  --color-brand-100: #dce6ff;
+  --color-brand-200: #bccfff;
+  --color-brand-300: #8eadff;
+  --color-brand-500: #4a6cf7;
+  --color-brand-600: #3651e0;
+  --color-brand-700: #2b40b8;
+  --color-brand-800: #263791;
+  --color-rose-50: oklch(96.9% 0.015 12.422);
+  --color-rose-100: oklch(94.1% 0.03 12.58);
+  --color-rose-200: oklch(89.2% 0.058 10.001);
+  --color-rose-600: oklch(58.6% 0.253 17.585);
+  --color-rose-700: oklch(51.4% 0.222 16.935);
+  --color-rose-800: oklch(45.5% 0.188 13.697);
+  --color-emerald-50: oklch(97.9% 0.021 166.113);
+  --color-emerald-100: oklch(95% 0.052 163.051);
+  --color-emerald-200: oklch(90.5% 0.093 164.15);
+  --color-emerald-700: oklch(50.8% 0.118 165.612);
+  --color-emerald-800: oklch(43.2% 0.095 166.913);
+  --color-amber-50: oklch(98.7% 0.022 95.277);
+  --color-amber-100: oklch(96.2% 0.059 95.617);
+  --color-amber-200: oklch(92.4% 0.12 95.746);
+  --color-amber-700: oklch(55.5% 0.163 48.998);
+  --color-amber-800: oklch(47.3% 0.137 46.201);
+  --color-amber-900: oklch(41.4% 0.112 45.904);
+  --color-amber-950: oklch(27.9% 0.077 45.635);
+  --color-blue-50: oklch(97% 0.014 254.604);
+  --color-blue-100: oklch(93.2% 0.032 255.585);
+  --color-blue-200: oklch(88.2% 0.059 254.128);
+  --color-blue-700: oklch(48.8% 0.243 264.376);
+  --color-blue-800: oklch(42.4% 0.199 265.638);
+  --color-blue-900: oklch(37.9% 0.146 265.522);
+  --color-sky-50: oklch(97.7% 0.013 236.62);
+  --color-sky-700: oklch(50% 0.134 242.749);
+  --color-indigo-50: oklch(96.2% 0.018 272.314);
+  --color-indigo-700: oklch(45.7% 0.24 277.023);
+  --color-violet-800: oklch(43.2% 0.232 292.759);
+  --shadow-color-soft: rgb(15 23 42 / 0.04);
+  --shadow-color: rgb(15 23 42 / 0.06);
+  --shadow-color-strong: rgb(15 23 42 / 0.08);
+  --shadow-control: rgb(15 23 42 / 0.1);
+  --shadow-primary: rgb(38 55 145 / 0.25);
+  --accent-ring: var(--color-brand-100);
+  --prose-fg: #111827;
+  --prose-muted: #475569;
+  --prose-rule: #cbd5e1;
+  --prose-code-bg: #f1f5f9;
 }
 
 html,
@@ -74,7 +251,7 @@ pre,
 .prose-pad {
   font-size: 20px;
   line-height: 1.6;
-  color: #111827;
+  color: var(--prose-fg);
 }
 .prose-pad p,
 .prose-pad ul,
@@ -107,7 +284,7 @@ pre,
 .prose-pad code {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 0.88em;
-  background: #f1f5f9;
+  background: var(--prose-code-bg);
   padding: 0.1em 0.3em;
   border-radius: 4px;
 }
@@ -127,13 +304,13 @@ pre,
 }
 .prose-pad th,
 .prose-pad td {
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--prose-rule);
   padding: 0.3em 0.6em;
 }
 .prose-pad blockquote {
-  border-left: 3px solid #cbd5e1;
+  border-left: 3px solid var(--prose-rule);
   padding-left: 0.8em;
-  color: #475569;
+  color: var(--prose-muted);
 }
 .prose-pad img {
   max-width: 100%;
@@ -207,16 +384,16 @@ pre,
   }
   input[type="file"]::file-selector-button {
     margin-right: 0.75rem;
-    border: 1px solid var(--color-slate-300);
+    border: 1px solid var(--border-strong);
     border-radius: 0.5rem;
-    background: white;
+    background: var(--surface);
     padding: 0.375rem 0.75rem;
     font-weight: 500;
-    color: var(--color-slate-700);
+    color: var(--text-body);
     cursor: pointer;
   }
   input[type="file"]::file-selector-button:hover {
-    background: var(--color-slate-50);
+    background: var(--surface-muted);
   }
   input[type="checkbox"],
   input[type="radio"] {
@@ -231,9 +408,9 @@ pre,
 
 @layer components {
   .card {
-    border: 1px solid var(--color-slate-200);
+    border: 1px solid var(--border);
     border-radius: 1rem;
-    background: white;
+    background: var(--surface);
     box-shadow: var(--shadow-card);
   }
   .btn {
@@ -261,41 +438,41 @@ pre,
     border-radius: 0.5rem;
   }
   .btn-primary {
-    background: var(--color-brand-600);
-    color: white;
-    box-shadow: 0 1px 2px rgb(38 55 145 / 0.25);
+    background: var(--accent);
+    color: var(--color-on-accent);
+    box-shadow: 0 1px 2px var(--shadow-primary);
   }
   .btn-primary:not(:disabled):hover {
-    background: var(--color-brand-700);
+    background: var(--accent-hover);
   }
   .btn-secondary {
-    border-color: var(--color-slate-300);
-    background: white;
-    color: var(--color-slate-700);
-    box-shadow: 0 1px 1px rgb(15 23 42 / 0.04);
+    border-color: var(--border-strong);
+    background: var(--surface);
+    color: var(--text-body);
+    box-shadow: 0 1px 1px var(--shadow-color-soft);
   }
   .btn-secondary:not(:disabled):hover {
-    border-color: var(--color-slate-400);
-    background: var(--color-slate-50);
+    border-color: var(--border-hover);
+    background: var(--surface-muted);
   }
   .btn-ghost {
-    color: var(--color-slate-600);
+    color: var(--text-muted);
   }
   .btn-ghost:not(:disabled):hover {
-    background: var(--color-slate-100);
-    color: var(--color-slate-900);
+    background: var(--surface-sunken);
+    color: var(--text);
   }
   .btn-ghost[aria-pressed="true"],
   .btn-ghost[aria-expanded="true"] {
-    background: var(--color-slate-900);
-    color: white;
+    background: var(--text);
+    color: var(--surface);
   }
   .btn-danger {
-    color: var(--color-rose-600);
+    color: var(--danger);
   }
   .btn-danger:not(:disabled):hover {
-    background: var(--color-rose-50);
-    color: var(--color-rose-700);
+    background: var(--danger-bg);
+    color: var(--danger-hover);
   }
   .icon-btn {
     display: inline-flex;
@@ -304,12 +481,12 @@ pre,
     width: 2.25rem;
     height: 2.25rem;
     border-radius: 0.625rem;
-    color: var(--color-slate-600);
+    color: var(--text-muted);
     transition: background-color 120ms, color 120ms;
   }
   .icon-btn:not(:disabled):hover {
-    background: var(--color-slate-100);
-    color: var(--color-slate-900);
+    background: var(--surface-sunken);
+    color: var(--text);
   }
   .icon-btn:disabled {
     opacity: 0.3;
@@ -317,28 +494,28 @@ pre,
   .field {
     display: block;
     width: 100%;
-    border: 1px solid var(--color-slate-300);
+    border: 1px solid var(--border-strong);
     border-radius: 0.625rem;
-    background: white;
+    background: var(--surface);
     padding: 0.5rem 0.75rem;
     font-size: 0.875rem;
-    color: var(--color-slate-900);
+    color: var(--text);
     transition: border-color 120ms, box-shadow 120ms;
   }
   .field::placeholder {
-    color: var(--color-slate-400);
+    color: var(--text-faint);
   }
   .field:focus {
     outline: none;
     border-color: var(--color-brand-500);
-    box-shadow: 0 0 0 3px var(--color-brand-100);
+    box-shadow: 0 0 0 3px var(--accent-ring);
   }
   /* Segmented control: a row of buttons using aria-pressed or aria-selected. */
   .segmented {
     display: inline-flex;
     gap: 2px;
     border-radius: 0.625rem;
-    background: var(--color-slate-100);
+    background: var(--surface-sunken);
     padding: 3px;
   }
   .segmented > button {
@@ -349,17 +526,17 @@ pre,
     padding: 0.25rem 0.65rem;
     font-size: 0.8125rem;
     font-weight: 500;
-    color: var(--color-slate-600);
+    color: var(--text-muted);
     transition: background-color 120ms, color 120ms;
   }
   .segmented > button:hover {
-    color: var(--color-slate-900);
+    color: var(--text);
   }
   .segmented > button[aria-pressed="true"],
   .segmented > button[aria-selected="true"] {
-    background: white;
-    color: var(--color-slate-900);
-    box-shadow: 0 1px 2px rgb(15 23 42 / 0.1);
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 2px var(--shadow-control);
   }
   .kbd {
     border: 1px solid currentColor;
@@ -376,7 +553,7 @@ pre,
     height: 1.25rem;
     flex-shrink: 0;
     border-radius: 999px;
-    background: var(--color-slate-300);
+    background: var(--border-strong);
     transition: background-color 150ms;
   }
   input[type="checkbox"].switch::after {
@@ -392,15 +569,15 @@ pre,
     transition: transform 150ms;
   }
   input[type="checkbox"].switch:checked {
-    background: var(--color-brand-600);
+    background: var(--accent);
   }
   input[type="checkbox"].switch:checked::after {
     transform: translateX(1rem);
   }
   .dropzone {
-    border: 1.5px dashed var(--color-slate-300);
+    border: 1.5px dashed var(--border-strong);
     border-radius: 1rem;
-    background: white;
+    background: var(--surface);
     transition: border-color 120ms, background-color 120ms;
   }
   .dropzone[data-over="true"] {
