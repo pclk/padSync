@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { deviceId, deviceKind } from "@/lib/db";
 import { useSyncStatus } from "@/lib/hooks";
 import { useShowCopyButtons } from "@/lib/settings";
-import { requestSync, resetCursor } from "@/lib/sync";
+import { requestSync, resetCursor, stopSync } from "@/lib/sync";
 import { SyncTimingSettings } from "./SyncTimingSettings";
 import { DeviceTokens } from "./DeviceTokens";
 
@@ -47,7 +47,8 @@ export default function SettingsView() {
 
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
-    await load();
+    stopSync();
+    window.location.reload();
   };
 
   const checkCanvas = async () => {

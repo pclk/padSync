@@ -39,7 +39,7 @@ export function SyncTimingSettings() {
   }
   return <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
     <h2 className="mb-3 font-semibold text-slate-800">Sync timing</h2>
-    <p className="text-sm">An edit waits for the send delay on one device, then the receive interval on the other, plus network and server time. Lower the visible receive interval to make iPad ↔ Mac updates arrive sooner.</p>
+    <p className="text-sm">Realtime notifications fetch changes as they arrive. If realtime is unavailable, the receive intervals below control polling. Send delay, network and server time still affect delivery.</p>
     <p className="mt-2 text-sm text-slate-600">Shorter intervals use more requests, battery and data, even when you are not editing. Background sync depends on the browser keeping the tab running; a locked or sleeping device may stop syncing.</p>
     {admin && <>
       <div className="my-3 flex flex-wrap gap-2">
@@ -62,7 +62,8 @@ export function SyncTimingSettings() {
     </>}
     {!admin && <p className="mt-2 text-sm text-slate-500">Only GitHub admin @pclk can change these settings.</p>}
     {sample && <div className="mt-4 text-xs text-slate-600">
-      <p>Active timings on this tab: send {sample.debounceMs} ms · visible receive {sample.visiblePollMs} ms · hidden receive {sample.hiddenPollMs} ms · initial retry {sample.retryBaseMs} ms.</p>
+      <p>Realtime: {sample.realtimeStatus === 'live' ? 'Connected · changes arrive automatically' : sample.realtimeStatus === 'disabled' ? 'Not configured · using HTTP polling' : `${sample.realtimeStatus} · using HTTP polling`}. Current recovery poll: {sample.effectivePollMs} ms. While realtime is connected, recovery polling runs at most once every 30 seconds.</p>
+      <p className="mt-2">Configured timings on this tab: send {sample.debounceMs} ms · visible receive {sample.visiblePollMs} ms · hidden receive {sample.hiddenPollMs} ms · initial retry {sample.retryBaseMs} ms.</p>
       <p className="mt-2">Observed: {sample.requests} sync requests and {sample.edits.length} local sync triggers over {Math.round((sample.end - sample.start) / 1000)} seconds (up to 5 minutes). Triggers include ink, typed changes, analytics and presence. {sample.traceTruncated && 'Trace limit reached; older entries omitted.'}</p>
       <p className="mt-2">Intervals start after each completed request. Network and server time add latency. Configuration checks run about once a minute while syncing. This counter measures requests on this tab, not end-to-end latency or database cost.</p>
     </div>}

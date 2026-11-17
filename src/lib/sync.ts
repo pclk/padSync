@@ -1,3 +1,4 @@
+import { startRealtime, type RealtimeStatus } from "./sync-realtime";
 import { DEFAULT_DEBOUNCE_MS, validDebounce, DEFAULT_SYNC_CONFIG, normalizeSyncConfig, type SyncConfig } from "./sync-policy";
 import { db, getMeta, setMeta } from "./db";
 import { hlcObserve } from "./hlc";
@@ -5,11 +6,19 @@ import type { Entity } from "./types";
 
 // Offline-first sync. Local writes land in IndexedDB marked dirty; this engine pushes them
 // (debounced) and pulls everything the server has seen since our cursor. The same POST does
-// both, so one round trip per tick. Transport is plain HTTP polling for now; a realtime
-// "new data" ping can later just call requestSync().
+// both, so one round trip per tick. Realtime metadata notifications wake this same
+// engine, with HTTP polling retained for recovery.
 
 export type SyncStatus = "idle" | "syncing" | "synced" | "offline" | "local-only" | "needs-login" | "error";
 
+let realtimeStatus: RealtimeStatus = 'connecting';
+let stopRealtime: (() => void) | undefined;
+let stopWakeListeners: (() => void) | undefined;
+const REALTIME_RECOVERY_MS = 30000;
+function pollDelay() {
+  const configured = typeof document === 'undefined' || document.visibilityState === 'visible' ? config.visiblePollMs : config.hiddenPollMs;
+  return realtimeStatus === 'live' ? Math.max(REALTIME_RECOVERY_MS, configured) : configured;
+}
 let debounceMs = DEFAULT_DEBOUNCE_MS;
 let config = { ...DEFAULT_SYNC_CONFIG };
 // Strokes are a few KB each; keep requests well under Vercel's 4.5 MB body limit.
@@ -34,7 +43,7 @@ const requestTimes: number[] = [];
 let traceTruncated = false;
 export function getSyncTiming() {
   const now = Date.now(), start = Math.max(observedSince, now - 300000);
-  return { ...config, debounceMs, start, end: now, edits: editTimes.filter(t => t >= start), requests: requestTimes.filter(t => t >= start).length, traceTruncated };
+  return { ...config, debounceMs, realtimeStatus, effectivePollMs: pollDelay(), start, end: now, edits: editTimes.filter(t => t >= start), requests: requestTimes.filter(t => t >= start).length, traceTruncated };
 }
 export function setSyncDebounce(value: number) {
   if (validDebounce(value)) setSyncConfig({ ...config, debounceMs: value });
@@ -43,7 +52,7 @@ export function setSyncConfig(value: Partial<SyncConfig>) {
   config = normalizeSyncConfig({ ...config, ...value });
   debounceMs = config.debounceMs;
   // A faster configuration advances an existing poll without delaying queued writes.
-  if (started) schedule(document.visibilityState === 'visible' ? config.visiblePollMs : config.hiddenPollMs);
+  if (started) schedule(pollDelay());
 }
 function record(trace: number[]) {
   const now = Date.now();
@@ -94,11 +103,20 @@ export function requestSync(delay?: number) {
 export function startSync() {
   if (started || typeof window === "undefined") return;
   started = true;
+  stopRealtime = startRealtime(() => requestSync(0), next => {
+    const wasLive = realtimeStatus === 'live';
+    realtimeStatus = next;
+    if (wasLive && next !== 'live') schedule(pollDelay());
+    listeners.forEach(listener => listener());
+  });
   const wake = () => { retryAt = 0; configCheckedAt = -Infinity; requestSync(0); };
   window.addEventListener("online", wake);
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === 'visible') wake();
-  });
+  const visible = () => { if (document.visibilityState === 'visible') wake(); };
+  document.addEventListener("visibilitychange", visible);
+  stopWakeListeners = () => {
+    window.removeEventListener("online", wake);
+    document.removeEventListener("visibilitychange", visible);
+  };
   requestSync(0);
 }
 async function runSync() {
@@ -121,7 +139,7 @@ async function runSync() {
     const pending = again;
     again = false;
     if (pending) schedule(0);
-    else if (started) schedule(retryAt ? Math.max(0, retryAt - Date.now()) : document.visibilityState === 'visible' ? config.visiblePollMs : config.hiddenPollMs);
+    else if (started) schedule(retryAt ? Math.max(0, retryAt - Date.now()) : pollDelay());
   }
 }
 
@@ -190,6 +208,15 @@ export async function syncOnce(): Promise<boolean> {
 
   setStatus("synced");
   return body.more || dirty.length === ENTITY_BATCH || events.length === EVENT_BATCH;
+}
+
+export function stopSync() {
+  started = false; again = false;
+  stopWakeListeners?.(); stopWakeListeners = undefined;
+  stopRealtime?.(); stopRealtime = undefined;
+  realtimeStatus = 'suspended';
+  if (timer) clearTimeout(timer);
+  timer = null; dueAt = Infinity;
 }
 
 export async function resetCursor() {

@@ -5,8 +5,8 @@ import { requireSession } from "@/server/guard";
 // One endpoint does push and pull. Writes are last-writer-wins per entity on the hlc; every
 // accepted write takes a new seq, and clients pull "everything after my cursor".
 //
-// Known gap: two concurrent requests can commit seqs out of order, so a pull may briefly skip a
-// row. With one person on two devices this is rare; the next write to that entity heals it.
+// Entity writers take one transaction-scoped lock before allocating sequence numbers.
+// This keeps committed sequence order safe for the pull cursor across devices/instances.
 
 const PULL_LIMIT = 200; // keeps responses under Vercel's 4.5 MB body limit
 
@@ -64,31 +64,33 @@ export async function POST(req: NextRequest) {
   }
   const pushed = [...latest.values()];
 
-  // A write that loses to a newer server version gets that version back, even if the caller's
-  // cursor is already past it, so the two never stay diverged. The outer select reads the snapshot
-  // from before the upsert, which is exactly where those losers show up. hlc compares bytewise
-  // (collate "C"), the same order the client's string comparison uses.
+  // The lock is evaluated before INSERT defaults or conflict updates allocate seq.
+  // It is held until this statement's implicit transaction commits.
   let lost: Row[] = [];
   if (pushed.length) {
     const rows = pushed.map((c) => ({ id: c.id, kind: c.kind, notebook_id: c.notebookId, parent_id: c.parentId, data: c.data, hlc: c.hlc, deleted: c.deleted === 1 }));
-    lost = (await sql.query(
-      `with x as (
+    await sql.query(
+      `with locked as materialized (select pg_advisory_xact_lock(72419381)), x as (
          select * from jsonb_to_recordset($1::jsonb)
            as x(id text, kind text, notebook_id text, parent_id text, data jsonb, hlc text, deleted boolean)
-       ), up as (
-         insert into entities (id, kind, notebook_id, parent_id, data, hlc, deleted)
-         select id, kind, notebook_id, parent_id, data, hlc, deleted from x
-         on conflict (id) do update set
-           kind = excluded.kind, notebook_id = excluded.notebook_id, parent_id = excluded.parent_id,
-           data = excluded.data, hlc = excluded.hlc, deleted = excluded.deleted,
-           seq = nextval('entity_seq'), updated_at = now()
-         where entities.hlc collate "C" < excluded.hlc collate "C"
        )
-       select e.id, e.kind, e.notebook_id, e.parent_id, e.data, e.hlc, e.deleted, e.seq
-       from entities e join x on x.id = e.id
-       where e.hlc collate "C" > x.hlc collate "C"`,
+       insert into entities (id, kind, notebook_id, parent_id, data, hlc, deleted)
+       select x.id, x.kind, x.notebook_id, x.parent_id, x.data, x.hlc, x.deleted from locked cross join x
+       on conflict (id) do update set
+         kind = excluded.kind, notebook_id = excluded.notebook_id, parent_id = excluded.parent_id,
+         data = excluded.data, hlc = excluded.hlc, deleted = excluded.deleted,
+         seq = nextval('entity_seq'), updated_at = now()
+       where entities.hlc collate "C" < excluded.hlc collate "C"`,
       [JSON.stringify(rows)],
-    )) as Row[];
+    );
+    // Fresh statement snapshot sees a concurrent winner that ON CONFLICT waited for.
+    // Return it even when its sequence is behind the caller's existing cursor.
+    const authoritative = await sql.query<Row>(
+      'select id, kind, notebook_id, parent_id, data, hlc, deleted, seq from entities where id = any($1::text[])',
+      [pushed.map(c => c.id)],
+    );
+    const sent = new Map(pushed.map(c => [c.id, c.hlc]));
+    lost = authoritative.filter(row => row.hlc > sent.get(row.id)!);
   }
 
   if (events.length) {

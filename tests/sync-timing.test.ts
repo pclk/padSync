@@ -1,6 +1,10 @@
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { replaySyncRequests } from '@/lib/sync-policy';
+const realtime = vi.hoisted(() => ({ notify: undefined as (() => void) | undefined, status: undefined as ((status: 'live' | 'fallback') => void) | undefined }));
+vi.mock('@/lib/sync-realtime', () => ({ startRealtime: (notify: () => void, status: (status: 'live' | 'fallback') => void) => {
+ realtime.notify = notify; realtime.status = status; return () => {};
+} }));
 let sync: typeof import('@/lib/sync');
 let fetchMock: ReturnType<typeof vi.fn>;
 beforeEach(async()=>{
@@ -122,4 +126,31 @@ it('sends edits with zero delay and retains all zero controls',async()=>{
  expect(fetchMock.mock.calls.filter(c=>c[0]==='/api/sync')).toHaveLength(1);
  expect(sync.getSyncTiming()).toMatchObject({debounceMs:0,visiblePollMs:0,hiddenPollMs:0,retryBaseMs:0});
  expect(replaySyncRequests([],0,1000,0,0)).toBe(Infinity);
+});
+
+it('slows recovery polling while realtime is connected and restores configured polling on failure',async()=>{
+ sync.startSync(); await vi.advanceTimersByTimeAsync(0);
+ realtime.status!('live');
+ expect(sync.getSyncTiming().effectivePollMs).toBe(30000);
+ // An already scheduled deadline remains intact to protect queued edits.
+ await vi.advanceTimersByTimeAsync(2000);
+ await vi.advanceTimersByTimeAsync(29999);
+ expect(fetchMock.mock.calls.filter(c=>c[0]==='/api/sync')).toHaveLength(2);
+ await vi.advanceTimersByTimeAsync(1);
+ expect(fetchMock.mock.calls.filter(c=>c[0]==='/api/sync')).toHaveLength(3);
+ realtime.status!('fallback');
+ await vi.advanceTimersByTimeAsync(2000);
+ expect(fetchMock.mock.calls.filter(c=>c[0]==='/api/sync')).toHaveLength(4);
+});
+it('a realtime notification during a request schedules serialized reconciliation',async()=>{
+ let release!:()=>void; let count=0;
+ fetchMock.mockImplementation(async(url:string)=>{
+  if(url==='/api/sync-config') return Response.json({debounceMs:400});
+  count++; if(count===1) await new Promise<void>(resolve=>{release=resolve;});
+  return Response.json({changes:[],cursor:0,more:false});
+ });
+ sync.startSync(); await vi.advanceTimersByTimeAsync(0);
+ realtime.notify!(); await vi.advanceTimersByTimeAsync(0); expect(count).toBe(1);
+ release(); await vi.advanceTimersByTimeAsync(1); expect(count).toBe(2);
+ expect(sync.getSyncTiming().edits).toHaveLength(0);
 });

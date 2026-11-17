@@ -34,6 +34,26 @@ No AirDrop, no Handoff, no PDF round trip.
 4. On the iPad: open the site in Safari → Share → *Add to Home Screen*, open it from there, and
    tap *Sign in with GitHub* on *Settings*. Do the same in the Mac browser.
 
+### Realtime sync (recommended)
+
+Enable Neon Realtime on the same branch as `DATABASE_URL`, allowing the exact browser origins
+(e.g. `https://pad-sync.vercel.app` and `http://localhost:3000`). Set `NEON_REALTIME_URL` and
+`NEON_REALTIME_SECRET` in Vercel's environment variables and redeploy. Both variables are server-only;
+the authenticated `/api/sync/live` route gives the browser a short-lived, metadata-only capability.
+Never expose the secret under a `NEXT_PUBLIC_` name.
+
+The browser connects directly to Neon over WebSockets. When entities change, it immediately runs
+the existing HTTP sync, retaining offline writes, pagination and conflict handling. While realtime
+is live, recovery polling is at least 30 seconds; during outages it uses your configured polling
+intervals. Hidden tabs disconnect from realtime and use their hidden polling interval if the
+browser keeps them running. Returning to a visible tab reconnects and reconciles missed changes.
+Settings → Sync timing displays the connection state and effective recovery interval.
+
+For local credentials, use `neon env pull --project-id <project-id> --branch <branch> --service realtime`.
+Use the same database branch for both services. Neon Realtime is beta and has its own service usage;
+it avoids holding a Vercel Function open for each idle browser connection. See
+[docs/sync-timing.md](docs/sync-timing.md) for behavior and validation.
+
 Without `DATABASE_URL` the app still runs and stores everything on the device ("Local only").
 
 ## Using it
