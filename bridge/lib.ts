@@ -460,12 +460,13 @@ export class BridgeApi {
     this.fetchImpl = fetchImpl;
   }
 
-  private async call<T>(method: string, path: string, body?: unknown): Promise<T> {
+  private async call<T>(method: string, path: string, body?: unknown, opts: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<T> {
+    const timeout = AbortSignal.timeout(opts.timeoutMs ?? 30_000);
     const res = await this.fetchImpl(this.server + path, {
       method,
       headers: { authorization: `Bearer ${this.token}`, "content-type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(30_000),
+      signal: opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout,
       redirect: "error", // never forward the token to another host
     });
     const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -481,7 +482,7 @@ export class BridgeApi {
     return this.call<{ job: ClaimedJob | null }>("POST", "/api/bridge/claim", { agents, info });
   }
 
-  update(jobId: string, u: { output?: string; status?: "done" | "error"; error?: string }) {
-    return this.call<{ status: string; cancelled: boolean }>("POST", `/api/bridge/jobs/${encodeURIComponent(jobId)}`, { ...u, ...(u.output === undefined ? {} : { output: u.output.slice(0, MAX_OUTPUT) }) });
+  update(jobId: string, u: { output?: string; status?: "done" | "error"; error?: string }, opts?: { signal?: AbortSignal; timeoutMs?: number }) {
+    return this.call<{ status: string; cancelled: boolean }>("POST", `/api/bridge/jobs/${encodeURIComponent(jobId)}`, { ...u, ...(u.output === undefined ? {} : { output: u.output.slice(0, MAX_OUTPUT) }) }, opts);
   }
 }

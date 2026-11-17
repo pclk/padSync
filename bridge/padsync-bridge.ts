@@ -45,6 +45,9 @@ const HEARTBEAT_MS = 5000;
 const JOB_TIMEOUT_MS = 15 * 60_000;
 // A job directory this old cannot belong to a live job (they time out after JOB_TIMEOUT_MS).
 const STALE_JOB_DIR_MS = 60 * 60_000;
+// On SIGTERM/SIGINT: how long the "bridge stopped" report may take, and the hard exit after that.
+const SHUTDOWN_REPORT_MS = 5000;
+const SHUTDOWN_EXIT_MS = 10_000;
 const TOKEN_RE = /^psd_[A-Za-z0-9_-]{43}$/;
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a);
@@ -101,6 +104,13 @@ async function status() {
 /** Aborted on SIGTERM/SIGINT so the running agent is stopped and its job directory removed. */
 const shutdown = new AbortController();
 
+function reportStopped(api: BridgeApi, jobId: string, output = "") {
+  return api
+    .update(jobId, { output, status: "error", error: "the Mac bridge was stopped before finishing; ask again" }, { timeoutMs: SHUTDOWN_REPORT_MS })
+    .then(() => log(`job ${jobId} reported as stopped`))
+    .catch((e) => log(`could not report job ${jobId} as stopped: ${(e as Error).message}`));
+}
+
 async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
   const o = cleanOptions(job.agent, job.options);
   const how = [o.model, o.effort && `effort ${o.effort}`, o.webSearch && "web search"].filter(Boolean).join(", ");
@@ -120,7 +130,8 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
     if (!changed && Date.now() - lastContact < HEARTBEAT_MS) return;
     const out = latest;
     try {
-      const r = await api.update(job.id, changed ? { output: out } : {});
+      // Cancelled with the job, so a hung progress request can't hold up stopping it.
+      const r = await api.update(job.id, changed ? { output: out } : {}, { signal: abort.signal });
       sent = out;
       lastContact = Date.now();
       if (r.cancelled) {
@@ -151,7 +162,7 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
     await flushing;
     if (result.status === "cancelled") {
       // Tell padSync now rather than leaving the job to go stale and be reclaimed in 10 minutes.
-      if (shutdown.signal.aborted) await api.update(job.id, { output: result.output, status: "error", error: "the Mac bridge was stopped before finishing; ask again" }).catch(() => {});
+      if (shutdown.signal.aborted) await reportStopped(api, job.id, result.output);
       return;
     }
     await api.update(job.id, result.status === "done" ? { output: result.output, status: "done" } : { output: result.output, status: "error", error: result.error });
@@ -178,13 +189,17 @@ async function run() {
   const info = { hostname: hostname(), version: VERSION };
   const swept = await sweepStaleJobDirs(STALE_JOB_DIR_MS);
   if (swept) log(`removed ${swept} job folder(s) left over from an earlier run`);
-  let active: Promise<void> | null = null;
+  // One poll: the claim and, if it returned a job, running it. Shutdown waits for the whole of it,
+  // so a job the server handed out while the claim was in flight is still reported, not abandoned.
+  let active: Promise<boolean> | null = null;
   const stop = (sig: string) => {
     if (shutdown.signal.aborted) return;
     log(`${sig}: stopping`);
     shutdown.abort();
-    setTimeout(() => process.exit(1), 10_000).unref();
-    void Promise.resolve(active).finally(() => process.exit(0));
+    setTimeout(() => process.exit(1), SHUTDOWN_EXIT_MS).unref();
+    void Promise.resolve(active)
+      .catch(() => {})
+      .finally(() => process.exit(0));
   };
   process.on("SIGTERM", () => stop("SIGTERM"));
   process.on("SIGINT", () => stop("SIGINT"));
@@ -193,14 +208,15 @@ async function run() {
   let backoff = POLL_MS;
   while (!shutdown.signal.aborted) {
     try {
-      const { job } = await api.claim(agents, info);
+      active = api.claim(agents, info).then(async ({ job }) => {
+        if (!job) return false;
+        if (shutdown.signal.aborted) await reportStopped(api, job.id);
+        else await handleJob(api, cfg, job);
+        return true;
+      });
+      const hadJob = await active.finally(() => (active = null));
       backoff = POLL_MS;
-      if (job) {
-        active = handleJob(api, cfg, job);
-        await active;
-        active = null;
-        continue; // check for the next job immediately
-      }
+      if (hadJob) continue; // check for the next job immediately
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
         log("device token was rejected (revoked or wrong server). Create a new one in padSync → Settings, then run setup again.");
