@@ -30,11 +30,16 @@ export function planTiles(height: number, strokes: StrokeEntity[]): TilePlan[] {
   for (let i = 0; i < n; i++) {
     const top = i * TILE_H;
     const h = Math.min(TILE_H, height - top);
-    const inTile = strokes.filter((s) => {
-      const b = strokeBox(s);
-      return b.maxY >= top && b.minY <= top + h;
-    });
-    out.push({ top, h, strokes: inTile });
+    out.push({ top, h, strokes: [] });
+  }
+  for (const s of strokes) {
+    const b = strokeBox(s);
+    // Inclusive tile edges preserve strokes touching a shared boundary.
+    const first = Math.max(0, Math.ceil(b.minY / TILE_H) - 1);
+    const last = Math.min(n - 1, Math.floor(b.maxY / TILE_H));
+    for (let i = first; i <= last; i++) {
+      if (b.minY <= out[i].top + out[i].h) out[i].strokes.push(s);
+    }
   }
   return out;
 }
@@ -53,6 +58,9 @@ export function paintDelta(painted: StrokeEntity[], next: StrokeEntity[]): Strok
   let kept = 0;
   for (const s of next) {
     if (have.has(version(s))) {
+      // Equal timestamps use stable input order when painting. A reorder can
+      // therefore change the bitmap even when every version is unchanged.
+      if (kept >= painted.length || version(painted[kept]) !== version(s)) return null;
       kept++;
       continue;
     }
