@@ -86,10 +86,10 @@ export function SidePanel(p: Props) {
   return (
     <aside
       style={{ width: p.width ?? 360 }}
-      className="side-panel fixed bottom-0 right-0 top-14 z-30 flex flex-col overflow-hidden border-l border-slate-200 bg-slate-50 text-sm transition-[width] duration-250 motion-reduce:transition-none"
+      className="side-panel fixed bottom-0 right-0 top-14 z-30 flex flex-col overflow-hidden border-l border-slate-200 bg-white text-sm transition-[width] duration-250 motion-reduce:transition-none"
     >
       <div
-        className="flex shrink-0 gap-2 border-b p-2"
+        className="flex shrink-0 items-center border-b border-slate-200 px-3 py-2"
         role="tablist"
         aria-label="Side panel"
       >
@@ -98,7 +98,7 @@ export function SidePanel(p: Props) {
             key={t}
             role="tab"
             aria-selected={tab === t}
-            className="rounded-lg px-3 py-1 capitalize aria-selected:bg-white"
+            className="relative px-3 py-1.5 text-sm font-medium capitalize text-slate-500 transition-colors hover:text-slate-900 aria-selected:text-slate-900 aria-selected:after:absolute aria-selected:after:inset-x-3 aria-selected:after:-bottom-2 aria-selected:after:h-0.5 aria-selected:after:rounded-full aria-selected:after:bg-brand-600"
             onClick={() => setTab(t)}
           >
             {t}
@@ -150,13 +150,13 @@ export function SidePanel(p: Props) {
                 data-testid="copy-buttons"
               >
                 <button
-                  className="rounded-lg bg-slate-900 px-3 py-2 font-medium text-white hover:bg-slate-700"
+                  className="btn btn-primary"
                   onClick={copyImage}
                 >
                   Copy as image
                 </button>
                 <button
-                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 hover:bg-slate-100"
+                  className="btn btn-secondary"
                   onClick={copySource}
                 >
                   Copy question text
@@ -191,14 +191,14 @@ export function SidePanel(p: Props) {
             {current.data.solution && (
               <div className="mt-4">
                 <button
-                  className="text-xs font-medium text-blue-700"
+                  className="text-xs font-medium text-brand-700 hover:underline"
                   onClick={() => setShowSolution(!showSolution)}
                 >
                   {showSolution ? "Hide solution" : "Reveal solution"}
                 </button>
                 {showSolution && (
                   <div
-                    className="prose-pad mt-2 rounded-lg bg-white p-3 text-[14px]"
+                    className="prose-pad mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[14px]"
                     dangerouslySetInnerHTML={{
                       __html: renderMarkdown(current.data.solution),
                     }}
@@ -207,23 +207,23 @@ export function SidePanel(p: Props) {
               </div>
             )}
 
-            <div className="mt-4 flex flex-wrap gap-1 text-xs">
+            <div className="mt-4 flex flex-wrap gap-1.5">
               <button
-                className="rounded border bg-white px-2 py-1 disabled:opacity-40"
+                className="btn btn-secondary btn-sm"
                 disabled={idx <= 0}
                 onClick={() => swapSectionOrder(current, p.sections[idx - 1])}
               >
                 Move up
               </button>
               <button
-                className="rounded border bg-white px-2 py-1 disabled:opacity-40"
+                className="btn btn-secondary btn-sm"
                 disabled={idx >= p.sections.length - 1}
                 onClick={() => swapSectionOrder(current, p.sections[idx + 1])}
               >
                 Move down
               </button>
               <button
-                className="rounded border bg-white px-2 py-1"
+                className="btn btn-secondary btn-sm"
                 onClick={() =>
                   insertSectionAfter(p.notebookId, current, p.sections)
                 }
@@ -231,7 +231,7 @@ export function SidePanel(p: Props) {
                 Blank page after
               </button>
               <button
-                className="rounded border bg-white px-2 py-1 text-rose-600 disabled:opacity-40"
+                className="btn btn-danger btn-sm"
                 disabled={p.sections.length <= 1}
                 onClick={() =>
                   confirm(
@@ -253,17 +253,17 @@ export function SidePanel(p: Props) {
             <button
               key={s.id}
               onClick={() => p.onJump(s.id)}
-              className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left ${s.id === current?.id ? "bg-white shadow-sm" : "hover:bg-white/60"}`}
+              className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left ${s.id === current?.id ? "bg-brand-50 font-medium text-brand-800" : "hover:bg-slate-50"}`}
             >
               <span className="w-6 text-right text-xs tabular-nums text-slate-400">
                 {i + 1}
               </span>
-              <span className="truncate text-slate-700">
+              <span className="truncate">
                 {s.data.title ??
                   (s.data.blocks.length ? "Untitled" : "Blank page")}
               </span>
               {p.ipad?.data.sectionId === s.id && (
-                <span className="ml-auto rounded bg-blue-100 px-1.5 text-[10px] text-blue-700">
+                <span className="ml-auto rounded-full bg-brand-100 px-1.5 text-[10px] font-medium text-brand-700">
                   iPad
                 </span>
               )}
@@ -272,7 +272,7 @@ export function SidePanel(p: Props) {
         </nav>
 
         {toast && (
-          <div className="fixed bottom-4 right-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-white shadow-lg">
+          <div className="fixed bottom-4 right-4 z-50 rounded-xl bg-slate-900 px-4 py-2.5 text-white shadow-lift">
             {toast}
           </div>
         )}
@@ -283,7 +283,7 @@ export function SidePanel(p: Props) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-white px-2 py-2">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-2 py-2">
       <dd className="text-base font-semibold tabular-nums text-slate-800">
         {value}
       </dd>

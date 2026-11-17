@@ -7,6 +7,7 @@ import { useChat } from "./useChat";
 import { ModelPicker } from "./ModelPicker";
 import { Composer } from "./Composer";
 import { Conversation } from "./Conversation";
+import { Icon } from "../Icons";
 import { ThreadList } from "./ThreadList";
 import { ThreadSwitcher } from "./ThreadSwitcher";
 import type { ContextProps } from "./ContextPicker";
@@ -44,7 +45,7 @@ export function ChatPanel(
       <div
         className={
           p.mode === "chat" && !collapsed
-            ? "w-60 shrink-0 overflow-y-auto border-r"
+            ? "w-60 shrink-0 overflow-y-auto border-r border-slate-200 bg-slate-50/70"
             : "hidden"
         }
       >
@@ -54,17 +55,17 @@ export function ChatPanel(
         {p.mode === "drawing" && <ThreadSwitcher {...list} />}
         {p.mode === "chat" && (
           <button
-            className="self-start p-2 text-xs"
+            className="btn btn-ghost btn-sm m-1.5 self-start text-xs"
             onClick={() => setCollapsed(!collapsed)}
           >
             {collapsed ? "Show threads" : "Hide threads"}
           </button>
         )}
         {thread && (
-          <header className="space-y-1 border-b p-2">
+          <header className="space-y-2 border-b border-slate-200 px-3 py-2.5">
             <input
               aria-label="Thread title"
-              className="w-full bg-transparent font-medium"
+              className="w-full rounded-md bg-transparent px-1 py-0.5 font-semibold text-slate-900 hover:bg-slate-50 focus:bg-white"
               key={thread.id + thread.title}
               defaultValue={thread.title}
               onBlur={(e) => {
@@ -72,9 +73,10 @@ export function ChatPanel(
                   patch({ title: e.target.value });
               }}
             />
-            <div className="flex flex-wrap gap-1 text-xs">
+            <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
               <select
                 aria-label="Agent"
+                className="rounded-md border border-slate-200 bg-white px-1.5 py-1"
                 value={thread.agent}
                 onChange={(e) =>
                   patch({ agent: e.target.value as "claude" | "codex" })
@@ -113,17 +115,17 @@ export function ChatPanel(
                 }}
               >
                 <button
+                  className="icon-btn h-7 w-7"
                   aria-label="Thread actions"
                   aria-expanded={menuOpen}
                   onClick={() => setMenuOpen(!menuOpen)}
                 >
-                  •••
+                  <Icon name="more" />
                 </button>
                 {menuOpen && (
-                  <div className="flex flex-wrap gap-2 rounded-lg border bg-white p-2">
+                  <div className="absolute right-0 z-20 mt-1 flex w-max flex-col items-start gap-0.5 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lift [&>button]:w-full [&>button]:rounded-md [&>button]:px-2 [&>button]:py-1 [&>button]:text-left [&>button:hover]:bg-slate-100">
                     {["export", "archive", "delete"].map((kind) => (
                       <button
-                        className="mr-2"
                         key={kind}
                         onClick={() => rowAction(kind, thread)}
                       >

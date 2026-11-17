@@ -13,6 +13,7 @@ import { PAGE_WIDTH, type NotebookEntity, type PresenceData, type PresenceEntity
 import { SectionView } from "./SectionView";
 import { SidePanel } from "./SidePanel";
 import { Toolbar } from "./Toolbar";
+import { Icon } from "./Icons";
 
 const emitLocalText = (notebookId: string) => emitActivity({ notebookId, source: "local", kinds: ["text"], at: Date.now() });
 
@@ -406,7 +407,7 @@ function Editor({ notebookId }: { notebookId: string }) {
   const showPanel = panelOpen;
 
   return (
-    <div className="editor min-h-screen bg-slate-200/70" style={{ paddingTop: TOOLBAR_H + 16, paddingRight: showPanel ? panelWidth : 0 }}>
+    <div className="editor min-h-screen bg-[#e9ebef]" style={{ paddingTop: TOOLBAR_H + 16, paddingRight: showPanel ? panelWidth : 0 }}>
       <style>{` .editor { transition: padding-right 250ms; } .editor > aside { transition: width 250ms; } @media (prefers-reduced-motion: reduce) { .editor, .editor > aside { transition: none; } } `}</style>
       <Toolbar
         notebookId={notebookId}
@@ -442,10 +443,10 @@ function Editor({ notebookId }: { notebookId: string }) {
           />
         ))}
         <button
-          className="mx-auto rounded-xl border-2 border-dashed border-slate-400 px-8 py-4 text-slate-500 hover:bg-white"
+          className="mx-auto flex items-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 px-8 py-4 text-base font-medium text-slate-500 transition-colors hover:border-brand-300 hover:bg-white hover:text-brand-700"
           onClick={async () => { await insertSectionAfter(notebookId, sections[sections.length - 1] ?? null, sections); emitActivity({ notebookId, source: "local", kinds: ["section"], at: Date.now() }); }}
         >
-          + Blank page
+          <Icon name="plus" /> Blank page
         </button>
       </div>
       </div>

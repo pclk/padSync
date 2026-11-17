@@ -81,7 +81,7 @@ export const SectionView = memo(function SectionView(p: Props) {
     <section
       ref={sectionRef}
       data-section-id={section.id}
-      className={`paper template-${section.data.template} relative mx-auto bg-white shadow-sm`}
+      className={`paper template-${section.data.template} relative mx-auto bg-white shadow-[0_1px_3px_rgb(15_23_42/0.08),0_8px_24px_-8px_rgb(15_23_42/0.12)]`}
       style={{ width: PAGE_WIDTH, height }}
     >
       {section.data.pdf && <PdfBackground page={section.data.pdf} />}
@@ -126,7 +126,7 @@ export const SectionView = memo(function SectionView(p: Props) {
           className="pointer-events-none absolute rounded border-2 border-dashed border-blue-500/80 bg-blue-500/5"
           style={{ left: sel.box.minX, top: sel.box.minY, width: sel.box.maxX - sel.box.minX, height: sel.box.maxY - sel.box.minY }}
         >
-          <div className="pointer-events-auto absolute -top-11 left-0 flex gap-1 rounded-lg bg-slate-900 p-1 text-sm text-white shadow-lg">
+          <div className="pointer-events-auto absolute -top-11 left-0 flex gap-1 rounded-xl bg-slate-900 p-1 text-sm text-white shadow-lg">
             <button className="rounded px-3 py-1 hover:bg-slate-700" onPointerDown={(e) => e.stopPropagation()} onClick={() => controller.deleteSelection()}>
               Delete
             </button>

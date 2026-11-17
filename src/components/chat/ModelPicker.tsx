@@ -37,7 +37,7 @@ export function ModelPicker({
         <input
           aria-label="Custom model"
           placeholder="Model name"
-          className="w-32 rounded border"
+          className="w-32 rounded-md border border-slate-200 bg-white px-1.5 py-1"
           defaultValue={thread.options.model}
           onBlur={(e) =>
             patch({ options: { ...thread.options, model: e.target.value } })

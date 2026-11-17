@@ -37,27 +37,27 @@ export function SyncTimingSettings() {
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not save.'); }
     finally { setBusy(false); }
   }
-  return <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
-    <h2 className="mb-3 font-semibold text-slate-800">Sync timing</h2>
+  return <section className="card mb-5 p-5">
+    <h2 className="mb-3 text-base font-semibold text-slate-900">Sync timing</h2>
     <p className="text-sm">Realtime notifications fetch changes as they arrive. If realtime is unavailable, the receive intervals below control polling. Send delay, network and server time still affect delivery.</p>
     <p className="mt-2 text-sm text-slate-600">Shorter intervals use more requests, battery and data, even when you are not editing. Background sync depends on the browser keeping the tab running; a locked or sleeping device may stop syncing.</p>
     {admin && <>
       <div className="my-3 flex flex-wrap gap-2">
-        <button type="button" disabled={busy} className="rounded border px-3 py-1" onClick={() => setDraft(draftOf(FAST_SYNC_CONFIG))}>Fast preset</button>
-        <button type="button" disabled={busy} className="rounded border px-3 py-1" onClick={() => setDraft(draftOf(DEFAULT_SYNC_CONFIG))}>Default preset</button>
+        <button type="button" disabled={busy} className="btn btn-secondary btn-sm" onClick={() => setDraft(draftOf(FAST_SYNC_CONFIG))}>Fast preset</button>
+        <button type="button" disabled={busy} className="btn btn-secondary btn-sm" onClick={() => setDraft(draftOf(DEFAULT_SYNC_CONFIG))}>Default preset</button>
       </div>
       <div className="space-y-4">{keys.map(key => {
         const field = SYNC_FIELDS[key];
         const invalid = !validSyncField(key, Number(draft[key])) || !draft[key].trim();
         return <div key={key}>
           <label className="flex flex-wrap items-center gap-2 text-sm font-medium" htmlFor={`sync-${key}`}>{field.label} (ms)
-            <input id={`sync-${key}`} type="number" min={field.min} max={field.max} step={1} disabled={busy} aria-invalid={invalid} aria-describedby={`sync-${key}-help`} className="w-28 rounded border px-2 py-1" value={draft[key]} onChange={e => setDraft(previous => ({ ...previous, [key]: e.target.value }))} />
+            <input id={`sync-${key}`} type="number" min={field.min} max={field.max} step={1} disabled={busy} aria-invalid={invalid} aria-describedby={`sync-${key}-help`} className="field w-28 py-1" value={draft[key]} onChange={e => setDraft(previous => ({ ...previous, [key]: e.target.value }))} />
           </label>
           <p id={`sync-${key}-help`} className="mt-1 text-xs text-slate-600">{field.help} Range: {field.min}–{field.max} ms. Active: {sample?.[key] ?? field.default} ms.</p>
           {invalid && <p className="text-xs text-rose-700">Enter a whole number from {field.min} to {field.max}.</p>}
         </div>;
       })}</div>
-      <button type="button" className="mt-4 rounded border px-3 py-1 disabled:opacity-40" disabled={!valid || busy} onClick={save}>{busy ? 'Saving…' : 'Save for all devices'}</button>
+      <button type="button" className="btn btn-primary mt-4" disabled={!valid || busy} onClick={save}>{busy ? 'Saving…' : 'Save for all devices'}</button>
       <p className="mt-2 text-xs text-slate-500">Presets fill in the controls; save to apply them. Send delay starts at the first edit; further edits join the batch without postponing it. Earlier polling can send it sooner.</p>
     </>}
     {!admin && <p className="mt-2 text-sm text-slate-500">Only GitHub admin @pclk can change these settings.</p>}

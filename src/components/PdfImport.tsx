@@ -5,6 +5,7 @@ import { nanoid } from 'nanoid';
 import { cachePdf, pdfEngine } from '@/lib/pdf';
 import { MAX_PDF_BYTES, PDF_PART_BYTES, pdfSections, pdfSignature } from '@/lib/pdf-meta';
 import { createNotebook } from '@/lib/store';
+import { Icon } from './Icons';
 async function api(body: unknown, signal?: AbortSignal) {
   const r = await fetch('/api/pdfs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal });
   const d = await r.json(); if (!r.ok) throw new Error(d.error || 'PDF upload failed'); return d;
@@ -21,7 +22,7 @@ function put(url: string, blob: Blob, signal: AbortSignal, progress: (n: number)
 }
 export default function PdfImport() {
   const router = useRouter(), cancel = useRef<AbortController | null>(null);
-  const [busy,setBusy] = useState(false), [status,setStatus] = useState(''), [progress,setProgress] = useState(0), [local,setLocal] = useState(false), [offline,setOffline] = useState(false);
+  const [busy,setBusy] = useState(false), [status,setStatus] = useState(''), [progress,setProgress] = useState(0), [local,setLocal] = useState(false), [offline,setOffline] = useState(false), [over,setOver] = useState(false);
   useEffect(() => { const update = () => setOffline(!navigator.onLine); update(); window.addEventListener('online',update); window.addEventListener('offline',update); return () => { window.removeEventListener('online',update); window.removeEventListener('offline',update); cancel.current?.abort(); }; },[]);
   async function run(file?: File) {
     if (!file || cancel.current) return;
@@ -64,12 +65,31 @@ export default function PdfImport() {
     } catch(e) { setStatus(signal.aborted ? 'Import cancelled.' : e instanceof Error ? e.message : 'PDF import failed.'); }
     finally { if (remoteId && !committed) await api({ action: 'abort', id: remoteId }).catch(() => {}); cancel.current = null; setBusy(false); }
   }
-  return <div id="pdf-import" className="my-4 rounded-xl border p-4" onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (!busy) void run(e.dataTransfer.files[0]); }}>
-    <label className="font-medium">Import PDF <input aria-label="Import PDF" type="file" accept="application/pdf,.pdf" disabled={busy} onChange={e => { void run(e.target.files?.[0]); e.target.value = ''; }} /></label>
-    <p className="mt-2 text-sm text-slate-500">Drop a PDF to create a notebook, one page per section. Up to 100 MiB.</p>
-    <label className="text-sm"><input type="checkbox" checked={local} disabled={busy} onChange={e => setLocal(e.target.checked)} /> Local only (PDF stays on this device)</label>
-    {offline && <p className="text-amber-700">Offline — local import is available.</p>}
-    {busy && <><progress aria-label="PDF upload progress" value={progress} max={100} /><button className="ml-3 underline" onClick={() => cancel.current?.abort()}>Cancel</button></>}
-    <p role="status" className="text-sm">{status}</p>
+  const failed = !busy && !!status && status !== 'Saving notebook…';
+  return <div id="pdf-import" data-over={over} className="dropzone flex flex-wrap items-center gap-x-4 gap-y-3 p-4 sm:p-5"
+    onDragOver={e => { e.preventDefault(); if (!busy) setOver(true); }} onDragLeave={() => setOver(false)}
+    onDrop={e => { e.preventDefault(); setOver(false); if (!busy) void run(e.dataTransfer.files[0]); }}>
+    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-xl text-rose-600"><Icon name="file" /></span>
+    <div className="min-w-0 flex-1 basis-56">
+      <p className="font-medium text-slate-900">Import a PDF</p>
+      <p className="text-sm text-slate-500">Drop a PDF here to create a notebook, one page per section. Up to 100 MiB.</p>
+    </div>
+    <label className="ml-auto flex items-center gap-2 text-sm text-slate-600" title="The PDF stays on this device and is not uploaded">
+      <input type="checkbox" checked={local} disabled={busy} onChange={e => setLocal(e.target.checked)} /> Local only
+    </label>
+    <label className={`btn btn-secondary ${busy ? 'pointer-events-none opacity-50' : ''}`}>
+      <Icon name="upload" />Choose PDF
+      <input aria-label="Import PDF" type="file" accept="application/pdf,.pdf" disabled={busy} className="sr-only" onChange={e => { void run(e.target.files?.[0]); e.target.value = ''; }} />
+    </label>
+    {(busy || status || offline) && <div className="w-full space-y-2 border-t border-slate-100 pt-3">
+      {offline && <p className="text-sm text-amber-700">Offline — local import is available.</p>}
+      {busy && <div className="flex items-center gap-3">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-brand-600 transition-[width]" style={{ width: `${progress}%` }} /></div>
+        <progress aria-label="PDF upload progress" value={progress} max={100} className="sr-only" />
+        <span className="w-10 text-right text-xs tabular-nums text-slate-500">{progress}%</span>
+        <button className="btn btn-ghost btn-sm" onClick={() => cancel.current?.abort()}>Cancel</button>
+      </div>}
+      <p role="status" className={`text-sm ${failed ? 'text-rose-700' : 'text-slate-600'}`}>{status}</p>
+    </div>}
   </div>;
 }

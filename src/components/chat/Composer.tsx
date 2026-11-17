@@ -7,6 +7,7 @@ import {
   type ContextHandle,
   type ContextProps,
 } from "./ContextPicker";
+import { Icon } from "../Icons";
 export function Composer(
   p: ContextProps & {
     draft: string;
@@ -71,11 +72,11 @@ export function Composer(
     }
   }
   return (
-    <div className="shrink-0 space-y-2 border-t bg-slate-50 p-3">
+    <div className="shrink-0 space-y-2 border-t border-slate-200 bg-slate-50/70 p-3">
       <ContextPicker {...p} ref={ctx} />
       <div className="flex flex-wrap gap-1">
         {files.map((file, index) => (
-          <span key={index} className="rounded-lg border bg-white p-2 text-xs">
+          <span key={index} className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs">
             {file.name} · {(file.size / 1000).toFixed(0)} KB{" "}
             {p.busy && `${Math.round(progress)}%`}
             <button
@@ -93,7 +94,7 @@ export function Composer(
         data-chat-composer
         aria-label="Message"
         placeholder="Ask a question…"
-        className="max-h-[40vh] min-h-20 w-full resize-y rounded-lg border border-slate-300 bg-white p-2"
+        className="field max-h-[40vh] min-h-20 resize-y"
         value={p.draft}
         onPaste={(e) => {
           const images = Array.from(e.clipboardData.files).filter((file) =>
@@ -130,17 +131,18 @@ export function Composer(
           e.target.value = "";
         }}
       />
-      <div className="flex gap-2">
+      <div className="flex items-center justify-between gap-2">
         <button
           aria-label="Attach images or PDFs"
           disabled={p.busy}
-          className="rounded-lg border bg-white px-3 py-2"
+          className="btn btn-secondary px-2.5"
+          title="Attach images or PDFs"
           onClick={() => picker.current?.click()}
         >
-          📎
+          <Icon name="paperclip" />
         </button>
         <button
-          className="rounded-lg bg-slate-900 px-4 py-2 text-white disabled:opacity-40"
+          className="btn btn-primary"
           disabled={p.busy || !p.draft.trim()}
           onClick={() => void send()}
         >

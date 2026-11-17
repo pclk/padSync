@@ -1,5 +1,6 @@
 "use client";
 import PdfImport from "./PdfImport";
+import { Icon } from "./Icons";
 
 import { useLiveQuery } from "dexie-react-hooks";
 import Link from "next/link";
@@ -212,19 +213,21 @@ export default function AiImportView() {
   };
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-10">
-      <Link href="/" className="text-sm text-slate-500">‹ Library</Link>
-      <div className="mb-6 mt-2 flex items-baseline gap-3">
-        <h1 className="text-2xl font-semibold text-slate-900">AI import</h1>
-        <p className="text-sm text-slate-600">Lecture notes in, a notebook to study and write on out.</p>
-        <button className="ml-auto text-xs text-slate-500 hover:text-rose-600" onClick={startOver}>
+    <main className="mx-auto max-w-4xl px-4 pb-16 pt-5 sm:px-8 sm:pt-8">
+      <Link href="/" className="btn btn-ghost -ml-2 px-2"><Icon name="back" className="text-lg" />Library</Link>
+      <div className="mb-8 mt-4 flex flex-wrap items-end gap-x-4 gap-y-2">
+        <div>
+          <h1 className="flex items-center gap-2 text-3xl font-semibold tracking-tight text-slate-900"><Icon name="sparkles" className="text-brand-600" />AI import</h1>
+          <p className="mt-1 text-sm text-slate-500">Lecture notes in, a notebook to study and write on out.</p>
+        </div>
+        <button className="btn btn-danger btn-sm ml-auto" onClick={startOver}>
           Start over
         </button>
       </div>
 
-      <PdfImport />
-      <div className="mb-4 rounded-xl border p-4 text-sm">
-        <label>Saved lecture PDFs from <select aria-label="Saved PDF notebook" value={pdfNotebookId} onChange={(e) => { setPersistentPdfs([]); setPdfNotebookId(e.target.value); }}>
+      <div className="mb-4"><PdfImport /></div>
+      <div className="card mb-4 p-5 text-sm">
+        <label className="mb-3 flex flex-wrap items-center gap-2 font-semibold text-slate-900">Saved lecture PDFs from <select className="field w-auto py-1.5 font-normal" aria-label="Saved PDF notebook" value={pdfNotebookId} onChange={(e) => { setPersistentPdfs([]); setPdfNotebookId(e.target.value); }}>
           <option value="library">Lecture library (for a new notebook)</option>
           {savedNotebooks.map((n) => <option key={n.id} value={n.id}>{n.data.title}</option>)}
         </select></label>
@@ -290,9 +293,9 @@ export default function AiImportView() {
 
 function Step({ n, title, active, done, children }: { n: number; title: string; active: boolean; done: boolean; children: ReactNode }) {
   return (
-    <section className={`mb-4 rounded-2xl border bg-white p-5 shadow-sm ${active ? "border-blue-400 ring-2 ring-blue-100" : "border-slate-200"}`} data-step={n} data-active={active ? "1" : undefined}>
+    <section className={`mb-4 rounded-2xl border bg-white p-5 shadow-card ${active ? "border-brand-300 ring-4 ring-brand-50" : "border-slate-200"}`} data-step={n} data-active={active ? "1" : undefined}>
       <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-slate-900">
-        <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${done ? "bg-emerald-600 text-white" : active ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-600"}`}>{done ? "✓" : n}</span>
+        <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${done ? "bg-emerald-600 text-white" : active ? "bg-brand-600 text-white" : "bg-slate-200 text-slate-600"}`}>{done ? "✓" : n}</span>
         {title}
       </h2>
       {children}
@@ -310,7 +313,7 @@ function Attachments({ list, onFiles, errors }: { list: StoredAttachment[]; onFi
   return (
     <div>
       <div
-        className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-6 text-center text-sm ${over ? "border-blue-500 bg-blue-50" : "border-slate-300 bg-slate-50"}`}
+        className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-6 text-center text-sm ${over ? "border-brand-500 bg-brand-50" : "border-slate-300 bg-slate-50"}`}
         onDragOver={(e) => {
           if (!e.dataTransfer.types.includes("Files")) return;
           e.preventDefault();
@@ -325,7 +328,7 @@ function Attachments({ list, onFiles, errors }: { list: StoredAttachment[]; onFi
         data-testid="dropzone"
       >
         <p className="text-slate-600">Drop lecture notes here: PDF, slides (.pptx), images, Markdown or text.</p>
-        <button className="mt-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50" onClick={() => input.current?.click()}>
+        <button className="btn btn-secondary mt-3" onClick={() => input.current?.click()}>
           Choose files
         </button>
         <input
@@ -392,7 +395,7 @@ function Configure({ config, setConfig, officeNeedsCode }: { config: ImportConfi
       <div className="flex flex-wrap gap-2">
         <span className="py-1 text-xs text-slate-500">Start from:</span>
         {PRESETS.map((p) => (
-          <button key={p.label} onClick={() => setConfig({ goals: p.goals, request: p.request })} className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs text-slate-600 hover:bg-slate-50">
+          <button key={p.label} onClick={() => setConfig({ goals: p.goals, request: p.request })} className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700">
             {p.label}
           </button>
         ))}
@@ -406,7 +409,7 @@ function Configure({ config, setConfig, officeNeedsCode }: { config: ImportConfi
         ))}
       </div>
       <textarea
-        className="h-24 w-full rounded-xl border border-slate-300 bg-white p-3 outline-none focus:border-blue-500"
+        className="h-24 w-full rounded-xl border border-slate-300 bg-white p-3 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-50"
         placeholder="Anything specific? e.g. Focus on slides 12–30; my exam is open-book; use the lecturer's notation."
         value={config.request}
         onChange={(e) => setConfig({ request: e.target.value })}
@@ -489,15 +492,15 @@ function Generate(p: {
         </div>
         {!signedIn ? (
           <p className="text-slate-500">
-            Sign in on <Link href="/settings" className="text-blue-700 underline">Settings</Link> and run the Mac bridge to send files straight to Claude Code or Codex. Or use the prompt on the right.
+            Sign in on <Link href="/settings" className="text-brand-700 underline">Settings</Link> and run the Mac bridge to send files straight to Claude Code or Codex. Or use the prompt on the right.
           </p>
         ) : (
           <div className="flex items-center gap-2">
-            <button className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white disabled:opacity-40" disabled={!p.canSend} onClick={p.send}>
+            <button className="btn btn-primary" disabled={!p.canSend} onClick={p.send}>
               {j?.status === "done" || j?.status === "error" || j?.status === "cancelled" ? "Send again" : "Send"}
             </button>
             {running && (
-              <button className="rounded-lg border border-rose-300 px-3 py-2 text-rose-700" onClick={p.cancel}>
+              <button className="btn btn-secondary text-rose-700" onClick={p.cancel}>
                 Cancel
               </button>
             )}
@@ -508,17 +511,17 @@ function Generate(p: {
         {j?.status === "error" && <p className="mt-2 text-xs text-rose-700">The AI run failed: {j.error ?? "unknown error"}. Send again, or paste a reply below.</p>}
         {p.resultMissing && <p className="mt-2 text-xs text-amber-700">The AI finished but didn&apos;t return padsync.json. Its answer is above; send again or paste JSON below.</p>}
         {p.reload && (
-          <button className="mt-2 text-xs text-blue-700 underline" onClick={p.reload}>
+          <button className="mt-2 text-xs text-brand-700 underline" onClick={p.reload}>
             Load this result into review again
           </button>
         )}
       </div>
-      <div className="rounded-xl bg-slate-50 p-3">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
         <div className="mb-1 font-medium text-slate-800">No bridge? Use any chat</div>
         <p className="mb-2 text-xs text-slate-600">Copy the prompt into Claude or ChatGPT, attach the same lecture files there, then paste the reply in step 4.</p>
         <div className="flex gap-2">
-          <button onClick={copy} className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white">{copied ? "Copied" : "Copy prompt"}</button>
-          <button onClick={download} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs">Download</button>
+          <button onClick={copy} className="btn btn-primary btn-sm">{copied ? "Copied" : "Copy prompt"}</button>
+          <button onClick={download} className="btn btn-secondary btn-sm">Download</button>
           <button onClick={() => setShowPrompt(!showPrompt)} className="text-xs text-slate-500 underline">{showPrompt ? "Hide" : "Show"}</button>
         </div>
       </div>
@@ -547,7 +550,7 @@ function Progress({ progress, job, bridgeOnline }: { progress: SendProgress | nu
       <div className="text-xs text-slate-600">{label}</div>
       {pct !== null && (
         <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-200">
-          <div className="h-full bg-blue-600 transition-all" style={{ width: `${Math.round(pct * 100)}%` }} />
+          <div className="h-full bg-brand-600 transition-all" style={{ width: `${Math.round(pct * 100)}%` }} />
         </div>
       )}
       {job?.status === "running" && <div className="mt-1 h-1.5 animate-pulse rounded-full bg-amber-300" />}
@@ -628,7 +631,7 @@ function Review(p: {
       {!p.raw.trim() || editing ? (
         <div>
           <textarea
-            className="h-56 w-full rounded-xl border border-slate-300 bg-white p-3 font-mono text-xs outline-none focus:border-blue-500"
+            className="h-56 w-full rounded-xl border border-slate-300 bg-white p-3 font-mono text-xs outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-50"
             value={p.raw}
             onChange={(e) => p.setRaw(e.target.value, p.from || "pasted text", p.returned)}
             onDragOver={(e) => e.preventDefault()}
@@ -639,12 +642,12 @@ function Review(p: {
             placeholder={'Paste the AI\'s reply here (code fences and text around it are fine), or drop a .json file.\n\n{"schemaVersion": 2, "title": "…", "sections": [ … ]}'}
           />
           <div className="mt-2 flex items-center gap-3">
-            <button className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 hover:bg-slate-50" onClick={() => file.current?.click()}>
+            <button className="btn btn-secondary" onClick={() => file.current?.click()}>
               Open .json file
             </button>
             <input ref={file} type="file" accept=".json,application/json,text/plain" className="hidden" onChange={(e) => void onFile(e.target.files?.[0])} />
             {editing && (
-              <button className="text-blue-700" onClick={() => setEditing(false)}>
+              <button className="text-brand-700" onClick={() => setEditing(false)}>
                 Done editing
               </button>
             )}
@@ -653,7 +656,7 @@ function Review(p: {
       ) : (
         <div className="mb-2 flex items-center gap-3 text-xs text-slate-500">
           <span>From {p.from || "pasted text"}</span>
-          <button className="text-blue-700" onClick={() => setEditing(true)}>Edit JSON</button>
+          <button className="text-brand-700" onClick={() => setEditing(true)}>Edit JSON</button>
           <button className="text-slate-500 hover:text-rose-600" onClick={() => p.setRaw("", "")}>Clear</button>
         </div>
       )}
@@ -692,7 +695,7 @@ function Review(p: {
                       ))}
                     </span>
                   </label>
-                  {s.section && <details className="mt-2 rounded bg-white p-3" open><summary className="cursor-pointer text-xs text-blue-700">Section preview</summary><div className="max-h-96 overflow-auto">{s.section.blocks.map((block, i) => <ImportBlockPreview key={i} block={block} />)}</div></details>}
+                  {s.section && <details className="mt-2 rounded bg-white p-3" open><summary className="cursor-pointer text-xs text-brand-700">Section preview</summary><div className="max-h-96 overflow-auto">{s.section.blocks.map((block, i) => <ImportBlockPreview key={i} block={block} />)}</div></details>}
                 </li>
               ))}
             </ul>

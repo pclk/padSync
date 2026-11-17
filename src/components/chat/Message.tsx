@@ -76,7 +76,7 @@ export function Message({
   }, [t.output]);
   return (
     <article className="space-y-3">
-      <div className="ml-auto max-w-[92%] space-y-2 rounded-lg bg-blue-50 p-3 text-slate-800">
+      <div className="ml-auto max-w-[92%] space-y-2 rounded-2xl rounded-br-md bg-brand-50 px-3.5 py-2.5 text-slate-800">
         <div className="flex justify-between text-xs text-slate-500">
           <span>You</span>
           <time>{new Date(t.createdAt).toLocaleTimeString()}</time>
@@ -150,7 +150,7 @@ export function Message({
           Copy message
         </button>
       </div>
-      <div className="space-y-2 rounded-lg bg-white p-3">
+      <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-card">
         <div className="border-t pt-2 text-xs text-slate-500">
           {[t.agent, t.options.model, t.options.effort, t.status]
             .filter(Boolean)

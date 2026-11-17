@@ -27,7 +27,7 @@ export function Conversation(p: {
     <div className="relative min-h-0 flex-1">
       <div
         ref={box}
-        className="h-full space-y-3 overflow-y-auto p-3"
+        className="h-full space-y-4 overflow-y-auto p-4"
         onScroll={() => {
           const el = box.current!;
           atBottom.current =
@@ -59,7 +59,7 @@ export function Conversation(p: {
       </div>
       {newText && (
         <button
-          className="absolute bottom-2 right-3 rounded-lg bg-slate-900 px-3 py-1 text-white"
+          className="absolute bottom-3 right-3 rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white shadow-lift"
           onClick={() => {
             box.current!.scrollTop = box.current!.scrollHeight;
             atBottom.current = true;

@@ -17,7 +17,7 @@ export function SyncBadge() {
   const { status } = useSyncStatus();
   const [label, dot] = LABEL[status];
   return (
-    <Link href="/settings" className="flex items-center gap-2 rounded-full px-2 py-1 text-xs text-slate-500 hover:bg-slate-100" title={label} aria-label={`Sync status: ${label}. Open settings`}>
+    <Link href="/settings" className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50" title={label} aria-label={`Sync status: ${label}. Open settings`}>
       <span aria-hidden="true" className={`h-2 w-2 rounded-full ${dot}`} />
       <span className="hidden lg:inline">{label}</span>
     </Link>

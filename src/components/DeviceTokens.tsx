@@ -61,8 +61,8 @@ export function DeviceTokens() {
   const revoked = tokens?.filter((t) => t.revokedAt) ?? [];
 
   return (
-    <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
-      <h2 className="mb-1 font-semibold text-slate-800">Device tokens</h2>
+    <section className="card mb-5 p-5">
+      <h2 className="mb-1 text-base font-semibold text-slate-900">Device tokens</h2>
       <p className="mb-3 text-xs text-slate-500">
         For the Mac bridge that runs Claude Code / Codex. A token can only pick up and answer AI jobs: it cannot read your notebooks or create more tokens.
       </p>
@@ -98,8 +98,8 @@ export function DeviceTokens() {
       )}
 
       <form onSubmit={create} className="mb-3 flex gap-2">
-        <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className="flex-1 rounded-lg border px-3 py-2" placeholder="Token name" />
-        <button className="rounded-lg bg-slate-900 px-4 py-2 font-medium text-white">Create token</button>
+        <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className="field flex-1" placeholder="Token name" />
+        <button className="btn btn-primary">Create token</button>
       </form>
       {error && <p className="mb-2 text-rose-700">{error}</p>}
 
@@ -119,7 +119,7 @@ export function DeviceTokens() {
                   {t.lastSeenInfo?.hostname ? ` · ${t.lastSeenInfo.hostname}` : ""}
                 </div>
               </div>
-              <button className="rounded border px-2 py-1 text-xs text-rose-600" onClick={() => revoke(t)}>
+              <button className="btn btn-danger btn-sm" onClick={() => revoke(t)}>
                 Revoke
               </button>
             </li>

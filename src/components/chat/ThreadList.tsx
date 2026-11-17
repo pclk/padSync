@@ -2,6 +2,7 @@
 import { useState } from "react";
 import type { ThreadSummary } from "@/lib/chat-types";
 import { Spinner } from "./Spinner";
+import { Icon } from "../Icons";
 import { relativeTime, isUnread, type ThreadFilter } from "@/lib/chat-ui";
 export interface ThreadListProps {
   now: number;
@@ -22,21 +23,21 @@ export function ThreadList(p: ThreadListProps) {
   return (
     <div className="space-y-2 p-2">
       <button
-        className="w-full rounded-lg bg-slate-900 p-2 text-white"
+        className="btn btn-primary w-full"
         onClick={p.create}
       >
-        New thread ⌥N
+        <Icon name="plus" />New thread <span className="kbd">⌥N</span>
       </button>
       <input
         data-chat-search
         aria-label="Search threads"
-        className="w-full rounded-lg border p-2"
+        className="field"
         placeholder="Search ⌘K"
         value={p.search}
         onChange={(e) => p.setSearch(e.target.value)}
       />
       <select
-        className="w-full"
+        className="field py-1.5 text-xs"
         aria-label="Filter threads"
         value={p.filter}
         onChange={(e) => p.setFilter(e.target.value as ThreadFilter)}
@@ -55,7 +56,7 @@ export function ThreadList(p: ThreadListProps) {
       {p.threads.map((t, index) => (
         <div
           key={t.id}
-          className={`rounded-lg p-2 ${t.id === p.selected ? "bg-slate-200" : "bg-white"}`}
+          className={`group/thread relative rounded-xl p-2 transition-colors ${t.id === p.selected ? "bg-white shadow-card ring-1 ring-slate-200" : "hover:bg-white"}`}
         >
           {t.pinned && !p.threads[index - 1]?.pinned && (
             <p className="mb-2 text-xs font-medium text-slate-500">Pinned</p>
@@ -111,14 +112,15 @@ export function ThreadList(p: ThreadListProps) {
             }}
           >
             <button
+              className="icon-btn h-6 w-6"
               aria-label={`Actions for ${t.title || "New thread"}`}
               aria-expanded={menu === t.id}
               onClick={() => setMenu(menu === t.id ? "" : t.id)}
             >
-              •••
+              <Icon name="more" />
             </button>
             {menu === t.id && (
-              <div className="z-10 flex flex-wrap gap-2 rounded-lg border bg-white p-2 shadow-sm">
+              <div className="z-10 mt-1 flex flex-col items-start gap-0.5 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lift [&>button]:w-full [&>button]:rounded-md [&>button]:px-2 [&>button]:py-1 [&>button]:text-left [&>button:hover]:bg-slate-100">
                 <button
                   onClick={() => {
                     setRename(t.id);

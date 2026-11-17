@@ -8,6 +8,7 @@ import { useShowCopyButtons, useSyncDebug } from "@/lib/settings";
 import { requestSync, resetCursor, stopSync } from "@/lib/sync";
 import { SyncTimingSettings } from "./SyncTimingSettings";
 import { DeviceTokens } from "./DeviceTokens";
+import { Icon } from "./Icons";
 
 interface Status {
   db: boolean;
@@ -63,38 +64,38 @@ export default function SettingsView() {
   const daysLeft = status?.canvas.expiresAt ? Math.ceil((new Date(status.canvas.expiresAt).getTime() - now) / 86_400_000) : null;
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-10 text-sm">
-      <Link href="/" className="text-slate-500">‹ Library</Link>
-      <h1 className="mb-6 mt-2 text-2xl font-semibold text-slate-900">Settings</h1>
+    <main className="mx-auto max-w-2xl px-4 pb-16 pt-5 text-sm sm:px-8 sm:pt-8">
+      <Link href="/" className="btn btn-ghost -ml-2 px-2"><Icon name="back" className="text-lg" />Library</Link>
+      <h1 className="mb-8 mt-4 text-3xl font-semibold tracking-tight text-slate-900">Settings</h1>
 
-      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 font-semibold">Layout</h2>
+      <section className="card mb-5 p-5">
+        <h2 className="mb-3 text-base font-semibold text-slate-900">Layout</h2>
         <p className="text-xs text-slate-500">Starts in Auto by default.</p>
-        <label>Idle delay: {idleMs / 1000} s<input aria-label="Layout idle delay" type="range" min="5" max="120" value={idleMs / 1000} onChange={e => setIdleMs(Number(e.target.value) * 1000)} className="block w-full" /></label>
+        <label>Idle delay: {idleMs / 1000} s<input aria-label="Layout idle delay" type="range" min="5" max="120" value={idleMs / 1000} onChange={e => setIdleMs(Number(e.target.value) * 1000)} className="mt-2 block w-full" /></label>
       </section>
-      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 font-semibold text-slate-800">Sync</h2>
+      <section className="card mb-5 p-5">
+        <h2 className="mb-3 text-base font-semibold text-slate-900">Sync</h2>
         <Row k="Status" v={sync.status} />
         <Row k="Last synced" v={sync.lastSyncedAt ? new Date(sync.lastSyncedAt).toLocaleTimeString() : "—"} />
         <Row k="Database" v={status ? (status.db ? "connected" : "not configured (DATABASE_URL)") : "unreachable"} />
         <Row k="This device" v={`${deviceKind()} · ${deviceId()}`} />
         <div className="mt-3 flex gap-2">
-          <button className="rounded-lg border px-3 py-1.5" onClick={() => requestSync(0)}>Sync now</button>
-          <button className="rounded-lg border px-3 py-1.5" onClick={() => resetCursor()}>Re-download everything</button>
+          <button className="btn btn-secondary" onClick={() => requestSync(0)}>Sync now</button>
+          <button className="btn btn-secondary" onClick={() => resetCursor()}>Re-download everything</button>
         </div>
       </section>
 
-      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 font-semibold text-slate-800">Diagnostics</h2>
+      <section className="card mb-5 p-5">
+        <h2 className="mb-3 text-base font-semibold text-slate-900">Diagnostics</h2>
         <label className="flex items-center justify-between gap-3">
           <span><span className="block text-slate-800">Show sync debug menu</span>
             <span className="block text-xs text-slate-500">Show timing, visibility and realtime diagnostics on this device. Enable separately on the iPad and Mac. Recording stays in memory and stops when switched off.</span></span>
-          <input type="checkbox" className="h-4 w-4 shrink-0" checked={syncDebug} onChange={e => setSyncDebug(e.target.checked)} />
+          <input type="checkbox" className="switch" checked={syncDebug} onChange={e => setSyncDebug(e.target.checked)} />
         </label>
       </section>
 
-      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 font-semibold text-slate-800">Sign in</h2>
+      <section className="card mb-5 p-5">
+        <h2 className="mb-3 text-base font-semibold text-slate-900">Sign in</h2>
         {status && !status.auth ? (
           <p className="text-slate-600">
             Set <code>GITHUB_CLIENT_ID</code>, <code>GITHUB_CLIENT_SECRET</code> and <code>SESSION_SECRET</code> in the Vercel project to enable sync.
@@ -102,12 +103,12 @@ export default function SettingsView() {
         ) : status?.authed ? (
           <div className="flex items-center justify-between">
             <p className="text-emerald-700">Signed in as @{status.login}</p>
-            <button className="rounded-lg border px-3 py-1.5" onClick={logout}>Sign out</button>
+            <button className="btn btn-secondary" onClick={logout}>Sign out</button>
           </div>
         ) : (
           <div className="flex items-center justify-between gap-3">
             <p className="text-slate-600">Only @{status?.allowed ?? "…"} can sign in.</p>
-            <a href="/api/auth/github?next=/settings" className="rounded-lg bg-slate-900 px-4 py-2 font-medium text-white">Sign in with GitHub</a>
+            <a href="/api/auth/github?next=/settings" className="btn btn-primary">Sign in with GitHub</a>
           </div>
         )}
         {authError && <p className="mt-2 text-rose-700">{authError}</p>}
@@ -116,22 +117,22 @@ export default function SettingsView() {
       {status?.authed && <SyncTimingSettings />}
       {status?.authed && <DeviceTokens />}
 
-      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 font-semibold text-slate-800">Notebook</h2>
+      <section className="card mb-5 p-5">
+        <h2 className="mb-3 text-base font-semibold text-slate-900">Notebook</h2>
         <label className="flex items-center justify-between gap-3">
           <span>
             <span className="block text-slate-800">Show copy buttons</span>
             <span className="block text-xs text-slate-500">&ldquo;Copy as image&rdquo; and &ldquo;Copy question text&rdquo; in the side panel, for pasting into a chat by hand. Ask AI through the Mac bridge doesn&rsquo;t need them.</span>
           </span>
-          <input type="checkbox" className="h-4 w-4 shrink-0" checked={showCopy} onChange={(e) => setShowCopy(e.target.checked)} />
+          <input type="checkbox" className="switch" checked={showCopy} onChange={(e) => setShowCopy(e.target.checked)} />
         </label>
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 font-semibold text-slate-800">NUS Canvas</h2>
+      <section className="card p-5">
+        <h2 className="mb-3 text-base font-semibold text-slate-900">NUS Canvas</h2>
         <Row k="Token" v={status?.canvas.configured ? "configured on server" : "not set (CANVAS_TOKEN)"} />
         <Row k="Expires" v={daysLeft == null ? "—" : daysLeft > 0 ? `in ${daysLeft} days` : "expired: generate a new one"} />
-        <button className="mt-3 rounded-lg border px-3 py-1.5 disabled:opacity-40" disabled={!status?.canvas.configured} onClick={checkCanvas}>
+        <button className="btn btn-secondary mt-3" disabled={!status?.canvas.configured} onClick={checkCanvas}>
           Check token
         </button>
         {canvas && <p className={`mt-2 ${canvas.ok ? "text-emerald-700" : "text-rose-700"}`}>{canvas.ok ? `Connected as ${canvas.name}` : canvas.error}</p>}
@@ -146,9 +147,9 @@ export default function SettingsView() {
 
 function Row({ k, v }: { k: string; v: string }) {
   return (
-    <div className="flex justify-between border-b border-slate-100 py-1.5 last:border-0">
+    <div className="flex justify-between gap-4 border-b border-slate-100 py-2 last:border-0">
       <span className="text-slate-500">{k}</span>
-      <span className="text-slate-800">{v}</span>
+      <span className="min-w-0 truncate text-right font-medium text-slate-800">{v}</span>
     </div>
   );
 }
