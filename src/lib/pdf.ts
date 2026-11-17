@@ -14,6 +14,10 @@ export async function forgetPdf(id: string) {
   for (const key of [...renders.keys()]) if (key.startsWith(`${id}:`)) renders.delete(key);
   await db.meta.delete(`pdf-bytes:${id}`);
 }
+/** Asks the server to remove stored PDFs no notebook can reach (deleted elsewhere, abandoned uploads). */
+export function sweepStoredPdfs() {
+  return fetch('/api/pdfs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'sweep' }) }).then(() => {}, () => {});
+}
 export async function openPdf(id: string) {
   let task = documents.get(id);
   if (!task) {

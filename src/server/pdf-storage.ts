@@ -1,4 +1,5 @@
 import 'server-only';
+import { after } from 'next/server';
 import { createHash } from 'node:crypto';
 import { AbortMultipartUploadCommand, DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import type { Sql } from './db';
@@ -34,4 +35,9 @@ export async function sweepPdfs(sql: Sql, owner: string, { s3, bucket: Bucket }:
     await sql.query('delete from notebook_pdfs where id=$1 and owner=$2', [row.id, owner.toLowerCase()]);
   }
   return rows.length;
+}
+// Cleanup runs after the response; outside a request scope (tests) it is skipped.
+export function sweepPdfsLater(sql: Sql, owner: string, storage: Storage | null = pdfStorage()) {
+  if (!storage) return;
+  try { after(() => sweepPdfs(sql, owner, storage).catch(e => console.warn('PDF sweep failed', e))); } catch { /* no request scope */ }
 }

@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { requireSession } from "@/server/guard";
 import { syncServerTiming } from "@/server/sync-timing";
+import { sweepPdfsLater } from "@/server/pdf-storage";
 
 // One endpoint does push and pull. Writes are last-writer-wins per entity on the hlc; every
 // accepted write takes a new seq, and clients pull "everything after my cursor".
@@ -100,6 +101,8 @@ export async function POST(req: NextRequest) {
     );
     lost = authoritative;
     timing.mark("conflicts");
+    // A notebook tombstone frees its stored PDF; the sweep removes the object after the response.
+    if (pushed.some((c) => c.kind === "notebook" && c.deleted === 1)) sweepPdfsLater(sql, auth.login);
   }
 
   if (events.length) {

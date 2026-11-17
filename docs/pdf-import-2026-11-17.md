@@ -31,7 +31,9 @@ GET URLs expire after five minutes and API responses are no-store.
 Cancellation/failure attempts multipart abort and object deletion before removing
 pending metadata. Anything that slips through (tab crashes, network loss during cleanup)
 and the PDFs of deleted notebooks are removed by `sweepPdfs`, which runs after the
-response of every `/api/pdfs` create or download (Next `after`, up to 20 PDFs per run).
+response (Next `after`, up to 20 PDFs per run) of every `/api/pdfs` create or download,
+every sync push that carries a notebook tombstone, and the `sweep` action the library
+sends when it opens (which also clears PDFs of notebooks deleted before these triggers existed).
 It deletes the object and row for: pending uploads older than a day; PDFs whose notebook
 entity is tombstoned; and PDFs older than 30 days whose notebook never reached the
 server. Neon does not enforce lifecycle policies, so this is the only collection.

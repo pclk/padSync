@@ -92,3 +92,13 @@ it('renders PDF pages at screen density, capped for iPad canvas limits', () => {
   expect(rasterScale({height:1948},1)).toBe(1); expect(rasterScale({height:1948},2)).toBe(2); expect(rasterScale({height:1948},3)).toBe(2);
   const tall = {height:1376*8}; expect(1376*tall.height*rasterScale(tall,2)**2).toBeLessThanOrEqual(16_000_000);
 });
+it('sweeps stored PDFs when a notebook tombstone syncs and when the library asks', async () => {
+  const { POST: sync } = await import('@/app/api/sync/route');
+  const { id } = await create(); await db.sql.query('update notebook_pdfs set ready=true where id=$1',[id]);
+  const tombstone = { id:'book',kind:'notebook',notebookId:'book',parentId:'',data:{},hlc:'1',deleted:1 };
+  expect((await sync(req('/api/sync',{session,body:{ since:0,changes:[tombstone],events:[] }}))).status).toBe(200);
+  expect((await POST(req('/api/pdfs',{session,body:{action:'sweep'}}))).status).toBe(200);
+  send.mockReset(); send.mockResolvedValue({} as never);
+  expect(await sweepPdfs(db.sql,'pclk',pdfStorage()!)).toBe(1);
+  expect(send.mock.calls.map(c => (c[0].input as {Key:string}).Key)).toEqual([pdfKey('pclk',id)]);
+});
