@@ -32,7 +32,12 @@ const ENTITY_BATCH = 100;
 const EVENT_BATCH = 500;
 
 let status: SyncStatus = "idle";
-let lastSyncedAt = 0;
+// Remembered across reloads so the status popover can say when this device last reached the server.
+const LAST_SYNCED_KEY = "padsync.lastSyncedAt";
+let lastSyncedAt = (() => {
+  if (typeof window === "undefined") return 0;
+  try { return Number(localStorage.getItem(LAST_SYNCED_KEY)) || 0; } catch { return 0; }
+})();
 const listeners = new Set<() => void>();
 let timer: ReturnType<typeof setTimeout> | null = null;
 let running = false;
@@ -79,8 +84,9 @@ async function refreshConfig() {
   finally { configLoading = false; }
 }
 
+/** `at` is when this snapshot was taken, so a countdown to `retryAt` starts from the right moment. */
 export function getSyncState() {
-  return { status, lastSyncedAt };
+  return { status, lastSyncedAt, failures, retryAt, at: Date.now() };
 }
 
 export function subscribeSync(fn: () => void) {
@@ -90,7 +96,10 @@ export function subscribeSync(fn: () => void) {
 
 function setStatus(s: SyncStatus) {
   status = s;
-  if (s === "synced") lastSyncedAt = Date.now();
+  if (s === "synced") {
+    lastSyncedAt = Date.now();
+    try { localStorage.setItem(LAST_SYNCED_KEY, String(lastSyncedAt)); } catch { /* status still shows this session */ }
+  }
   listeners.forEach((l) => l());
 }
 
@@ -116,6 +125,11 @@ export function requestSync(delay?: number, reason = delay === undefined ? "loca
   if (delay === undefined) record(editTimes);
   recordSyncDebug("trigger", "Sync requested", { trigger: reason, delayMs: delay ?? debounceMs });
   schedule(delay ?? debounceMs, reason);
+}
+/** "Retry now" from the status badge: skip the remaining backoff, like coming back online. */
+export function retrySyncNow() {
+  retryAt = 0;
+  requestSync(0, "retry now");
 }
 export function startSync() {
   if (started || typeof window === "undefined") return;
@@ -173,6 +187,8 @@ async function runSync(context = { trigger: "manual", queueMs: 0, timerLateMs: 0
     else {
       failures++;
       retryAt = Date.now() + Math.min(60000, config.retryBaseMs * 2 ** Math.min(failures - 1, 16));
+      // The status was set before the backoff was known; let the badge show the new countdown.
+      listeners.forEach((l) => l());
     }
     const pending = again;
     again = false;

@@ -114,7 +114,7 @@ export default function Library() {
           <Logo />
           <h1 className="text-xl font-semibold tracking-tight text-slate-900">padSync</h1>
         </div>
-        <SyncBadge />
+        <SyncBadge align="start" />
         <nav aria-label="Library" className="ml-auto flex flex-wrap items-center gap-1.5">
           <Link href="/import" className="btn btn-ghost"><Icon name="sparkles" className="text-brand-600" />AI import</Link>
           <Link href="/settings" className="icon-btn" aria-label="Settings" title="Settings"><Icon name="settings" className="text-lg" /></Link>
