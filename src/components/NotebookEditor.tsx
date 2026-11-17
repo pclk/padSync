@@ -331,7 +331,11 @@ function Editor({ notebookId }: { notebookId: string }) {
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(frame);
+      if (presenceTimer.current) clearTimeout(presenceTimer.current);
+    };
   }, [notebookId, publishPresence, sections?.length]);
 
   const presences = useLiveQuery(() => db.entities.where("kind").equals("presence").toArray(), []) as PresenceEntity[] | undefined;

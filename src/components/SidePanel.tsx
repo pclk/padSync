@@ -1,7 +1,7 @@
 "use client";
 
 import { useLiveQuery } from "dexie-react-hooks";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { copySectionImage, sectionSource, sectionStats } from "@/lib/export";
 import { renderMarkdown } from "@/lib/markdown";
 import { useShowCopyButtons } from "@/lib/settings";
@@ -33,16 +33,16 @@ export function SidePanel(p: Props) {
   const [toast, setToast] = useState<string | null>(null);
   const [showSolution, setShowSolution] = useState(false);
   const [showCopy] = useShowCopyButtons();
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 5000);
-    return () => clearInterval(t);
-  }, []);
   const stats = useLiveQuery(() => (current ? sectionStats(current.id) : undefined), [current?.id, current?.hlc]);
 
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+  }, []);
   const flash = (msg: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast(msg);
-    setTimeout(() => setToast(null), 1800);
+    toastTimer.current = setTimeout(() => setToast(null), 1800);
   };
 
   const copyImage = () => {
@@ -78,8 +78,9 @@ export function SidePanel(p: Props) {
           {!p.ipad
             ? "No iPad seen yet."
             : ipadHere
-              ? `iPad is on ${p.sections.find((s) => s.id === p.ipad!.data.sectionId)?.data.title ?? "this notebook"} · ${fmt(Math.max(0, now - p.ipad.data.at))} ago`
+              ? `iPad is on ${p.sections.find((s) => s.id === p.ipad!.data.sectionId)?.data.title ?? "this notebook"}`
               : "iPad is on another notebook."}
+          {ipadHere && p.ipad && <> · <PresenceAge at={p.ipad.data.at} /></>}
         </p>
       </div>
 
@@ -171,4 +172,13 @@ function Stat({ label, value }: { label: string; value: string }) {
       <dt className="text-[11px] text-slate-500">{label}</dt>
     </div>
   );
+}
+
+function PresenceAge({ at }: { at: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(timer);
+  }, []);
+  return <>{fmt(Math.max(0, now - at))} ago</>;
 }

@@ -81,6 +81,17 @@ export class InkController {
   }
 
   attachLive(canvas: HTMLCanvasElement | null) {
+    if (this.live && this.live !== canvas) {
+      this.live.width = 0;
+      this.live.height = 0;
+    }
+    if (!canvas) {
+      cancelAnimationFrame(this.frame);
+      this.frame = 0;
+      this.pending.clear();
+      this.gesture = null;
+      this.hover = null;
+    }
     this.live = canvas;
     // desynchronized hints a low-latency canvas where supported.
     this.ctx = canvas?.getContext("2d", { desynchronized: true }) ?? null;
