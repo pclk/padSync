@@ -260,9 +260,9 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
       if (kind === "retry") {
         if (t.turn === turns.at(-1)?.turn)
           return api.regenerateTurn(id, t.turn);
-        throw new Error(
-          "Retry the latest reply, or edit this message to start a fork.",
-        );
+        const data = await api.editTurn(id, t.turn, t.question);
+        select(data.thread.id);
+        setThread(data.thread);
       }
     });
   const list: ThreadListProps = {
