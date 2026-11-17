@@ -1,92 +1,229 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import * as api from "@/lib/chat-api";
-import type { PanelMode, ThreadPatch, ThreadSummary, Turn } from "@/lib/chat-types";
-import { createPollScheduler, exportMarkdown, groupThreads, pollDelay, readDraft, readStored, writeDraft, writeStored, type ThreadFilter } from "@/lib/chat-ui";
+import type { PanelMode } from "@/lib/chat-types";
+import { exportMarkdown, writeDraft } from "@/lib/chat-ui";
+import { useChat } from "./useChat";
+import { ModelPicker } from "./ModelPicker";
 import { Composer } from "./Composer";
 import { Conversation } from "./Conversation";
-import { ThreadList, type ThreadListProps } from "./ThreadList";
+import { ThreadList } from "./ThreadList";
 import { ThreadSwitcher } from "./ThreadSwitcher";
-import type { ContextHandle, ContextProps } from "./ContextPicker";
-export function ChatPanel(p: ContextProps & { notebookId: string; mode: PanelMode; visible: boolean }) {
-  const [threads, setThreads] = useState<ThreadSummary[]>([]);
-  const [id, setId] = useState("");
-  const [turns, setTurns] = useState<Turn[]>([]);
-  const [thread, setThread] = useState<ThreadSummary | null>(null);
-  const [search, setSearch] = useState("");
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<ThreadFilter>("notebook");
-  const [collapsed, setCollapsed] = useState(false);
-  const [error, setError] = useState("");
-  const [draft, setDraft] = useState(() => readDraft(""));
-  const [busy, setBusy] = useState(false);
-  const [seen, setSeen] = useState<Record<string, string>>(() => readStored("padsync.chat.seen", {}));
-  const [pending, setPending] = useState<ThreadSummary | null>(null);
-  const [bridge, setBridge] = useState<string | null>(null);
-  const [tabVisible, setTabVisible] = useState(true);
-  const turnsRef = useRef(turns);
-  useEffect(() => { turnsRef.current = turns; }, [turns]);
-  const requests = useRef(new Set<string>());
-  const since = useRef<string | undefined>(undefined);
-  const listPoll = useRef<ReturnType<typeof createPollScheduler> | null>(null);
-  const detailPoll = useRef<ReturnType<typeof createPollScheduler> | null>(null);
-  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const selected = useRef(id);
-  useEffect(() => { selected.current = id; }, [id]);
-  const [now, setNow] = useState(() => Date.now());
-  const select = (next: string) => { writeDraft(id, draft); setDraft(readDraft(next)); selected.current = next; turnsRef.current = []; setId(next); setTurns([]); setThread(threads.find((t) => t.id === next) ?? null); since.current = undefined; };
-  const refresh = () => { listPoll.current?.refresh(); detailPoll.current?.refresh(); };
-  useEffect(() => { const timer = setTimeout(() => setQuery(search), 250); return () => clearTimeout(timer); }, [search]);
-  useEffect(() => { const change = () => setTabVisible(document.visibilityState === "visible"); document.addEventListener("visibilitychange", change); change(); return () => document.removeEventListener("visibilitychange", change); }, []);
-  useEffect(() => {
-    const scheduler = createPollScheduler(async () => { try { const data = await api.listThreads({ notebookId: filter === "notebook" ? p.notebookId : undefined, q: query, archived: filter === "archived" }); setThreads(data.threads); setBridge(data.bridgeSeenAt); setNow(Date.now()); } catch (e) { setError((e as Error).message); } }, () => pollDelay("list", false), () => p.visible && tabVisible);
-    listPoll.current = scheduler; scheduler.refresh(); return () => scheduler.stop();
-  }, [p.notebookId, p.visible, tabVisible, query, filter]);
-  useEffect(() => {
-    if (!id) return;
-    let live = true;
-    const scheduler = createPollScheduler(async () => { if (requests.current.has(id)) return; requests.current.add(id); try { const data = await api.getThread(id, { since: since.current, from: turnsRef.current.filter((t) => t.status === "running").map((t) => `${t.turn}:${t.output.length}`).join(",") }); if (!live || selected.current !== id) return; setThread(data.thread); setTurns((old) => api.mergeTurns(old, data.turns)); since.current = data.now; setBridge(data.bridgeSeenAt); setNow(Date.now()); setSeen((old) => { const next = { ...old, [id]: data.thread.updatedAt }; writeStored("padsync.chat.seen", next); return next; }); setError(""); } catch (e) { if (live) setError((e as Error).message); } finally { requests.current.delete(id); } }, () => pollDelay("thread", turnsRef.current.some((t) => ["queued", "running", "uploading"].includes(t.status))), () => p.visible && tabVisible);
-    detailPoll.current = scheduler; scheduler.refresh(); return () => { live = false; scheduler.stop(); };
-  }, [id, p.visible, tabVisible]);
-  const run = (fn: () => Promise<unknown>) => { void fn().then(refresh).catch((e) => setError((e as Error).message)); };
-  const create = async () => { const data = await api.createThread({ notebookId: p.notebookId, agent: thread?.agent ?? "claude", options: thread?.options ?? {} }); setThreads((old) => [data.thread, ...old]); select(data.thread.id); setThread(data.thread); refresh(); return data.thread; };
-  const patch = (input: ThreadPatch) => { if (thread) run(async () => { const data = await api.updateThread(thread.id, input); setThread(data.thread); }); };
-  const download = (t: ThreadSummary, messages: Turn[]) => { const url = URL.createObjectURL(new Blob([exportMarkdown(t, messages)], { type: "text/markdown" })); const a = document.createElement("a"); a.href = url; a.download = "conversation.md"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); };
-  const rowAction = (kind: string, t: ThreadSummary, title?: string) => run(async () => {
-    if (kind === "export") return download(t, (await api.getThread(t.id)).turns);
-    if (kind === "delete") { if (undoTimer.current) { clearTimeout(undoTimer.current); if (pending) await api.deleteThread(pending.id); } setPending(t); undoTimer.current = setTimeout(() => { run(async () => { await api.deleteThread(t.id); setPending(null); if (selected.current === t.id) select(""); }); }, 5000); return; }
-    await api.updateThread(t.id, kind === "rename" ? { title } : kind.includes("pin") ? { pinned: kind === "pin" } : { archived: kind === "archive" });
-  });
-  const send = async (text: string, context: ContextHandle | null) => {
-    setBusy(true); try { const bundle = await context?.prepare(); const target = thread ?? await create(); await api.sendTurn(target.id, { question: text, files: bundle?.files ?? [], uploads: [], context: bundle?.context, options: { ...target.options, ...bundle?.options } }); setDraft(""); writeDraft(target.id, ""); refresh(); } finally { setBusy(false); }
-  };
-  const action = (kind: string, t: Turn) => run(async () => {
-    if (kind === "copy") return navigator.clipboard.writeText(t.output);
-    if (kind === "stop") return api.cancelTurn(t.jobId);
-    if (kind === "regenerate") return api.regenerateTurn(id, t.turn);
-    if (kind === "retry") { if (t.turn === turns.at(-1)?.turn) return api.regenerateTurn(id, t.turn); throw new Error("Retry the latest reply, or edit this message to start a fork."); }
-    if (kind === "edit") { if (t.attachments.length || t.context?.scope !== "none" && t.context !== null) throw new Error("This turn includes context or attachments. Fork the thread and send a new message with the context picker."); const text = kind === "edit" ? window.prompt("Edit message", t.question) : t.question; if (!text) return; const fork = await api.forkThread(id, t.turn - 1); await api.sendTurn(fork.thread.id, { question: text, files: [], uploads: [], context: t.context ?? undefined, options: t.options }); select(fork.thread.id); setThread(fork.thread); }
-  });
-  const list: ThreadListProps = { threads: groupThreads(threads, filter, p.notebookId).filter((t) => t.id !== pending?.id), selected: id, seen, search, setSearch, filter, setFilter, select, create: () => run(create), action: rowAction };
-  useEffect(() => { const key = (e: KeyboardEvent) => {
-    const input = (e.target as HTMLElement).matches("input,textarea,select,[contenteditable=true]");
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setCollapsed(false); const details = document.querySelector("[data-chat-switcher]"); if (details) details.setAttribute("open", ""); setTimeout(() => [...document.querySelectorAll<HTMLInputElement>("[data-chat-search]")].find((el) => el.offsetParent !== null)?.focus(), 0); }
-    if (e.altKey && e.code === "KeyN") { e.preventDefault(); run(create); }
-    if (e.altKey && ["ArrowUp", "ArrowDown"].includes(e.key)) { e.preventDefault(); const i = list.threads.findIndex((t) => t.id === id); const next = list.threads[i + (e.key === "ArrowUp" ? -1 : 1)]; if (next) select(next.id); }
-    if (e.key === "/" && !input) { e.preventDefault(); document.querySelector<HTMLTextAreaElement>("[data-chat-composer]")?.focus(); }
-  }; if (p.visible) window.addEventListener("keydown", key); return () => window.removeEventListener("keydown", key); });
-  return <div data-chat-root className="flex min-h-0 w-full">
-    <div className={p.mode === "chat" && !collapsed ? "w-60 shrink-0 overflow-y-auto border-r" : "hidden"}><ThreadList {...list} /></div>
-    <div className="flex min-w-0 flex-1 flex-col">
-      {p.mode === "drawing" && <ThreadSwitcher {...list} />}
-      {p.mode === "chat" && <button className="self-start p-2 text-xs" onClick={() => setCollapsed(!collapsed)}>{collapsed ? "Show threads" : "Hide threads"}</button>}
-      {thread && <header className="space-y-1 border-b p-2"><input aria-label="Thread title" className="w-full bg-transparent font-medium" key={thread.id + thread.title} defaultValue={thread.title} onBlur={(e) => { if (e.target.value !== thread.title) patch({ title: e.target.value }); }} /><div className="flex flex-wrap gap-1 text-xs"><select aria-label="Agent" value={thread.agent} onChange={(e) => patch({ agent: e.target.value as "claude" | "codex" })}><option>claude</option><option>codex</option></select><input aria-label="Model" className="w-24 rounded border" placeholder="Default model" key={thread.id + thread.agent} defaultValue={thread.options.model ?? ""} onBlur={(e) => patch({ options: { ...thread.options, model: e.target.value } })} /><select aria-label="Effort" value={thread.options.effort ?? ""} onChange={(e) => patch({ options: { ...thread.options, effort: e.target.value } })}>{["", "low", "medium", "high", "xhigh", "max", "ultra"].map((v) => <option key={v} value={v}>{v || "Default effort"}</option>)}</select><label><input type="checkbox" checked={!!thread.options.webSearch} onChange={(e) => patch({ options: { ...thread.options, webSearch: e.target.checked } })} /> Web search</label><details><summary>•••</summary>{["export", "archive", "delete"].map((kind) => <button className="mr-2" key={kind} onClick={() => rowAction(kind, thread)}>{kind}</button>)}<button onClick={() => run(async () => { const data = await api.forkThread(id, turns.at(-1)?.turn ?? 0); select(data.thread.id); setThread(data.thread); })}>Fork</button><button onClick={() => run(() => navigator.clipboard.writeText(exportMarkdown(thread, turns)))}>Copy thread</button></details></div></header>}
-      {error && <p role="alert" className="p-2 text-xs text-rose-700">{error}</p>}
-      {turns.some((t) => t.status === "queued") && (!bridge || now - Date.parse(bridge) > 30000) && <p className="p-2 text-xs text-slate-500">Waiting for the bridge on your Mac</p>}
-      {turns.filter((t) => ["queued", "running"].includes(t.status)).length > 1 && <p className="p-2 text-xs">Queued after the previous reply</p>}
-      <Conversation turns={turns} notebookId={p.notebookId} sections={p.sections} action={action} />
-      <Composer {...p} draft={draft} setDraft={(s) => { setDraft(s); writeDraft(id, s); }} busy={busy} send={send} stop={() => { const active = turns.find((t) => ["queued", "running"].includes(t.status)); if (active) action("stop", active); }} />
-      {pending && <div role="status" className="p-2">Thread deleted. <button className="text-blue-700" onClick={() => { if (undoTimer.current) clearTimeout(undoTimer.current); setPending(null); }}>Undo</button></div>}
+import type { ContextProps } from "./ContextPicker";
+export function ChatPanel(
+  p: ContextProps & { notebookId: string; mode: PanelMode; visible: boolean },
+) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const {
+    list,
+    thread,
+    turns,
+    id,
+    draft,
+    setDraft,
+    busy,
+    error,
+    bridge,
+    now,
+    pending,
+    undoTimer,
+    setPending,
+    collapsed,
+    setCollapsed,
+    patch,
+    rowAction,
+    run,
+    select,
+    setThread,
+    action,
+    send,
+    refresh,
+  } = useChat(p);
+  return (
+    <div data-chat-root className="flex min-h-0 w-full">
+      <div
+        className={
+          p.mode === "chat" && !collapsed
+            ? "w-60 shrink-0 overflow-y-auto border-r"
+            : "hidden"
+        }
+      >
+        <ThreadList {...list} />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col">
+        {p.mode === "drawing" && <ThreadSwitcher {...list} />}
+        {p.mode === "chat" && (
+          <button
+            className="self-start p-2 text-xs"
+            onClick={() => setCollapsed(!collapsed)}
+          >
+            {collapsed ? "Show threads" : "Hide threads"}
+          </button>
+        )}
+        {thread && (
+          <header className="space-y-1 border-b p-2">
+            <input
+              aria-label="Thread title"
+              className="w-full bg-transparent font-medium"
+              key={thread.id + thread.title}
+              defaultValue={thread.title}
+              onBlur={(e) => {
+                if (e.target.value !== thread.title)
+                  patch({ title: e.target.value });
+              }}
+            />
+            <div className="flex flex-wrap gap-1 text-xs">
+              <select
+                aria-label="Agent"
+                value={thread.agent}
+                onChange={(e) =>
+                  patch({ agent: e.target.value as "claude" | "codex" })
+                }
+              >
+                <option>claude</option>
+                <option>codex</option>
+              </select>
+              <ModelPicker
+                key={thread.id + thread.agent}
+                thread={thread}
+                patch={patch}
+              />
+              <label>
+                <input
+                  type="checkbox"
+                  checked={!!thread.options.webSearch}
+                  onChange={(e) =>
+                    patch({
+                      options: {
+                        ...thread.options,
+                        webSearch: e.target.checked,
+                      },
+                    })
+                  }
+                />{" "}
+                Web search
+              </label>
+              <div
+                className="relative"
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setMenuOpen(false);
+                    e.currentTarget.querySelector("button")?.focus();
+                  }
+                }}
+              >
+                <button
+                  aria-label="Thread actions"
+                  aria-expanded={menuOpen}
+                  onClick={() => setMenuOpen(!menuOpen)}
+                >
+                  •••
+                </button>
+                {menuOpen && (
+                  <div className="flex flex-wrap gap-2 rounded-lg border bg-white p-2">
+                    {["export", "archive", "delete"].map((kind) => (
+                      <button
+                        className="mr-2"
+                        key={kind}
+                        onClick={() => rowAction(kind, thread)}
+                      >
+                        {kind[0].toUpperCase() + kind.slice(1)}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() =>
+                        run(async () => {
+                          const data = await api.forkThread(
+                            id,
+                            turns.at(-1)?.turn ?? 0,
+                          );
+                          select(data.thread.id);
+                          setThread(data.thread);
+                        })
+                      }
+                    >
+                      Fork
+                    </button>
+                    <button
+                      onClick={() =>
+                        run(() =>
+                          navigator.clipboard.writeText(
+                            exportMarkdown(thread, turns),
+                          ),
+                        )
+                      }
+                    >
+                      Copy thread
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </header>
+        )}
+        {error && (
+          <p role="alert" className="p-2 text-xs text-rose-700">
+            {error}
+          </p>
+        )}
+        {turns.some((t) => t.status === "queued") &&
+          (!bridge || now - Date.parse(bridge) > 30000) && (
+            <p className="p-2 text-xs text-slate-500">
+              Waiting for the bridge on your Mac
+            </p>
+          )}
+        <Conversation
+          key={id}
+          turns={turns}
+          notebookId={p.notebookId}
+          sections={p.sections}
+          action={action}
+          edit={async (turn, question) => {
+            const data = await api.editTurn(id, turn.turn, question);
+            select(data.thread.id);
+            setThread(data.thread);
+            refresh();
+          }}
+          fork={async (turn, question) => {
+            const data = await api.forkThread(id, turn.turn - 1);
+            select(data.thread.id);
+            setThread(data.thread);
+            setDraft(question);
+            writeDraft(data.thread.id, question);
+            refresh();
+          }}
+        />
+        <Composer
+          {...p}
+          draft={draft}
+          setDraft={(s) => {
+            setDraft(s);
+            writeDraft(id, s);
+          }}
+          busy={busy}
+          send={send}
+          stop={() => {
+            const active = turns.find((t) =>
+              ["queued", "running"].includes(t.status),
+            );
+            if (active) action("stop", active);
+          }}
+        />
+        {pending && (
+          <div role="status" className="p-2">
+            Thread deleted.{" "}
+            <button
+              className="text-blue-700"
+              onClick={() => {
+                if (undoTimer.current) clearTimeout(undoTimer.current);
+                setPending(null);
+              }}
+            >
+              Undo
+            </button>
+          </div>
+        )}
+      </div>
     </div>
-  </div>;
+  );
 }
