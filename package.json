@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p bridge"
+    "typecheck": "next typegen && tsc --noEmit && tsc --noEmit -p bridge"
   },
   "dependencies": {
     "@neon/realtime": "^0.2.1",

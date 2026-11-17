@@ -50,6 +50,7 @@ function distToSegmentSq(px: number, py: number, ax: number, ay: number, bx: num
 /** Strokes touched by an eraser segment from (ax,ay) to (bx,by) with the given radius. */
 export function hitStrokes(strokes: StrokeEntity[], ax: number, ay: number, bx: number, by: number, radius: number): StrokeEntity[] {
   const hits: StrokeEntity[] = [];
+  const dx = bx - ax, dy = by - ay;
   const sMinX = Math.min(ax, bx) - radius, sMaxX = Math.max(ax, bx) + radius;
   const sMinY = Math.min(ay, by) - radius, sMaxY = Math.max(ay, by) + radius;
   for (const s of strokes) {
@@ -60,13 +61,18 @@ export function hitStrokes(strokes: StrokeEntity[], ax: number, ay: number, bx: 
     const p = s.data.pts;
     let hit = false;
     for (let i = 0; i < p.length && !hit; i += STROKE_STRIDE) {
-      // Sample the eraser path at a few points against each stroke point.
-      for (let k = 0; k <= 4 && !hit; k++) {
-        const ex = ax + ((bx - ax) * k) / 4, ey = ay + ((by - ay) * k) / 4;
-        const nx = i + STROKE_STRIDE < p.length ? p[i + STROKE_STRIDE] : p[i];
-        const ny = i + STROKE_STRIDE < p.length ? p[i + STROKE_STRIDE + 1] : p[i + 1];
-        if (distToSegmentSq(ex, ey, p[i], p[i + 1], nx, ny) <= r2) hit = true;
-      }
+      const nx = i + STROKE_STRIDE < p.length ? p[i + STROKE_STRIDE] : p[i];
+      const ny = i + STROKE_STRIDE < p.length ? p[i + STROKE_STRIDE + 1] : p[i + 1];
+      const sx = nx - p[i], sy = ny - p[i + 1];
+      const cross = dx * sy - dy * sx;
+      const qx = p[i] - ax, qy = p[i + 1] - ay;
+      const t = (qx * sy - qy * sx) / cross;
+      const u = (qx * dy - qy * dx) / cross;
+      hit = (cross !== 0 && t >= 0 && t <= 1 && u >= 0 && u <= 1)
+        || distToSegmentSq(ax, ay, p[i], p[i + 1], nx, ny) <= r2
+        || distToSegmentSq(bx, by, p[i], p[i + 1], nx, ny) <= r2
+        || distToSegmentSq(p[i], p[i + 1], ax, ay, bx, by) <= r2
+        || distToSegmentSq(nx, ny, ax, ay, bx, by) <= r2;
     }
     if (hit) hits.push(s);
   }
