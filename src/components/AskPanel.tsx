@@ -1,14 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { sectionPng, sectionSource } from "@/lib/export";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { Selection } from "@/ink/controller";
+import { addRenders, cropSelection, gatherSections } from "@/lib/ask-bundle";
+import { DEFAULT_CONTEXT, buildBundle, bundleSignature, jobRequestBody, kb, pickSections, type Bundle, type ContextOptions, type SelectionInput } from "@/lib/context";
+import { sectionSource } from "@/lib/export";
 import { useStoredState } from "@/lib/hooks";
 import { renderMarkdown } from "@/lib/markdown";
 import { logEvent } from "@/lib/store";
 import type { SectionEntity } from "@/lib/types";
+import { BundlePreview, ContextControls, type TextSelection } from "./ContextControls";
+import { ReturnedFiles } from "./ReturnedFiles";
 
 // "Ask AI": queues a job on the server; the bridge on the Mac runs Claude Code / Codex and
 // streams the answer back. Works from any signed-in device; answers wait if the Mac is offline.
+// What the AI gets is a bundle of files (src/lib/context.ts) chosen under "What to send"; the
+// bridge writes it into a temp folder and the agent reads it with its own tools.
 
 type Agent = "claude" | "codex";
 
@@ -37,28 +44,42 @@ interface Job {
   output: string;
   error: string | null;
   createdAt: string;
+  resultFiles?: { path: string; mime: string; size: number }[];
 }
 
-const MAX_IMAGE_CHARS = 3_000_000;
 const BRIDGE_ONLINE_MS = 30_000;
+/** Rough cost of one section render in the summary, before anything is rendered. */
+const RENDER_TOKENS_GUESS = 1200;
+
+interface Prepared {
+  sig: string;
+  bundle: Bundle;
+}
 
 async function fetchJobs(sectionId: string) {
   const res = await fetch(`/api/jobs?sectionId=${encodeURIComponent(sectionId)}`).catch(() => null);
   return res?.ok ? ((await res.json()) as { jobs: Job[]; bridgeSeenAt: string | null }) : null;
 }
 
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(r.result as string);
-    r.onerror = () => reject(r.error);
-    r.readAsDataURL(blob);
-  });
+interface Props {
+  notebookId: string;
+  notebookTitle: string;
+  sections: SectionEntity[];
+  section: SectionEntity;
+  sectionEl: (id: string) => HTMLElement | undefined;
+  /** The editor's lasso selection, if any. */
+  lasso: Selection | null;
 }
 
-export function AskPanel({ notebookId, section, sectionEl }: { notebookId: string; section: SectionEntity; sectionEl: () => HTMLElement | undefined }) {
+export function AskPanel({ notebookId, notebookTitle, sections, section, sectionEl, lasso }: Props) {
   const [agent, setAgent] = useStoredState<Agent>("padsync.agent", "claude");
-  const [withSolution, setWithSolution] = useStoredState("padsync.askWithSolution", true);
+  const [storedCtx, setStoredCtx] = useStoredState<Partial<ContextOptions>>("padsync.askContext", DEFAULT_CONTEXT);
+  const [storedIds, setPickedIds] = useStoredState<string[] | null>(`padsync.askSections.${notebookId}`, null);
+  const [showContext, setShowContext] = useStoredState("padsync.askShowContext", false);
+  const [textSel, setTextSel] = useState<TextSelection | null>(null);
+  const [source, setSource] = useState("");
+  const [preview, setPreview] = useState<Prepared | null>(null);
+  const [summary, setSummary] = useState("");
   const [allOptions, setAllOptions] = useStoredState<Record<Agent, JobOptions>>("padsync.askOptions", { claude: {}, codex: {} });
   const options = allOptions[agent] ?? {};
   const setOption = (o: JobOptions) => setAllOptions({ ...allOptions, [agent]: { ...options, ...o } });
@@ -85,31 +106,96 @@ export function AskPanel({ notebookId, section, sectionEl }: { notebookId: strin
     return () => clearInterval(t);
   }, [section.id, apply, active]);
 
-  const ask = async () => {
-    const el = sectionEl();
-    if (!question.trim() || !el) return;
+  // Stored settings are merged over the defaults so options added later get their default.
+  const pickedIds = useMemo(() => (storedIds ?? sections.map((s) => s.id)).filter((id) => sections.some((s) => s.id === id)), [storedIds, sections]);
+  const ctx: ContextOptions = useMemo(() => ({ ...DEFAULT_CONTEXT, ...storedCtx, sectionIds: pickedIds }), [storedCtx, pickedIds]);
+  const setCtx = (patch: Partial<ContextOptions>) => setStoredCtx({ ...storedCtx, ...patch, sectionIds: [] });
+  const lassoHere = lasso && lasso.sectionId === section.id && lasso.ids.size ? lasso : null;
+  const selectionKey = useMemo(
+    () => (ctx.scope === "selection" ? [section.id, textSel?.text ?? "", lassoHere ? [lassoHere.box, [...lassoHere.ids].sort()] : null] : null),
+    [ctx.scope, section.id, textSel, lassoHere],
+  );
+
+  useEffect(() => {
+    let live = true;
+    void sectionSource(section, false).then((t) => live && setSource(t));
+    return () => {
+      live = false;
+    };
+  }, [section]);
+
+  // Summary before anything is rendered: exact for text, a guess for renders.
+  useEffect(() => {
+    let live = true;
+    void gatherSections(sections).then((inputs) => {
+      if (!live) return;
+      const selection: SelectionInput | null = selectionKey ? { sectionId: section.id, text: textSel?.text, crop: lassoHere ? { base64: "", width: 600, height: 400 } : null } : null;
+      const b = buildBundle({ title: notebookTitle, sections: inputs, selection }, { ...ctx, renders: false });
+      if (b.error) return setSummary(b.error);
+      const renders = ctx.renders && ctx.scope !== "selection" ? pickSections(inputs, ctx, selection).length : 0;
+      const n = b.sectionIds.length;
+      setSummary(
+        [
+          ctx.scope === "selection" ? "selection only" : `${n} section${n === 1 ? "" : "s"}`,
+          renders ? `${renders} render${renders === 1 ? "" : "s"}` : null,
+          `~${(b.tokens + renders * RENDER_TOKENS_GUESS).toLocaleString()} tokens`,
+          `${kb(b.bytes)} text`,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      );
+    });
+    return () => {
+      live = false;
+    };
+  }, [sections, notebookTitle, ctx, selectionKey, section.id, textSel, lassoHere]);
+
+  /** Builds the bundle exactly as it would be sent, plus a signature of everything it used. */
+  const prepare = async (): Promise<Prepared> => {
+    const inputs = await gatherSections(sections);
+    let selection: SelectionInput | null = null;
+    if (ctx.scope === "selection") {
+      const el = sectionEl(section.id);
+      const crop = lassoHere && el ? await cropSelection(section, el, lassoHere.box) : null;
+      selection = { sectionId: section.id, text: textSel?.text, crop };
+    }
+    const withRenders = await addRenders(inputs, sections, ctx, sectionEl, selection);
+    return { sig: bundleSignature(notebookTitle, inputs, selectionKey, ctx), bundle: buildBundle({ title: notebookTitle, sections: withRenders, selection }, ctx) };
+  };
+
+  const showPreview = async () => {
     setBusy(true);
     setError(null);
     try {
-      let image = await blobToDataUrl(await sectionPng(section, el, 2));
-      if (image.length > MAX_IMAGE_CHARS) image = await blobToDataUrl(await sectionPng(section, el, 1));
-      if (image.length > MAX_IMAGE_CHARS) image = "";
+      setPreview(await prepare());
+    } catch (e) {
+      setError(`Couldn't build the preview: ${(e as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const ask = async () => {
+    if (!question.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      let bundle: Bundle;
+      if (preview) {
+        // Send what was previewed, or nothing: if anything changed, show the new version first.
+        const sig = bundleSignature(notebookTitle, await gatherSections(sections), selectionKey, ctx);
+        if (sig !== preview.sig) {
+          setPreview(await prepare());
+          setError("The notebook or the options changed since the preview. Check it again, then send.");
+          return;
+        }
+        bundle = preview.bundle;
+      } else bundle = (await prepare()).bundle;
+      if (bundle.error) return setError(bundle.error);
       const res = await fetch("/api/jobs", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          notebookId,
-          sectionId: section.id,
-          agent,
-          question,
-          context: await sectionSource(section, withSolution),
-          image: image || null,
-          options: {
-            ...(options.model ? { model: options.model } : {}),
-            ...(options.effort ? { effort: options.effort } : {}),
-            ...(options.webSearch ? { webSearch: true } : {}),
-          },
-        }),
+        body: JSON.stringify(jobRequestBody({ notebookId, sectionId: section.id, agent, question, options }, bundle, ctx)),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -117,7 +203,8 @@ export function AskPanel({ notebookId, section, sectionEl }: { notebookId: strin
         return;
       }
       setQuestion("");
-      void logEvent(notebookId, section.id, "ask", { jobId: data.job.id, agent });
+      setPreview(null);
+      void logEvent(notebookId, section.id, "ask", { jobId: data.job.id, agent, scope: ctx.scope, sections: bundle.sectionIds.length, bytes: bundle.bytes });
       await refresh();
     } catch (e) {
       setError(navigator.onLine ? (e as Error).message : "You're offline; asking needs a connection.");
@@ -166,12 +253,10 @@ export function AskPanel({ notebookId, section, sectionEl }: { notebookId: strin
           <option value="claude">Claude Code</option>
           <option value="codex">Codex</option>
         </select>
-        {section.data.solution && (
-          <label className="flex items-center gap-1 text-xs text-slate-600" title="The AI sees the hidden solution and is told not to reveal it unless you ask.">
-            <input type="checkbox" checked={withSolution} onChange={(e) => setWithSolution(e.target.checked)} /> use solution
-          </label>
-        )}
-        <button className="ml-auto shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 font-medium text-white disabled:opacity-40" disabled={busy || !question.trim()} onClick={ask}>
+        <button className="ml-auto shrink-0 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs disabled:opacity-40" disabled={busy} onClick={showPreview}>
+          Preview
+        </button>
+        <button className="shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 font-medium text-white disabled:opacity-40" disabled={busy || !question.trim()} onClick={ask}>
           {busy ? "Sending…" : "Ask ⌘↵"}
         </button>
       </div>
@@ -196,6 +281,31 @@ export function AskPanel({ notebookId, section, sectionEl }: { notebookId: strin
           <input type="checkbox" checked={!!options.webSearch} onChange={(e) => setOption({ webSearch: e.target.checked })} /> web search
         </label>
       </div>
+      <div className="mt-2">
+        <button className="flex w-full items-center gap-1 text-xs text-slate-600" onClick={() => setShowContext(!showContext)} aria-expanded={showContext}>
+          <span>{showContext ? "▾" : "▸"}</span>
+          <span className="font-medium">What to send</span>
+          {!showContext && <span className="ml-1 truncate text-slate-400">{summary}</span>}
+        </button>
+        {showContext && (
+          <div className="mt-1">
+            <ContextControls
+              o={ctx}
+              set={setCtx}
+              sections={sections}
+              pickedIds={pickedIds}
+              setPickedIds={setPickedIds}
+              currentId={section.id}
+              source={source}
+              textSel={textSel}
+              setTextSel={setTextSel}
+              lassoCount={lassoHere?.ids.size ?? 0}
+              summary={summary}
+            />
+          </div>
+        )}
+      </div>
+      {preview && <BundlePreview bundle={preview.bundle} onClose={() => setPreview(null)} />}
       {error && <p className="mt-2 text-xs text-rose-700">{error}</p>}
 
       <ul className="mt-3 space-y-3">
@@ -211,6 +321,7 @@ export function AskPanel({ notebookId, section, sectionEl }: { notebookId: strin
             {j.output && <div className="prose-pad border-t border-slate-100 pt-2" dangerouslySetInnerHTML={{ __html: renderMarkdown(j.output) }} />}
             {j.status === "queued" && !bridgeOnline && <p className="text-xs text-slate-400">Waiting for the bridge on your Mac.</p>}
             {j.error && <p className="mt-1 text-xs text-rose-700">{j.error}</p>}
+            {j.status === "done" && !!j.resultFiles?.length && <ReturnedFiles jobId={j.id} notebookId={notebookId} sections={sections} count={j.resultFiles.length} />}
             <div className="mt-2 flex gap-2 text-xs">
               {(j.status === "queued" || j.status === "running") && (
                 <button className="text-rose-600" onClick={() => cancel(j.id)}>
