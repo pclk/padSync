@@ -1,6 +1,7 @@
 import { connection, type NextRequest } from "next/server";
 import { allowedLogin, authConfigured, sessionLogin } from "@/server/auth";
 import { databaseUrl, getSql } from "@/server/db";
+import { isAdminLogin } from "@/server/sync-config";
 import { lastBridgeActivity } from "@/server/tokens";
 
 export async function GET(req: NextRequest) {
@@ -14,6 +15,7 @@ export async function GET(req: NextRequest) {
     auth: authConfigured(),
     authed: login !== null,
     login,
+    admin: isAdminLogin(login),
     allowed: allowedLogin(),
     bridgeSeenAt,
     canvas: { configured: !!process.env.CANVAS_TOKEN, expiresAt: process.env.CANVAS_TOKEN_EXPIRES ?? null },
