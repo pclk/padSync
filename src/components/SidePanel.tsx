@@ -8,9 +8,13 @@ import { useShowCopyButtons } from "@/lib/settings";
 import { insertSectionAfter, logEvent, setDeleted, swapSectionOrder } from "@/lib/store";
 import type { Selection } from "@/ink/controller";
 import type { PresenceEntity, SectionEntity } from "@/lib/types";
-import { AskPanel } from "./AskPanel";
+import { EarlierQuestions } from "./AskPanel";
+import { ChatPanel } from "./chat/ChatPanel";
+import type { PanelMode } from "@/lib/chat-types";
 
 interface Props {
+  mode?: PanelMode;
+  width?: number;
   notebookId: string;
   notebookTitle: string;
   selection: Selection | null;
@@ -30,6 +34,7 @@ function fmt(ms: number) {
 
 export function SidePanel(p: Props) {
   const { current } = p;
+  const [tab, setTab] = useState("chat");
   const [toast, setToast] = useState<string | null>(null);
   const [showSolution, setShowSolution] = useState(false);
   const [showCopy] = useShowCopyButtons();
@@ -68,7 +73,12 @@ export function SidePanel(p: Props) {
   const ipadHere = p.ipad && p.ipad.notebookId === p.notebookId;
 
   return (
-    <aside className="side-panel fixed bottom-0 right-0 top-14 z-30 flex w-[360px] flex-col overflow-y-auto border-l border-slate-200 bg-slate-50 text-sm">
+    <aside style={{ width: p.width ?? 360 }} className="side-panel fixed bottom-0 right-0 top-14 z-30 flex flex-col overflow-hidden border-l border-slate-200 bg-slate-50 text-sm transition-[width] duration-250 motion-reduce:transition-none">
+      <div className="flex shrink-0 gap-2 border-b p-2" role="tablist" aria-label="Side panel">
+        {["chat", "section"].map((t) => <button key={t} role="tab" aria-selected={tab === t} className="rounded-lg px-3 py-1 capitalize aria-selected:bg-white" onClick={() => setTab(t)}>{t}</button>)}
+      </div>
+      <div className={tab === "chat" ? "flex min-h-0 flex-1" : "hidden"}><ChatPanel {...p} mode={p.mode ?? "drawing"} visible={tab === "chat"} /></div>
+      <div className={tab === "section" ? "overflow-y-auto" : "hidden"}>
       <div className="border-b border-slate-200 p-4">
         <label className="flex items-center justify-between gap-2">
           <span className="font-medium text-slate-700">Follow iPad</span>
@@ -102,7 +112,7 @@ export function SidePanel(p: Props) {
               </button>
             </div>
           )}
-          <AskPanel key={current.id} notebookId={p.notebookId} notebookTitle={p.notebookTitle} sections={p.sections} section={current} sectionEl={p.sectionEl} lasso={p.selection} />
+          <EarlierQuestions key={current.id} sectionId={current.id} notebookId={p.notebookId} sections={p.sections} />
 
           {stats && (
             <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
@@ -161,6 +171,7 @@ export function SidePanel(p: Props) {
       </nav>
 
       {toast && <div className="fixed bottom-4 right-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-white shadow-lg">{toast}</div>}
+      </div>
     </aside>
   );
 }
