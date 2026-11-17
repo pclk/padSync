@@ -140,3 +140,33 @@ pre,
 @media (prefers-reduced-motion: reduce) {
   .copy-btn.copied { animation: none; }
 }
+
+/* Study blocks (AI import): writing lines, blanks and the annotation margin. */
+.study-lines {
+  background-image: linear-gradient(transparent 35px, #dbe3ee 35px, #dbe3ee 36px);
+  background-size: 100% 36px;
+}
+.study-blank-line {
+  border-bottom: 1.5px solid #94a3b8;
+}
+.study-blank {
+  display: inline-block;
+  min-height: 1.3em;
+  margin: 0 0.15em;
+  vertical-align: bottom;
+  border-bottom: 1.5px solid #64748b;
+}
+.study-blank.revealed {
+  padding: 0 0.3em;
+  color: #1e40af;
+  background: #eff6ff;
+  border-bottom-color: #93c5fd;
+}
+.study-cloze {
+  line-height: 2.1;
+}
+.study-margin {
+  background-image: linear-gradient(transparent 35px, #eef2f7 35px, #eef2f7 36px);
+  background-size: 100% 36px;
+  background-position: 0 60px;
+}

@@ -1,6 +1,7 @@
 import { z } from "zod";
+import { maskAnswers } from "./blocks";
 import { assetMap } from "./context";
-import { blockSchema } from "./payload";
+import { blockSchema, sectionSchema } from "./schema";
 import { SCREEN_HEIGHT, type Block, type SectionData } from "./types";
 
 // The return half of "Ask AI": the agent writes out/notebook.json (the bundle's format), the
@@ -13,7 +14,7 @@ export interface ReturnedFile {
   base64?: string;
 }
 
-export const EDITABLE_FIELDS = ["title", "blocks", "solution", "marks", "timeLimitMinutes", "tags", "template"] as const;
+export const EDITABLE_FIELDS = ["title", "blocks", "solution", "marks", "timeLimitMinutes", "tags", "template", "kind", "objectives", "margin"] as const;
 export type EditableField = (typeof EDITABLE_FIELDS)[number];
 
 // Images may point at an exported asset ("assets/…") or a file the agent returned ("out/…" or a
@@ -32,6 +33,9 @@ const returnedSection = z.object({
   timeLimitMinutes: z.number().positive().optional(),
   tags: z.array(z.string().max(100)).max(50).optional(),
   template: z.enum(["plain", "dots", "grid", "lines"]).optional(),
+  kind: sectionSchema.shape.kind,
+  objectives: sectionSchema.shape.objectives,
+  margin: sectionSchema.shape.margin,
 });
 
 const returnedNotebook = z.object({ sections: z.array(returnedSection).max(500) });
@@ -82,12 +86,15 @@ export function parseReturnedNotebook(text: string, current: { id: string; data:
 
   parsed.data.sections.forEach((r, ri) => {
     const label = r.title?.trim() || (r.id && byId.get(r.id)?.s.data.title) || `returned section ${ri + 1}`;
+    const hitData = r.id ? byId.get(r.id)?.s.data : undefined;
     let blocks: Block[] | undefined;
     if (r.blocks) {
       blocks = [];
-      for (const b of r.blocks) {
+      for (const [bi, b] of r.blocks.entries()) {
         if (b.type !== "image") {
-          blocks.push(b as Block);
+          // A block sent with its answers blanked and returned as is keeps the real answers.
+          const cur = hitData?.blocks[bi];
+          blocks.push(cur && cur !== maskAnswers(cur) && same(maskAnswers(cur), b) ? cur : (b as Block));
           continue;
         }
         const src = resolveImage(b.src, assets, returned);
@@ -125,6 +132,9 @@ export function parseReturnedNotebook(text: string, current: { id: string; data:
         timeLimitMinutes: r.timeLimitMinutes,
         tags: r.tags,
         template: r.template ?? "plain",
+        ...(r.kind ? { kind: r.kind } : {}),
+        ...(r.objectives?.length ? { objectives: r.objectives } : {}),
+        ...(r.margin ? { margin: r.margin } : {}),
         minHeight: Math.round(SCREEN_HEIGHT * 0.5),
       },
     });

@@ -1,6 +1,7 @@
 import { toCanvas } from "html-to-image";
 import { strokeBox, unionBox } from "@/ink/geometry";
 import { paintStrokes } from "@/ink/render";
+import { studyBlockMarkdown } from "./blocks";
 import { db } from "./db";
 import { liveChildren } from "./store";
 import { PAGE_WIDTH, type SectionEntity, type StrokeEntity, type TextBoxEntity } from "./types";
@@ -58,6 +59,10 @@ export async function sectionSource(section: SectionEntity, includeSolution = fa
     else if (b.type === "code") lines.push("```" + (b.language ?? "") + "\n" + b.code + "\n```");
     else if (b.type === "image") lines.push(b.src.startsWith("data:") ? `[image: ${b.alt ?? "figure"}]` : `![${b.alt ?? ""}](${b.src})`);
     else if (b.type === "divider") lines.push("---");
+    else {
+      const text = studyBlockMarkdown(b, includeSolution);
+      if (text) lines.push(text);
+    }
   }
   const texts = (await liveChildren<TextBoxEntity>(section.id, "textbox")).sort((a, b) => a.data.y - b.data.y);
   if (texts.length) lines.push("### My typed notes", ...texts.map((t) => t.data.text));

@@ -85,7 +85,9 @@ describe("defaults", () => {
     const b = build();
     expect(file(b, "notebook.md")!.text).toContain("**IBP** $\\int u\\,dv$");
     const json = JSON.parse(file(b, "notebook.json")!.text!);
-    expect(json.padsync).toBe(1);
+    // The current import schema (v2), so a returned copy also imports as a new notebook.
+    expect(json.schemaVersion).toBe(2);
+    expect(json.padsync).toBeUndefined();
     expect(json.sections.map((s: { id: string }) => s.id)).toEqual(["s1", "s2", "s3"]);
     expect(json.sections[1]).toMatchObject({ title: "Q1", marks: 3, solution: "SECRET-SOLUTION", tags: ["ibp"], timeLimitMinutes: 5 });
     // The embedded image is a file, not a data URL repeated inside the JSON.

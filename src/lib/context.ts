@@ -1,3 +1,5 @@
+import { maskAnswers, studyBlockMarkdown } from "./blocks";
+import { SCHEMA_VERSION } from "./schema";
 import type { Block, SectionData } from "./types";
 
 // What "Ask AI" sends: a small folder of files (the bundle) that the Mac bridge writes into the
@@ -40,10 +42,12 @@ export const MAX_BUNDLE_BYTES = 3_200_000;
 export const MAX_BUNDLE_FILES = 64;
 /** One optional folder, then a name; no leading dot, so no `..` and no hidden files. */
 export const BUNDLE_PATH_RE = /^(?:[A-Za-z0-9][A-Za-z0-9._-]{0,63}\/)?[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
-export const BUNDLE_MIMES = ["text/markdown", "text/plain", "application/json", "image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf"] as const;
+export const PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+export const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+export const BUNDLE_MIMES = ["text/markdown", "text/plain", "application/json", "image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf", PPTX_MIME, DOCX_MIME] as const;
 export type BundleMime = (typeof BUNDLE_MIMES)[number];
 /** Binary files travel as base64, the rest as text. */
-export const isBinaryMime = (m: string) => m.startsWith("image/") || m === "application/pdf";
+export const isBinaryMime = (m: string) => m.startsWith("image/") || m === "application/pdf" || m === PPTX_MIME || m === DOCX_MIME;
 
 export interface Raster {
   base64: string;
@@ -193,7 +197,7 @@ function sectionHeading(index: number, d: SectionData) {
   return `## ${index + 1}. ${d.title?.trim() || "Untitled"}${marks}`;
 }
 
-function blockMarkdown(b: Block, assetRef: string | null, imagesIncluded: boolean): string | null {
+function blockMarkdown(b: Block, assetRef: string | null, imagesIncluded: boolean, answers: boolean): string | null {
   if (b.type === "markdown") return b.text;
   if (b.type === "code") return "```" + (b.language ?? "") + "\n" + b.code + "\n```";
   if (b.type === "divider") return "---";
@@ -204,7 +208,7 @@ function blockMarkdown(b: Block, assetRef: string | null, imagesIncluded: boolea
     if (assetRef) return `![${b.alt ?? ""}](${assetRef})${cap}`;
     return `[image: ${b.alt || "figure"}${imagesIncluded ? " (not included: size limit)" : ""}]${cap}`;
   }
-  return null; // answer space
+  return studyBlockMarkdown(b, answers); // null for answer space
 }
 
 /** Builds the bundle for the given options. Same input, same output: the preview is the send. */
@@ -266,7 +270,7 @@ function notebookText(input: BundleInput, picked: SectionInput[], o: ContextOpti
   const md: string[] = [`# ${input.title.trim() || "Untitled notebook"}`];
   md.push(`_Exported from padSync: ${picked.length} of ${input.sections.length} section${input.sections.length === 1 ? "" : "s"}._`);
   const json = {
-    padsync: 1,
+    schemaVersion: SCHEMA_VERSION,
     title: input.title,
     sections: [] as Record<string, unknown>[],
   };
@@ -280,14 +284,15 @@ function notebookText(input: BundleInput, picked: SectionInput[], o: ContextOpti
     if (kept.has(render)) md.push(`![Render of section ${i + 1}: the printed content plus my handwriting](${render})`);
     for (const b of d.blocks) {
       const p = b.type === "image" ? assetPath(s.id, b.src) : null;
-      const text = blockMarkdown(b, p && kept.has(p) ? p : null, o.images);
+      const text = blockMarkdown(b, p && kept.has(p) ? p : null, o.images, o.solutions);
       if (text != null && text.trim()) md.push(text);
     }
     if (o.notes && s.notes.some((n) => n.trim())) md.push("### My typed notes", ...s.notes.filter((n) => n.trim()));
     if (o.solutions && d.solution) md.push("### Reference solution (hidden from student)", d.solution);
 
     const blocks = d.blocks.map((b) => {
-      if (b.type !== "image") return b;
+      // Without solutions, hidden answers are blanked too (the return path maps them back).
+      if (b.type !== "image") return o.solutions ? b : maskAnswers(b);
       // Embedded images always travel as their reference (mapped back on return, keeps the JSON
       // small); remote URLs only when images are included.
       const ref = imageRef(s.id, b.src);
@@ -302,6 +307,9 @@ function notebookText(input: BundleInput, picked: SectionInput[], o: ContextOpti
       ...(d.timeLimitMinutes != null ? { timeLimitMinutes: d.timeLimitMinutes } : {}),
       ...(d.tags?.length ? { tags: d.tags } : {}),
       template: d.template,
+      ...(d.kind ? { kind: d.kind } : {}),
+      ...(d.objectives?.length ? { objectives: d.objectives } : {}),
+      ...(d.margin ? { margin: d.margin } : {}),
     });
   }
   return [

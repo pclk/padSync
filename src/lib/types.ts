@@ -1,3 +1,7 @@
+import type { Block, SectionKind, SectionMargin, SpaceSize } from "./schema";
+
+export type { Block, SectionKind, SectionMargin, SpaceSize };
+
 // Shared data model. Everything that syncs is an Entity: a small JSON document with a
 // hybrid-logical-clock stamp. Conflicts resolve per entity, last writer (highest hlc) wins.
 
@@ -24,6 +28,8 @@ export interface NotebookData {
   title: string;
   description?: string;
   createdAt: number;
+  /** Set on notebooks made by AI import: the payload's hash, to warn before importing it twice. */
+  source?: { importHash: string; importedAt: number; jobId?: string };
 }
 
 export type Template = "plain" | "dots" | "grid" | "lines";
@@ -38,6 +44,12 @@ export interface SectionData {
   marks?: number;
   tags?: string[];
   template: Template;
+  /** What the section is for (AI import); styles the header. */
+  kind?: SectionKind;
+  /** Learning goals, shown under the title. */
+  objectives?: string[];
+  /** A ruled column beside the content for handwritten annotations. */
+  margin?: SectionMargin;
   minHeight: number;
   createdAt: number;
 }
@@ -78,14 +90,6 @@ export interface PresenceData {
 
 export type DeviceKind = "ipad" | "desktop";
 
-export type Block =
-  | { type: "markdown"; text: string }
-  | { type: "code"; language?: string; code: string }
-  | { type: "image"; src: string; alt?: string; width?: number; caption?: string }
-  | { type: "space"; size: SpaceSize | number }
-  | { type: "divider" };
-
-export type SpaceSize = "xs" | "s" | "m" | "l" | "xl";
 
 export const SPACE_PX: Record<SpaceSize, number> = { xs: 120, s: 240, m: 420, l: 640, xl: 900 };
 
