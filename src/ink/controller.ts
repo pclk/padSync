@@ -1,4 +1,4 @@
-import { emitActivity } from "@/lib/activity";
+import { emitActivity, setInking, whenIdle } from "@/lib/activity";
 import { db, deviceId } from "@/lib/db";
 import { logEvent, moveStrokes, newEntity, putEntities, setDeleted } from "@/lib/store";
 import { STROKE_STRIDE, type StrokeData, type StrokeEntity } from "@/lib/types";
@@ -90,7 +90,7 @@ export class InkController {
       cancelAnimationFrame(this.frame);
       this.frame = 0;
       this.pending.clear();
-      this.gesture = null;
+      this.setGesture(null);
       this.hover = null;
     }
     this.live = canvas;
@@ -140,8 +140,17 @@ export class InkController {
     return true;
   }
 
+  private setGesture(g: Gesture | null) {
+    this.gesture = g;
+    setInking(g !== null);
+  }
+
   down(e: PointerEvent, sec: SectionHandle) {
-    if (!this.accepts(e) || this.gesture) return;
+    if (!this.accepts(e)) return;
+    // A new pointerdown while a gesture is open means the old pointer's pointerup/pointercancel
+    // never reached us (capture lost, Scribble, a system gesture). Finish it and take the new one;
+    // ignoring it here is what left the Pencil dead until reload.
+    if (this.gesture) this.end(this.gesture, null);
     const rect = sec.el.getBoundingClientRect();
     const [x, y] = this.local(e, rect);
     this.hover = null;
@@ -153,12 +162,16 @@ export class InkController {
     }
 
     e.preventDefault();
-    sec.el.setPointerCapture(e.pointerId);
+    try {
+      sec.el.setPointerCapture(e.pointerId);
+    } catch {
+      // The pointer is already gone (WebKit can deliver a stale pointerdown); still draw.
+    }
 
     const sel = this.selection;
     if (sel && sel.sectionId === sec.id && inBox(sel.box, x, y, 12)) {
       const strokes = sec.strokes().filter((s) => sel.ids.has(s.id));
-      this.gesture = { type: "drag", sec, rect, start: [x, y], dx: 0, dy: 0, strokes, pointerId: e.pointerId };
+      this.setGesture({ type: "drag", sec, rect, start: [x, y], dx: 0, dy: 0, strokes, pointerId: e.pointerId });
       this.cb.onDragging(sel.ids);
       this.requestFrame();
       return;
@@ -167,10 +180,10 @@ export class InkController {
 
     if (kind === "eraser") {
       const g: Gesture = { type: "erase", sec, rect, last: [x, y], at: [x, y], erased: new Set(), pointerId: e.pointerId };
-      this.gesture = g;
+      this.setGesture(g);
       this.eraseAlong(g, x, y);
     } else if (kind === "lasso") {
-      this.gesture = { type: "lasso", sec, rect, poly: [[x, y]], pointerId: e.pointerId };
+      this.setGesture({ type: "lasso", sec, rect, poly: [[x, y]], pointerId: e.pointerId });
     } else {
       const hl = kind === "highlighter";
       const data: StrokeData = {
@@ -182,14 +195,20 @@ export class InkController {
         input: e.pointerType,
         device: deviceId(),
       };
-      this.gesture = { type: "ink", sec, rect, data, predicted: [], t0: e.timeStamp, pointerId: e.pointerId };
-      this.addPoints(this.gesture, [e]);
+      const g: Extract<Gesture, { type: "ink" }> = { type: "ink", sec, rect, data, predicted: [], t0: e.timeStamp, pointerId: e.pointerId };
+      this.setGesture(g);
+      this.addPoints(g, [e]);
     }
     this.requestFrame();
   }
 
   move(e: PointerEvent, sec: SectionHandle) {
-    const g = this.gesture;
+    let g = this.gesture;
+    // The pointer is hovering with nothing pressed: its pointerup was lost. End the gesture.
+    if (g && e.pointerId === g.pointerId && e.buttons === 0) {
+      this.end(g, null);
+      g = null;
+    }
     if (!g) {
       if (e.pointerType === "pen" && e.buttons === 0) {
         const rect = sec.el.getBoundingClientRect();
@@ -229,8 +248,24 @@ export class InkController {
   up(e: PointerEvent) {
     const g = this.gesture;
     if (!g || e.pointerId !== g.pointerId) return;
-    this.gesture = null;
-    if (e.type !== "pointercancel" && g.type === "ink") this.addPoints(g, [e]);
+    this.end(g, e.type === "pointercancel" ? null : e);
+  }
+
+  /** Capture was taken away mid-gesture (element detached, system gesture): the up may never come. */
+  lostCapture(e: PointerEvent) {
+    const g = this.gesture;
+    if (g && e.pointerId === g.pointerId) this.end(g, null);
+  }
+
+  /** Ends the open gesture, keeping what was drawn: page hidden, window blurred, section unmounted. */
+  endGesture(sectionId?: string) {
+    const g = this.gesture;
+    if (g && (!sectionId || g.sec.id === sectionId)) this.end(g, null);
+  }
+
+  private end(g: Gesture, last: PointerEvent | null) {
+    if (this.gesture === g) this.setGesture(null);
+    if (last && g.type === "ink") this.addPoints(g, [last]);
 
     if (g.type === "ink") void this.commitInk(g);
     else if (g.type === "erase") this.commitErase(g);
@@ -284,16 +319,13 @@ export class InkController {
     const [saved] = await putEntities([stroke]);
     seedPath(saved, path);
     const id = stroke.id;
-    emitActivity({ notebookId: this.notebookId, source: "local", kinds: ["stroke"], at: Date.now() });
+    // The layout re-renders the whole editor on activity; let the next stroke start first.
+    const at = Date.now();
+    whenIdle(() => emitActivity({ notebookId: this.notebookId, source: "local", kinds: ["stroke"], at }));
     this.undo.push({ label: "stroke", undo: () => setDeleted([id], true), redo: () => setDeleted([id], false) });
     const n = g.data.pts.length / STROKE_STRIDE;
-    void logEvent(this.notebookId, g.sec.id, "stroke", {
-      id,
-      tool: g.data.tool,
-      points: n,
-      durationMs: g.data.pts[g.data.pts.length - 1],
-      box: dataBox(g.data),
-    });
+    const box = dataBox(g.data);
+    whenIdle(() => void logEvent(this.notebookId, g.sec.id, "stroke", { id, tool: g.data.tool, points: n, durationMs: g.data.pts[g.data.pts.length - 1], box }));
   }
 
   private eraseAlong(g: Extract<Gesture, { type: "erase" }>, x: number, y: number) {
@@ -310,9 +342,10 @@ export class InkController {
   private commitErase(g: Extract<Gesture, { type: "erase" }>) {
     if (!g.erased.size) return;
     const ids = [...g.erased];
-    emitActivity({ notebookId: this.notebookId, source: "local", kinds: ["stroke"], at: Date.now() });
+    const at = Date.now();
+    whenIdle(() => emitActivity({ notebookId: this.notebookId, source: "local", kinds: ["stroke"], at }));
     this.undo.push({ label: "erase", undo: () => setDeleted(ids, false), redo: () => setDeleted(ids, true) });
-    void logEvent(this.notebookId, g.sec.id, "erase", { ids });
+    whenIdle(() => void logEvent(this.notebookId, g.sec.id, "erase", { ids }));
   }
 
   private commitLasso(g: Extract<Gesture, { type: "lasso" }>) {
@@ -339,7 +372,7 @@ export class InkController {
     };
     emitActivity({ notebookId: this.notebookId, source: "local", kinds: ["stroke"], at: Date.now() });
     this.undo.push({ label: "move", undo: () => current(-dx, -dy), redo: () => current(dx, dy) });
-    void logEvent(this.notebookId, g.sec.id, "lasso_move", { ids, dx, dy });
+    whenIdle(() => void logEvent(this.notebookId, g.sec.id, "lasso_move", { ids, dx, dy }));
   }
 
   requestFrame() {

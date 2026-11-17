@@ -24,3 +24,17 @@ export function onActivity(listener: (e: ActivityEvent) => void): () => void {
 
 /** The device that wrote an entity, from its hlc (`<wall>-<counter>-<device>`). */
 export const hlcDevice = (hlc: string) => hlc.split("-").slice(2).join("-");
+
+// True while a pen/mouse gesture is on the page, so background work (sync) can wait for the
+// stroke to end instead of competing with pointer events for the main thread.
+let inking = false;
+export const setInking = (v: boolean) => {
+  inking = v;
+};
+export const isInking = () => inking;
+
+/** Runs bookkeeping after the current input has been handled and painted. */
+export function whenIdle(fn: () => void) {
+  if (typeof requestIdleCallback === "function") requestIdleCallback(() => fn(), { timeout: 1000 });
+  else setTimeout(fn, 50);
+}

@@ -69,6 +69,9 @@ export const SectionView = memo(function SectionView(p: Props) {
     [section.id],
   );
 
+  // A stroke on a section that unmounts never gets its pointerup here; don't leave it open.
+  useEffect(() => () => controller.endGesture(section.id), [controller, section.id]);
+
   const tiles = useMemo(() => planTiles(height, strokes), [height, strokes]);
   const margin = section.data.margin;
   const marginPx = margin ? Math.round(PAGE_WIDTH * (margin.width ?? 0.3)) : 0;
@@ -106,6 +109,7 @@ export const SectionView = memo(function SectionView(p: Props) {
         onPointerMove={(e) => controller.move(e.nativeEvent, handle)}
         onPointerUp={(e) => controller.up(e.nativeEvent)}
         onPointerCancel={(e) => controller.up(e.nativeEvent)}
+        onLostPointerCapture={(e) => controller.lostCapture(e.nativeEvent)}
         onPointerLeave={() => controller.leave()}
       />
 

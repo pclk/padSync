@@ -43,9 +43,15 @@ pre,
   user-select: text;
 }
 
+/* Pencil touches are claimed in NotebookEditor's touchstart (preventDefault), so a pen stroke is
+   never taken over as a pan; fingers still scroll. No callout, drag image or selection loupe on a
+   long press with the Pencil. */
 .ink-surface {
   -webkit-user-select: none;
   user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  touch-action: pan-x pan-y;
 }
 
 /* Paper templates (section backgrounds), in section-local units. */

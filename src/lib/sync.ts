@@ -1,4 +1,4 @@
-import { emitActivity, hlcDevice, type ActivityKind } from "./activity";
+import { emitActivity, hlcDevice, isInking, type ActivityKind } from "./activity";
 import { deviceId } from "./db";
 import { beginSyncDebugRequest, debugNow, parseServerTiming, recordRemoteApplied, recordSyncDebug, syncDebugEnabled, updateSyncDebugRequest } from "./sync-debug";
 import { startRealtime, type RealtimeStatus } from "./sync-realtime";
@@ -24,6 +24,9 @@ function pollDelay() {
 }
 let debounceMs = DEFAULT_DEBOUNCE_MS;
 let config = { ...DEFAULT_SYNC_CONFIG };
+const INK_HOLD_STEP_MS = 250;
+const INK_HOLD_MAX_MS = 3000;
+let inkHeldSince = 0;
 // Strokes are a few KB each; keep requests well under Vercel's 4.5 MB body limit.
 const ENTITY_BATCH = 100;
 const EVENT_BATCH = 500;
@@ -145,6 +148,13 @@ export function startSync() {
 }
 async function runSync(context = { trigger: "manual", queueMs: 0, timerLateMs: 0 }) {
   if (Date.now() < retryAt) { schedule(retryAt - Date.now()); return; }
+  // Encoding a push and applying a pull compete with Pencil input; wait for the stroke to end
+  // (bounded, so a stuck or very long gesture never stalls sync).
+  if (isInking() && context.trigger !== "manual") {
+    inkHeldSince ||= Date.now();
+    if (Date.now() - inkHeldSince < INK_HOLD_MAX_MS) { schedule(INK_HOLD_STEP_MS, context.trigger); return; }
+  }
+  inkHeldSince = 0;
   if (running) { again = true; recordSyncDebug("schedule", "Waiting for in-flight request", { trigger: context.trigger }); return; }
   running = true;
   const current = generation;

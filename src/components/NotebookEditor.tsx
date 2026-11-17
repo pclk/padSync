@@ -129,6 +129,20 @@ function Editor({ notebookId }: { notebookId: string }) {
     return () => window.removeEventListener("resize", onResize);
   }, [controller]);
 
+  // Switching apps, Slide Over or a system gesture can swallow the Pencil's pointerup.
+  useEffect(() => {
+    const end = () => controller.endGesture();
+    const vis = () => document.visibilityState === "hidden" && end();
+    window.addEventListener("blur", end);
+    window.addEventListener("pagehide", end);
+    document.addEventListener("visibilitychange", vis);
+    return () => {
+      window.removeEventListener("blur", end);
+      window.removeEventListener("pagehide", end);
+      document.removeEventListener("visibilitychange", vis);
+    };
+  }, [controller]);
+
   useEffect(() => {
     void logEvent(notebookId, null, "open", { device: kind });
     const vis = () => void logEvent(notebookId, null, "visibility", { state: document.visibilityState });
