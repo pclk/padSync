@@ -417,7 +417,7 @@ function Editor({ notebookId }: { notebookId: string }) {
       </div>
       </div>
 
-      <canvas ref={liveRef} className="pointer-events-none fixed inset-0 z-30 h-screen w-screen" />
+      <canvas ref={liveRef} className="pointer-events-none fixed left-0 top-0 z-30" />
 
       {showPanel && (
         <SidePanel

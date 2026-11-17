@@ -90,8 +90,15 @@ export class InkController {
   resizeLive() {
     if (!this.live) return;
     const dpr = window.devicePixelRatio || 1;
-    this.live.width = Math.round(window.innerWidth * dpr);
-    this.live.height = Math.round(window.innerHeight * dpr);
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    // The CSS size must match the backing store exactly. With 100vh, iPad Safari stretches the
+    // overlay to the toolbar-collapsed height, so live ink lands below the Pencil tip and then
+    // jumps when the tile paints it.
+    this.live.style.width = `${w}px`;
+    this.live.style.height = `${h}px`;
+    this.live.width = Math.round(w * dpr);
+    this.live.height = Math.round(h * dpr);
     this.requestFrame();
   }
 
@@ -334,9 +341,12 @@ export class InkController {
     const dpr = window.devicePixelRatio || 1;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Section rects are in client coordinates; the overlay is not always at (0, 0) on iOS (e.g.
+    // while the keyboard shifts the visual viewport).
+    const origin = this.gesture || this.pending.size || this.hover ? canvas.getBoundingClientRect() : null;
 
     const toSection = (rect: DOMRect) => {
-      ctx.setTransform(dpr * this.zoom, 0, 0, dpr * this.zoom, dpr * rect.left, dpr * rect.top);
+      ctx.setTransform(dpr * this.zoom, 0, 0, dpr * this.zoom, dpr * (rect.left - origin!.left), dpr * (rect.top - origin!.top));
     };
 
     const now = performance.now();

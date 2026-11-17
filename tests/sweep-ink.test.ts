@@ -137,7 +137,7 @@ describe("controller overlay", () => {
     const { InkController } = await import("@/ink/controller");
     const c = new InkController("nb", { kind: "pen", penColor: "#000", penSize: 3, hlColor: "#ff0", hlSize: 20, eraserSize: 20 }, { onSelection() {}, onDragging() {}, onTextCreate() {} });
     const ctx = { setTransform() {}, clearRect() {} };
-    c.attachLive({ width: 0, height: 0, getContext: () => ctx } as unknown as HTMLCanvasElement);
+    c.attachLive({ width: 0, height: 0, style: {}, getContext: () => ctx, getBoundingClientRect: () => ({ left: 0, top: 0 }) } as unknown as HTMLCanvasElement);
     const el = { getBoundingClientRect: () => ({ left: 0, top: 0 }), setPointerCapture() {} } as unknown as HTMLElement;
     const sec = { id: "sec", el, strokes: () => [] };
     const ev = (type: string, x: number) => ({ type, pointerType: "pen", button: 0, pointerId: 1, clientX: x, clientY: x, pressure: 0.5, timeStamp: x, preventDefault() {} }) as unknown as PointerEvent;

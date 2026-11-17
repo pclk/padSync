@@ -104,6 +104,7 @@ export async function migrate(sql: Sql) {
       updated_at timestamptz not null default now(),
       finished_at timestamptz
     )`,
+    `alter table jobs add column if not exists options jsonb not null default '{}'::jsonb`,
     `create index if not exists jobs_queue_idx on jobs (status, created_at)`,
     `create index if not exists jobs_section_idx on jobs (section_id, created_at)`,
     // Jobs finished before image/context were dropped on completion (see jobs.ts).

@@ -9,6 +9,7 @@ const HL_COLORS = ["#facc15", "#4ade80", "#f472b6", "#60a5fa"];
 const PEN_SIZES = [2.2, 3.4, 5.5];
 const HL_SIZES = [14, 22, 32];
 const ERASER_SIZES = [12, 24, 48];
+const COLOR_SLOTS = Math.max(PEN_COLORS.length, HL_COLORS.length);
 
 const TOOLS: { kind: ToolKind; label: string; icon: string; key: string }[] = [
   { kind: "pen", label: "Pen", icon: "✒︎", key: "P" },
@@ -67,7 +68,7 @@ export function Toolbar(p: Props) {
         </button>
       </header>
 
-      <aside className="tool-rail fixed left-3 top-1/2 z-40 flex max-h-[calc(100vh-5rem)] -translate-y-1/2 flex-col items-center gap-2 overflow-y-auto rounded-2xl border border-slate-200 bg-white/95 p-1.5 shadow-lg backdrop-blur">
+      <aside className="tool-rail fixed left-3 top-1/2 z-40 flex max-h-[calc(100dvh-5rem)] -translate-y-1/2 flex-col items-center gap-2 overflow-y-auto rounded-2xl border border-slate-200 bg-white/95 p-1.5 shadow-lg backdrop-blur">
         <div className="flex flex-col rounded-xl bg-slate-100 p-1">
           {TOOLS.map((t) => (
             <button
@@ -81,33 +82,37 @@ export function Toolbar(p: Props) {
           ))}
         </div>
 
-        {showColors && (
-          <div className="flex flex-col items-center gap-1.5">
-            {colors.map((c) => (
+        {/* Colour and size slots are always laid out (hidden when the tool has none) so the rail
+            keeps one height and nothing moves under your finger when you switch tools. */}
+        <div className={`flex flex-col items-center gap-1.5 ${showColors ? "" : "invisible"}`} aria-hidden={!showColors}>
+          {Array.from({ length: COLOR_SLOTS }, (_, i) => {
+            const c = colors[i];
+            if (!c) return <span key={`empty${i}`} className="h-8 w-8" />;
+            return (
               <button
                 key={c}
                 onClick={() => setColor(c)}
+                tabIndex={showColors ? 0 : -1}
                 className={`h-8 w-8 rounded-full border-2 ${color === c ? "border-slate-900" : "border-transparent"}`}
                 style={{ background: c }}
                 aria-label={`Color ${c}`}
               />
-            ))}
-          </div>
-        )}
-        {showSizes && (
-          <div className="flex flex-col items-center gap-1">
-            {sizes.map((s, i) => (
-              <button
-                key={s}
-                onClick={() => setSize(s)}
-                className={`flex h-9 w-9 items-center justify-center rounded-lg ${size === s ? "bg-slate-200" : ""}`}
-                aria-label={`Size ${i + 1}`}
-              >
-                <span className="rounded-full bg-slate-700" style={{ width: 4 + i * 5, height: 4 + i * 5 }} />
-              </button>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
+        <div className={`flex flex-col items-center gap-1 ${showSizes ? "" : "invisible"}`} aria-hidden={!showSizes}>
+          {sizes.map((s, i) => (
+            <button
+              key={i}
+              onClick={() => setSize(s)}
+              tabIndex={showSizes ? 0 : -1}
+              className={`flex h-9 w-9 items-center justify-center rounded-lg ${size === s ? "bg-slate-200" : ""}`}
+              aria-label={`Size ${i + 1}`}
+            >
+              <span className="rounded-full bg-slate-700" style={{ width: 4 + i * 5, height: 4 + i * 5 }} />
+            </button>
+          ))}
+        </div>
 
         <div className="flex flex-col border-t border-slate-200 pt-1">
           <button className="h-10 w-10 rounded-lg text-lg text-slate-600 disabled:opacity-30" disabled={!p.canUndo} onClick={p.onUndo} title="Undo (two-finger tap, ⌘Z)">

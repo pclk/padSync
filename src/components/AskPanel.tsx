@@ -12,10 +12,27 @@ import type { SectionEntity } from "@/lib/types";
 
 type Agent = "claude" | "codex";
 
+interface JobOptions {
+  model?: string;
+  effort?: string;
+  webSearch?: boolean;
+}
+
+// Choices offered per agent; "" leaves it to the agent's own default (its config on the Mac).
+const MODELS: Record<Agent, [string, string][]> = {
+  claude: [["", "Default model"], ["fable", "Fable"], ["opus", "Opus"], ["sonnet", "Sonnet"], ["haiku", "Haiku"]],
+  codex: [["", "Default model"], ["gpt-6.1-sol", "GPT-6.1 Sol"], ["gpt-6.1-terra", "GPT-6.1 Terra"], ["gpt-6-astra", "GPT-6 Astra"], ["gpt-6-sol", "GPT-6 Sol"], ["gpt-6-luna", "GPT-6 Luna"]],
+};
+const EFFORTS: Record<Agent, string[]> = {
+  claude: ["low", "medium", "high", "xhigh", "max"],
+  codex: ["low", "medium", "high", "xhigh", "max", "ultra"],
+};
+
 interface Job {
   id: string;
   agent: Agent;
   question: string;
+  options?: JobOptions;
   status: "queued" | "running" | "done" | "error" | "cancelled";
   output: string;
   error: string | null;
@@ -42,6 +59,10 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 export function AskPanel({ notebookId, section, sectionEl }: { notebookId: string; section: SectionEntity; sectionEl: () => HTMLElement | undefined }) {
   const [agent, setAgent] = useStoredState<Agent>("padsync.agent", "claude");
   const [withSolution, setWithSolution] = useStoredState("padsync.askWithSolution", true);
+  const [allOptions, setAllOptions] = useStoredState<Record<Agent, JobOptions>>("padsync.askOptions", { claude: {}, codex: {} });
+  const options = allOptions[agent] ?? {};
+  const setOption = (o: JobOptions) => setAllOptions({ ...allOptions, [agent]: { ...options, ...o } });
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [question, setQuestion] = useState("");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [bridgeSeenAt, setBridgeSeenAt] = useState<string | null>(null);
@@ -83,6 +104,11 @@ export function AskPanel({ notebookId, section, sectionEl }: { notebookId: strin
           question,
           context: await sectionSource(section, withSolution),
           image: image || null,
+          options: {
+            ...(options.model ? { model: options.model } : {}),
+            ...(options.effort ? { effort: options.effort } : {}),
+            ...(options.webSearch ? { webSearch: true } : {}),
+          },
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -103,6 +129,16 @@ export function AskPanel({ notebookId, section, sectionEl }: { notebookId: strin
   const cancel = async (id: string) => {
     await fetch(`/api/jobs/${id}/cancel`, { method: "POST" });
     await refresh();
+  };
+
+  const copy = async (j: Job) => {
+    try {
+      await navigator.clipboard.writeText(j.output);
+    } catch {
+      return setError("Couldn't copy: the browser blocked clipboard access.");
+    }
+    setCopiedId(j.id);
+    setTimeout(() => setCopiedId((id) => (id === j.id ? null : id)), 1600);
   };
 
   const bridgeOnline = bridgeSeenAt && now - new Date(bridgeSeenAt).getTime() < BRIDGE_ONLINE_MS;
@@ -135,9 +171,30 @@ export function AskPanel({ notebookId, section, sectionEl }: { notebookId: strin
             <input type="checkbox" checked={withSolution} onChange={(e) => setWithSolution(e.target.checked)} /> use solution
           </label>
         )}
-        <button className="ml-auto rounded-lg bg-blue-600 px-3 py-1.5 font-medium text-white disabled:opacity-40" disabled={busy || !question.trim()} onClick={ask}>
+        <button className="ml-auto shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 font-medium text-white disabled:opacity-40" disabled={busy || !question.trim()} onClick={ask}>
           {busy ? "Sending…" : "Ask ⌘↵"}
         </button>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+        <select className="rounded-lg border border-slate-300 bg-white px-2 py-1" value={options.model ?? ""} onChange={(e) => setOption({ model: e.target.value || undefined })} aria-label="Model">
+          {MODELS[agent].map(([v, label]) => (
+            <option key={v} value={v}>
+              {label}
+            </option>
+          ))}
+          {options.model && !MODELS[agent].some(([v]) => v === options.model) && <option value={options.model}>{options.model}</option>}
+        </select>
+        <select className="rounded-lg border border-slate-300 bg-white px-2 py-1" value={options.effort ?? ""} onChange={(e) => setOption({ effort: e.target.value || undefined })} aria-label="Thinking effort">
+          <option value="">Default effort</option>
+          {EFFORTS[agent].map((v) => (
+            <option key={v} value={v}>
+              {v} effort
+            </option>
+          ))}
+        </select>
+        <label className="flex items-center gap-1 text-slate-600" title="Let the agent search and read the web.">
+          <input type="checkbox" checked={!!options.webSearch} onChange={(e) => setOption({ webSearch: e.target.checked })} /> web search
+        </label>
       </div>
       {error && <p className="mt-2 text-xs text-rose-700">{error}</p>}
 
@@ -146,6 +203,7 @@ export function AskPanel({ notebookId, section, sectionEl }: { notebookId: strin
           <li key={j.id} className="rounded-lg border border-slate-200 bg-white p-3">
             <div className="mb-1 flex items-center gap-2 text-xs text-slate-500">
               <span className="font-medium text-slate-700">{j.agent === "claude" ? "Claude Code" : "Codex"}</span>
+              {(j.options?.model || j.options?.effort) && <span>{[j.options.model, j.options.effort].filter(Boolean).join(" · ")}</span>}
               <StatusChip status={j.status} />
               <span className="ml-auto">{new Date(j.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
             </div>
@@ -160,8 +218,12 @@ export function AskPanel({ notebookId, section, sectionEl }: { notebookId: strin
                 </button>
               )}
               {j.output && (
-                <button className="text-blue-700" onClick={() => navigator.clipboard.writeText(j.output)}>
-                  Copy answer
+                <button
+                  className={`copy-btn rounded px-1 transition-colors duration-200 ${copiedId === j.id ? "copied bg-emerald-100 text-emerald-700" : "text-blue-700"}`}
+                  onClick={() => copy(j)}
+                  aria-live="polite"
+                >
+                  {copiedId === j.id ? "✓ Copied" : "Copy answer"}
                 </button>
               )}
             </div>

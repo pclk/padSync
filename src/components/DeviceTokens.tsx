@@ -25,7 +25,7 @@ export function DeviceTokens() {
   const [name, setName] = useState("MacBook bridge");
   const [fresh, setFresh] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"cmd" | "token" | null>(null);
 
   const load = useCallback(() => fetchTokens().then((t) => t && setTokens(t)), []);
 
@@ -40,7 +40,7 @@ export function DeviceTokens() {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return setError(data.error ?? `Failed (${res.status})`);
     setFresh(data.token);
-    setCopied(false);
+    setCopied(null);
     await load();
   };
 
@@ -50,13 +50,13 @@ export function DeviceTokens() {
     await load();
   };
 
-  const copy = async () => {
-    if (!fresh) return;
-    await navigator.clipboard.writeText(fresh);
-    setCopied(true);
+  const copy = async (what: "cmd" | "token", text: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopied(what);
   };
 
   const origin = typeof window === "undefined" ? "" : window.location.origin;
+  const commands = `pbpaste | node bridge/padsync-bridge.ts setup --server ${origin}\nnode bridge/padsync-bridge.ts install`;
   const active = tokens?.filter((t) => !t.revokedAt) ?? [];
   const revoked = tokens?.filter((t) => t.revokedAt) ?? [];
 
@@ -69,17 +69,28 @@ export function DeviceTokens() {
 
       {fresh && (
         <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3">
-          <p className="mb-2 font-medium text-amber-900">Copy this token now. It won&apos;t be shown again.</p>
-          <div className="flex gap-2">
-            <code className="flex-1 select-all break-all rounded bg-white px-2 py-1.5 text-xs">{fresh}</code>
-            <button className="rounded-lg bg-slate-900 px-3 py-1.5 text-white" onClick={copy}>
-              {copied ? "Copied" : "Copy"}
-            </button>
-          </div>
-          <p className="mt-3 text-xs text-amber-900">Then, on your Mac, in the padSync repo:</p>
-          <pre className="mt-1 overflow-x-auto rounded bg-slate-900 p-2 text-xs text-slate-100">
-            {`pbpaste | node bridge/padsync-bridge.ts setup --server ${origin}\nnode bridge/padsync-bridge.ts install`}
-          </pre>
+          <p className="mb-2 font-medium text-amber-900">This token is shown only once. Set up the bridge on your Mac now:</p>
+          <ol className="list-decimal space-y-2 pl-5 text-xs text-amber-900">
+            <li>
+              In Terminal, in the padSync repo, paste these commands. <strong>Don&apos;t run them yet.</strong>
+              <div className="mt-1 flex gap-2">
+                <pre className="flex-1 overflow-x-auto rounded bg-slate-900 p-2 text-xs text-slate-100">{commands}</pre>
+                <button className={`copy-btn self-start rounded-lg bg-slate-900 px-3 py-1.5 text-white ${copied === "cmd" ? "copied" : ""}`} onClick={() => copy("cmd", commands)}>
+                  {copied === "cmd" ? "✓ Copied" : "Copy"}
+                </button>
+              </div>
+            </li>
+            <li>
+              Copy the device token:
+              <div className="mt-1 flex gap-2">
+                <code className="flex-1 select-all break-all rounded bg-white px-2 py-1.5 text-xs text-slate-800">{fresh}</code>
+                <button className={`copy-btn self-start rounded-lg bg-slate-900 px-3 py-1.5 text-white ${copied === "token" ? "copied" : ""}`} onClick={() => copy("token", fresh)}>
+                  {copied === "token" ? "✓ Copied" : "Copy"}
+                </button>
+              </div>
+            </li>
+            <li>Go back to Terminal and press Return. Setup reads the token from the clipboard, then the bridge starts in the background and at every login.</li>
+          </ol>
           <button className="mt-2 text-xs text-amber-900 underline" onClick={() => setFresh(null)}>
             I&apos;ve saved it
           </button>

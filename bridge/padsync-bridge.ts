@@ -2,7 +2,7 @@
 // padSync bridge: runs on your Mac, picks up "Ask AI" jobs from padSync and answers them with
 // your local Claude Code or Codex (your subscription, not API credits).
 //
-//   pbpaste | node bridge/padsync-bridge.ts setup --server https://pad-sync.vercel.app
+//   pbpaste | node bridge/padsync-bridge.ts setup --server https://p.siew.dev
 //   node bridge/padsync-bridge.ts status
 //   node bridge/padsync-bridge.ts run          # foreground
 //   node bridge/padsync-bridge.ts install      # background via launchd, starts at login
@@ -20,6 +20,7 @@ import {
   LAUNCHD_LABEL,
   agentCommand,
   buildAgentPrompt,
+  cleanOptions,
   configPath,
   decodePngDataUrl,
   launchdPlist,
@@ -95,7 +96,9 @@ async function status() {
 }
 
 async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
-  log(`job ${job.id} (${job.agent}): ${job.question.slice(0, 80)}`);
+  const o = cleanOptions(job.agent, job.options);
+  const how = [o.model, o.effort && `effort ${o.effort}`, o.webSearch && "web search"].filter(Boolean).join(", ");
+  log(`job ${job.id} (${job.agent}${how ? `: ${how}` : ""}): ${job.question.slice(0, 80)}`);
   const dir = await mkdtemp(join(tmpdir(), "padsync-job-"));
   const abort = new AbortController();
   let latest = "";
@@ -131,7 +134,7 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
     const result = await runAgent({
       cwd: dir,
       prompt: buildAgentPrompt(job),
-      command: agentCommand(job.agent, cfg, !!job.image),
+      command: agentCommand(job.agent, cfg, !!job.image, job.options),
       timeoutMs: JOB_TIMEOUT_MS,
       onText: (t) => (latest = t),
       signal: abort.signal,

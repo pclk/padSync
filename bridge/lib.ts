@@ -12,12 +12,20 @@ export const AGENTS: Agent[] = ["claude", "codex"];
 /** Server-side cap on a job's answer (src/server/jobs.ts MAX_OUTPUT). */
 export const MAX_OUTPUT = 200_000;
 
+/** Per-question agent settings chosen in padSync (src/server/jobs.ts jobOptionsSchema). */
+export interface JobOptions {
+  model?: string;
+  effort?: string;
+  webSearch?: boolean;
+}
+
 export interface ClaimedJob {
   id: string;
   notebookId: string;
   sectionId: string | null;
   agent: Agent;
   question: string;
+  options?: JobOptions;
   context: string;
   image: string | null;
 }
@@ -164,16 +172,45 @@ export interface AgentCommand {
   finalFile?: string;
 }
 
-export function agentCommand(agent: Agent, cfg: Pick<BridgeConfig, "claudeBin" | "codexBin">, hasImage: boolean): AgentCommand {
+const MODEL_RE = /^[A-Za-z0-9][A-Za-z0-9._:[\]-]{0,79}$/;
+const EFFORTS: Record<Agent, string[]> = {
+  claude: ["low", "medium", "high", "xhigh", "max"],
+  codex: ["low", "medium", "high", "xhigh", "max", "ultra"],
+};
+
+/** Drops anything the agent's CLI would not accept, so a bad option falls back to its default. */
+export function cleanOptions(agent: Agent, o: JobOptions = {}): JobOptions {
+  const effort = agent === "claude" && o.effort === "ultra" ? "max" : o.effort;
+  return {
+    model: typeof o.model === "string" && MODEL_RE.test(o.model) ? o.model : undefined,
+    effort: effort && EFFORTS[agent].includes(effort) ? effort : undefined,
+    webSearch: o.webSearch === true,
+  };
+}
+
+export function agentCommand(agent: Agent, cfg: Pick<BridgeConfig, "claudeBin" | "codexBin">, hasImage: boolean, options?: JobOptions): AgentCommand {
+  const o = cleanOptions(agent, options);
   if (agent === "claude") {
+    const web = o.webSearch ? ["WebSearch", "WebFetch"] : [];
+    const denied = ["Bash", "Edit", "Write", "NotebookEdit", ...(o.webSearch ? [] : ["WebFetch", "WebSearch"])];
     return {
       bin: cfg.claudeBin ?? "claude",
       // Restrict built-in tools and ignore ambient MCP servers. Prompt arrives on stdin.
-      args: ["-p", "--output-format", "stream-json", "--verbose", "--tools", "Read", "--strict-mcp-config", "--allowedTools", "Read", "--disallowedTools", "Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch"],
+      args: [
+        "-p", "--output-format", "stream-json", "--verbose",
+        ...(o.model ? ["--model", o.model] : []),
+        ...(o.effort ? ["--effort", o.effort] : []),
+        "--tools", ["Read", ...web].join(","), "--strict-mcp-config",
+        "--allowedTools", "Read", ...web,
+        "--disallowedTools", ...denied,
+      ],
       parse: parseClaudeLine,
     };
   }
-  const args = ["exec", "--json", "--skip-git-repo-check", "--sandbox", "read-only", "--output-last-message", "final.md"];
+  // --search is a top-level codex flag, so it goes before `exec`.
+  const args = [...(o.webSearch ? ["--search"] : []), "exec", "--json", "--skip-git-repo-check", "--sandbox", "read-only", "--output-last-message", "final.md"];
+  if (o.model) args.push("--model", o.model);
+  if (o.effort) args.push("-c", `model_reasoning_effort="${o.effort}"`);
   if (hasImage) args.push("--image", "section.png");
   return { bin: cfg.codexBin ?? "codex", args, parse: parseCodexLine, finalFile: "final.md" };
 }

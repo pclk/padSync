@@ -19,6 +19,18 @@ const MAX_IMAGE = 3_000_000; // data URL chars; keeps requests under Vercel's 4.
 // Only the bridge reads image and context, and only while running, so both are dropped when a job
 // finishes or is cancelled: otherwise every ask keeps a multi-MB PNG in Postgres forever.
 
+export const EFFORTS = ["low", "medium", "high", "xhigh", "max", "ultra"] as const;
+
+/** How the bridge runs the agent. Unset fields fall back to the agent's own defaults. */
+export const jobOptionsSchema = z
+  .object({
+    model: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:[\]-]{0,79}$/, "model: letters, digits and . _ : - [ ] only").optional(),
+    effort: z.enum(EFFORTS).optional(),
+    webSearch: z.boolean().optional(),
+  })
+  .strict();
+export type JobOptions = z.infer<typeof jobOptionsSchema>;
+
 export const newJobSchema = z.object({
   notebookId: z.string().min(1).max(100),
   sectionId: z.string().min(1).max(100).nullable(),
@@ -31,6 +43,7 @@ export const newJobSchema = z.object({
     .regex(/^data:image\/png;base64,[A-Za-z0-9+/]+=*$/, "image must be a base64 PNG data URL")
     .nullable()
     .default(null),
+  options: jobOptionsSchema.default({}),
 });
 
 export const jobUpdateSchema = z
@@ -48,6 +61,7 @@ export interface Job {
   sectionId: string | null;
   agent: Agent;
   question: string;
+  options: JobOptions;
   status: JobStatus;
   output: string;
   error: string | null;
@@ -67,6 +81,7 @@ interface Row {
   section_id: string | null;
   agent: Agent;
   question: string;
+  options: JobOptions | null;
   status: JobStatus;
   output: string;
   error: string | null;
@@ -77,7 +92,7 @@ interface Row {
   image?: string | null;
 }
 
-const PUBLIC_COLS = "id, notebook_id, section_id, agent, question, status, output, error, created_at, updated_at, finished_at";
+const PUBLIC_COLS = "id, notebook_id, section_id, agent, question, options, status, output, error, created_at, updated_at, finished_at";
 const iso = (v: string | Date | null) => (v == null ? null : new Date(v).toISOString());
 
 function toJob(r: Row): Job {
@@ -87,6 +102,7 @@ function toJob(r: Row): Job {
     sectionId: r.section_id,
     agent: r.agent,
     question: r.question,
+    options: r.options ?? {},
     status: r.status,
     output: r.output,
     error: r.error,
@@ -96,12 +112,12 @@ function toJob(r: Row): Job {
   };
 }
 
-export async function createJob(sql: Sql, input: z.infer<typeof newJobSchema>): Promise<Job> {
+export async function createJob(sql: Sql, input: z.input<typeof newJobSchema> & Omit<z.infer<typeof newJobSchema>, "options">): Promise<Job> {
   const id = "job_" + randomBytes(9).toString("base64url");
   const rows = await sql.query<Row>(
-    `insert into jobs (id, notebook_id, section_id, agent, question, context, image)
-     values ($1, $2, $3, $4, $5, $6, $7) returning ${PUBLIC_COLS}`,
-    [id, input.notebookId, input.sectionId, input.agent, input.question, input.context, input.image],
+    `insert into jobs (id, notebook_id, section_id, agent, question, context, image, options)
+     values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb) returning ${PUBLIC_COLS}`,
+    [id, input.notebookId, input.sectionId, input.agent, input.question, input.context, input.image, JSON.stringify(input.options ?? {})],
   );
   return toJob(rows[0]);
 }
