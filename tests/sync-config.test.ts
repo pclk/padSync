@@ -7,7 +7,7 @@ beforeEach(async()=>{configureAuthEnv(); db=await freshDb();});
 afterEach(async()=>{delete process.env.ALLOWED_GITHUB_LOGIN; await db.pg.close();});
 it('persists the admin value and returns it to other authenticated devices',async()=>{
  const session=sessionCookie('PcLk');
- expect(await (await GET(req('/api/sync-config',{session}))).json()).toEqual({admin:true,debounceMs:400,visiblePollMs:2000,hiddenPollMs:15000,retryBaseMs:2000});
+ expect(await (await GET(req('/api/sync-config',{session}))).json()).toEqual({admin:true,debounceMs:100,visiblePollMs:2000,hiddenPollMs:60000,retryBaseMs:2000});
  expect((await PUT(req('/api/sync-config',{method:'PUT',session,body:{debounceMs:125}}))).status).toBe(200);
  expect((await (await GET(req('/api/sync-config',{session:sessionCookie()}))).json()).debounceMs).toBe(125);
 });
@@ -21,7 +21,7 @@ it('rejects non-admin sessions, missing sessions, bearer tokens and foreign orig
 });
 it('rejects invalid timing values without changing the stored setting',async()=>{
  for(const debounceMs of [-1,10001,1.5,'400',null]) expect((await PUT(req('/api/sync-config',{method:'PUT',session:sessionCookie(),body:{debounceMs}}))).status).toBe(400);
- expect((await (await GET(req('/api/sync-config',{session:sessionCookie()}))).json()).debounceMs).toBe(400);
+ expect((await (await GET(req('/api/sync-config',{session:sessionCookie()}))).json()).debounceMs).toBe(100);
 });
 
 it('persists all timing controls and preserves them on legacy debounce updates', async()=>{
@@ -54,4 +54,10 @@ it('upgrades existing minimum constraints and preserves saved values',async()=>{
  await migrate(db.sql);
  expect((await (await GET(req('/api/sync-config',{session}))).json()).debounceMs).toBe(125);
  expect((await PUT(req('/api/sync-config',{method:'PUT',session,body:{debounceMs:0,visiblePollMs:0,hiddenPollMs:0,retryBaseMs:0}}))).status).toBe(200);
+});
+
+it('uses recommended defaults for fields omitted when first saving a configuration', async()=>{
+ const session=sessionCookie();
+ const response=await PUT(req('/api/sync-config',{method:'PUT',session,body:{debounceMs:50}}));
+ expect(await response.json()).toEqual({debounceMs:50,visiblePollMs:2000,hiddenPollMs:60000,retryBaseMs:2000});
 });

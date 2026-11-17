@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { requireSession } from '@/server/guard';
 import { isAdminLogin, readSyncConfig } from '@/server/sync-config';
-import { SYNC_FIELDS, validSyncField, type SyncConfig } from '@/lib/sync-policy';
+import { DEFAULT_SYNC_CONFIG, SYNC_FIELDS, validSyncField, type SyncConfig } from '@/lib/sync-policy';
 export async function GET(req: NextRequest) {
   const auth = await requireSession(req);
   if (auth instanceof Response) return auth;
@@ -17,10 +17,11 @@ export async function PUT(req: NextRequest) {
   }
   // Partial updates keep older clients from overwriting the new controls.
   await auth.sql.query(`insert into sync_config(id,debounce_ms,visible_poll_ms,hidden_poll_ms,retry_base_ms)
-    values(1,coalesce($1,400),coalesce($2,2000),coalesce($3,15000),coalesce($4,2000))
+    values(1,coalesce($1::integer,$5::integer),coalesce($2::integer,$6::integer),coalesce($3::integer,$7::integer),coalesce($4::integer,$8::integer))
     on conflict(id) do update set debounce_ms=coalesce($1,sync_config.debounce_ms),
     visible_poll_ms=coalesce($2,sync_config.visible_poll_ms), hidden_poll_ms=coalesce($3,sync_config.hidden_poll_ms),
     retry_base_ms=coalesce($4,sync_config.retry_base_ms)`,
-    [body.debounceMs ?? null, body.visiblePollMs ?? null, body.hiddenPollMs ?? null, body.retryBaseMs ?? null]);
+    [body.debounceMs ?? null, body.visiblePollMs ?? null, body.hiddenPollMs ?? null, body.retryBaseMs ?? null,
+      DEFAULT_SYNC_CONFIG.debounceMs, DEFAULT_SYNC_CONFIG.visiblePollMs, DEFAULT_SYNC_CONFIG.hiddenPollMs, DEFAULT_SYNC_CONFIG.retryBaseMs]);
   return Response.json(await readSyncConfig(auth.sql));
 }

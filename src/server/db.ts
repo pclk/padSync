@@ -1,5 +1,6 @@
 import "server-only";
 import { neon } from "@neondatabase/serverless";
+import { DEFAULT_SYNC_CONFIG } from "@/lib/sync-policy";
 
 // Neon over HTTP: one round trip per query, no connection pool to manage on Vercel.
 // The schema is created on first use so a fresh Neon integration works without a migrate step.
@@ -49,7 +50,7 @@ export async function migrate(sql: Sql) {
   const ddl = [
     `create table if not exists sync_config (id integer primary key check(id=1), debounce_ms integer not null check(debounce_ms between 100 and 10000))`,
     `alter table sync_config add column if not exists visible_poll_ms integer not null default 2000 check(visible_poll_ms between 100 and 30000)`,
-    `alter table sync_config add column if not exists hidden_poll_ms integer not null default 15000 check(hidden_poll_ms between 1000 and 120000)`,
+    `alter table sync_config add column if not exists hidden_poll_ms integer not null default ${DEFAULT_SYNC_CONFIG.hiddenPollMs} check(hidden_poll_ms between 0 and 120000)`,
     `alter table sync_config add column if not exists retry_base_ms integer not null default 2000 check(retry_base_ms between 250 and 30000)`,
     `alter table sync_config drop constraint if exists sync_config_debounce_ms_check`,
     `alter table sync_config add constraint sync_config_debounce_ms_check check(debounce_ms between 0 and 10000)`,

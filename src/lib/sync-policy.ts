@@ -1,8 +1,8 @@
-export const DEFAULT_DEBOUNCE_MS = 400;
+export const DEFAULT_DEBOUNCE_MS = 100;
 export const MIN_DEBOUNCE_MS = 0;
 export const MAX_DEBOUNCE_MS = 10000;
 export const VISIBLE_POLL_MS = 2000;
-export const HIDDEN_POLL_MS = 15000;
+export const HIDDEN_POLL_MS = 60000;
 export function validDebounce(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= MIN_DEBOUNCE_MS && value <= MAX_DEBOUNCE_MS;
 }
@@ -15,6 +15,7 @@ export const SYNC_FIELDS = {
 } as const;
 export type SyncConfig = { [K in keyof typeof SYNC_FIELDS]: number };
 export const DEFAULT_SYNC_CONFIG: SyncConfig = { debounceMs: DEFAULT_DEBOUNCE_MS, visiblePollMs: VISIBLE_POLL_MS, hiddenPollMs: HIDDEN_POLL_MS, retryBaseMs: 2000 };
+export const FAST_SYNC_CONFIG: SyncConfig = { ...DEFAULT_SYNC_CONFIG, debounceMs: 50 };
 export function validSyncField(key: keyof SyncConfig, value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= SYNC_FIELDS[key].min && value <= SYNC_FIELDS[key].max;
 }

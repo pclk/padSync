@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { getSyncTiming, setSyncConfig } from '@/lib/sync';
-import { DEFAULT_SYNC_CONFIG, SYNC_FIELDS, validSyncField, normalizeSyncConfig, type SyncConfig } from '@/lib/sync-policy';
+import { DEFAULT_SYNC_CONFIG, FAST_SYNC_CONFIG, SYNC_FIELDS, validSyncField, normalizeSyncConfig, type SyncConfig } from '@/lib/sync-policy';
 
 const keys = Object.keys(SYNC_FIELDS) as (keyof SyncConfig)[];
 const draftOf = (config: SyncConfig) => Object.fromEntries(keys.map(key => [key, String(config[key])])) as Record<keyof SyncConfig, string>;
@@ -43,7 +43,7 @@ export function SyncTimingSettings() {
     <p className="mt-2 text-sm text-slate-600">Shorter intervals use more requests, battery and data, even when you are not editing. Background sync depends on the browser keeping the tab running; a locked or sleeping device may stop syncing.</p>
     {admin && <>
       <div className="my-3 flex flex-wrap gap-2">
-        <button type="button" disabled={busy} className="rounded border px-3 py-1" onClick={() => setDraft(draftOf({ debounceMs: 100, visiblePollMs: 250, hiddenPollMs: 2000, retryBaseMs: 500 }))}>Fast preset</button>
+        <button type="button" disabled={busy} className="rounded border px-3 py-1" onClick={() => setDraft(draftOf(FAST_SYNC_CONFIG))}>Fast preset</button>
         <button type="button" disabled={busy} className="rounded border px-3 py-1" onClick={() => setDraft(draftOf(DEFAULT_SYNC_CONFIG))}>Default preset</button>
       </div>
       <div className="space-y-4">{keys.map(key => {

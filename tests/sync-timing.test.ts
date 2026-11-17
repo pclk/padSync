@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { replaySyncRequests } from '@/lib/sync-policy';
+import { FAST_SYNC_CONFIG, replaySyncRequests } from '@/lib/sync-policy';
 const realtime = vi.hoisted(() => ({ notify: undefined as (() => void) | undefined, status: undefined as ((status: 'live' | 'fallback') => void) | undefined }));
 vi.mock('@/lib/sync-realtime', () => ({ startRealtime: (notify: () => void, status: (status: 'live' | 'fallback') => void) => {
  realtime.notify = notify; realtime.status = status; return () => {};
@@ -19,8 +19,8 @@ afterEach(()=>{vi.clearAllTimers();vi.useRealTimers();vi.unstubAllGlobals();});
 // Mock IndexedDB boundary so fake timers exercise scheduling rather than Dexie's own timers.
 vi.mock('@/lib/db',()=>({db:{entities:{where:()=>({equals:()=>({limit:()=>({toArray:async()=>[]})})}),bulkGet:async()=>[]},events:{where:()=>({equals:()=>({limit:()=>({toArray:async()=>[]})})})},meta:{put:async()=>{}},transaction:async(...args:unknown[])=>await (args.at(-1) as ()=>Promise<void>)()},getMeta:async()=>0,setMeta:async()=>{}}));
 it('does not postpone a scheduled push during sustained edits',async()=>{
- sync.requestSync(); await vi.advanceTimersByTimeAsync(300); sync.requestSync();
- await vi.advanceTimersByTimeAsync(100);
+ sync.requestSync(); await vi.advanceTimersByTimeAsync(75); sync.requestSync();
+ await vi.advanceTimersByTimeAsync(25);
  expect(fetchMock.mock.calls.filter(c=>c[0]==='/api/sync')).toHaveLength(1);
  expect(sync.getSyncTiming().edits).toHaveLength(2);
 });
@@ -84,7 +84,7 @@ it('does not send while offline and wakes immediately on reconnect',async()=>{
 it('uses slower polling for hidden tabs',async()=>{
  Object.defineProperty(document,'visibilityState',{value:'hidden',configurable:true});
  sync.startSync(); await vi.advanceTimersByTimeAsync(0);
- await vi.advanceTimersByTimeAsync(14999);
+ await vi.advanceTimersByTimeAsync(59999);
  expect(fetchMock.mock.calls.filter(c=>c[0]==='/api/sync')).toHaveLength(1);
  await vi.advanceTimersByTimeAsync(1);
  expect(fetchMock.mock.calls.filter(c=>c[0]==='/api/sync')).toHaveLength(2);
@@ -153,4 +153,13 @@ it('a realtime notification during a request schedules serialized reconciliation
  realtime.notify!(); await vi.advanceTimersByTimeAsync(0); expect(count).toBe(1);
  release(); await vi.advanceTimersByTimeAsync(1); expect(count).toBe(2);
  expect(sync.getSyncTiming().edits).toHaveLength(0);
+});
+
+it('batches edits with the fast preset while keeping moderate fallback and retry intervals',async()=>{
+ sync.setSyncConfig(FAST_SYNC_CONFIG); sync.requestSync();
+ await vi.advanceTimersByTimeAsync(25); sync.requestSync();
+ await vi.advanceTimersByTimeAsync(24); expect(fetchMock).not.toHaveBeenCalled();
+ await vi.advanceTimersByTimeAsync(1);
+ expect(fetchMock.mock.calls.filter(c=>c[0]==='/api/sync')).toHaveLength(1);
+ expect(sync.getSyncTiming()).toMatchObject({visiblePollMs:2000,hiddenPollMs:60000,retryBaseMs:2000});
 });

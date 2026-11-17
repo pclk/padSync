@@ -1,19 +1,19 @@
 # Sync timing and load
 
-The sync engine now coalesces writes from the first trigger rather than restarting a trailing timer on every trigger. A later trigger cannot delay an existing deadline. This bounds continuous-writing delays while retaining batching. Requests remain serialized, writes arriving during a request get a follow-up, and queued changes retain the existing HLC acknowledgement protection. HTTP sync attempts time out after 15 seconds. Failed attempts back off from 2 to 60 seconds, including under continuing edits. Returning online or to a visible tab resets the retry deadline. Hidden tabs default to a 15-second poll interval; visible tabs default to 2 seconds. Polling deadlines can send writes before their debounce expires.
+The sync engine now coalesces writes from the first trigger rather than restarting a trailing timer on every trigger. A later trigger cannot delay an existing deadline. This bounds continuous-writing delays while retaining batching. Requests remain serialized, writes arriving during a request get a follow-up, and queued changes retain the existing HLC acknowledgement protection. HTTP sync attempts time out after 15 seconds. Failed attempts back off from 2 to 60 seconds, including under continuing edits. Returning online or to a visible tab resets the retry deadline. Hidden tabs default to a 60-second poll interval; visible tabs default to 2 seconds. Polling deadlines can send writes before their debounce expires.
 
-GitHub login `pclk` is the admin (case insensitive), based on the authenticated signed session, not client input. Only this admin can PUT global sync timing settings. Browser session, CSRF origin and bearer-token separation checks remain in force. Values are integer milliseconds from 0 through 10000; the default is 400. The setting persists in Postgres and applies to new clients within approximately a minute while online, via a separate configuration GET. No existing auth admission rules were broadened.
+GitHub login `pclk` is the admin (case insensitive), based on the authenticated signed session, not client input. Only this admin can PUT global sync timing settings. Browser session, CSRF origin and bearer-token separation checks remain in force. Values are integer milliseconds from 0 through 10000; the default is 100. The setting persists in Postgres and applies to new clients within approximately a minute while online, via a separate configuration GET. No existing auth admission rules were broadened.
 
 Settings exposes four global integer millisecond controls:
 
 | Control | Default | Range | Effect |
 | --- | ---: | ---: | --- |
-| Send delay | 400 | 0–10000 | Coalesces local edits before upload |
+| Send delay | 100 | 0–10000 | Coalesces local edits before upload |
 | Visible receive interval | 2000 | 0–30000 | Checks for remote edits after each completed sync |
-| Hidden receive interval | 15000 | 0–120000 | Checks while the browser keeps a hidden tab running |
+| Hidden receive interval | 60000 | 0–120000 | Checks while the browser keeps a hidden tab running |
 | Initial retry delay | 2000 | 0–30000 | Initial failure backoff, doubling up to 60000 ms |
 
-The fast preset fills in 100 / 250 / 2000 / 500 ms respectively; the default preset restores the values above. Presets require saving. Saving immediately updates the current tab and advances an existing poll when appropriate, without postponing queued writes or bypassing failure backoff. Other online devices refresh within about a minute or on returning to the tab. Partial API updates preserve unspecified settings, including when an older client saves only debounce. Additive schema migrations retain existing debounce values.
+The fast preset fills in 50 / 2000 / 60000 / 2000 ms respectively; the default preset restores the values above. Presets require saving. Saving immediately updates the current tab and advances an existing poll when appropriate, without postponing queued writes or bypassing failure backoff. Other online devices refresh within about a minute or on returning to the tab. Partial API updates preserve unspecified settings, including when an older client saves only debounce. Additive schema migrations retain existing debounce values.
 
 The receiving device's poll interval often dominates perceived latency: lowering only the sender's debounce cannot remove the wait for the receiver. End-to-end latency includes the sender's send delay, upload and server processing, the receiver's next poll, and its response time. Lower polling intervals increase requests, battery use and data use even without edits. Browsers may throttle or suspend hidden tabs, and a locked iPad or sleeping Mac may stop syncing entirely.
 
@@ -76,3 +76,5 @@ server and run `npx vitest run tests/sync-concurrency.postgres.test.ts`. The sui
 hosts, creates an isolated schema, and drops that schema afterward. It verifies that a blocked
 writer does not allocate a sequence before its predecessor commits, and that a concurrent conflict
 winner is returned even when normal cursor pulls exclude it. Without that variable the suite skips.
+
+The fast preset retains moderate outage polling and failure retry intervals; only the local send window is shorter than the default. Existing saved configuration is preserved when code defaults change.
