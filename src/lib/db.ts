@@ -25,6 +25,11 @@ class PadDB extends Dexie {
       entities: "id, kind, dirty, [notebookId+kind], [parentId+kind], [parentId+kind+deleted]",
       events: "id, synced, notebookId, sectionId, t, [sectionId+type]",
     });
+    // [notebookId+hlc] answers "when was this notebook last edited" by reading its newest row
+    // (see lastEditedTimes in store.ts) instead of scanning every stroke.
+    this.version(3).stores({
+      entities: "id, kind, dirty, [notebookId+kind], [parentId+kind], [parentId+kind+deleted], [notebookId+hlc]",
+    });
   }
 }
 

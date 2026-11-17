@@ -3,12 +3,12 @@ import PdfImport from "./PdfImport";
 import { forgetPdf, sweepStoredPdfs } from "@/lib/pdf";
 
 import { useEffect, useRef, useState } from "react";
-import { selectNotebooks, type LibrarySort } from "@/lib/library";
+import { formatEdited, selectNotebooks, type LibrarySort } from "@/lib/library";
 import { useLiveQuery } from "dexie-react-hooks";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { db, deviceId } from "@/lib/db";
-import { createNotebook, listNotebooks, putEntities } from "@/lib/store";
+import { createNotebook, lastEditedTimes, listNotebooks, putEntities } from "@/lib/store";
 import type { NotebookEntity, PresenceEntity, SectionData } from "@/lib/types";
 import { SyncBadge } from "./SyncBadge";
 import { Icon, Logo } from "./Icons";
@@ -21,7 +21,7 @@ export const UNDO_MS = 6000;
 export default function Library() {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<LibrarySort>("newest");
+  const [sort, setSort] = useState<LibrarySort>("recent");
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
   const searchInput = useRef<HTMLInputElement>(null);
@@ -73,9 +73,16 @@ export default function Library() {
     const ps = (await db.entities.where("kind").equals("presence").toArray()) as PresenceEntity[];
     return ps.filter((p) => p.data.deviceKind === "ipad" && p.data.device !== deviceId()).sort((a, b) => b.data.at - a.data.at)[0];
   }, []);
+  const edited = useLiveQuery(() => lastEditedTimes(), []);
+  // "Edited 5 min ago" has to keep counting while the library sits open.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   const live = deleted ? notebooks?.filter((n) => n.id !== deleted.id) : notebooks;
-  const sorted = selectNotebooks(live ?? [], query, sort);
+  const sorted = selectNotebooks(live ?? [], query, sort, edited);
   const ipadNb = ipad && live?.find((n) => n.id === ipad.notebookId);
 
   const newBlank = () => mutate(async () => {
@@ -130,7 +137,7 @@ export default function Library() {
             <label>
               <span className="sr-only">Sort by</span>
               <select value={sort} onChange={(e) => setSort(e.target.value as LibrarySort)} className="field w-auto pr-8">
-                <option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="title">Title A–Z</option>
+                <option value="recent">Recently edited</option><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="title">Title A–Z</option>
               </select>
             </label>
           </div>
@@ -174,7 +181,7 @@ export default function Library() {
                 <div className="py-3 pl-4 pr-20">
                   <div className="truncate font-medium text-slate-900" title={nb.data.title}>{nb.data.title}</div>
                   <div className="mt-0.5 text-xs text-slate-500">
-                    {counts === undefined ? "…" : (counts.get(nb.id) ?? 0)} {(counts?.get(nb.id) ?? 0) === 1 ? "section" : "sections"} · {new Date(nb.data.createdAt).toLocaleDateString()}
+                    {counts === undefined ? "…" : (counts.get(nb.id) ?? 0)} {(counts?.get(nb.id) ?? 0) === 1 ? "section" : "sections"} · <span title={`Created ${new Date(nb.data.createdAt).toLocaleDateString()}`}>{edited === undefined ? "…" : formatEdited(edited.get(nb.id) ?? nb.data.createdAt, now)}</span>
                   </div>
                 </div>
               </Link>

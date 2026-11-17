@@ -1,6 +1,7 @@
+import Dexie from "dexie";
 import { nanoid } from "nanoid";
 import { db, deviceId } from "./db";
-import { hlcNow, hlcObserve } from "./hlc";
+import { hlcNow, hlcObserve, hlcWall } from "./hlc";
 import { applyPatch, type SectionChange } from "./roundtrip";
 import { requestSync } from "./sync";
 import { debugNow, recordSyncDebug, syncDebugEnabled } from "./sync-debug";
@@ -125,6 +126,28 @@ export async function findImported(importHash: string) {
 
 export async function listNotebooks() {
   return (await db.entities.where("kind").equals("notebook").toArray()).filter((n) => !n.deleted) as NotebookEntity[];
+}
+
+/**
+ * When each live notebook was last edited: the newest clock stamp among the notebook and every
+ * section, stroke and text box in it (deletes and erases restamp the row, so they count too).
+ * Remote rows keep the stamp of the device that wrote them, so a pull moves the time to when the
+ * edit happened, not when it arrived. Presence is skipped: scrolling is not editing. Reads one or
+ * two rows per notebook through [notebookId+hlc]; nothing extra is written per stroke.
+ */
+export async function lastEditedTimes(): Promise<Map<string, number>> {
+  const notebooks = await listNotebooks();
+  const times = new Map<string, number>();
+  await Promise.all(notebooks.map(async (nb) => {
+    const newest = await db.entities
+      .where("[notebookId+hlc]")
+      .between([nb.id, Dexie.minKey], [nb.id, Dexie.maxKey])
+      .reverse()
+      .filter((e) => e.kind !== "presence")
+      .first();
+    times.set(nb.id, (newest && hlcWall(newest.hlc)) ?? nb.data.createdAt);
+  }));
+  return times;
 }
 
 export function liveSections(notebookId: string) {

@@ -5,11 +5,11 @@ import { selectNotebooks } from "@/lib/library";
 import type { PresenceEntity } from "@/lib/types";
 import type { NotebookEntity } from "@/lib/types";
 
-const state = vi.hoisted(() => ({ notebooks: undefined as NotebookEntity[] | undefined, call: 0, counts: undefined as Map<string, number> | undefined, ipad: undefined as PresenceEntity | undefined }));
-vi.mock("dexie-react-hooks", () => ({ useLiveQuery: () => [state.notebooks, state.counts, state.ipad][state.call++ % 3] }));
+const state = vi.hoisted(() => ({ notebooks: undefined as NotebookEntity[] | undefined, call: 0, counts: undefined as Map<string, number> | undefined, ipad: undefined as PresenceEntity | undefined, edited: undefined as Map<string, number> | undefined }));
+vi.mock("dexie-react-hooks", () => ({ useLiveQuery: () => [state.notebooks, state.counts, state.ipad, state.edited][state.call++ % 4] }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/lib/db", () => ({ db: {}, deviceId: () => "test" }));
-vi.mock("@/lib/store", () => ({ createNotebook: vi.fn(), listNotebooks: vi.fn(), putEntities: vi.fn() }));
+vi.mock("@/lib/store", () => ({ createNotebook: vi.fn(), lastEditedTimes: vi.fn(), listNotebooks: vi.fn(), putEntities: vi.fn() }));
 vi.mock("@/components/SyncBadge", () => ({ SyncBadge: () => null }));
 import Library from "@/components/Library";
 const nb = (id: string, title: string, createdAt: number) => ({ id, data: { title, createdAt } }) as NotebookEntity;
@@ -30,7 +30,7 @@ describe("library selection", () => {
 });
 
 describe("library states and accessible actions", () => {
-  beforeEach(() => { state.call = 0; state.notebooks = undefined; state.counts = undefined; state.ipad = undefined; });
+  beforeEach(() => { state.call = 0; state.notebooks = undefined; state.counts = undefined; state.ipad = undefined; state.edited = undefined; });
   const render = () => renderToStaticMarkup(createElement(Library));
   it("announces loading rather than flashing an empty library", () => {
     expect(render()).toContain('role="status"');
@@ -55,7 +55,7 @@ describe("library states and accessible actions", () => {
 
 
 describe("independent library rendering regressions", () => {
-  beforeEach(() => { state.call = 0; state.notebooks = notebooks; state.counts = undefined; state.ipad = undefined; });
+  beforeEach(() => { state.call = 0; state.notebooks = notebooks; state.counts = undefined; state.ipad = undefined; state.edited = undefined; });
   const render = () => renderToStaticMarkup(createElement(Library));
   it("does not misrepresent unresolved section counts as zero", () => {
     expect(render()).toContain("…");

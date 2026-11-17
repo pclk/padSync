@@ -34,6 +34,12 @@ export function hlcObserve(remote: string) {
   }
 }
 
+/** Wall-clock ms of a stamp, or undefined for an empty or malformed one. */
+export function hlcWall(hlc: string): number | undefined {
+  if (!/^\d{13}-/.test(hlc)) return undefined;
+  return Number(hlc.slice(0, 13));
+}
+
 function encode(wall: number, count: number, device: string) {
   return `${String(wall).padStart(13, "0")}-${String(count).padStart(4, "0")}-${device}`;
 }
