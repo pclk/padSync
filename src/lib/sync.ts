@@ -1,4 +1,4 @@
-import { DEFAULT_DEBOUNCE_MS, VISIBLE_POLL_MS, HIDDEN_POLL_MS, validDebounce } from "./sync-policy";
+import { DEFAULT_DEBOUNCE_MS, validDebounce, DEFAULT_SYNC_CONFIG, normalizeSyncConfig, type SyncConfig } from "./sync-policy";
 import { db, getMeta, setMeta } from "./db";
 import { hlcObserve } from "./hlc";
 import type { Entity } from "./types";
@@ -11,6 +11,7 @@ import type { Entity } from "./types";
 export type SyncStatus = "idle" | "syncing" | "synced" | "offline" | "local-only" | "needs-login" | "error";
 
 let debounceMs = DEFAULT_DEBOUNCE_MS;
+let config = { ...DEFAULT_SYNC_CONFIG };
 // Strokes are a few KB each; keep requests well under Vercel's 4.5 MB body limit.
 const ENTITY_BATCH = 100;
 const EVENT_BATCH = 500;
@@ -33,10 +34,16 @@ const requestTimes: number[] = [];
 let traceTruncated = false;
 export function getSyncTiming() {
   const now = Date.now(), start = Math.max(observedSince, now - 300000);
-  return { debounceMs, start, end: now, edits: editTimes.filter(t => t >= start), requests: requestTimes.filter(t => t >= start).length, traceTruncated };
+  return { ...config, debounceMs, start, end: now, edits: editTimes.filter(t => t >= start), requests: requestTimes.filter(t => t >= start).length, traceTruncated };
 }
 export function setSyncDebounce(value: number) {
-  if (validDebounce(value)) debounceMs = value;
+  if (validDebounce(value)) setSyncConfig({ ...config, debounceMs: value });
+}
+export function setSyncConfig(value: Partial<SyncConfig>) {
+  config = normalizeSyncConfig({ ...config, ...value });
+  debounceMs = config.debounceMs;
+  // A faster configuration advances an existing poll without delaying queued writes.
+  if (started) schedule(document.visibilityState === 'visible' ? config.visiblePollMs : config.hiddenPollMs);
 }
 function record(trace: number[]) {
   const now = Date.now();
@@ -50,7 +57,7 @@ async function refreshConfig() {
   configCheckedAt = Date.now();
   try {
     const res = await fetch('/api/sync-config', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
-    if (res.ok) setSyncDebounce((await res.json()).debounceMs);
+    if (res.ok) setSyncConfig(await res.json());
   } catch { /* use last known timing until the next refresh */ }
   finally { configLoading = false; }
 }
@@ -109,12 +116,12 @@ async function runSync() {
     if (status === 'synced') { failures = 0; retryAt = 0; }
     else {
       failures++;
-      retryAt = Date.now() + Math.min(60000, 2000 * 2 ** Math.min(failures - 1, 5));
+      retryAt = Date.now() + Math.min(60000, config.retryBaseMs * 2 ** Math.min(failures - 1, 5));
     }
     const pending = again;
     again = false;
     if (pending) schedule(0);
-    else if (started) schedule(document.visibilityState === 'visible' ? VISIBLE_POLL_MS : HIDDEN_POLL_MS);
+    else if (started) schedule(retryAt ? Math.max(0, retryAt - Date.now()) : document.visibilityState === 'visible' ? config.visiblePollMs : config.hiddenPollMs);
   }
 }
 

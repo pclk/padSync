@@ -85,3 +85,32 @@ it('uses slower polling for hidden tabs',async()=>{
  await vi.advanceTimersByTimeAsync(1);
  expect(fetchMock.mock.calls.filter(c=>c[0]==='/api/sync')).toHaveLength(2);
 });
+
+it('advances a pending receive poll when faster settings arrive',async()=>{
+ sync.startSync(); await vi.advanceTimersByTimeAsync(0);
+ sync.setSyncConfig({visiblePollMs:250});
+ await vi.advanceTimersByTimeAsync(249);
+ expect(fetchMock.mock.calls.filter(c=>c[0]==='/api/sync')).toHaveLength(1);
+ await vi.advanceTimersByTimeAsync(1);
+ expect(fetchMock.mock.calls.filter(c=>c[0]==='/api/sync')).toHaveLength(2);
+});
+it('uses configurable hidden polling and retry delay',async()=>{
+ Object.defineProperty(document,'visibilityState',{value:'hidden',configurable:true});
+ sync.setSyncConfig({hiddenPollMs:1000,retryBaseMs:500});
+ fetchMock.mockImplementation(async(url:string)=>url==='/api/sync-config'?Response.json({debounceMs:400}):new Response('',{status:500}));
+ sync.startSync(); await vi.advanceTimersByTimeAsync(0);
+ await vi.advanceTimersByTimeAsync(499);
+ expect(fetchMock.mock.calls.filter(c=>c[0]==='/api/sync')).toHaveLength(1);
+ await vi.advanceTimersByTimeAsync(1);
+ expect(fetchMock.mock.calls.filter(c=>c[0]==='/api/sync')).toHaveLength(2);
+});
+
+it('uses the configured interval for successful hidden-tab receives',async()=>{
+ Object.defineProperty(document,'visibilityState',{value:'hidden',configurable:true});
+ sync.setSyncConfig({hiddenPollMs:1000});
+ sync.startSync(); await vi.advanceTimersByTimeAsync(0);
+ await vi.advanceTimersByTimeAsync(999);
+ expect(fetchMock.mock.calls.filter(c=>c[0]==='/api/sync')).toHaveLength(1);
+ await vi.advanceTimersByTimeAsync(1);
+ expect(fetchMock.mock.calls.filter(c=>c[0]==='/api/sync')).toHaveLength(2);
+});
