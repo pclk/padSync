@@ -44,7 +44,7 @@ export async function sectionPng(section: SectionEntity, sectionEl: HTMLElement,
   if (section.data.pdf) {
     // Composite under DOM text boxes and ink, even for a page outside the viewport.
     ctx.globalCompositeOperation = "destination-over";
-    ctx.drawImage(await pdfImage(section.data.pdf),0,0,PAGE_WIDTH,section.data.pdf.height);
+    ctx.drawImage(await pdfImage(section.data.pdf,scale),0,0,PAGE_WIDTH,section.data.pdf.height);
     ctx.fillStyle = "#ffffff"; ctx.fillRect(0,0,PAGE_WIDTH,height);
     ctx.globalCompositeOperation = "source-over";
   }

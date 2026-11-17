@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { S3Client } from '@aws-sdk/client-s3';
 import { GET, POST } from '@/app/api/pdfs/route';
-import { pdfKey, ownedDocument } from '@/server/pdf-storage';
+import { pdfKey, ownedDocument, pdfStorage, sweepPdfs } from '@/server/pdf-storage';
+import { rasterScale } from '@/lib/pdf';
 import { MAX_PDF_BYTES, PDF_PART_BYTES, pdfMetadata, pdfSections } from '@/lib/pdf-meta';
 import { buildBundle, DEFAULT_CONTEXT } from '@/lib/context';
 import { configureAuthEnv, freshDb, req, sessionCookie } from './helpers/env';
@@ -71,4 +72,23 @@ it('aborts pending uploads, removes the object and metadata, and never downloads
   expect(response.status).toBe(200);
   expect(send.mock.calls.slice(-2).map(c => c[0].constructor.name)).toEqual(['AbortMultipartUploadCommand','DeleteObjectCommand']);
   expect(await ownedDocument(db.sql,'pclk',id)).toBeUndefined();
+});
+it('sweeps PDFs of deleted notebooks, stale pending uploads and never-synced notebooks only',async () => {
+  const ids = [] as string[];
+  for (const notebookId of ['live','gone','stale','unsynced','fresh']) ids.push((await POST(req('/api/pdfs',{session,body:{action:'create',...meta,notebookId}})).then(r => r.json())).id);
+  await db.sql.query("update notebook_pdfs set ready=true where notebook_id <> 'stale'");
+  await db.sql.query("update notebook_pdfs set created_at=now() - interval '2 days' where notebook_id='stale'");
+  await db.sql.query("update notebook_pdfs set created_at=now() - interval '31 days' where notebook_id in ('unsynced','live')");
+  for (const [id,deleted] of [['live',false],['gone',true]] as const) await db.sql.query("insert into entities(id,kind,notebook_id,data,hlc,deleted) values($1,'notebook',$1,'{}','0',$2)",[id,deleted]);
+  send.mockReset(); send.mockResolvedValue({} as never);
+  expect(await sweepPdfs(db.sql,'pclk',pdfStorage()!)).toBe(3);
+  const left = await db.sql.query<{notebook_id:string}>('select notebook_id from notebook_pdfs order by notebook_id');
+  expect(left.map(r => r.notebook_id)).toEqual(['fresh','live']);
+  expect(send.mock.calls.map(c => c[0].constructor.name).filter(n => n === 'AbortMultipartUploadCommand')).toHaveLength(1);
+  expect(send.mock.calls.filter(c => c[0].constructor.name === 'DeleteObjectCommand').map(c => (c[0].input as {Key:string}).Key).sort()).toEqual([ids[1],ids[2],ids[3]].map(id => pdfKey('pclk',id)).sort());
+  expect(await sweepPdfs(db.sql,'foreign',pdfStorage()!)).toBe(0);
+});
+it('renders PDF pages at screen density, capped for iPad canvas limits', () => {
+  expect(rasterScale({height:1948},1)).toBe(1); expect(rasterScale({height:1948},2)).toBe(2); expect(rasterScale({height:1948},3)).toBe(2);
+  const tall = {height:1376*8}; expect(1376*tall.height*rasterScale(tall,2)**2).toBeLessThanOrEqual(16_000_000);
 });

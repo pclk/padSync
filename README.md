@@ -24,7 +24,7 @@ No AirDrop, no Handoff, no PDF round trip.
    | --- | --- |
    | `AWS_ENDPOINT_URL_S3` / `AWS_REGION` | Neon branch storage endpoint and region (same branch as database) |
    | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Branch storage credential; server-only |
-   | `PDF_STORAGE_BUCKET` | Private bucket name, e.g. `notebook-pdfs` |
+   | `PDF_STORAGE_BUCKET` | Private bucket name: `uploads` (declared in `neon.ts`) |
    | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | from a GitHub OAuth app (see below) |
    | `SESSION_SECRET` | random string, e.g. `openssl rand -base64 32`; changing it signs all devices out |
    | `ALLOWED_GITHUB_LOGIN` | optional, defaults to `pclk`; the only account allowed in |
@@ -47,10 +47,10 @@ Design and validation: [docs/pdf-import-2026-11-17.md](docs/pdf-import-2026-11-1
 
 In Neon Console, select the project and the same branch as `DATABASE_URL`. Check its
 region: storage currently supports Ohio, N. Virginia, Frankfurt and Singapore.
-Open **Object Storage**, create a **private** `notebook-pdfs` bucket, and obtain the
+Open **Object Storage**, create a **private** `uploads` bucket, and obtain the
 branch S3 endpoint/region and a credential with storage access. Set the five storage
 variables above in Vercel and redeploy. If storage is unavailable in the console,
-use the documented CLI flow: `neon link`, `neon config add bucket notebook-pdfs`,
+use the documented CLI flow: `neon link`, `neon config add bucket uploads`,
 `neon deploy`, then `neon env pull`; copy the resulting AWS variables to Vercel.
 Storage has no separate manual enable API; a 404 endpoint requires checking region
 availability. Never prefix credentials with `NEXT_PUBLIC_`.

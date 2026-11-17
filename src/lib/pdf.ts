@@ -1,4 +1,4 @@
-import { getMeta, setMeta } from './db';
+import { db, getMeta, setMeta } from './db';
 import { PAGE_WIDTH } from './types';
 import { pdfSignature, type PdfPage } from './pdf-meta';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
@@ -8,6 +8,12 @@ export function pdfEngine() {
 }
 export const cachePdf = (id: string, blob: Blob) => setMeta(`pdf-bytes:${id}`, blob);
 const documents = new Map<string, Promise<PDFDocumentProxy>>();
+/** Drops a deleted notebook's PDF from this device: cached bytes, open document and rasters. */
+export async function forgetPdf(id: string) {
+  void documents.get(id)?.then(doc => doc.loadingTask.destroy()).catch(() => {}); documents.delete(id);
+  for (const key of [...renders.keys()]) if (key.startsWith(`${id}:`)) renders.delete(key);
+  await db.meta.delete(`pdf-bytes:${id}`);
+}
 export async function openPdf(id: string) {
   let task = documents.get(id);
   if (!task) {
@@ -36,17 +42,25 @@ export async function openPdf(id: string) {
   }
   return task;
 }
+// iOS Safari refuses canvases above ~16.7 MP; stay under it even for tall pages.
+const MAX_RASTER_PIXELS = 16_000_000;
+/** Device pixels per CSS pixel for a page: the screen's density (≤ 2), in quarter steps so the cache stays small. */
+export function rasterScale(page: Pick<PdfPage, 'height'>, density = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1) {
+  const fit = Math.sqrt(MAX_RASTER_PIXELS / (PAGE_WIDTH * page.height));
+  return Math.max(0.25, Math.floor(Math.min(density, 2, fit) * 4) / 4);
+}
 // A small LRU of compressed rasters, shared by the viewport and exports. No 149-page canvas set.
 const renders = new Map<string, Blob>();
 let renderQueue: Promise<unknown> = Promise.resolve();
-export function pdfRaster(page: PdfPage): Promise<Blob> {
-  const key = `${page.documentId}:${page.page}`;
+export function pdfRaster(page: PdfPage, density?: number): Promise<Blob> {
+  const scale = rasterScale(page, density);
+  const key = `${page.documentId}:${page.page}:${scale}`;
   const cached = renders.get(key);
   if (cached) { renders.delete(key); renders.set(key,cached); return Promise.resolve(cached); }
   const job = renderQueue.catch(() => {}).then(async () => {
     const existing = renders.get(key); if (existing) return existing;
     const doc = await openPdf(page.documentId), p = await doc.getPage(page.page);
-    const viewport = p.getViewport({ scale: PAGE_WIDTH / p.getViewport({ scale: 1 }).width });
+    const viewport = p.getViewport({ scale: scale * PAGE_WIDTH / p.getViewport({ scale: 1 }).width });
     const canvas = document.createElement('canvas'); canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
     try {
       await p.render({ canvas, canvasContext: canvas.getContext('2d')!, viewport }).promise;
@@ -57,7 +71,7 @@ export function pdfRaster(page: PdfPage): Promise<Blob> {
   });
   renderQueue = job; return job;
 }
-export async function pdfImage(page: PdfPage) {
-  const url = URL.createObjectURL(await pdfRaster(page));
+export async function pdfImage(page: PdfPage, density?: number) {
+  const url = URL.createObjectURL(await pdfRaster(page, density));
   try { const img = new Image(); img.src = url; await img.decode(); return img; } finally { URL.revokeObjectURL(url); }
 }

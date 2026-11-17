@@ -29,11 +29,14 @@ SHA-256 before caching. Completed multipart URLs cannot overwrite the object.
 GET URLs expire after five minutes and API responses are no-store.
 
 Cancellation/failure attempts multipart abort and object deletion before removing
-pending metadata. Tab crashes, network loss during cleanup, or failures after remote
-completion can leave pending/orphaned objects. Operators can inspect `notebook_pdfs`
-where ready=false and use AbortMultipartUpload/DeleteObject for stale keys, then
-remove their rows. Neon does not currently enforce stored lifecycle policies.
-There is no automatic resumable upload or garbage collection in this version.
+pending metadata. Anything that slips through (tab crashes, network loss during cleanup)
+and the PDFs of deleted notebooks are removed by `sweepPdfs`, which runs after the
+response of every `/api/pdfs` create or download (Next `after`, up to 20 PDFs per run).
+It deletes the object and row for: pending uploads older than a day; PDFs whose notebook
+entity is tombstoned; and PDFs older than 30 days whose notebook never reached the
+server. Neon does not enforce lifecycle policies, so this is the only collection.
+Deleting a notebook also drops this device's cached bytes and rasters at once. There
+is no resumable upload in this version.
 
 The notebook and all sections save together through createNotebook, retaining the
 existing HLC, offline writes and ink sync. PDF bytes cache in IndexedDB's metadata
@@ -51,7 +54,10 @@ require coordinated read/upload/cleanup changes and a verified data migration.
 pdf.js loads dynamically in the browser. The worker uses new URL relative to
 import.meta.url, so Next 16 emits a hashed worker under /_next/static/media; the
 existing service worker caches it. Worker rendering is disabled to use the browser
-canvas path. IntersectionObserver mounts rasters only within 800 px of the viewport;
+canvas path. Pages rasterize at the screen's density (at most 2×, in quarter steps),
+capped at 16 MP so tall pages stay under iOS Safari's canvas limit; an A4 page on an
+iPad is 2752 × 3896. Exports use their own pixel ratio, with the same caps.
+IntersectionObserver mounts rasters only within 800 px of the viewport;
 leaving releases the image URL. Rendering is serialized with at most six compressed
 page rasters cached and two document workers retained. Canvases are cleared after
 rasterization and pdf.js page resources cleaned. Ink tiles and gesture handling
@@ -67,7 +73,8 @@ asking about all 149 pages may omit later rasters, so select relevant pages for 
 ## Setup and verification
 
 See README's setup table and Neon storage instructions for credentials and CORS.
-No live bucket was provisioned in this implementation session. Vitest exercises the
+A private `uploads` bucket was provisioned on `main` with `neon deploy` and verified by
+uploading, listing and reading back a file; its CORS allows the production origin and localhost. Vitest exercises the
 routes with real PGlite metadata and mocked S3, including ownership, metadata limits,
 part lengths, signature, readiness, presigned requests and bundle selection. A production
 Next build verifies worker bundling. Actual iPad memory/scrolling, live Neon credentials,

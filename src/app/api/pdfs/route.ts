@@ -1,16 +1,22 @@
-import type { NextRequest } from 'next/server';
+import { after, type NextRequest } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { AbortMultipartUploadCommand, CompleteMultipartUploadCommand, CreateMultipartUploadCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, ListPartsCommand, UploadPartCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { requireSession } from '@/server/guard';
 import { pdfError } from '@/server/attachments';
-import { ownedDocument, pdfKey, pdfStorage } from '@/server/pdf-storage';
+import { ownedDocument, pdfKey, pdfStorage, sweepPdfs } from '@/server/pdf-storage';
+import type { Sql } from '@/server/db';
 import { PDF_PART_BYTES, pdfMetadata, pdfSignature } from '@/lib/pdf-meta';
 const reply = (data: unknown) => Response.json(data, { headers: { 'Cache-Control': 'no-store' } });
+// Cleanup piggybacks on PDF traffic after the response; outside a request scope (tests) it is skipped.
+function sweepLater(sql: Sql, login: string, storage: NonNullable<ReturnType<typeof pdfStorage>>) {
+  try { after(() => sweepPdfs(sql, login, storage).catch(e => console.warn('PDF sweep failed', e))); } catch { /* no request scope */ }
+}
 export async function GET(req: NextRequest) {
   const auth = await requireSession(req); if (auth instanceof Response) return auth;
   const storage = pdfStorage(); if (!storage) return pdfError(503, 'PDF object storage is not configured. Use Local only or configure Neon storage.');
+  sweepLater(auth.sql, auth.login, storage);
   const row = await ownedDocument(auth.sql, auth.login, req.nextUrl.searchParams.get('id') ?? '');
   if (!row?.ready) return pdfError(404, 'PDF not found');
   return reply({ sha256: row.sha256, size: row.size, url: await getSignedUrl(storage.s3, new GetObjectCommand({ Bucket: storage.bucket, Key: row.object_key }), { expiresIn: 300 }) });
@@ -23,6 +29,7 @@ export async function POST(req: NextRequest) {
   try {
     if (body?.action === 'create') {
       const parsed = pdfMetadata.safeParse(body); if (!parsed.success) return pdfError(400, 'Invalid PDF metadata (maximum 100 MiB, 2000 pages)');
+      sweepLater(auth.sql, auth.login, storage);
       const d = parsed.data, id = randomUUID(), Key = pdfKey(auth.login, id);
       const upload = await s3.send(new CreateMultipartUploadCommand({ Bucket, Key, ContentType: 'application/pdf' }));
       if (!upload.UploadId) throw new Error('No upload id');
