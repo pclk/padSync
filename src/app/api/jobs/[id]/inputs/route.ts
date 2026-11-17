@@ -9,6 +9,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const parsed = jobInputSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") }, { status: 400 });
   const r = await putJobInput(auth.sql, (await params).id, parsed.data);
-  if (!r.ok) return Response.json({ error: r.error }, { status: r.status });
+  if (!r.ok) return Response.json({ error: r.error, ...(r.jobStatus ? { jobStatus: r.jobStatus } : {}) }, { status: r.status });
   return Response.json({ status: r.status, received: r.received, expected: r.expected });
 }

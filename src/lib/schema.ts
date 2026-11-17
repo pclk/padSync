@@ -374,8 +374,9 @@ const fail = (error: string, warnings: string[] = []): ParseResult => ({ ok: fal
 /** Pulls the JSON object out of a chat reply: tolerates ```json fences and prose around it. */
 export function extractJson(raw: string): string {
   const fences = [...raw.matchAll(/```(?:json|JSON)?[ \t]*\r?\n?([\s\S]*?)```/g)].map((m) => m[1].trim());
-  // With several fenced blocks, the payload is the one that looks like an object.
-  const fenced = fences.find((f) => f.startsWith("{")) ?? fences[0];
+  // With several fenced blocks, the payload is the object with sections (an example or metadata
+  // object may come first), else the first object.
+  const fenced = fences.find((f) => f.startsWith("{") && /"sections"\s*:/.test(f)) ?? fences.find((f) => f.startsWith("{")) ?? fences[0];
   let text = (fenced ?? raw).trim().replace(/^﻿/, "");
   if (!text.startsWith("{")) {
     const start = text.indexOf("{");
@@ -463,7 +464,11 @@ function conceptMapProblems(s: PayloadSection, prefix: string): string[] {
   const out: string[] = [];
   s.blocks.forEach((b, i) => {
     if (b.type !== "conceptMap") return;
-    const ids = new Set(b.nodes.map((n) => n.id));
+    const ids = new Set<string>();
+    b.nodes.forEach((n, j) => {
+      if (ids.has(n.id)) out.push(`${prefix} › blocks[${i}] (conceptMap) › nodes[${j}] › id: ${JSON.stringify(n.id)} is used twice`);
+      ids.add(n.id);
+    });
     b.links.forEach((l, j) => {
       for (const end of ["from", "to"] as const) if (!ids.has(l[end])) out.push(`${prefix} › blocks[${i}] (conceptMap) › links[${j}] › ${end}: no node with id ${JSON.stringify(l[end])}`);
     });

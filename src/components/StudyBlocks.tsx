@@ -120,13 +120,17 @@ export function StudyBlock({ block }: { block: Block }) {
 function Steps({ block }: { block: Extract<Block, { type: "steps" }> }) {
   const [shown, toggle] = useReveal();
   const hidden = !!block.blankWhy;
+  // The chip shows even without a heading, or hidden reasons could never be revealed.
+  const chip = hidden && block.steps.some((s) => s.why) ? <RevealChip shown={shown} toggle={toggle} label="reasons" /> : null;
   return (
     <div className="my-3">
-      {(block.title || block.style) && (
+      {block.title || block.style ? (
         <Heading>
           {block.title ?? title(block.style!)}
-          {hidden && block.steps.some((s) => s.why) && <RevealChip shown={shown} toggle={toggle} label="reasons" />}
+          {chip}
         </Heading>
+      ) : (
+        chip && <div className="mb-1 flex justify-end">{chip}</div>
       )}
       {block.problem && <Md text={block.problem} className="mb-1 font-medium" />}
       <ol className="space-y-1">
@@ -204,7 +208,8 @@ function ConceptMap({ block }: { block: Extract<Block, { type: "conceptMap" }> }
   );
 }
 
-const PLACEHOLDER = (i: number) => `⟦${i}⟧`;
+// Private-use characters, stripped from the text first, so literal notation can't collide.
+const PLACEHOLDER = (i: number) => `\uE000${i}\uE001`;
 
 function Cloze({ block }: { block: Extract<Block, { type: "cloze" }> }) {
   const [shown, toggle] = useReveal();
@@ -213,9 +218,10 @@ function Cloze({ block }: { block: Extract<Block, { type: "cloze" }> }) {
   // Render the whole text once (so Markdown and lists still work), then swap each placeholder for
   // a blank: a writing line about as long as the answer.
   let i = 0;
-  const src = parts.map((p) => (p.blank ? PLACEHOLDER(i++) : p.text)).join("");
-  const html = renderMarkdown(src).replace(/⟦(\d+)⟧/g, (_, n) => {
+  const src = parts.map((p) => (p.blank ? PLACEHOLDER(i++) : p.text.replace(/[\uE000\uE001]/g, ""))).join("");
+  const html = renderMarkdown(src).replace(/\uE000(\d+)\uE001/g, (_, n) => {
     const a = answers[Number(n)];
+    if (a === undefined) return "";
     const width = Math.min(22, Math.max(5, a.length * 0.75 + 2));
     return shown ? `<span class="study-blank revealed">${renderInline(a)}</span>` : `<span class="study-blank" style="min-width:${width}em"></span>`;
   });

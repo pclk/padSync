@@ -302,7 +302,8 @@ export async function updateJob(sql: Sql, id: string, deviceId: string, u: z.inf
   return { ok: false, reason: cur[0]?.status === "cancelled" ? "cancelled" : "not_claimed" };
 }
 
-export type InputResult = { ok: true; status: JobStatus; received: number; expected: number } | { ok: false; status: 400 | 404 | 409; error: string };
+/** A 409 carries the job's status, so a client whose last response was lost can tell it already queued. */
+export type InputResult = { ok: true; status: JobStatus; received: number; expected: number } | { ok: false; status: 400 | 404 | 409; error: string; jobStatus?: JobStatus };
 
 /**
  * Stores one part of a declared upload. The part must be in the manifest and exactly its expected
@@ -312,7 +313,7 @@ export type InputResult = { ok: true; status: JobStatus; received: number; expec
 export async function putJobInput(sql: Sql, id: string, input: z.infer<typeof jobInputSchema>): Promise<InputResult> {
   const job = (await sql.query<{ status: JobStatus; uploads: UploadSpec[] | null }>(`select status, uploads from jobs where id = $1`, [id]))[0];
   if (!job) return { ok: false, status: 404, error: "not found" };
-  if (job.status !== "uploading") return { ok: false, status: 409, error: `job is ${job.status}, not uploading` };
+  if (job.status !== "uploading") return { ok: false, status: 409, error: `job is ${job.status}, not uploading`, jobStatus: job.status };
   const spec = (job.uploads ?? []).find((u) => u.path === input.path);
   if (!spec) return { ok: false, status: 400, error: `${input.path} is not one of this job's uploads` };
   if (input.part >= spec.parts) return { ok: false, status: 400, error: `${input.path} has ${spec.parts} part(s)` };
@@ -325,7 +326,10 @@ export async function putJobInput(sql: Sql, id: string, input: z.infer<typeof jo
      returning part`,
     [id, input.path, input.part, input.data],
   );
-  if (!ins.length) return { ok: false, status: 409, error: "job is no longer uploading" };
+  if (!ins.length) {
+    const now = (await sql.query<{ status: JobStatus }>(`select status from jobs where id = $1`, [id]))[0]?.status;
+    return { ok: false, status: 409, error: "job is no longer uploading", jobStatus: now };
+  }
   const expected = (job.uploads ?? []).reduce((n, u) => n + u.parts, 0);
   // Separate statement, so it sees this insert and any made in parallel.
   const done = await sql.query<{ status: JobStatus; received: number }>(

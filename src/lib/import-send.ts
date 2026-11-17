@@ -68,7 +68,7 @@ export async function sendImport(opts: {
   let sent = 0;
   let status = "uploading";
   try {
-    for (const [i, spec] of specs.entries()) {
+    upload: for (const [i, spec] of specs.entries()) {
       signal?.throwIfAborted();
       opts.onProgress?.({ phase: "reading", sent, total });
       const content = await opts.attachments[i].base64();
@@ -83,6 +83,17 @@ export async function sendImport(opts: {
           if (r?.ok) {
             status = (await json(r)).status ?? status;
             break;
+          }
+          // A 409 saying the job already moved on means every part arrived: the response to the
+          // last one was lost and this was its retry. Cancelling now would throw away a good job.
+          if (r?.status === 409) {
+            const s = ((await r.clone().json().catch(() => ({}))) as { jobStatus?: string }).jobStatus;
+            if (s === "queued" || s === "running" || s === "done") {
+              status = s;
+              sent = total;
+              opts.onProgress?.({ phase: "uploading", sent, total });
+              break upload;
+            }
           }
           // 4xx other than a timeout won't get better by retrying.
           if (r && r.status < 500 && r.status !== 408) throw new SendError(`Uploading ${metas[i].name} failed: ${friendlyHttpError(r.status, (await json(r)).error)}`, jobId);

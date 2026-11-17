@@ -86,17 +86,16 @@ export default function AiImportView() {
 
   // Saved shortly after the last change: typing into a multi-MB JSON shouldn't rewrite it per key.
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const setRaw = useCallback((text: string, from: string, files: ReturnedFile[] = []) => {
+  const setRaw = useCallback((text: string, from: string, files: ReturnedFile[] = [], now = false): Promise<void> => {
     setRawState(text);
     setRawFrom(from);
     setReturned(files);
     setImported(null);
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      void setDraft("raw", text);
-      void setDraft("rawFrom", from);
-      void setDraft("returned", files.length ? files : null);
-    }, 300);
+    const save = () => Promise.all([setDraft("raw", text), setDraft("rawFrom", from), setDraft("returned", files.length ? files : null)]).then(() => {});
+    if (now) return save();
+    saveTimer.current = setTimeout(() => void save(), 300);
+    return Promise.resolve();
   }, []);
 
   // Server status (signed in, bridge seen) every 10 s while the page is visible.
@@ -120,9 +119,10 @@ export default function AiImportView() {
     async (j: Job) => {
       await draftLoaded.current;
       if ((await getDraft<string>("loadedJob")) === j.id) return;
-      await setDraft("loadedJob", j.id);
       const picked = pickResult(j);
-      if (picked) setRaw(picked.text, `${picked.from} from the bridge`, j.resultFiles ?? []);
+      // Saved before marking the job consumed: a reload in between must not lose the result.
+      if (picked) await setRaw(picked.text, `${picked.from} from the bridge`, j.resultFiles ?? [], true);
+      await setDraft("loadedJob", j.id);
     },
     [setRaw],
   );
@@ -177,8 +177,10 @@ export default function AiImportView() {
   };
 
   const startOver = async () => {
-    if (!confirm("Remove the attachments and the JSON under review?")) return;
+    if (!confirm("Remove the attachments and the JSON under review? A running AI job is cancelled.")) return;
     abortSend();
+    // Don't leave the agent working on a job the page has forgotten.
+    if (jobId && job && ["uploading", "queued", "running"].includes(job.status)) await fetch(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, { method: "POST" }).catch(() => null);
     await clearAttachments();
     setRaw("", "");
     setJobId(null);
@@ -649,7 +651,8 @@ function Review(p: {
           )}
           {!result.sections.length && result.errors.map((e) => <p key={e} className="text-xs text-rose-700">{e}</p>)}
           {result.warnings.length > 0 && (
-            <details className="mt-2 text-xs text-amber-800">
+            // Open by itself when content was left out or a newer format was read, not for cosmetic fixes.
+            <details className="mt-2 text-xs text-amber-800" open={result.warnings.some((w) => /newer padSync|left out|unknown block type/.test(w))}>
               <summary className="cursor-pointer">{result.warnings.length} note{result.warnings.length === 1 ? "" : "s"} (fixed or ignored automatically)</summary>
               <ul className="mt-1 list-disc pl-5">
                 {result.warnings.slice(0, 50).map((w, i) => (
