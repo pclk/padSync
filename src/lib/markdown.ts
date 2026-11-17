@@ -60,3 +60,16 @@ export function renderMarkdown(src: string): string {
   }
   return html;
 }
+
+const inlineCache = new Map<string, string>();
+
+/** Markdown + LaTeX without the surrounding paragraph, for text inside a line (cloze answers). */
+export function renderInline(src: string): string {
+  let html = inlineCache.get(src);
+  if (html === undefined) {
+    html = marked.parseInline(src, { async: false }) as string;
+    if (inlineCache.size > 500) inlineCache.clear();
+    inlineCache.set(src, html);
+  }
+  return html;
+}

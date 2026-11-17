@@ -47,9 +47,9 @@ export async function updateData<D>(id: string, patch: (data: D) => D) {
   await putEntities([{ ...row, data: patch(row.data as D) }]);
 }
 
-export async function createNotebook(title: string, sections: Omit<SectionData, "order" | "createdAt">[] = [], description?: string) {
+export async function createNotebook(title: string, sections: Omit<SectionData, "order" | "createdAt">[] = [], description?: string, source?: NotebookData["source"]) {
   const now = Date.now();
-  const nb = newEntity<"notebook", NotebookData>("notebook", "", "", { title, description, createdAt: now });
+  const nb = newEntity<"notebook", NotebookData>("notebook", "", "", { title, description, createdAt: now, ...(source ? { source } : {}) });
   nb.notebookId = nb.id;
   const secs = (sections.length ? sections : [blankSection()]).map((s, i) =>
     newEntity<"section", SectionData>("section", nb.id, "", { ...s, order: i + 1, createdAt: now }),
@@ -106,6 +106,11 @@ export async function logEvent(notebookId: string, sectionId: string | null, typ
   const ev: PadEvent = { id: nanoid(), notebookId, sectionId, type, t: Date.now(), device: deviceId(), data, synced: 0 };
   await db.events.add(ev);
   requestSync();
+}
+
+/** Live notebooks made from this import before (same payload hash). */
+export async function findImported(importHash: string) {
+  return (await listNotebooks()).filter((n) => n.data.source?.importHash === importHash);
 }
 
 export async function listNotebooks() {

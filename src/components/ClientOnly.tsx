@@ -10,8 +10,7 @@ import { startSync } from "@/lib/sync";
 const views = {
   library: dynamic(() => import("./Library"), { ssr: false }),
   notebook: dynamic(() => import("./NotebookEditor"), { ssr: false }),
-  import: dynamic(() => import("./ImportView"), { ssr: false }),
-  prompt: dynamic(() => import("./PromptView"), { ssr: false }),
+  import: dynamic(() => import("./AiImportView"), { ssr: false }),
   settings: dynamic(() => import("./SettingsView"), { ssr: false }),
 };
 
