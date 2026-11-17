@@ -1,3 +1,4 @@
+import { chatJobContext } from '@/server/chat';
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { requireDevice } from "@/server/guard";
@@ -18,5 +19,5 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return Response.json({ error: "agents: non-empty list of claude|codex" }, { status: 400 });
   const features = (parsed.data.features ?? []).filter((f): f is (typeof BRIDGE_FEATURES)[number] => (BRIDGE_FEATURES as readonly string[]).includes(f));
   const job = await claimJob(auth.sql, auth.device.id, parsed.data.agents, features);
-  return Response.json({ job }, { headers: { "cache-control": "no-store" } });
+  return Response.json({ job: job ? { ...job, ...(job.kind === 'chat' ? await chatJobContext(auth.sql, job.id) : {}) } : null }, { headers: { "cache-control": "no-store" } });
 }

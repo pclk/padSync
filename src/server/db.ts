@@ -141,6 +141,23 @@ export async function migrate(sql: Sql) {
       data text not null,
       primary key (job_id, path, part)
     )`,
+    `create table if not exists chat_threads (
+      id text primary key, notebook_id text not null default '', title text not null default '',
+      agent text not null, options jsonb not null default '{}'::jsonb,
+      pinned boolean not null default false, archived boolean not null default false,
+      agent_session jsonb, forked_from jsonb, created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(), last_message_at timestamptz, deleted_at timestamptz,
+      next_turn integer not null default 0
+    )`,
+    `alter table jobs add column if not exists thread_id text`,
+    `alter table jobs add column if not exists turn integer`,
+    `alter table jobs add column if not exists chat_context jsonb`,
+    `alter table jobs add column if not exists chat_files jsonb`,
+    `create table if not exists chat_input_parts (job_id text not null, path text not null, part integer not null, data text not null, primary key(job_id,path,part))`,
+    `alter table jobs add column if not exists attachments jsonb not null default '[]'::jsonb`,
+    `create unique index if not exists jobs_thread_turn_idx on jobs(thread_id, turn) where thread_id is not null`,
+    `create index if not exists jobs_thread_updated_idx on jobs(thread_id, updated_at)`,
+    `create index if not exists chat_threads_list_idx on chat_threads(deleted_at, archived, last_message_at desc)`,
     `create index if not exists jobs_queue_idx on jobs (status, created_at)`,
     `create index if not exists jobs_section_idx on jobs (section_id, created_at)`,
     // Jobs finished before image/context were dropped on completion (see jobs.ts).
