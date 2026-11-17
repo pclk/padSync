@@ -3,8 +3,8 @@
 // only erasable syntax.
 
 import { spawn } from "node:child_process";
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
+import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 export type Agent = "claude" | "codex";
@@ -87,15 +87,99 @@ export function decodePngDataUrl(dataUrl: string): Buffer {
   return Buffer.from(m[1], "base64");
 }
 
-export function buildAgentPrompt(job: Pick<ClaimedJob, "question" | "image" | "context">) {
-  const files = [
-    job.image ? "- `section.png`: a render of the section, the printed question plus my handwriting." : null,
-    job.context ? "- `context.md`: the question's source text, my typed notes, and possibly a reference solution I have NOT seen." : null,
+// Inputs never go into the prompt itself: the bridge writes them to a private per-job directory
+// (the agent's cwd) and the prompt only names their absolute paths. File names are fixed, so
+// nothing from the job ever becomes part of a path.
+
+export const JOB_DIR_PREFIX = "padsync-job-";
+export const IMAGE_FILE = "section.png";
+export const CONTEXT_FILE = "context.md";
+
+export interface JobDir {
+  dir: string;
+  /** Absolute paths of the inputs that exist for this job. */
+  image?: string;
+  context?: string;
+}
+
+/** Creates a fresh 0700 directory under `root` holding the job's inputs. Removes it again on failure. */
+export async function prepareJobDir(job: Pick<ClaimedJob, "image" | "context">, root: string = tmpdir()): Promise<JobDir> {
+  // realpath: macOS tmpdir() is behind the /var -> /private/var symlink; give agents the real path.
+  const dir = await realpath(await mkdtemp(join(root, JOB_DIR_PREFIX)));
+  try {
+    const out: JobDir = { dir };
+    if (job.image) {
+      out.image = join(dir, IMAGE_FILE);
+      await writeFile(out.image, decodePngDataUrl(job.image), { mode: 0o600, flag: "wx" });
+    }
+    if (job.context) {
+      out.context = join(dir, CONTEXT_FILE);
+      await writeFile(out.context, job.context, { mode: 0o600, flag: "wx" });
+    }
+    return out;
+  } catch (e) {
+    await removeJobDir(dir);
+    throw e;
+  }
+}
+
+/** Best-effort recursive delete; never throws (a failed cleanup must not take the bridge down). */
+export async function removeJobDir(dir: string): Promise<boolean> {
+  try {
+    await rm(dir, { recursive: true, force: true, maxRetries: 2 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Runs `fn` with the job's inputs on disk and always removes them afterwards, even if `fn` throws. */
+export async function withJobDir<T>(job: Pick<ClaimedJob, "image" | "context">, fn: (d: JobDir) => Promise<T>, root?: string): Promise<T> {
+  const d = await prepareJobDir(job, root);
+  try {
+    return await fn(d);
+  } finally {
+    await removeJobDir(d.dir);
+  }
+}
+
+/**
+ * Deletes job directories left behind by a bridge that was killed mid-job (SIGKILL, crash, power
+ * loss). Only directories older than `maxAgeMs` go, so a second bridge's live job is never touched.
+ */
+export async function sweepStaleJobDirs(maxAgeMs: number, root: string = tmpdir(), now = Date.now()): Promise<number> {
+  let removed = 0;
+  const names = await readdir(root).catch(() => [] as string[]);
+  for (const name of names) {
+    if (!name.startsWith(JOB_DIR_PREFIX)) continue;
+    const path = join(root, name);
+    const st = await lstat(path).catch(() => null);
+    if (!st?.isDirectory() || now - st.mtimeMs < maxAgeMs) continue;
+    if (await removeJobDir(path)) removed++;
+  }
+  return removed;
+}
+
+export function buildAgentPrompt(question: string, files: Omit<JobDir, "dir">, agent: Agent = "claude") {
+  // Codex gets the image attached with --image, so it must not open the file a second time.
+  const imageAttached = agent === "codex";
+  const lines = [
+    files.image
+      ? imageAttached
+        ? "- The attached image (also at `" + files.image + "`): a render of the section, the printed question plus my handwriting."
+        : "- `" + files.image + "`: a render of the section, the printed question plus my handwriting."
+      : null,
+    files.context ? "- `" + files.context + "`: the question's source text, my typed notes, and possibly a reference solution I have NOT seen." : null,
   ].filter(Boolean);
+  const how = imageAttached
+    ? files.context
+      ? "Read the text file before answering; the image is already attached, so don't open it again."
+      : "Look at the attached image before answering."
+    : "Open them with your Read tool before answering.";
   return [
     "You are helping me (a university student) with work I wrote by hand on my iPad in padSync.",
-    files.length ? `Files in the current directory:\n${files.join("\n")}\nRead them before answering.` : "",
-    `My question:\n${job.question}`,
+    lines.length ? `My work is in these files:\n${lines.join("\n")}\n${how}` : "",
+    `My question:\n${question}`,
     [
       "Guidelines:",
       "- Answer the question directly and refer to specific lines of my working.",
@@ -211,7 +295,7 @@ export function agentCommand(agent: Agent, cfg: Pick<BridgeConfig, "claudeBin" |
   const args = [...(o.webSearch ? ["--search"] : []), "exec", "--json", "--skip-git-repo-check", "--sandbox", "read-only", "--output-last-message", "final.md"];
   if (o.model) args.push("--model", o.model);
   if (o.effort) args.push("-c", `model_reasoning_effort="${o.effort}"`);
-  if (hasImage) args.push("--image", "section.png");
+  if (hasImage) args.push("--image", IMAGE_FILE);
   return { bin: cfg.codexBin ?? "codex", args, parse: parseCodexLine, finalFile: "final.md" };
 }
 

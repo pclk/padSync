@@ -72,18 +72,18 @@ describe("agent commands are read-only", () => {
 });
 
 describe("prompt and inputs", () => {
-  it("mentions only the files that exist", () => {
-    const both = buildAgentPrompt({ question: "Q?", image: PNG_DATA_URL, context: "ctx" });
-    expect(both).toContain("section.png");
-    expect(both).toContain("context.md");
-    const none = buildAgentPrompt({ question: "Q?", image: null, context: "" });
+  it("mentions only the files that exist, by absolute path", () => {
+    const both = buildAgentPrompt("Q?", { image: "/t/padsync-job-1/section.png", context: "/t/padsync-job-1/context.md" });
+    expect(both).toContain("`/t/padsync-job-1/section.png`");
+    expect(both).toContain("`/t/padsync-job-1/context.md`");
+    const none = buildAgentPrompt("Q?", {});
     expect(none).not.toContain("section.png");
     expect(none).not.toContain("context.md");
     expect(none).toContain("Q?");
   });
 
   it("tells the agent not to reveal the solution or modify files", () => {
-    const p = buildAgentPrompt({ question: "Q?", image: null, context: "x" });
+    const p = buildAgentPrompt("Q?", { context: "/t/context.md" });
     expect(p).toMatch(/do not reveal it in full/i);
     expect(p).toMatch(/do not create or modify any files/i);
   });

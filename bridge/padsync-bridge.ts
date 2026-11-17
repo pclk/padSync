@@ -9,8 +9,8 @@
 //   node bridge/padsync-bridge.ts uninstall
 
 import { spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, rm, unlink, writeFile } from "node:fs/promises";
-import { homedir, hostname, tmpdir } from "node:os";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { homedir, hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -22,13 +22,14 @@ import {
   buildAgentPrompt,
   cleanOptions,
   configPath,
-  decodePngDataUrl,
   launchdPlist,
   loadConfig,
   maskToken,
   normalizeServer,
   runAgent,
   saveConfig,
+  sweepStaleJobDirs,
+  withJobDir,
   type Agent,
   type BridgeConfig,
   type ClaimedJob,
@@ -42,6 +43,8 @@ const FLUSH_MS = 1000;
 // and it keeps the job from looking stale (and being reclaimed) during long thinking.
 const HEARTBEAT_MS = 5000;
 const JOB_TIMEOUT_MS = 15 * 60_000;
+// A job directory this old cannot belong to a live job (they time out after JOB_TIMEOUT_MS).
+const STALE_JOB_DIR_MS = 60 * 60_000;
 const TOKEN_RE = /^psd_[A-Za-z0-9_-]{43}$/;
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a);
@@ -95,12 +98,17 @@ async function status() {
   }
 }
 
+/** Aborted on SIGTERM/SIGINT so the running agent is stopped and its job directory removed. */
+const shutdown = new AbortController();
+
 async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
   const o = cleanOptions(job.agent, job.options);
   const how = [o.model, o.effort && `effort ${o.effort}`, o.webSearch && "web search"].filter(Boolean).join(", ");
   log(`job ${job.id} (${job.agent}${how ? `: ${how}` : ""}): ${job.question.slice(0, 80)}`);
-  const dir = await mkdtemp(join(tmpdir(), "padsync-job-"));
   const abort = new AbortController();
+  const onShutdown = () => abort.abort();
+  shutdown.signal.addEventListener("abort", onShutdown);
+  if (shutdown.signal.aborted) abort.abort();
   let latest = "";
   let sent = "";
   let lastContact = Date.now();
@@ -129,19 +137,23 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
   }, FLUSH_MS);
 
   try {
-    if (job.image) await writeFile(join(dir, "section.png"), decodePngDataUrl(job.image));
-    if (job.context) await writeFile(join(dir, "context.md"), job.context);
-    const result = await runAgent({
-      cwd: dir,
-      prompt: buildAgentPrompt(job),
-      command: agentCommand(job.agent, cfg, !!job.image, job.options),
-      timeoutMs: JOB_TIMEOUT_MS,
-      onText: (t) => (latest = t),
-      signal: abort.signal,
-    });
+    const result = await withJobDir(job, (files) =>
+      runAgent({
+        cwd: files.dir,
+        prompt: buildAgentPrompt(job.question, files, job.agent),
+        command: agentCommand(job.agent, cfg, !!files.image, job.options),
+        timeoutMs: JOB_TIMEOUT_MS,
+        onText: (t) => (latest = t),
+        signal: abort.signal,
+      }),
+    );
     clearInterval(ticker);
     await flushing;
-    if (result.status === "cancelled") return;
+    if (result.status === "cancelled") {
+      // Tell padSync now rather than leaving the job to go stale and be reclaimed in 10 minutes.
+      if (shutdown.signal.aborted) await api.update(job.id, { output: result.output, status: "error", error: "the Mac bridge was stopped before finishing; ask again" }).catch(() => {});
+      return;
+    }
     await api.update(job.id, result.status === "done" ? { output: result.output, status: "done" } : { output: result.output, status: "error", error: result.error });
     log(`job ${job.id} ${result.status}${result.error ? `: ${result.error}` : ""}`);
   } catch (e) {
@@ -149,7 +161,7 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
     await api.update(job.id, { status: "error", error: (e as Error).message }).catch(() => {});
   } finally {
     clearInterval(ticker);
-    await rm(dir, { recursive: true, force: true });
+    shutdown.signal.removeEventListener("abort", onShutdown);
   }
 }
 
@@ -164,15 +176,29 @@ async function run() {
   if (!agents.length) throw new Error("neither claude nor codex is on PATH");
   const api = new BridgeApi(cfg);
   const info = { hostname: hostname(), version: VERSION };
+  const swept = await sweepStaleJobDirs(STALE_JOB_DIR_MS);
+  if (swept) log(`removed ${swept} job folder(s) left over from an earlier run`);
+  let active: Promise<void> | null = null;
+  const stop = (sig: string) => {
+    if (shutdown.signal.aborted) return;
+    log(`${sig}: stopping`);
+    shutdown.abort();
+    setTimeout(() => process.exit(1), 10_000).unref();
+    void Promise.resolve(active).finally(() => process.exit(0));
+  };
+  process.on("SIGTERM", () => stop("SIGTERM"));
+  process.on("SIGINT", () => stop("SIGINT"));
   log(`bridge ${VERSION} polling ${cfg.server} as ${maskToken(cfg.token)}`);
 
   let backoff = POLL_MS;
-  for (;;) {
+  while (!shutdown.signal.aborted) {
     try {
       const { job } = await api.claim(agents, info);
       backoff = POLL_MS;
       if (job) {
-        await handleJob(api, cfg, job);
+        active = handleJob(api, cfg, job);
+        await active;
+        active = null;
         continue; // check for the next job immediately
       }
     } catch (e) {
