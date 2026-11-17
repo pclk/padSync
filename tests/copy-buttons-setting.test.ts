@@ -42,7 +42,7 @@ const section = {
 
 const panel = () =>
   renderToStaticMarkup(
-    createElement(SidePanel, { notebookId: "nb", sections: [section], current: section, sectionEl: () => undefined, follow: false, setFollow: () => {}, ipad: null, onJump: () => {} }),
+    createElement(SidePanel, { notebookId: "nb", notebookTitle: "NB", selection: null, sections: [section], current: section, sectionEl: () => undefined, follow: false, setFollow: () => {}, ipad: null, onJump: () => {} }),
   );
 
 describe("copy buttons setting", () => {

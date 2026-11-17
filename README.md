@@ -46,10 +46,17 @@ Sections grow as you write near the bottom. Lasso to move or delete strokes. Tex
 
 ## Ask AI from padSync (Mac bridge)
 
-The side panel's **Ask AI** box queues your question with the section (rendered image + source
-text + hidden solution). A small bridge on your Mac picks it up, runs **Claude Code** or **Codex**
-locally (on your subscription), and streams the answer back into the panel. Jobs asked while the
-Mac is off wait until the bridge comes back.
+The side panel's **Ask AI** box queues your question with a bundle of files: by default the whole
+notebook as `notebook.md` (Markdown + LaTeX), `notebook.json` (padSync format, with ids), a PNG
+render of each section (your handwriting) and embedded images. **What to send** narrows it: pick
+sections, send only a selection (highlighted text and/or lassoed ink), only recently changed
+sections, or turn off renders, typed notes, hidden solutions or images. The size and token estimate
+is always shown, and **Preview** lists exactly the files that will go. A small bridge on your Mac
+picks the job up, writes the files to a private temp folder, runs **Claude Code** or **Codex**
+locally (on your subscription) to read them with its own tools, and streams the answer back. With
+*let AI edit a copy* on, the agent writes changed copies to `out/`; they come back with the answer,
+and a returned `notebook.json` can be reviewed and applied section by section. Jobs asked while the
+Mac is off wait until the bridge comes back. Design: [docs/context-control-2026-11-17.md](docs/context-control-2026-11-17.md).
 
 1. padSync → *Settings* → *Device tokens* → **Create token**, then copy it.
 2. On the Mac, in this repo (Node ≥ 22.18; `claude` and/or `codex` logged in):
@@ -72,7 +79,10 @@ Mac is off wait until the bridge comes back.
 - The bridge reads the token from stdin (never argv), stores it in `~/.config/padsync/bridge.json`
   (mode 600), requires https, and refuses redirects. Agents run in a throwaway directory without
   padSync's credentials in their environment. Claude gets only the `Read` tool and no MCP servers
-  (`--tools Read --strict-mcp-config`); Codex runs with `--sandbox read-only`.
+  (`--tools Read --strict-mcp-config`); Codex runs with `--sandbox read-only`. With *let AI edit a
+  copy*, Claude also gets `Glob`, `Grep`, `Write` and `Edit` under `--permission-mode acceptEdits`
+  (edits approved only inside the job folder), and Codex runs with `--sandbox workspace-write`.
+  *Allow running code* (off by default) adds `Bash` for Claude with Claude Code's sandbox enabled.
 - Limits: this is tool restriction, not filesystem isolation. A read-capable agent can still
   read files your user can (including the bridge config), and two processes sharing one token
   aren't told apart. See [docs/bridge-review.md](docs/bridge-review.md).
