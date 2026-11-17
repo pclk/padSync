@@ -11,6 +11,10 @@
     "typecheck": "next typegen && tsc --noEmit && tsc --noEmit -p bridge"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1170.0",
+    "@aws-sdk/s3-request-presigner": "3.1170.0",
+    "@neon/config": "^1.14.2",
+    "@neon/env": "^2.1.5",
     "@neon/realtime": "^0.2.1",
     "@neondatabase/serverless": "^1.2.1",
     "dexie": "^4.4.7",
@@ -21,6 +25,7 @@
     "marked": "^18.2.0",
     "nanoid": "^6.0.2",
     "next": "16.4.6",
+    "pdfjs-dist": "6.5.438",
     "perfect-freehand": "^1.2.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",

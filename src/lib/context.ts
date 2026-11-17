@@ -278,6 +278,7 @@ function notebookText(input: BundleInput, picked: SectionInput[], o: ContextOpti
     const i = indexOf.get(s.id)!;
     const d = s.data;
     md.push(sectionHeading(i, d));
+    if (d.pdf) md.push(`PDF: ${d.pdf.name} · page ${d.pdf.page}`, d.pdf.text);
     const meta = [`id: ${s.id}`, d.tags?.length ? `tags: ${d.tags.join(", ")}` : null, d.timeLimitMinutes ? `time limit: ${d.timeLimitMinutes} min` : null].filter(Boolean);
     md.push(`<!-- ${meta.join(" · ")} -->`);
     const render = renderPath(i, d.title);
@@ -323,6 +324,7 @@ function selectionText(input: BundleInput, sel: SelectionInput, o: ContextOption
   const i = indexOf.get(sel.sectionId) ?? 0;
   const sec = input.sections[i];
   const md = [`# Selection from section ${i + 1}: ${sec?.data.title?.trim() || "Untitled"}`, `_Notebook: ${input.title.trim() || "Untitled notebook"}. Only this selection was shared._`];
+  if (sec?.data.pdf) md.push(`PDF: ${sec.data.pdf.name} · page ${sec.data.pdf.page}`);
   if (kept.has("selection.png")) md.push("![The selected area, with my handwriting](selection.png)");
   if (sel.text?.trim()) md.push("## Selected text", sel.text.trim());
   return [

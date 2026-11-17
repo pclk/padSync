@@ -1,4 +1,5 @@
 "use client";
+import PdfImport from "./PdfImport";
 
 import { useLiveQuery } from "dexie-react-hooks";
 import Link from "next/link";
@@ -221,6 +222,7 @@ export default function AiImportView() {
         </button>
       </div>
 
+      <PdfImport />
       <div className="mb-4 rounded-xl border p-4 text-sm">
         <label>Saved lecture PDFs from <select aria-label="Saved PDF notebook" value={pdfNotebookId} onChange={(e) => { setPersistentPdfs([]); setPdfNotebookId(e.target.value); }}>
           <option value="library">Lecture library (for a new notebook)</option>

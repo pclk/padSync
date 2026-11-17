@@ -22,6 +22,9 @@ No AirDrop, no Handoff, no PDF round trip.
 
    | Name | Value |
    | --- | --- |
+   | `AWS_ENDPOINT_URL_S3` / `AWS_REGION` | Neon branch storage endpoint and region (same branch as database) |
+   | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Branch storage credential; server-only |
+   | `PDF_STORAGE_BUCKET` | Private bucket name: `uploads` (declared in `neon.ts`) |
    | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | from a GitHub OAuth app (see below) |
    | `SESSION_SECRET` | random string, e.g. `openssl rand -base64 32`; changing it signs all devices out |
    | `ALLOWED_GITHUB_LOGIN` | optional, defaults to `pclk`; the only account allowed in |
@@ -33,6 +36,36 @@ No AirDrop, no Handoff, no PDF round trip.
    homepage `https://<your-domain>`, callback `https://<your-domain>/api/auth/github/callback`.
 4. On the iPad: open the site in Safari → Share → *Add to Home Screen*, open it from there, and
    tap *Sign in with GitHub* on *Settings*. Do the same in the Mac browser.
+
+### Direct PDF import and Neon Object Storage
+
+Choose **Import PDF** on Library or AI import, or drop a PDF there. Each page becomes
+an annotation section; Ask AI and copied section images include the original page.
+Maximum 100 MiB. PDF bytes cache on each device after first open for offline use.
+Without storage credentials, select **Local only** (original stays on that device).
+Design and validation: [docs/pdf-import-2026-11-17.md](docs/pdf-import-2026-11-17.md).
+
+In Neon Console, select the project and the same branch as `DATABASE_URL`. Check its
+region: storage currently supports Ohio, N. Virginia, Frankfurt and Singapore.
+Open **Object Storage**, create a **private** `uploads` bucket, and obtain the
+branch S3 endpoint/region and a credential with storage access. Set the five storage
+variables above in Vercel and redeploy. If storage is unavailable in the console,
+use the documented CLI flow: `neon link`, `neon config add bucket uploads`,
+`neon deploy`, then `neon env pull`; copy the resulting AWS variables to Vercel.
+Storage has no separate manual enable API; a 404 endpoint requires checking region
+availability. Never prefix credentials with `NEXT_PUBLIC_`.
+
+Configure bucket CORS with PutBucketCors (AWS SDK/CLI against that branch endpoint):
+allow your exact production and development origins, methods GET/HEAD/PUT, request
+headers `*`, and expose `ETag`. Example rule:
+
+```json
+{"CORSRules":[{"AllowedOrigins":["https://your-app.vercel.app","http://localhost:3000"],"AllowedMethods":["GET","HEAD","PUT"],"AllowedHeaders":["*"],"ExposeHeaders":["ETag"],"MaxAgeSeconds":3600}]}
+```
+
+Neon's current [storage setup](https://neon.com/docs/storage/get-started) and
+[S3 compatibility](https://neon.com/docs/storage/s3-compatibility) describe provisioning,
+credentials and supported operations. Use separate branch endpoints for previews.
 
 ### Realtime sync (recommended)
 
@@ -134,7 +167,7 @@ iPad PWA ─┐                         ┌─ Mac browser (side panel, follow i
 ## Roadmap
 
 - Canvas import: list courses and files, then pull lecture PDFs, slides and problem sheets.
-- PDF import with `pdf_crop` blocks (lecture excerpts placed in sections).
+- PDF excerpt cropping with `pdf_crop` blocks (whole-page PDF notebooks are supported).
 - Remote MCP server (`/api/mcp`) so Claude Code / Codex can read the current section and import payloads.
 - Realtime ping (Ably / Neon Realtime) in place of the 2 s poll; timed tests; PDF export.
 

@@ -1,4 +1,6 @@
 "use client";
+import PdfImport from "./PdfImport";
+import { forgetPdf } from "@/lib/pdf";
 
 import { useRef, useState } from "react";
 import { selectNotebooks, type LibrarySort } from "@/lib/library";
@@ -7,7 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { db, deviceId } from "@/lib/db";
 import { createNotebook, listNotebooks, putEntities } from "@/lib/store";
-import type { NotebookEntity, PresenceEntity } from "@/lib/types";
+import type { NotebookEntity, PresenceEntity, SectionData } from "@/lib/types";
 import { SyncBadge } from "./SyncBadge";
 
 export default function Library() {
@@ -53,7 +55,11 @@ export default function Library() {
   };
 
   const remove = async (nb: NotebookEntity) => {
-    if (confirm(`Delete “${nb.data.title}”?`)) await mutate(async () => { await putEntities([{ ...nb, deleted: 1 }]); });
+    if (!confirm(`Delete “${nb.data.title}”?`)) return;
+    await mutate(async () => { await putEntities([{ ...nb, deleted: 1 }]); });
+    // The server removes stored PDFs of deleted notebooks; this device's copy goes now.
+    const secs = await db.entities.where("[notebookId+kind]").equals([nb.id, "section"]).toArray();
+    for (const id of new Set(secs.flatMap((s) => (s.data as SectionData).pdf?.documentId ?? []))) await forgetPdf(id).catch(() => {});
   };
 
   return (
@@ -68,6 +74,7 @@ export default function Library() {
         </nav>
       </header>
 
+      <PdfImport />
       <section className="mb-6" aria-labelledby="library-title">
         <h2 id="library-title" className="text-2xl font-semibold tracking-tight">Your notebooks</h2>
         <p className="mt-1 text-sm text-slate-500">A place to write, practise, and bring your notes together.</p>

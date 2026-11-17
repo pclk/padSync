@@ -53,9 +53,10 @@ export async function updateData<D>(id: string, patch: (data: D) => D) {
   await putEntities([{ ...row, data: patch(row.data as D) }]);
 }
 
-export async function createNotebook(title: string, sections: Omit<SectionData, "order" | "createdAt">[] = [], description?: string, source?: NotebookData["source"]) {
+export async function createNotebook(title: string, sections: Omit<SectionData, "order" | "createdAt">[] = [], description?: string, source?: NotebookData["source"], notebookId?: string) {
   const now = Date.now();
   const nb = newEntity<"notebook", NotebookData>("notebook", "", "", { title, description, createdAt: now, ...(source ? { source } : {}) });
+  if (notebookId) nb.id = notebookId;
   nb.notebookId = nb.id;
   const secs = (sections.length ? sections : [blankSection()]).map((s, i) =>
     newEntity<"section", SectionData>("section", nb.id, "", { ...s, order: i + 1, createdAt: now }),
