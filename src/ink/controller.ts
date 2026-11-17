@@ -95,6 +95,9 @@ export class InkController {
       this.live.height = 0;
     }
     if (!canvas) {
+      // The editor is going away mid-stroke: keep what was drawn (sections end it too, but their
+      // cleanup runs after this ref is detached and would find the gesture already cleared).
+      if (this.gesture) this.end(this.gesture, null);
       cancelAnimationFrame(this.frame);
       this.frame = 0;
       this.pending.clear();
@@ -264,9 +267,11 @@ export class InkController {
   }
 
   /** Capture was taken away mid-gesture (element detached, system gesture): the up may never come. */
-  lostCapture(e: PointerEvent) {
+  lostCapture(e: PointerEvent, sec: SectionHandle) {
     const g = this.gesture;
-    if (g && e.pointerId === g.pointerId) this.end(g, null);
+    // Only the gesture's own section: a stale gesture's section losing capture to a new stroke with
+    // the same pointerId must not end that new stroke.
+    if (g && e.pointerId === g.pointerId && sec.id === g.sec.id) this.end(g, null);
   }
 
   /** Ends the open gesture, keeping what was drawn: page hidden, window blurred, section unmounted. */
@@ -421,7 +426,13 @@ export class InkController {
         this.pending.delete(id);
         continue;
       }
-      toSection(p.sec.el.getBoundingClientRect());
+      // A section that unmounted (deleted, editor closing) has no element; its tile never acks.
+      const el = p.sec.el as HTMLElement | null;
+      if (!el) {
+        this.pending.delete(id);
+        continue;
+      }
+      toSection(el.getBoundingClientRect());
       paintStroke(ctx, p.data, p.path);
     }
     if (this.pending.size) this.requestFrame();
@@ -455,9 +466,11 @@ export class InkController {
       for (const s of g.strokes) paintStroke(ctx, s.data, cachedPath(s));
     }
 
-    if (!g && this.hover) {
+    const hoverEl = this.hover?.sec.el as HTMLElement | null | undefined;
+    if (!g && this.hover && !hoverEl) this.hover = null;
+    if (!g && this.hover && hoverEl) {
       const h = this.hover;
-      toSection(h.sec.el.getBoundingClientRect());
+      toSection(hoverEl.getBoundingClientRect());
       const k = this.tool.kind;
       const r = k === "eraser" ? this.tool.eraserSize / 2 : k === "highlighter" ? this.tool.hlSize / 2 : Math.max(this.tool.penSize / 2, 1.5);
       ctx.beginPath();

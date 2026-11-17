@@ -109,7 +109,7 @@ export const SectionView = memo(function SectionView(p: Props) {
         onPointerMove={(e) => controller.move(e.nativeEvent, handle)}
         onPointerUp={(e) => controller.up(e.nativeEvent)}
         onPointerCancel={(e) => controller.up(e.nativeEvent)}
-        onLostPointerCapture={(e) => controller.lostCapture(e.nativeEvent)}
+        onLostPointerCapture={(e) => controller.lostCapture(e.nativeEvent, handle)}
         onPointerLeave={() => controller.leave()}
       />
 

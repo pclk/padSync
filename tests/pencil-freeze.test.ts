@@ -73,7 +73,7 @@ describe("pencil never stays frozen", () => {
     const c = await setup();
     c.down(ev("pointerdown", 1, 1), sec);
     c.move(ev("pointermove", 1, 5), sec);
-    c.lostCapture(ev("lostpointercapture", 1, 5));
+    c.lostCapture(ev("lostpointercapture", 1, 5), sec);
     expect(c.isDrawing()).toBe(false);
     c.up(ev("pointerup", 1, 7));
     expect(committed()).toEqual([2]);
@@ -82,7 +82,7 @@ describe("pencil never stays frozen", () => {
   it("ignores lostpointercapture for another pointer", async () => {
     const c = await setup();
     c.down(ev("pointerdown", 1, 1), sec);
-    c.lostCapture(ev("lostpointercapture", 9, 5));
+    c.lostCapture(ev("lostpointercapture", 9, 5), sec);
     expect(c.isDrawing()).toBe(true);
   });
 

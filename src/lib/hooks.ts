@@ -14,8 +14,12 @@ const subscribe = (fn: () => void) =>
     fn();
   });
 
+// Pages are prerendered with no sync state; hydrate with the same, then switch to the client's
+// (which remembers lastSyncedAt in localStorage), so the badge's label/tooltip don't mismatch.
+const serverSnapshot: ReturnType<typeof getSyncState> = { status: "idle", lastSyncedAt: 0, failures: 0, retryAt: 0, at: 0 };
+
 export function useSyncStatus() {
-  return useSyncExternalStore(subscribe, () => snapshot, () => snapshot);
+  return useSyncExternalStore(subscribe, () => snapshot, () => serverSnapshot);
 }
 
 export function useStoredState<T>(key: string, initial: T): [T, (v: T) => void] {
