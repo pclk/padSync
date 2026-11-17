@@ -3,13 +3,13 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { DEFAULT_CONFIG, PRESETS, chatPrompt, payloadHash, pickResult, reviewPayload, selectSections, stage, type ImportConfig, type JobStatus, type ReturnedFile, type Stage } from "@/lib/ai-import";
 import { blobToBase64 } from "@/lib/ask-bundle";
 import { ACCEPT, checkLimits, formatBytes, move, needsCode } from "@/lib/attachments";
 import { useStoredState } from "@/lib/hooks";
 import { addFiles, clearAttachments, getDraft, listAttachments, removeAttachment, reorderAttachments, setDraft, type StoredAttachment } from "@/lib/import-drafts";
-import { SendError, sendImport, type SendProgress } from "@/lib/import-send";
+import { abortSend, getSendState, isSending, setCurrentJob, startSend, subscribeSend, type SendProgress } from "@/lib/import-send";
 import { GOALS, payloadToSections } from "@/lib/payload";
 import { createNotebook, findImported } from "@/lib/store";
 import type { NotebookEntity } from "@/lib/types";
@@ -58,15 +58,16 @@ export default function AiImportView() {
   const [storedConfig, setStoredConfig] = useStoredState<ImportConfig>("padsync.import.config", initialConfig());
   const config: ImportConfig = { ...DEFAULT_CONFIG, ...storedConfig };
   const setConfig = (patch: Partial<ImportConfig>) => setStoredConfig({ ...config, ...patch });
-  const [jobId, setJobId] = useStoredState<string | null>("padsync.import.jobId", null);
+  // The send and the current job id live outside React (src/lib/import-send.ts): an upload keeps
+  // going if you leave the page, and its progress is back when you return.
+  const sendState = useSyncExternalStore(subscribeSend, getSendState, getSendState);
+  const { jobId, progress, error: sendError } = sendState;
+  const setJobId = setCurrentJob;
   const [jobState, setJob] = useState<Job | null>(null);
   const job = jobState && jobState.id === jobId ? jobState : null;
   const [status, setStatus] = useState<Status | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const [progress, setProgress] = useState<SendProgress | null>(null);
-  const [sendError, setSendError] = useState<string | null>(null);
   const [attachErrors, setAttachErrors] = useState<string[]>([]);
-  const abortRef = useRef<AbortController | null>(null);
 
   // The JSON under review, from whichever source; restored from the draft store.
   const [raw, setRawState] = useState("");
@@ -83,14 +84,19 @@ export default function AiImportView() {
     });
   }, []);
 
+  // Saved shortly after the last change: typing into a multi-MB JSON shouldn't rewrite it per key.
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const setRaw = useCallback((text: string, from: string, files: ReturnedFile[] = []) => {
     setRawState(text);
     setRawFrom(from);
     setReturned(files);
     setImported(null);
-    void setDraft("raw", text);
-    void setDraft("rawFrom", from);
-    void setDraft("returned", files.length ? files : null);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      void setDraft("raw", text);
+      void setDraft("rawFrom", from);
+      void setDraft("returned", files.length ? files : null);
+    }, 300);
   }, []);
 
   // Server status (signed in, bridge seen) every 10 s while the page is visible.
@@ -158,41 +164,24 @@ export default function AiImportView() {
   };
 
   const send = async () => {
-    setSendError(null);
+    if (isSending()) return;
     // An upload interrupted earlier (tab closed) is abandoned for this new one.
     if (jobId && job?.status === "uploading") await fetch(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, { method: "POST" }).catch(() => null);
-    const ac = new AbortController();
-    abortRef.current = ac;
-    setProgress({ phase: "reading", sent: 0, total: list.length });
-    try {
-      const r = await sendImport({
-        config,
-        attachments: list.map((a) => ({ meta: a, base64: () => blobToBase64(a.blob) })),
-        signal: ac.signal,
-        onProgress: setProgress,
-        onJob: setJobId,
-      });
-      setJobId(r.jobId);
-    } catch (e) {
-      setSendError(e instanceof SendError ? e.message : navigator.onLine ? (e as Error).message : "You're offline; sending needs a connection.");
-    } finally {
-      abortRef.current = null;
-      setProgress(null);
-    }
+    await startSend({ config, attachments: list.map((a) => ({ meta: a, base64: () => blobToBase64(a.blob) })) });
   };
 
   const cancel = async () => {
-    abortRef.current?.abort();
+    abortSend();
     if (jobId) await fetch(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, { method: "POST" }).catch(() => null);
     setJob((j) => (j ? { ...j, status: "cancelled" } : j));
   };
 
   const startOver = async () => {
     if (!confirm("Remove the attachments and the JSON under review?")) return;
+    abortSend();
     await clearAttachments();
     setRaw("", "");
     setJobId(null);
-    setSendError(null);
     setAttachErrors([]);
   };
 
@@ -497,14 +486,13 @@ function Progress({ progress, job, bridgeOnline }: { progress: SendProgress | nu
   let label: string | null = null;
   let pct: number | null = null;
   if (progress) {
-    if (progress.phase === "reading") label = `Reading files… (${progress.sent + 1} of ${progress.total})`;
-    else if (progress.phase === "creating") label = "Creating the job…";
+    if (progress.phase === "creating") label = "Creating the job…";
     else {
-      pct = progress.total ? progress.sent / progress.total : 1;
+      pct = progress.total ? progress.sent / progress.total : 0;
       label = `Uploading ${formatBytes(Math.round((progress.sent * 3) / 4))} of ${formatBytes(Math.round((progress.total * 3) / 4))}`;
     }
-  } else if (job?.status === "uploading") label = "Upload interrupted. Send again to retry.";
-  else if (job?.status === "queued") label = bridgeOnline ? "Waiting for the bridge to pick it up…" : "Queued: it starts when the bridge on your Mac is running.";
+  } else if (job?.status === "uploading") label = "The upload was interrupted (page closed or reloaded). Send again to retry.";
+  else if (job?.status === "queued") label = bridgeOnline ? "Waiting for the bridge to pick it up… (if this lasts, update the bridge: older versions can't run imports)" : "Queued: it starts when the bridge on your Mac is running.";
   else if (job?.status === "running") label = "The AI is reading your notes and writing the notebook…";
   else if (job?.status === "done") label = "Done.";
   else if (job?.status === "cancelled") label = "Cancelled.";
@@ -539,7 +527,11 @@ function Review(p: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [duplicates, setDuplicates] = useState<NotebookEntity[] | null>(null);
-  const result = useMemo(() => (p.raw.trim() ? reviewPayload(p.raw, p.returned) : null), [p.raw, p.returned]);
+  // Parsing a large payload on every keystroke would stall typing; React parses the latest text
+  // when it has time, and the import uses that same parsed result.
+  const deferredRaw = useDeferredValue(p.raw);
+  const result = useMemo(() => (deferredRaw.trim() ? reviewPayload(deferredRaw, p.returned) : null), [deferredRaw, p.returned]);
+  const importing = useRef(false);
   const [unticked, setUnticked] = useState<Set<number>>(new Set());
   // A new result starts with every section ticked.
   const [seenRaw, setSeenRaw] = useState(p.raw);
@@ -559,8 +551,10 @@ function Review(p: {
   };
 
   const doImport = async (force = false) => {
-    const payload = result && selectSections(result, ticked);
-    if (!payload || busy) return;
+    const payload = result && deferredRaw === p.raw ? selectSections(result, ticked) : null;
+    // A ref, not just state: two taps in one frame would both see busy === false.
+    if (!payload || importing.current) return;
+    importing.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -575,6 +569,7 @@ function Review(p: {
     } catch (e) {
       setError(`Couldn't create the notebook: ${(e as Error).message}`);
     } finally {
+      importing.current = false;
       setBusy(false);
     }
   };

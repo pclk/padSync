@@ -1,5 +1,6 @@
 import { attachmentPaths, type AttachmentMeta } from "./attachments";
-import { importInlineFiles, importJobBody, splitParts, uploadSpecs, type ImportConfig } from "./ai-import";
+import { importInlineFiles, importJobBody, splitParts, type ImportConfig } from "./ai-import";
+import { base64Length, partsFor, type UploadSpec } from "./uploads";
 
 // Sends an AI import to the bridge: creates the job with its upload manifest, then PUTs each
 // lecture file in parts. Cancelling (the signal) or a failed part cancels the job on the server,
@@ -52,13 +53,9 @@ export async function sendImport(opts: {
   const paths = attachmentPaths(metas);
   if (!opts.attachments.length) throw new SendError("Attach at least one file of lecture notes first.");
 
-  const contents: string[] = [];
-  for (const [i, a] of opts.attachments.entries()) {
-    signal?.throwIfAborted();
-    opts.onProgress?.({ phase: "reading", sent: i, total: opts.attachments.length });
-    contents.push(await a.base64());
-  }
-  const specs = uploadSpecs(contents.map((base64, i) => ({ path: paths[i], mime: metas[i].mime, base64 })));
+  // Sizes are known from the byte counts, so each file is read only when its turn comes: a
+  // 40 MB import never sits in memory as base64 all at once.
+  const specs: UploadSpec[] = metas.map((m, i) => ({ path: paths[i], mime: m.mime, size: base64Length(m.size), parts: partsFor(base64Length(m.size)) }));
   const total = specs.reduce((n, s) => n + s.size, 0);
 
   opts.onProgress?.({ phase: "creating", sent: 0, total });
@@ -72,7 +69,11 @@ export async function sendImport(opts: {
   let status = "uploading";
   try {
     for (const [i, spec] of specs.entries()) {
-      for (const [part, data] of splitParts(contents[i]).entries()) {
+      signal?.throwIfAborted();
+      opts.onProgress?.({ phase: "reading", sent, total });
+      const content = await opts.attachments[i].base64();
+      if (content.length !== spec.size) throw new SendError(`${metas[i].name} changed while it was being sent. Try again.`, jobId);
+      for (const [part, data] of splitParts(content).entries()) {
         for (let attempt = 0; ; attempt++) {
           signal?.throwIfAborted();
           const r = await f(`/api/jobs/${encodeURIComponent(jobId)}/inputs`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ path: spec.path, part, data }), signal }).catch((e: Error) => {
@@ -100,3 +101,72 @@ export async function sendImport(opts: {
   }
   return { jobId, status };
 }
+
+// ---------------------------------------------------------------------------------------------
+// The page's send, kept outside React: leaving the page doesn't stop an upload, and coming back
+// shows its progress again. The current job id is stored too, so a reload resumes following it.
+
+export interface SendState {
+  jobId: string | null;
+  progress: SendProgress | null;
+  error: string | null;
+}
+
+const JOB_KEY = "padsync.import.jobId";
+let state: SendState | null = null;
+let inflight: AbortController | null = null;
+const listeners = new Set<() => void>();
+
+function readJobId(): string | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(JOB_KEY) ?? "null");
+    return typeof v === "string" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function update(patch: Partial<SendState>) {
+  state = { ...getSendState(), ...patch };
+  if ("jobId" in patch)
+    try {
+      localStorage.setItem(JOB_KEY, JSON.stringify(state.jobId));
+    } catch {}
+  for (const l of listeners) l();
+}
+
+export function getSendState(): SendState {
+  return (state ??= { jobId: readJobId(), progress: null, error: null });
+}
+
+export function subscribeSend(fn: () => void) {
+  listeners.add(fn);
+  return () => void listeners.delete(fn);
+}
+
+export function setCurrentJob(jobId: string | null) {
+  update({ jobId, error: null });
+}
+
+/** Starts a send unless one is already running (a second tap does nothing). */
+export async function startSend(opts: Omit<Parameters<typeof sendImport>[0], "signal" | "onProgress" | "onJob">): Promise<void> {
+  if (inflight) return;
+  const ac = new AbortController();
+  inflight = ac;
+  update({ progress: { phase: "creating", sent: 0, total: 0 }, error: null });
+  try {
+    await sendImport({ ...opts, signal: ac.signal, onProgress: (progress) => update({ progress }), onJob: (jobId) => update({ jobId }) });
+    update({ progress: null });
+  } catch (e) {
+    const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+    update({ progress: null, error: e instanceof SendError ? e.message : offline ? "You're offline; sending needs a connection." : (e as Error).message });
+  } finally {
+    inflight = null;
+  }
+}
+
+export function abortSend() {
+  inflight?.abort();
+}
+
+export const isSending = () => inflight !== null;

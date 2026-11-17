@@ -193,7 +193,7 @@ HOW TO USE IT
 - Hidden material (solution, cloze answers, recall "a", "why" with blankWhy) must be correct and complete: I use it to check myself.
 - Stay faithful to the lecture: same notation, same order, nothing invented. Mention the slide/page in a tag or caption when useful.
 - JSON strings: escape backslashes (write "\\\\int" to get \\int) and newlines (\\n).${file ? "\n- If you include a figure from the material, save it as a PNG or JPEG under the figures folder named in your instructions and reference it by that relative path." : ""}
-${goals.length ? `\nWHAT I WANT\n${goals.map((g) => `- ${g.guidance}`).join("\n")}\n` : ""}${o.files?.length ? `\nATTACHED MATERIAL (in this order)\n${o.files.map((f, i) => `${i + 1}. ${f}`).join("\n")}\n` : ""}
+${goals.length ? `\nWHAT I WANT\n${goals.map((g) => `- ${g.guidance}`).join("\n")}\n` : ""}${o.files?.length ? `\nATTACHED MATERIAL (in this order)\n${o.files.map((f, i) => `${i + 1}. ${f.replace(/[\r\n]+/g, " ")}`).join("\n")}\n` : ""}
 MY REQUEST
 ${o.request.trim() || "(Describe what to generate: e.g. organised notes with blanks for Lecture 9, then 6 practice problems.)"}
 

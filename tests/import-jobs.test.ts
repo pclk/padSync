@@ -42,7 +42,7 @@ async function put(id: string, path: string, part: number, data: string, s: stri
   return { status: res.status, body: (await res.json()) as { status?: string; received?: number; expected?: number; error?: string } };
 }
 async function claim(b = bridge) {
-  const res = await claimRoute(req("/api/bridge/claim", { body: { agents: ["claude"] }, bearer: b.token }));
+  const res = await claimRoute(req("/api/bridge/claim", { body: { agents: ["claude"], features: ["import"] }, bearer: b.token }));
   return ((await res.json()) as { job: null | { id: string; kind: string; uploads: { path: string; size: number; parts: number }[]; files: { path: string }[] } }).job;
 }
 async function fetchPart(id: string, path: string, part: number, b = bridge) {

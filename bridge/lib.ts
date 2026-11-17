@@ -258,9 +258,13 @@ export async function collectOutFiles(outDir: string): Promise<CollectedFiles> {
       return;
     }
     const names = (await readdir(join(outDir, rel)).catch(() => [] as string[])).sort();
-    for (const name of names) {
+    // Files before folders: the main result (padsync.json, notebook.json) must not lose the size
+    // budget to a folder of figures that happens to sort first.
+    const entries = (await Promise.all(names.map(async (name) => ({ name, st: await lstat(join(outDir, rel ? `${rel}/${name}` : name)).catch(() => null) })))).sort(
+      (a, b) => Number(!!a.st?.isDirectory()) - Number(!!b.st?.isDirectory()),
+    );
+    for (const { name, st } of entries) {
       const path = rel ? `${rel}/${name}` : name;
-      const st = await lstat(join(outDir, path)).catch(() => null);
       if (!st) continue;
       if (st.isDirectory()) {
         if (depth === 0 && BUNDLE_PATH_RE.test(name)) await visit(path, 1);
@@ -742,7 +746,8 @@ export class BridgeApi {
   }
 
   claim(agents: Agent[], info: { hostname?: string; version?: string }) {
-    return this.call<{ job: ClaimedJob | null }>("POST", "/api/bridge/claim", { agents, info });
+    // "import": this bridge fetches uploads and runs import jobs (older bridges don't get them).
+    return this.call<{ job: ClaimedJob | null }>("POST", "/api/bridge/claim", { agents, info, features: ["import"] });
   }
 
   input(jobId: string, path: string, part: number, opts?: { signal?: AbortSignal }) {

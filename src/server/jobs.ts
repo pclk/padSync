@@ -248,21 +248,25 @@ export async function cancelJob(sql: Sql, id: string): Promise<Job | null> {
   return rows[0] ? toJob(rows[0]) : null;
 }
 
+/** What a bridge can run beyond plain questions; an older bridge sends none and never gets imports. */
+export const BRIDGE_FEATURES = ["import"] as const;
+
 /** Atomically hands the oldest runnable job to this device (or reclaims a stale one). */
-export async function claimJob(sql: Sql, deviceId: string, agents: readonly Agent[]): Promise<ClaimedJob | null> {
+export async function claimJob(sql: Sql, deviceId: string, agents: readonly Agent[], features: readonly string[] = []): Promise<ClaimedJob | null> {
   if (!agents.length) return null;
   const rows = await sql.query<Row>(
     `update jobs set status = 'running', claimed_by = $1, claimed_at = now(), updated_at = now(), output = '', error = null
      where id = (
        select id from jobs
        where agent = any($2::text[])
+         and (kind = 'ask' or kind = any($4::text[]))
          and (status = 'queued' or (status = 'running' and updated_at < now() - make_interval(secs => $3)))
        order by created_at
        limit 1
        for update skip locked
      )
      returning ${PUBLIC_COLS}, context, image, files`,
-    [deviceId, agents, STALE_AFTER_S],
+    [deviceId, agents, STALE_AFTER_S, features],
   );
   const r = rows[0];
   return r ? { ...toJob(r), context: r.context ?? "", image: r.image ?? null, files: r.files ?? [] } : null;

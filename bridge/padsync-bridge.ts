@@ -41,7 +41,7 @@ import {
   type JobFile,
 } from "./lib.ts";
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 const POLL_MS = 3000;
 const MAX_BACKOFF_MS = 60_000;
 const FLUSH_MS = 1000;

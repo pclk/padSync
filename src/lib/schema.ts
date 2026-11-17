@@ -385,6 +385,17 @@ export function extractJson(raw: string): string {
   return text;
 }
 
+function objectCandidates(text: string): unknown {
+  const end = text.lastIndexOf("}");
+  for (let i = text.indexOf("{", 1); i >= 0 && i < end; i = text.indexOf("{", i + 1)) {
+    if (!/^\{\s*"/.test(text.slice(i, i + 20))) continue;
+    try {
+      return JSON.parse(text.slice(i, end + 1));
+    } catch {}
+  }
+  return undefined;
+}
+
 export function parsePayloadText(raw: string): ParseResult {
   if (raw.length > MAX_PAYLOAD_CHARS) return fail(`The JSON is ${(raw.length / 1e6).toFixed(1)} MB; the limit is ${MAX_PAYLOAD_CHARS / 1e6} MB.`);
   const text = extractJson(raw);
@@ -393,6 +404,9 @@ export function parsePayloadText(raw: string): ParseResult {
   try {
     json = JSON.parse(text);
   } catch (e) {
+    // Prose with braces before the JSON ("use {x} notation: {…}"): try each object start.
+    const retry = objectCandidates(text);
+    if (retry !== undefined) return parsePayloadValue(retry);
     const msg = (e as Error).message;
     const pos = /position (\d+)/.exec(msg);
     const where = pos ? ` (line ${text.slice(0, Number(pos[1])).split("\n").length})` : "";
