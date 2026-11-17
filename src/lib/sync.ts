@@ -1,3 +1,5 @@
+import { emitActivity, hlcDevice, type ActivityKind } from "./activity";
+import { deviceId } from "./db";
 import { beginSyncDebugRequest, debugNow, parseServerTiming, recordRemoteApplied, recordSyncDebug, syncDebugEnabled, updateSyncDebugRequest } from "./sync-debug";
 import { startRealtime, type RealtimeStatus } from "./sync-realtime";
 import { DEFAULT_DEBOUNCE_MS, validDebounce, DEFAULT_SYNC_CONFIG, normalizeSyncConfig, type SyncConfig } from "./sync-policy";
@@ -253,6 +255,7 @@ export async function syncOnce(context = { trigger: "manual", queueMs: 0, timerL
 
     updateSyncDebugRequest(trace, { applyMs: debugNow() - phaseStart, applied: applied.length, phase: 'Done' });
     recordRemoteApplied(trace, applied);
+    if (applied.some(e => e.kind === "stroke" || e.kind === "textbox" || e.kind === "section")) emitRemoteActivity(applied);
     completed = true;
     setStatus("synced");
     return body.more || dirty.length === ENTITY_BATCH || events.length === EVENT_BATCH;
@@ -278,4 +281,17 @@ export function stopSync() {
 export async function resetCursor() {
   await setMeta("cursor", 0);
   requestSync(0);
+}
+
+/** One edit signal for each notebook represented in an applied pull batch, including tombstones. */
+export function emitRemoteActivity(applied: Omit<Entity, "dirty">[], ownDevice = deviceId(), at = Date.now()) {
+  const notebooks = new Map<string, Set<ActivityKind>>();
+  for (const e of applied) {
+    if (hlcDevice(e.hlc) === ownDevice) continue;
+    const kind = e.kind === 'textbox' ? 'text' : e.kind === 'stroke' ? 'stroke' : e.kind === 'section' ? 'section' : null;
+    if (!kind) continue;
+    const kinds = notebooks.get(e.notebookId) ?? new Set<ActivityKind>();
+    kinds.add(kind); notebooks.set(e.notebookId, kinds);
+  }
+  for (const [notebookId, kinds] of notebooks) emitActivity({notebookId, source:'remote', kinds:[...kinds], at});
 }
