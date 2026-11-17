@@ -56,15 +56,41 @@ export function outlineToPath(outline: number[][]): Path2D {
   return path;
 }
 
+/** Radius of a single-point stroke (a tap), drawn as a dot. */
+export function dotRadius(d: StrokeData): number {
+  const r = d.tool === "highlighter" ? d.size / 2 : (d.size * (0.35 + 0.5 * (d.input === "pen" ? smoothPressure(d.pts)[0] : 0.5))) / 2;
+  return Math.max(r, 0.8);
+}
+
 export function strokePath(d: StrokeData, last = true): Path2D {
   if (d.pts.length === STROKE_STRIDE) {
     // A tap: draw a dot.
     const p = new Path2D();
-    const r = d.tool === "highlighter" ? d.size / 2 : (d.size * (0.35 + 0.5 * (d.input === "pen" ? smoothPressure(d.pts)[0] : 0.5))) / 2;
-    p.arc(d.pts[0], d.pts[1], Math.max(r, 0.8), 0, Math.PI * 2);
+    p.arc(d.pts[0], d.pts[1], dotRadius(d), 0, Math.PI * 2);
     return p;
   }
   return outlineToPath(getStroke(toInput(d.pts, d.input), strokeOptions(d, last)));
+}
+
+const r1 = (n: number) => Math.round(n * 10) / 10;
+
+/** The same outline as strokePath, as an SVG path `d` (for library thumbnails, no canvas needed). */
+export function strokeSvgPath(d: StrokeData): string {
+  if (d.pts.length === STROKE_STRIDE) {
+    const [x, y, r] = [d.pts[0], d.pts[1], dotRadius(d)].map(r1);
+    return `M${r1(x - r)} ${y}a${r} ${r} 0 1 0 ${r1(2 * r)} 0a${r} ${r} 0 1 0 ${r1(-2 * r)} 0Z`;
+  }
+  const outline = getStroke(toInput(d.pts, d.input), strokeOptions(d, true));
+  const n = outline.length;
+  if (n < 2) return "";
+  // Quadratic curves through midpoints, exactly as outlineToPath.
+  let out = `M${r1(outline[0][0])} ${r1(outline[0][1])}`;
+  for (let i = 1; i < n; i++) {
+    const [x0, y0] = outline[i];
+    const [x1, y1] = outline[(i + 1) % n];
+    out += `Q${r1(x0)} ${r1(y0)} ${r1((x0 + x1) / 2)} ${r1((y0 + y1) / 2)}`;
+  }
+  return out + "Z";
 }
 
 const pathCache = new Map<string, Path2D>();

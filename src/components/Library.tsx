@@ -13,6 +13,7 @@ import type { NotebookEntity, PresenceEntity, SectionData } from "@/lib/types";
 import { SyncBadge } from "./SyncBadge";
 import { Icon, Logo } from "./Icons";
 import { Dialog } from "./Dialog";
+import { NotebookThumb } from "./NotebookThumb";
 import { deferredAction } from "@/lib/deferred";
 
 /** How long the "Undo" toast stays after deleting a notebook; the delete is written after it. */
@@ -176,7 +177,7 @@ export default function Library() {
             <li key={nb.id} className="group card relative overflow-hidden transition-shadow hover:shadow-lift">
               <Link href={`/notebook?id=${nb.id}`} className="block rounded-2xl">
                 <div className="relative m-3 mb-0 aspect-[16/10] overflow-hidden rounded-xl border border-slate-100 bg-[#fdfdfb]">
-                  <div className="absolute inset-0 bg-[radial-gradient(#d5dbe5_1px,transparent_1px)] [background-size:14px_14px] transition-transform duration-300 group-hover:scale-[1.03] motion-reduce:transition-none" />
+                  <NotebookThumb notebookId={nb.id} stamp={edited === undefined ? undefined : edited.get(nb.id) ?? nb.data.createdAt} />
                 </div>
                 <div className="py-3 pl-4 pr-20">
                   <div className="truncate font-medium text-slate-900" title={nb.data.title}>{nb.data.title}</div>

@@ -12,6 +12,7 @@ const documents = new Map<string, Promise<PDFDocumentProxy>>();
 export async function forgetPdf(id: string) {
   void documents.get(id)?.then(doc => doc.loadingTask.destroy()).catch(() => {}); documents.delete(id);
   for (const key of [...renders.keys()]) if (key.startsWith(`${id}:`)) renders.delete(key);
+  for (const key of [...thumbs.keys()]) if (key.startsWith(`${id}:`)) { void thumbs.get(key)!.then(url => url && URL.revokeObjectURL(url)); thumbs.delete(key); }
   await db.meta.delete(`pdf-bytes:${id}`);
 }
 /** Asks the server to remove stored PDFs no notebook can reach (deleted elsewhere, abandoned uploads). */
@@ -78,4 +79,24 @@ export function pdfRaster(page: PdfPage, density?: number): Promise<Blob> {
 export async function pdfImage(page: PdfPage, density?: number) {
   const url = URL.createObjectURL(await pdfRaster(page, density));
   try { const img = new Image(); img.src = url; await img.decode(); return img; } finally { URL.revokeObjectURL(url); }
+}
+// Library thumbnails: page rasters at a low density, kept as object URLs for the session.
+const thumbs = new Map<string, Promise<string | null>>();
+/**
+ * A small raster of a PDF page for a library card, or null when this device has no copy of the
+ * file (a thumbnail never downloads a whole PDF) or it fails to render.
+ */
+export function pdfThumbnail(page: PdfPage): Promise<string | null> {
+  const key = `${page.documentId}:${page.page}`;
+  let job = thumbs.get(key);
+  if (!job) {
+    job = (async () => {
+      if (!(await db.meta.where('key').equals(`pdf-bytes:${page.documentId}`).count())) return null;
+      return URL.createObjectURL(await pdfRaster(page, 0.5));
+    })().catch(() => null);
+    // Misses are not remembered, so a PDF cached later (opening the notebook) gets its preview.
+    void job.then((url) => { if (!url) thumbs.delete(key); });
+    thumbs.set(key, job);
+  }
+  return job;
 }
