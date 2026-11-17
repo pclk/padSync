@@ -54,8 +54,11 @@ export async function createNotebook(title: string, sections: Omit<SectionData, 
   const secs = (sections.length ? sections : [blankSection()]).map((s, i) =>
     newEntity<"section", SectionData>("section", nb.id, "", { ...s, order: i + 1, createdAt: now }),
   );
-  await putEntities([nb, ...secs]);
-  await logEvent(nb.id, null, "notebook_create", { sections: secs.length });
+  // A failed event write must not leave a notebook behind when the UI offers retry.
+  await db.transaction("rw", db.entities, db.events, async () => {
+    await putEntities([nb, ...secs]);
+    await logEvent(nb.id, null, "notebook_create", { sections: secs.length });
+  });
   return nb.id;
 }
 
