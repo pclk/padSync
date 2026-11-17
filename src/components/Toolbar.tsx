@@ -20,6 +20,7 @@ const TOOLS: { kind: ToolKind; label: string; icon: string; key: string }[] = [
 ];
 
 interface Props {
+  layout?: { mode: "auto" | "drawing" | "chat"; effective: "drawing" | "chat"; setMode: (mode: "auto" | "drawing" | "chat") => void };
   notebookId?: string;
   title: string;
   tool: ToolState;
@@ -61,6 +62,9 @@ export function Toolbar(p: Props) {
           {Math.round(p.zoom * 100)}%
         </button>
         {p.notebookId && <Link href={`/import?notebookId=${encodeURIComponent(p.notebookId)}`} className="rounded-lg px-2 py-1 text-xs text-blue-700">AI & PDFs</Link>}
+        {p.layout && <div role="group" aria-label="Layout" className="flex rounded-lg border p-1">
+          {(["auto", "drawing", "chat"] as const).map(mode => <button key={mode} aria-pressed={p.layout!.mode === mode} className="rounded px-2 py-1 text-xs aria-pressed:bg-slate-200" onClick={() => p.layout!.setMode(mode)}>{mode === "auto" ? "Auto" : mode === "drawing" ? "Drawing" : "Chat"}{mode === "auto" && p.layout!.mode === "auto" && <span aria-label={p.layout!.effective} title={p.layout!.effective} className={`ml-1 inline-block h-2 w-2 rounded-full ${p.layout!.effective === "drawing" ? "bg-blue-500" : "bg-emerald-500"}`} />}</button>)}
+        </div>}
         <SyncBadge />
         <button
           className={`rounded-lg px-3 py-2 text-sm ${p.panelOpen ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"}`}
