@@ -1,9 +1,10 @@
 import { nanoid } from "nanoid";
 import { db, deviceId } from "./db";
-import { hlcNow } from "./hlc";
+import { hlcNow, hlcObserve } from "./hlc";
 import { requestSync } from "./sync";
 import {
   SCREEN_HEIGHT,
+  STROKE_STRIDE,
   type Entity,
   type EntityKind,
   type NotebookData,
@@ -18,12 +19,16 @@ import {
 
 // All local writes go through here: stamp a fresh clock, mark dirty, schedule a push.
 
-export async function putEntities(entities: Entity[]) {
-  if (!entities.length) return;
+export async function putEntities<E extends Entity>(entities: E[]): Promise<E[]> {
+  if (!entities.length) return [];
   const device = deviceId();
+  // A rewrite must sort after the version it replaces, even if this device's clock went back
+  // since that version was stamped (the server ignores writes with an older hlc).
+  for (const e of entities) if (e.hlc) hlcObserve(e.hlc);
   const stamped = entities.map((e) => ({ ...e, hlc: hlcNow(device), dirty: 1 as const }));
   await db.entities.bulkPut(stamped);
   requestSync();
+  return stamped;
 }
 
 export function newEntity<K extends EntityKind, D>(kind: K, notebookId: string, parentId: string, data: D, id = nanoid()): Entity<K, D> {
@@ -87,7 +92,7 @@ export async function moveStrokes(strokes: StrokeEntity[], dx: number, dy: numbe
   await putEntities(
     strokes.map((s) => {
       const pts = s.data.pts.slice();
-      for (let i = 0; i < pts.length; i += 6) {
+      for (let i = 0; i < pts.length; i += STROKE_STRIDE) {
         pts[i] += dx;
         pts[i + 1] += dy;
       }
@@ -116,10 +121,10 @@ export function liveSections(notebookId: string) {
 
 export function liveChildren<T extends Entity>(sectionId: string, kind: EntityKind) {
   return db.entities
-    .where("[parentId+kind]")
-    .equals([sectionId, kind])
+    .where("[parentId+kind+deleted]")
+    .equals([sectionId, kind, 0])
     .toArray()
-    .then((rows) => rows.filter((r) => !r.deleted) as T[]);
+    .then((rows) => rows as T[]);
 }
 
 export type { TextBoxEntity };

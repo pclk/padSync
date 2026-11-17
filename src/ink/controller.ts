@@ -2,7 +2,7 @@ import { db, deviceId } from "@/lib/db";
 import { logEvent, moveStrokes, newEntity, putEntities, setDeleted } from "@/lib/store";
 import { STROKE_STRIDE, type StrokeData, type StrokeEntity } from "@/lib/types";
 import { dataBox, hitStrokes, lassoStrokes, strokeBox, unionBox, type Box } from "./geometry";
-import { paintStroke, strokePath, cachedPath } from "./render";
+import { paintStroke, strokePath, cachedPath, seedPath } from "./render";
 import { UndoStack } from "./undo";
 
 // Turns pointer input on a section into strokes, erasures and lasso moves. The in-progress
@@ -40,6 +40,8 @@ type Gesture =
 
 interface Pending {
   data: StrokeData;
+  /** Outline computed once at commit; redrawn every frame until the tile has painted it. */
+  path: Path2D;
   sec: SectionHandle;
   until: number;
 }
@@ -257,8 +259,10 @@ export class InkController {
   private async commitInk(g: Extract<Gesture, { type: "ink" }>) {
     if (!g.data.pts.length) return;
     const stroke = newEntity<"stroke", StrokeData>("stroke", this.notebookId, g.sec.id, g.data);
-    this.pending.set(stroke.id, { data: g.data, sec: g.sec, until: performance.now() + 1500 });
-    await putEntities([stroke]);
+    const path = strokePath(g.data);
+    this.pending.set(stroke.id, { data: g.data, path, sec: g.sec, until: performance.now() + 1500 });
+    const [saved] = await putEntities([stroke]);
+    seedPath(saved, path);
     const id = stroke.id;
     this.undo.push({ label: "stroke", undo: () => setDeleted([id], true), redo: () => setDeleted([id], false) });
     const n = g.data.pts.length / STROKE_STRIDE;
@@ -342,7 +346,7 @@ export class InkController {
         continue;
       }
       toSection(p.sec.el.getBoundingClientRect());
-      paintStroke(ctx, p.data, strokePath(p.data));
+      paintStroke(ctx, p.data, p.path);
     }
     if (this.pending.size) this.requestFrame();
 

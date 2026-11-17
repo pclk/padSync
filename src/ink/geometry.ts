@@ -85,7 +85,17 @@ export function pointInPolygon(x: number, y: number, poly: number[][]) {
 /** A stroke is lassoed when at least half of its points fall inside the polygon. */
 export function lassoStrokes(strokes: StrokeEntity[], poly: number[][]): StrokeEntity[] {
   if (poly.length < 3) return [];
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const [x, y] of poly) {
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
   return strokes.filter((s) => {
+    // Strokes clear of the lasso's bounds can't have points inside it.
+    const b = strokeBox(s);
+    if (b.maxX < minX || b.minX > maxX || b.maxY < minY || b.minY > maxY) return false;
     const p = s.data.pts;
     let inside = 0, total = 0;
     for (let i = 0; i < p.length; i += STROKE_STRIDE) {

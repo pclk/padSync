@@ -56,19 +56,39 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return Response.json({ error: parsed.error.issues.slice(0, 5) }, { status: 400 });
   const { since, changes, events } = parsed.data;
 
-  if (changes.length) {
-    const rows = changes.map((c) => ({ id: c.id, kind: c.kind, notebook_id: c.notebookId, parent_id: c.parentId, data: c.data, hlc: c.hlc, deleted: c.deleted === 1 }));
-    await sql.query(
-      `insert into entities (id, kind, notebook_id, parent_id, data, hlc, deleted)
-       select id, kind, notebook_id, parent_id, data, hlc, deleted
-       from jsonb_to_recordset($1::jsonb) as x(id text, kind text, notebook_id text, parent_id text, data jsonb, hlc text, deleted boolean)
-       on conflict (id) do update set
-         kind = excluded.kind, notebook_id = excluded.notebook_id, parent_id = excluded.parent_id,
-         data = excluded.data, hlc = excluded.hlc, deleted = excluded.deleted,
-         seq = nextval('entity_seq'), updated_at = now()
-       where entities.hlc < excluded.hlc`,
+  // One row per id (the newest), or the upsert fails with "cannot affect row a second time".
+  const latest = new Map<string, (typeof changes)[number]>();
+  for (const c of changes) {
+    const prev = latest.get(c.id);
+    if (!prev || c.hlc > prev.hlc) latest.set(c.id, c);
+  }
+  const pushed = [...latest.values()];
+
+  // A write that loses to a newer server version gets that version back, even if the caller's
+  // cursor is already past it, so the two never stay diverged. The outer select reads the snapshot
+  // from before the upsert, which is exactly where those losers show up. hlc compares bytewise
+  // (collate "C"), the same order the client's string comparison uses.
+  let lost: Row[] = [];
+  if (pushed.length) {
+    const rows = pushed.map((c) => ({ id: c.id, kind: c.kind, notebook_id: c.notebookId, parent_id: c.parentId, data: c.data, hlc: c.hlc, deleted: c.deleted === 1 }));
+    lost = (await sql.query(
+      `with x as (
+         select * from jsonb_to_recordset($1::jsonb)
+           as x(id text, kind text, notebook_id text, parent_id text, data jsonb, hlc text, deleted boolean)
+       ), up as (
+         insert into entities (id, kind, notebook_id, parent_id, data, hlc, deleted)
+         select id, kind, notebook_id, parent_id, data, hlc, deleted from x
+         on conflict (id) do update set
+           kind = excluded.kind, notebook_id = excluded.notebook_id, parent_id = excluded.parent_id,
+           data = excluded.data, hlc = excluded.hlc, deleted = excluded.deleted,
+           seq = nextval('entity_seq'), updated_at = now()
+         where entities.hlc collate "C" < excluded.hlc collate "C"
+       )
+       select e.id, e.kind, e.notebook_id, e.parent_id, e.data, e.hlc, e.deleted, e.seq
+       from entities e join x on x.id = e.id
+       where e.hlc collate "C" > x.hlc collate "C"`,
       [JSON.stringify(rows)],
-    );
+    )) as Row[];
   }
 
   if (events.length) {
@@ -89,8 +109,15 @@ export async function POST(req: NextRequest) {
   const more = pulled.length > PULL_LIMIT;
   const page = more ? pulled.slice(0, PULL_LIMIT) : pulled;
 
+  // The caller already has what it just wrote, so those rows are not echoed back; the cursor
+  // still moves past them.
+  const sentHlc = new Map(pushed.map((c) => [c.id, c.hlc]));
+  const out = page.filter((r) => sentHlc.get(r.id) !== r.hlc);
+  const inPage = new Set(out.map((r) => r.id));
+  for (const r of lost) if (!inPage.has(r.id)) out.push(r);
+
   return Response.json({
-    changes: page.map((r) => ({ id: r.id, kind: r.kind, notebookId: r.notebook_id, parentId: r.parent_id, data: r.data, hlc: r.hlc, deleted: r.deleted ? 1 : 0 })),
+    changes: out.map((r) => ({ id: r.id, kind: r.kind, notebookId: r.notebook_id, parentId: r.parent_id, data: r.data, hlc: r.hlc, deleted: r.deleted ? 1 : 0 })),
     cursor: page.length ? Number(page[page.length - 1].seq) : since,
     more,
   });

@@ -1,15 +1,15 @@
 "use client";
 
 import { useLiveQuery } from "dexie-react-hooks";
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { InkController, Selection, SectionHandle } from "@/ink/controller";
 import { strokeBox, unionBox } from "@/ink/geometry";
 import { paintStrokes } from "@/ink/render";
+import { paintDelta, planTiles, sameVersions } from "@/ink/tiles";
 import { highlight, renderMarkdown } from "@/lib/markdown";
 import { liveChildren, logEvent, putEntities, setDeleted, updateData } from "@/lib/store";
 import { PAGE_WIDTH, SPACE_PX, type Block, type SectionEntity, type StrokeEntity, type TextBoxData, type TextBoxEntity } from "@/lib/types";
 
-const TILE_H = 768;
 // iOS caps canvas area; 2.95 keeps a full-width tile under 4096px wide.
 const MAX_SCALE = 2.95;
 
@@ -18,6 +18,7 @@ interface Props {
   index: number;
   controller: InkController;
   zoom: number;
+  /** This section's selection only, so other sections' memo holds while lassoing. */
   selection: Selection | null;
   draggingIds: Set<string> | null;
   editingTextId: string | null;
@@ -64,24 +65,15 @@ export const SectionView = memo(function SectionView(p: Props) {
     [section.id],
   );
 
-  const tiles = useMemo(() => {
-    const n = Math.max(1, Math.ceil(height / TILE_H));
-    return Array.from({ length: n }, (_, i) => {
-      const top = i * TILE_H;
-      const h = Math.min(TILE_H, height - top);
-      const inTile = strokes.filter((s) => {
-        const b = strokeBox(s);
-        return b.maxY >= top && b.minY <= top + h;
-      });
-      return { top, h, strokes: inTile };
-    });
-  }, [height, strokes]);
+  const tiles = useMemo(() => planTiles(height, strokes), [height, strokes]);
 
-  const sel = p.selection?.sectionId === section.id ? p.selection : null;
+  const sel = p.selection;
+  const { registerEl } = p;
+  const sectionRef = useCallback((el: HTMLElement | null) => registerEl(section.id, el), [registerEl, section.id]);
 
   return (
     <section
-      ref={(el) => p.registerEl(section.id, el)}
+      ref={sectionRef}
       data-section-id={section.id}
       className={`paper template-${section.data.template} relative mx-auto bg-white shadow-sm`}
       style={{ width: PAGE_WIDTH, height }}
@@ -188,7 +180,20 @@ function BlockView({ block }: { block: Block }) {
   }
 }
 
-function InkTile({ top, height, strokes, zoom, hidden, controller }: { top: number; height: number; strokes: StrokeEntity[]; zoom: number; hidden: Set<string> | null; controller: InkController }) {
+interface TileProps {
+  top: number;
+  height: number;
+  strokes: StrokeEntity[];
+  zoom: number;
+  hidden: Set<string> | null;
+  controller: InkController;
+}
+
+// A stroke written in one tile leaves the other tiles of the section alone.
+const sameTile = (a: TileProps, b: TileProps) =>
+  a.top === b.top && a.height === b.height && a.zoom === b.zoom && a.hidden === b.hidden && a.controller === b.controller && sameVersions(a.strokes, b.strokes);
+
+const InkTile = memo(function InkTile({ top, height, strokes, zoom, hidden, controller }: TileProps) {
   const holder = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [visible, setVisible] = useState(false);
@@ -201,21 +206,35 @@ function InkTile({ top, height, strokes, zoom, hidden, controller }: { top: numb
     return () => io.disconnect();
   }, []);
 
+  // What the bitmap currently shows, so a new stroke on top can be painted alone.
+  const painted = useRef<{ strokes: StrokeEntity[]; scale: number; hidden: Set<string> | null } | null>(null);
+
   useEffect(() => {
     const c = canvas.current;
-    if (!visible || !c) return;
+    if (!visible || !c) {
+      painted.current = null;
+      return;
+    }
     const scale = Math.min((window.devicePixelRatio || 1) * zoom, MAX_SCALE);
     const w = Math.round(PAGE_WIDTH * scale);
     const h = Math.round(height * scale);
-    if (c.width !== w) c.width = w;
-    if (c.height !== h) c.height = h;
-    const ctx = c.getContext("2d")!;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-    ctx.setTransform(scale, 0, 0, scale, 0, -top * scale);
     const shown = hidden ? strokes.filter((s) => !hidden.has(s.id)) : strokes;
-    paintStrokes(ctx, shown);
-    controller.ackPainted(shown.map((s) => s.id));
+    const prev = painted.current;
+    const ctx = c.getContext("2d")!;
+    const delta = prev && prev.scale === scale && prev.hidden === hidden && c.width === w && c.height === h ? paintDelta(prev.strokes, shown) : null;
+    if (delta) {
+      ctx.setTransform(scale, 0, 0, scale, 0, -top * scale);
+      paintStrokes(ctx, delta);
+    } else {
+      if (c.width !== w) c.width = w;
+      if (c.height !== h) c.height = h;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      ctx.setTransform(scale, 0, 0, scale, 0, -top * scale);
+      paintStrokes(ctx, shown);
+    }
+    painted.current = { strokes: shown, scale, hidden };
+    controller.ackPainted((delta ?? shown).map((s) => s.id));
   }, [visible, strokes, zoom, height, top, hidden, controller]);
 
   useEffect(() => {
@@ -232,7 +251,7 @@ function InkTile({ top, height, strokes, zoom, hidden, controller }: { top: numb
       {visible && <canvas ref={canvas} style={{ width: PAGE_WIDTH, height }} />}
     </div>
   );
-}
+}, sameTile);
 
 function TextBox({ tb, editing, interactive, onEdit, onDone, zoom }: { tb: TextBoxEntity; editing: boolean; interactive: boolean; onEdit: () => void; onDone: () => void; zoom: number }) {
   const drag = useRef<{ id: number; sx: number; sy: number; x: number; y: number } | null>(null);

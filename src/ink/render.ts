@@ -64,6 +64,12 @@ export function cachedPath(s: StrokeEntity): Path2D {
   return p;
 }
 
+/** Hands the cache an outline already computed for this exact version (e.g. at commit). */
+export function seedPath(s: Pick<StrokeEntity, "id" | "hlc">, path: Path2D) {
+  if (pathCache.size > 20000) pathCache.clear();
+  pathCache.set(`${s.id}:${s.hlc}`, path);
+}
+
 export function paintStroke(ctx: CanvasRenderingContext2D, d: StrokeData, path: Path2D) {
   if (d.tool === "highlighter") {
     ctx.globalAlpha = 0.32;

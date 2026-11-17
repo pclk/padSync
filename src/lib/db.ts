@@ -18,6 +18,13 @@ class PadDB extends Dexie {
       events: "id, synced, notebookId, sectionId, t",
       meta: "key",
     });
+    // Erased ink is kept forever (soft delete), so the per-section queries that re-run on every
+    // stroke read only live rows via [parentId+kind+deleted]. [sectionId+type] lets the side
+    // panel count a section's visits without scanning its events.
+    this.version(2).stores({
+      entities: "id, kind, dirty, [notebookId+kind], [parentId+kind], [parentId+kind+deleted]",
+      events: "id, synced, notebookId, sectionId, t, [sectionId+type]",
+    });
   }
 }
 

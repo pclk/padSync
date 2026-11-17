@@ -105,19 +105,22 @@ export async function revokeDeviceToken(sql: Sql, id: string): Promise<boolean> 
  */
 export async function verifyDeviceToken(sql: Sql, token: string | null, seenInfo?: Record<string, unknown>): Promise<DeviceToken | null> {
   if (!token || !isWellFormedToken(token)) return null;
+  // Lookup and the throttled last-used refresh share one round trip; the select sees the row as
+  // it was before the refresh.
   const rows = await sql.query<Row>(
-    `select id, name, hint, created_by, created_at, last_used_at, last_seen_info, revoked_at
-     from device_tokens where token_hash = $1 and revoked_at is null`,
-    [hashToken(token)],
+    `with t as (
+       select id, name, hint, created_by, created_at, last_used_at, last_seen_info, revoked_at
+       from device_tokens where token_hash = $1 and revoked_at is null
+     ), touch as (
+       update device_tokens d set last_used_at = now(), last_seen_info = coalesce($2::jsonb, d.last_seen_info)
+       from t where d.id = t.id
+         and (d.last_used_at is null or d.last_used_at < now() - make_interval(secs => $3) or $2::jsonb is not null)
+     )
+     select * from t`,
+    [hashToken(token), seenInfo ? JSON.stringify(seenInfo) : null, LAST_USED_RESOLUTION_S],
   );
   const row = rows[0];
-  if (!row) return null;
-  await sql.query(
-    `update device_tokens set last_used_at = now(), last_seen_info = coalesce($2::jsonb, last_seen_info)
-     where id = $1 and (last_used_at is null or last_used_at < now() - make_interval(secs => $3) or $2::jsonb is not null)`,
-    [row.id, seenInfo ? JSON.stringify(seenInfo) : null, LAST_USED_RESOLUTION_S],
-  );
-  return toToken(row);
+  return row ? toToken(row) : null;
 }
 
 /** Most recent activity of any active token: the bridge counts as online if this is recent. */

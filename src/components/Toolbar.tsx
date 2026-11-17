@@ -45,21 +45,36 @@ export function Toolbar(p: Props) {
   const setSize = (s: number) =>
     setTool(tool.kind === "highlighter" ? { ...tool, hlSize: s } : tool.kind === "eraser" ? { ...tool, eraserSize: s } : { ...tool, penSize: s });
 
+  // The top bar keeps navigation and status; the drawing tools sit in a rail on the left edge,
+  // within thumb reach while the other hand holds the Pencil.
   return (
-    <header className="toolbar fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-2 border-b border-slate-200 bg-white/95 px-3 backdrop-blur">
-      <Link href="/" className="rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100" aria-label="Library">
-        ‹ Library
-      </Link>
-      <div className="mr-2 max-w-[22ch] truncate text-sm font-medium text-slate-800">{p.title}</div>
+    <>
+      <header className="toolbar fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-2 border-b border-slate-200 bg-white/95 px-3 backdrop-blur">
+        <Link href="/" className="rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100" aria-label="Library">
+          ‹ Library
+        </Link>
+        <div className="mr-auto max-w-[40ch] truncate text-sm font-medium text-slate-800">{p.title}</div>
 
-      <div className="mx-auto flex items-center gap-1">
-        <div className="flex rounded-xl bg-slate-100 p-1">
+        <button className="rounded-lg px-2 py-1 text-xs tabular-nums text-slate-500 hover:bg-slate-100" onClick={p.onZoomReset} title="Reset zoom">
+          {Math.round(p.zoom * 100)}%
+        </button>
+        <SyncBadge />
+        <button
+          className={`rounded-lg px-3 py-2 text-sm ${p.panelOpen ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"}`}
+          onClick={p.onTogglePanel}
+        >
+          Panel
+        </button>
+      </header>
+
+      <aside className="tool-rail fixed left-3 top-1/2 z-40 flex max-h-[calc(100vh-5rem)] -translate-y-1/2 flex-col items-center gap-2 overflow-y-auto rounded-2xl border border-slate-200 bg-white/95 p-1.5 shadow-lg backdrop-blur">
+        <div className="flex flex-col rounded-xl bg-slate-100 p-1">
           {TOOLS.map((t) => (
             <button
               key={t.kind}
               title={`${t.label} (${t.key})`}
               onClick={() => setTool({ ...tool, kind: t.kind })}
-              className={`h-10 w-11 rounded-lg text-lg ${tool.kind === t.kind ? "bg-white text-slate-900 shadow" : "text-slate-500"}`}
+              className={`h-11 w-10 rounded-lg text-lg ${tool.kind === t.kind ? "bg-white text-slate-900 shadow" : "text-slate-500"}`}
             >
               {t.icon}
             </button>
@@ -67,7 +82,7 @@ export function Toolbar(p: Props) {
         </div>
 
         {showColors && (
-          <div className="ml-2 flex items-center gap-1.5">
+          <div className="flex flex-col items-center gap-1.5">
             {colors.map((c) => (
               <button
                 key={c}
@@ -80,7 +95,7 @@ export function Toolbar(p: Props) {
           </div>
         )}
         {showSizes && (
-          <div className="ml-2 flex items-center gap-1">
+          <div className="flex flex-col items-center gap-1">
             {sizes.map((s, i) => (
               <button
                 key={s}
@@ -94,26 +109,15 @@ export function Toolbar(p: Props) {
           </div>
         )}
 
-        <div className="ml-3 flex">
-          <button className="h-10 w-10 rounded-lg text-lg text-slate-600 disabled:opacity-30" disabled={!p.canUndo} onClick={p.onUndo} title="Undo (two-finger tap)">
+        <div className="flex flex-col border-t border-slate-200 pt-1">
+          <button className="h-10 w-10 rounded-lg text-lg text-slate-600 disabled:opacity-30" disabled={!p.canUndo} onClick={p.onUndo} title="Undo (two-finger tap, ⌘Z)">
             ↶
           </button>
-          <button className="h-10 w-10 rounded-lg text-lg text-slate-600 disabled:opacity-30" disabled={!p.canRedo} onClick={p.onRedo} title="Redo (three-finger tap)">
+          <button className="h-10 w-10 rounded-lg text-lg text-slate-600 disabled:opacity-30" disabled={!p.canRedo} onClick={p.onRedo} title="Redo (three-finger tap, ⇧⌘Z)">
             ↷
           </button>
         </div>
-      </div>
-
-      <button className="rounded-lg px-2 py-1 text-xs tabular-nums text-slate-500 hover:bg-slate-100" onClick={p.onZoomReset} title="Reset zoom">
-        {Math.round(p.zoom * 100)}%
-      </button>
-      <SyncBadge />
-      <button
-        className={`rounded-lg px-3 py-2 text-sm ${p.panelOpen ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"}`}
-        onClick={p.onTogglePanel}
-      >
-        Panel
-      </button>
-    </header>
+      </aside>
+    </>
   );
 }

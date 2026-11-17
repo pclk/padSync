@@ -76,14 +76,17 @@ async function runSync() {
   }
 }
 
-async function syncOnce(): Promise<boolean> {
+/** One push+pull round trip; true when there is more to do. Exported for tests. */
+export async function syncOnce(): Promise<boolean> {
   if (!navigator.onLine) {
     setStatus("offline");
     return false;
   }
-  const dirty = await db.entities.where("dirty").equals(1).limit(ENTITY_BATCH).toArray();
-  const events = await db.events.where("synced").equals(0).limit(EVENT_BATCH).toArray();
-  const since = (await getMeta<number>("cursor")) ?? 0;
+  const [dirty, events, since] = await Promise.all([
+    db.entities.where("dirty").equals(1).limit(ENTITY_BATCH).toArray(),
+    db.events.where("synced").equals(0).limit(EVENT_BATCH).toArray(),
+    getMeta<number>("cursor").then((c) => c ?? 0),
+  ]);
   if (status !== "synced" || dirty.length || events.length) setStatus("syncing");
 
   let res: Response;
@@ -118,15 +121,18 @@ async function syncOnce(): Promise<boolean> {
 
   await db.transaction("rw", db.entities, db.events, db.meta, async () => {
     // Clear dirty only if the row was not rewritten while the request was in flight.
-    for (const sent of dirty) {
-      const cur = await db.entities.get(sent.id);
-      if (cur && cur.hlc === sent.hlc) await db.entities.update(sent.id, { dirty: 0 });
-    }
-    await db.events.bulkUpdate(events.map((e) => ({ key: e.id, changes: { synced: 1 as const } })));
-    for (const remote of body.changes) {
-      hlcObserve(remote.hlc);
-      const local = await db.entities.get(remote.id);
-      if (!local || remote.hlc > local.hlc) await db.entities.put({ ...remote, dirty: 0 });
+    const current = await db.entities.bulkGet(dirty.map((e) => e.id));
+    const acked = dirty.filter((sent, i) => current[i]?.hlc === sent.hlc);
+    if (acked.length) await db.entities.bulkUpdate(acked.map((e) => ({ key: e.id, changes: { dirty: 0 as const } })));
+    if (events.length) await db.events.bulkUpdate(events.map((e) => ({ key: e.id, changes: { synced: 1 as const } })));
+    if (body.changes.length) {
+      const locals = await db.entities.bulkGet(body.changes.map((r) => r.id));
+      const newer = body.changes.filter((remote, i) => {
+        hlcObserve(remote.hlc);
+        const local = locals[i];
+        return !local || remote.hlc > local.hlc;
+      });
+      if (newer.length) await db.entities.bulkPut(newer.map((r) => ({ ...r, dirty: 0 as const })));
     }
     await db.meta.put({ key: "cursor", value: body.cursor });
   });

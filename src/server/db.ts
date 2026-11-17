@@ -7,6 +7,8 @@ import { neon } from "@neondatabase/serverless";
 
 export interface Sql {
   query<T = Record<string, unknown>>(text: string, params?: unknown[]): Promise<T[]>;
+  /** Runs parameterless statements in one round trip (one transaction) where the driver can. */
+  batch?(texts: string[]): Promise<void>;
 }
 
 let client: Sql | null = null;
@@ -21,7 +23,12 @@ export async function getSql(): Promise<Sql | null> {
     const url = databaseUrl();
     if (!url) return null;
     const neonSql = neon(url);
-    client = { query: (text, params) => neonSql.query(text, params ?? []) as never };
+    client = {
+      query: (text, params) => neonSql.query(text, params ?? []) as never,
+      batch: async (texts) => {
+        await neonSql.transaction(texts.map((t) => neonSql.query(t)));
+      },
+    };
   }
   ready ??= migrate(client).catch((e) => {
     ready = null;
@@ -38,8 +45,10 @@ export function setSqlForTests(sql: Sql | null) {
 }
 
 export async function migrate(sql: Sql) {
-  await sql.query(`create sequence if not exists entity_seq`);
-  await sql.query(`
+  // Cold starts pay for this, so on Neon it is one HTTP round trip rather than one per statement.
+  const ddl = [
+    `create sequence if not exists entity_seq`,
+    `
     create table if not exists entities (
       id text primary key,
       kind text not null,
@@ -50,10 +59,10 @@ export async function migrate(sql: Sql) {
       deleted boolean not null default false,
       seq bigint not null default nextval('entity_seq'),
       updated_at timestamptz not null default now()
-    )`);
-  await sql.query(`create index if not exists entities_seq_idx on entities (seq)`);
-  await sql.query(`create index if not exists entities_notebook_idx on entities (notebook_id, kind)`);
-  await sql.query(`
+    )`,
+    `create index if not exists entities_seq_idx on entities (seq)`,
+    `create index if not exists entities_notebook_idx on entities (notebook_id, kind)`,
+    `
     create table if not exists events (
       id text primary key,
       notebook_id text not null,
@@ -63,9 +72,9 @@ export async function migrate(sql: Sql) {
       device text not null,
       data jsonb not null,
       received_at timestamptz not null default now()
-    )`);
-  await sql.query(`create index if not exists events_section_idx on events (section_id, t)`);
-  await sql.query(`
+    )`,
+    `create index if not exists events_section_idx on events (section_id, t)`,
+    `
     create table if not exists device_tokens (
       id text primary key,
       name text not null,
@@ -76,8 +85,8 @@ export async function migrate(sql: Sql) {
       last_used_at timestamptz,
       last_seen_info jsonb,
       revoked_at timestamptz
-    )`);
-  await sql.query(`
+    )`,
+    `
     create table if not exists jobs (
       id text primary key,
       notebook_id text not null,
@@ -94,7 +103,12 @@ export async function migrate(sql: Sql) {
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now(),
       finished_at timestamptz
-    )`);
-  await sql.query(`create index if not exists jobs_queue_idx on jobs (status, created_at)`);
-  await sql.query(`create index if not exists jobs_section_idx on jobs (section_id, created_at)`);
+    )`,
+    `create index if not exists jobs_queue_idx on jobs (status, created_at)`,
+    `create index if not exists jobs_section_idx on jobs (section_id, created_at)`,
+    // Jobs finished before image/context were dropped on completion (see jobs.ts).
+    `update jobs set image = null, context = '' where status in ('done', 'error', 'cancelled') and (image is not null or context <> '')`,
+  ];
+  if (sql.batch) await sql.batch(ddl);
+  else for (const text of ddl) await sql.query(text);
 }

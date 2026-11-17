@@ -75,7 +75,7 @@ export async function sectionStats(sectionId: string): Promise<SectionStats> {
     first = Math.min(first, s.data.t0);
     last = Math.max(last, s.data.t0 + dur);
   }
-  const focusEvents = await db.events.where("sectionId").equals(sectionId).filter((e) => e.type === "focus").count();
+  const focusEvents = await db.events.where("[sectionId+type]").equals([sectionId, "focus"]).count();
   return {
     strokes: live.length,
     erased: all.length - live.length,

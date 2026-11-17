@@ -16,6 +16,8 @@ export type JobStatus = "queued" | "running" | "done" | "error" | "cancelled";
 export const STALE_AFTER_S = 600;
 export const MAX_OUTPUT = 200_000;
 const MAX_IMAGE = 3_000_000; // data URL chars; keeps requests under Vercel's 4.5 MB limit
+// Only the bridge reads image and context, and only while running, so both are dropped when a job
+// finishes or is cancelled: otherwise every ask keeps a multi-MB PNG in Postgres forever.
 
 export const newJobSchema = z.object({
   notebookId: z.string().min(1).max(100),
@@ -119,7 +121,7 @@ export async function getJob(sql: Sql, id: string): Promise<Job | null> {
 /** Cancels a queued or running job. Returns the job, or null if it was already finished/missing. */
 export async function cancelJob(sql: Sql, id: string): Promise<Job | null> {
   const rows = await sql.query<Row>(
-    `update jobs set status = 'cancelled', updated_at = now(), finished_at = now()
+    `update jobs set status = 'cancelled', updated_at = now(), finished_at = now(), image = null, context = ''
      where id = $1 and status in ('queued', 'running') returning ${PUBLIC_COLS}`,
     [id],
   );
@@ -159,7 +161,9 @@ export async function updateJob(sql: Sql, id: string, deviceId: string, u: z.inf
        status = coalesce($5::text, status),
        error = coalesce($6::text, error),
        updated_at = now(),
-       finished_at = case when $5::text is not null then now() else finished_at end
+       finished_at = case when $5::text is not null then now() else finished_at end,
+       image = case when $5::text is not null then null else image end,
+       context = case when $5::text is not null then '' else context end
      where id = $1 and claimed_by = $2 and status = 'running'
      returning status`,
     [id, deviceId, u.output ?? null, u.append ?? null, u.status ?? null, u.error ?? null, MAX_OUTPUT],

@@ -8,7 +8,7 @@ import { InkController, type Selection, type ToolState } from "@/ink/controller"
 import { db, deviceId, deviceKind } from "@/lib/db";
 import { useStoredState } from "@/lib/hooks";
 import { addTextBox, insertSectionAfter, liveSections, logEvent, putEntities } from "@/lib/store";
-import { PAGE_WIDTH, type NotebookEntity, type PresenceData, type PresenceEntity } from "@/lib/types";
+import { PAGE_WIDTH, type NotebookEntity, type PresenceData, type PresenceEntity, type SectionEntity } from "@/lib/types";
 import { SectionView } from "./SectionView";
 import { SidePanel } from "./SidePanel";
 import { Toolbar } from "./Toolbar";
@@ -39,7 +39,21 @@ function Editor({ notebookId }: { notebookId: string }) {
   const kind = deviceKind();
   const isIpad = kind === "ipad";
   const notebook = useLiveQuery(() => db.entities.get(notebookId), [notebookId]) as NotebookEntity | undefined;
-  const sections = useLiveQuery(() => liveSections(notebookId), [notebookId]);
+  // Any section write re-runs the query with fresh objects; keeping the old object for sections
+  // whose hlc did not change lets every other SectionView skip re-rendering.
+  const [sectionCache] = useState(() => new Map<string, SectionEntity>());
+  const sections = useLiveQuery(
+    () =>
+      liveSections(notebookId).then((rows) =>
+        rows.map((s) => {
+          const prev = sectionCache.get(s.id);
+          if (prev && prev.hlc === s.hlc) return prev;
+          sectionCache.set(s.id, s);
+          return s;
+        }),
+      ),
+    [notebookId, sectionCache],
+  );
 
   const [tool, setToolState] = useStoredState<ToolState>("padsync.tool", DEFAULT_TOOL);
   const [panelOpen, setPanelOpen] = useStoredState("padsync.panel", !isIpad);
@@ -53,7 +67,6 @@ function Editor({ notebookId }: { notebookId: string }) {
   const wrapRef = useRef<HTMLDivElement>(null); // the page, scaled by transform; logical coords
   const pinchRef = useRef<HTMLDivElement>(null); // sizer around it, transformed during a pinch
   const [pageH, setPageH] = useState(0);
-  const liveRef = useRef<HTMLCanvasElement>(null);
   const els = useRef(new Map<string, HTMLElement>());
   const zoomAnchor = useRef<{ lx: number; ly: number; cx: number; cy: number } | null>(null);
 
@@ -100,8 +113,10 @@ function Editor({ notebookId }: { notebookId: string }) {
     if (label) void logEvent(notebookId, null, "redo", { label });
   }, [controller, notebookId]);
 
+  // A callback ref: the overlay canvas only mounts once the notebook has loaded, after the
+  // controller's mount effects have already run.
+  const liveRef = useCallback((c: HTMLCanvasElement | null) => controller.attachLive(c), [controller]);
   useEffect(() => {
-    controller.attachLive(liveRef.current);
     const onResize = () => controller.resizeLive();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
@@ -254,8 +269,25 @@ function Editor({ notebookId }: { notebookId: string }) {
       if ((e.key === "Backspace" || e.key === "Delete") && controller.selection) void controller.deleteSelection();
       if (e.key === "Escape") controller.setSelection(null);
     };
+    // iPadOS system undo/redo (Pencil Pro squeeze scrubber, three-finger swipe, the shortcut
+    // bar) arrives as beforeinput history events rather than keydown.
+    const onBeforeInput = (e: InputEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.tagName === "TEXTAREA" || t.tagName === "INPUT") return;
+      if (e.inputType === "historyUndo") {
+        e.preventDefault();
+        void undo();
+      } else if (e.inputType === "historyRedo") {
+        e.preventDefault();
+        void redo();
+      }
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("beforeinput", onBeforeInput, true);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("beforeinput", onBeforeInput, true);
+    };
   }, [controller, undo, redo, setTool, tool]);
 
   // --- current section + presence ---------------------------------------------------------
@@ -368,8 +400,8 @@ function Editor({ notebookId }: { notebookId: string }) {
             index={i}
             controller={controller}
             zoom={zoom}
-            selection={selection}
-            draggingIds={dragging}
+            selection={selection?.sectionId === s.id ? selection : null}
+            draggingIds={selection?.sectionId === s.id ? dragging : null}
             editingTextId={editingText}
             setEditingTextId={setEditingText}
             registerEl={registerEl}
