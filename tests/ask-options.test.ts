@@ -86,7 +86,7 @@ describe("agent command options", () => {
 
   it("drops anything the CLI would not accept", () => {
     expect(cleanOptions("claude", { effort: "ultra" }).effort).toBe("max");
-    expect(cleanOptions("codex", { model: "-c sandbox=x", effort: "nope" })).toEqual({ model: undefined, effort: undefined, webSearch: false });
+    expect(cleanOptions("codex", { model: "-c sandbox=x", effort: "nope" })).toEqual({ model: undefined, effort: undefined, webSearch: false, allowEdits: false, allowCode: false });
     expect(cleanOptions("claude", { webSearch: "yes" as unknown as boolean }).webSearch).toBe(false);
     expect(agentCommand("codex", {}, false, { model: "--full-auto" }).args).not.toContain("--full-auto");
   });
