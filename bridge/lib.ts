@@ -43,7 +43,9 @@ export interface UploadSpec {
 export interface ClaimedJob {
   id: string;
   /** "import": make a padSync notebook from the attached lecture files. Default "ask". */
-  kind?: "ask" | "import";
+  kind?: "ask" | "import" | "chat";
+  thread?: { agent: Agent; agent_session: {agent: Agent; sessionId: string} | null };
+  history?: {question:string;output:string}[];
   notebookId: string;
   sectionId: string | null;
   agent: Agent;
@@ -580,6 +582,7 @@ export interface RunResult {
   status: "done" | "error" | "cancelled";
   output: string;
   error?: string;
+  sessionId?: string;
 }
 
 /** The agent inherits the user's environment minus padSync's own credentials. */
@@ -593,6 +596,7 @@ export function runAgent(opts: RunOptions): Promise<RunResult> {
   const cap = (text: string) => text.slice(0, MAX_OUTPUT).replace(/[\uD800-\uDBFF]$/, "");
   return new Promise((resolve) => {
     const child = spawn(command.bin, command.args, { cwd: opts.cwd, env: (opts.env ?? agentEnv()) as NodeJS.ProcessEnv, stdio: ["pipe", "pipe", "pipe"], detached: process.platform !== "win32" });
+    let sessionId: string | undefined;
     let streamed = "";
     let final: string | undefined;
     let error: string | undefined;
@@ -616,7 +620,7 @@ export function runAgent(opts: RunOptions): Promise<RunResult> {
       clearTimeout(killTimer);
       if (stopReason) killTree("SIGKILL");
       opts.signal?.removeEventListener("abort", onAbort);
-      resolve(r);
+      resolve({ ...r, ...(sessionId ? { sessionId } : {}) });
     };
     const stop = (reason: "cancelled" | "timeout") => {
       if (stopReason) return;
@@ -631,6 +635,7 @@ export function runAgent(opts: RunOptions): Promise<RunResult> {
     opts.signal?.addEventListener("abort", onAbort);
 
     const handle = (line: string) => {
+      sessionId = parseSessionId(line) ?? sessionId;
       const u = command.parse(line);
       if (!u) return;
       if (u.text) {
@@ -763,14 +768,14 @@ export class BridgeApi {
 
   claim(agents: Agent[], info: { hostname?: string; version?: string }) {
     // "import": this bridge fetches uploads and runs import jobs (older bridges don't get them).
-    return this.call<{ job: ClaimedJob | null }>("POST", "/api/bridge/claim", { agents, info, features: ["import"] });
+    return this.call<{ job: ClaimedJob | null }>("POST", "/api/bridge/claim", { agents, info, features: ["import", "chat"] });
   }
 
   input(jobId: string, path: string, part: number, opts?: { signal?: AbortSignal }) {
     return this.call<{ data: string }>("GET", `/api/bridge/jobs/${encodeURIComponent(jobId)}/inputs?path=${encodeURIComponent(path)}&part=${part}`, undefined, { ...opts, timeoutMs: 120_000 });
   }
 
-  update(jobId: string, u: { output?: string; status?: "done" | "error"; error?: string; files?: JobFile[] }, opts?: { signal?: AbortSignal; timeoutMs?: number }) {
+  update(jobId: string, u: { sessionId?: string; output?: string; status?: "done" | "error"; error?: string; files?: JobFile[] }, opts?: { signal?: AbortSignal; timeoutMs?: number }) {
     return this.call<{ status: string; cancelled: boolean }>("POST", `/api/bridge/jobs/${encodeURIComponent(jobId)}`, { ...u, ...(u.output === undefined ? {} : { output: u.output.slice(0, MAX_OUTPUT).replace(/[\uD800-\uDBFF]$/, "") }) }, opts);
   }
 }
@@ -800,4 +805,34 @@ export async function fetchUploads(api: Pick<BridgeApi, "input">, job: Pick<Clai
     out.push({ path: u.path, mime: u.mime, base64 });
   }
   return out;
+}
+
+
+/** The JSON event forms emitted by the locally installed agents. */
+export function parseSessionId(line: string): string | undefined {
+  const e = safeJson(line);
+  if (e?.type === 'thread.started' && typeof e.thread_id === 'string') return e.thread_id;
+  if ((e?.type === 'system' || e?.type === 'result') && typeof e.session_id === 'string') return e.session_id;
+}
+export function chatHistory(history: {question:string;output:string}[]): string {
+  const text = history.map(t => `## User\n${t.question}\n\n## Assistant\n${t.output}`).join('\n\n');
+  const note = '[Earlier conversation truncated; newest messages retained.]\n';
+  return text.length > 60000 ? note + text.slice(-(60000-note.length)) : text;
+}
+export function resumeCommand(command: AgentCommand, agent: Agent, sessionId: string): AgentCommand {
+  if (agent === 'claude') return {...command,args:[...command.args,'--resume',sessionId]};
+  // Keep exec-level flags before the subcommand; resume accepts the session and stdin prompt.
+  return {...command,args:[...command.args,'resume',sessionId,'-']};
+}
+export function expiredSession(error = '') { return /(?:unknown|expired|not found|no .*found|does not exist).*session|session.*(?:unknown|expired|not found|does not exist)|no .*conversation|conversation.*not found/i.test(error); }
+
+/** A missing session gets exactly one fresh attempt with the saved conversation. */
+export async function runChatWithFallback(
+  resume: boolean,
+  run: (resume: boolean, history: boolean) => Promise<RunResult>,
+): Promise<RunResult> {
+  const result = await run(resume, !resume);
+  return resume && result.status === 'error' && expiredSession(result.error)
+    ? run(false, true)
+    : result;
 }
