@@ -2,17 +2,25 @@
 
 import { useLiveQuery } from "dexie-react-hooks";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { DEFAULT_CONFIG, PRESETS, chatPrompt, payloadHash, pickResult, reviewPayload, selectSections, stage, type ImportConfig, type JobStatus, type ReturnedFile, type Stage } from "@/lib/ai-import";
+import { DEFAULT_CONFIG, PRESETS, chatPrompt, pickResult, reviewPayload, selectSections, stage, type ImportConfig, type JobStatus, type ReturnedFile, type Stage } from "@/lib/ai-import";
 import { blobToBase64 } from "@/lib/ask-bundle";
 import { ACCEPT, checkLimits, formatBytes, move, needsCode } from "@/lib/attachments";
 import { useStoredState } from "@/lib/hooks";
 import { addFiles, clearAttachments, getDraft, listAttachments, removeAttachment, reorderAttachments, setDraft, type StoredAttachment } from "@/lib/import-drafts";
 import { abortSend, getSendState, isSending, setCurrentJob, startSend, subscribeSend, type SendProgress } from "@/lib/import-send";
-import { GOALS, payloadToSections } from "@/lib/payload";
-import { createNotebook, findImported } from "@/lib/store";
-import type { NotebookEntity } from "@/lib/types";
+import { GOALS } from "@/lib/payload";
+import { listNotebooks } from "@/lib/store";
+import { applyImport } from "@/lib/import-application";
+import PersistentPdfAttachments from "./PersistentPdfAttachments";
+import { lectureSources } from "@/lib/lecture-sources";
+import { associatePersistentPdf } from "@/lib/persistent-attachments";
+import type { LectureSource } from "@/lib/types";
+import type { ResolvedPdf } from "@/lib/persistent-attachments";
+import { StudyBlock } from "./StudyBlocks";
+import { highlight, renderMarkdown } from "@/lib/markdown";
+import { SPACE_PX, type Block } from "@/lib/types";
 
 // AI import: one page for the whole flow. Attach lecture notes → choose what to make → send it
 // to the Mac bridge (or copy the prompt into a chat) → review the JSON → import. Every step stays
@@ -53,9 +61,14 @@ function initialConfig(): ImportConfig {
 
 export default function AiImportView() {
   const router = useRouter();
+  const initialNotebook = useSearchParams().get("notebookId") ?? "";
   const attachments = useLiveQuery(listAttachments, [], undefined);
   const list = useMemo(() => attachments ?? [], [attachments]);
   const [storedConfig, setStoredConfig] = useStoredState<ImportConfig>("padsync.import.config", initialConfig());
+  const savedNotebooks = useLiveQuery(listNotebooks, [], []);
+  const [pdfNotebookId, setPdfNotebookId] = useState(initialNotebook || "library");
+  const [persistentPdfs, setPersistentPdfs] = useState<ResolvedPdf[]>([]);
+  const sendAttachments = [...list.map((a) => ({ meta: a, blob: a.blob })), ...persistentPdfs];
   const config: ImportConfig = { ...DEFAULT_CONFIG, ...storedConfig };
   const setConfig = (patch: Partial<ImportConfig>) => setStoredConfig({ ...config, ...patch });
   // The send and the current job id live outside React (src/lib/import-send.ts): an upload keeps
@@ -71,22 +84,25 @@ export default function AiImportView() {
 
   // The JSON under review, from whichever source; restored from the draft store.
   const [raw, setRawState] = useState("");
+  const [reviewSources, setReviewSources] = useState<LectureSource[]>([]);
   const [rawFrom, setRawFrom] = useState("");
   const [returned, setReturned] = useState<ReturnedFile[]>([]);
   const [imported, setImported] = useState<{ id: string; title: string } | null>(null);
   const draftLoaded = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
-    draftLoaded.current = Promise.all([getDraft<string>("raw"), getDraft<string>("rawFrom"), getDraft<ReturnedFile[]>("returned")]).then(([r, from, files]) => {
+    draftLoaded.current = Promise.all([getDraft<string>("raw"), getDraft<string>("rawFrom"), getDraft<ReturnedFile[]>("returned"), getDraft<LectureSource[]>("reviewSources")]).then(([r, from, files, sources]) => {
       setRawState(r ?? "");
       setRawFrom(from ?? "");
       setReturned(files ?? []);
+      setReviewSources(sources ?? []);
     });
   }, []);
 
   // Saved shortly after the last change: typing into a multi-MB JSON shouldn't rewrite it per key.
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const setRaw = useCallback((text: string, from: string, files: ReturnedFile[] = [], now = false): Promise<void> => {
+    if (!from.includes("bridge")) { setReviewSources([]); void setDraft("reviewSources", []); }
     setRawState(text);
     setRawFrom(from);
     setReturned(files);
@@ -96,7 +112,7 @@ export default function AiImportView() {
     if (now) return save();
     saveTimer.current = setTimeout(() => void save(), 300);
     return Promise.resolve();
-  }, []);
+  }, [setImported, setReviewSources]);
 
   // Server status (signed in, bridge seen) every 10 s while the page is visible.
   useEffect(() => {
@@ -121,10 +137,15 @@ export default function AiImportView() {
       if ((await getDraft<string>("loadedJob")) === j.id) return;
       const picked = pickResult(j);
       // Saved before marking the job consumed: a reload in between must not lose the result.
-      if (picked) await setRaw(picked.text, `${picked.from} from the bridge`, j.resultFiles ?? [], true);
+      if (picked) {
+        const sources = await getDraft<LectureSource[]>(`jobSources:${j.id}`) ?? [];
+        setReviewSources(sources);
+        await setDraft("reviewSources", sources);
+        await setRaw(picked.text, `${picked.from} from the bridge`, j.resultFiles ?? [], true);
+      }
       await setDraft("loadedJob", j.id);
     },
-    [setRaw],
+    [setRaw, setReviewSources],
   );
 
   // Follow the current job; stop polling once it is finished.
@@ -152,10 +173,10 @@ export default function AiImportView() {
     };
   }, [jobId, active, setJobId, consumeResult]);
 
-  const limitErrors = checkLimits(list);
+  const limitErrors = checkLimits(sendAttachments.map((a) => a.meta));
   const bridgeOnline = !!status?.bridgeSeenAt && now - new Date(status.bridgeSeenAt).getTime() < BRIDGE_ONLINE_MS;
   const sending = !!progress;
-  const current: Stage = stage({ attachments: list.length, sending, job, raw, imported: !!imported });
+  const current: Stage = stage({ attachments: sendAttachments.length, sending, job, raw, imported: !!imported });
   const officeNeedsCode = needsCode(list) && config.agent === "claude" && !config.allowCode;
 
   const onFiles = async (files: FileList | File[] | null | undefined) => {
@@ -167,7 +188,7 @@ export default function AiImportView() {
     if (isSending()) return;
     // An upload interrupted earlier (tab closed) is abandoned for this new one.
     if (jobId && job?.status === "uploading") await fetch(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, { method: "POST" }).catch(() => null);
-    await startSend({ config, attachments: list.map((a) => ({ meta: a, base64: () => blobToBase64(a.blob) })) });
+    await startSend({ config, attachments: sendAttachments.map((a) => ({ meta: a.meta, base64: () => blobToBase64(a.blob) })) });
   };
 
   const cancel = async () => {
@@ -182,6 +203,8 @@ export default function AiImportView() {
     // Don't leave the agent working on a job the page has forgotten.
     if (jobId && job && ["uploading", "queued", "running"].includes(job.status)) await fetch(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, { method: "POST" }).catch(() => null);
     await clearAttachments();
+    setPersistentPdfs([]);
+    setPdfNotebookId("");
     setRaw("", "");
     setJobId(null);
     setAttachErrors([]);
@@ -198,7 +221,15 @@ export default function AiImportView() {
         </button>
       </div>
 
-      <Step n={1} title="Lecture notes" active={current === "attach"} done={list.length > 0}>
+      <div className="mb-4 rounded-xl border p-4 text-sm">
+        <label>Saved lecture PDFs from <select aria-label="Saved PDF notebook" value={pdfNotebookId} onChange={(e) => { setPersistentPdfs([]); setPdfNotebookId(e.target.value); }}>
+          <option value="library">Lecture library (for a new notebook)</option>
+          {savedNotebooks.map((n) => <option key={n.id} value={n.id}>{n.data.title}</option>)}
+        </select></label>
+        {pdfNotebookId && <PersistentPdfAttachments key={pdfNotebookId} notebookId={pdfNotebookId} onChange={setPersistentPdfs} />}
+      </div>
+      <Step n={1} title="Lecture notes" active={current === "attach"} done={sendAttachments.length > 0}>
+        <p className="mb-2 text-xs text-slate-500">Files here are local drafts. Upload PDFs in Saved lecture PDFs above to reopen them on other devices.</p>
         <Attachments list={list} onFiles={onFiles} errors={[...attachErrors, ...limitErrors]} />
       </Step>
 
@@ -210,17 +241,20 @@ export default function AiImportView() {
         <Generate
           status={status}
           bridgeOnline={bridgeOnline}
-          canSend={list.length > 0 && !limitErrors.length && !sending && !(job && (job.status === "queued" || job.status === "running"))}
+          canSend={sendAttachments.length > 0 && !limitErrors.length && !sending && !(job && (job.status === "queued" || job.status === "running"))}
           send={send}
           cancel={cancel}
           progress={progress}
           job={job}
           sendError={sendError}
-          prompt={() => chatPrompt(config, list)}
+          prompt={() => chatPrompt(config, sendAttachments.map((a) => a.meta))}
           resultMissing={!!job && job.status === "done" && !pickResult(job)}
           reload={
             job?.status === "done" && pickResult(job)
-              ? () => {
+              ? async () => {
+                  const sources = await getDraft<LectureSource[]>(`jobSources:${job.id}`) ?? [];
+                  setReviewSources(sources);
+                  await setDraft("reviewSources", sources);
                   const r = pickResult(job)!;
                   setRaw(r.text, `${r.from} from the bridge`, job.resultFiles ?? []);
                 }
@@ -230,7 +264,14 @@ export default function AiImportView() {
       </Step>
 
       <Step n={4} title="Review & import" active={current === "review" || current === "imported"} done={!!imported}>
+        {persistentPdfs.length > 0 && <button className="mb-3 rounded-lg border px-3 py-2 text-sm" onClick={() => {
+          const sources = lectureSources(persistentPdfs.map(f => f.meta));
+          setReviewSources(sources); void setDraft("reviewSources", sources);
+        }}>Use selected PDF references for this preview (including pasted JSON)</button>}
+        {reviewSources.length > 0 && <p className="mb-2 text-xs text-slate-600">Sources: {reviewSources.map(s => `${s.name ?? "PDF"}${s.pages?.length ? ` (pages ${s.pages.join(", ")})` : " (all pages)"}`).join("; ")}</p>}
         <Review
+          sources={reviewSources}
+          initialDestination={initialNotebook}
           raw={raw}
           from={rawFrom}
           returned={returned}
@@ -516,6 +557,8 @@ function Progress({ progress, job, bridgeOnline }: { progress: SendProgress | nu
 }
 
 function Review(p: {
+  sources: LectureSource[];
+  initialDestination: string;
   raw: string;
   from: string;
   returned: ReturnedFile[];
@@ -528,7 +571,8 @@ function Review(p: {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [duplicates, setDuplicates] = useState<NotebookEntity[] | null>(null);
+  const notebooks = useLiveQuery(listNotebooks, [], []);
+  const [destination, setDestination] = useState(p.initialDestination || "new");
   // Parsing a large payload on every keystroke would stall typing; React parses the latest text
   // when it has time, and the import uses that same parsed result.
   const deferredRaw = useDeferredValue(p.raw);
@@ -540,7 +584,7 @@ function Review(p: {
   if (seenRaw !== p.raw) {
     setSeenRaw(p.raw);
     setUnticked(new Set());
-    setDuplicates(null);
+
     setError(null);
   }
   const validIdx = result?.sections.filter((s) => s.ok).map((s) => s.index) ?? [];
@@ -552,7 +596,7 @@ function Review(p: {
     if (f) p.setRaw(await f.text(), f.name);
   };
 
-  const doImport = async (force = false) => {
+  const doImport = async () => {
     const payload = result && deferredRaw === p.raw ? selectSections(result, ticked) : null;
     // A ref, not just state: two taps in one frame would both see busy === false.
     if (!payload || importing.current) return;
@@ -560,14 +604,15 @@ function Review(p: {
     setBusy(true);
     setError(null);
     try {
-      const hash = payloadHash(payload);
-      if (!force) {
-        const dup = await findImported(hash);
-        if (dup.length) return setDuplicates(dup);
-      }
-      const id = await createNotebook(payload.title, payloadToSections(payload), payload.description, { importHash: hash, importedAt: Date.now(), ...(p.jobId && p.from.includes("bridge") ? { jobId: p.jobId } : {}) });
-      p.onImported(id, payload.title);
-      p.open(id);
+      const applied = await applyImport({ raw: p.raw, returned: p.returned, selected: ticked,
+        destination: destination === "new" ? { kind: "new" } : { kind: "append", notebookId: destination },
+        accepted: true, sources: p.sources, ...(p.jobId && p.from.includes("bridge") ? { jobId: p.jobId } : {}) });
+      if (!applied) return;
+      p.onImported(applied.notebookId, applied.title);
+      try { await Promise.all(p.sources.map(s => associatePersistentPdf(s.attachmentId, applied.notebookId))); }
+      catch { setError("Sections were saved. Some PDF associations are unavailable; the notebook link below opens your saved work. Original filename and page references are retained."); return; }
+      if (applied.duplicate) setError("This result was already applied. Open the notebook using the link below.");
+      else p.open(applied.notebookId);
     } catch (e) {
       setError(`Couldn't create the notebook: ${(e as Error).message}`);
     } finally {
@@ -645,6 +690,7 @@ function Review(p: {
                       ))}
                     </span>
                   </label>
+                  {s.section && <details className="mt-2 rounded bg-white p-3" open><summary className="cursor-pointer text-xs text-blue-700">Section preview</summary><div className="max-h-96 overflow-auto">{s.section.blocks.map((block, i) => <ImportBlockPreview key={i} block={block} />)}</div></details>}
                 </li>
               ))}
             </ul>
@@ -662,19 +708,14 @@ function Review(p: {
             </details>
           )}
 
-          {duplicates && (
-            <div className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
-              You already imported this as{" "}
-              {duplicates.map((d, i) => (
-                <span key={d.id}>
-                  {i > 0 && ", "}
-                  <Link className="underline" href={`/notebook?id=${d.id}`}>{d.data.title}</Link> ({new Date(d.data.createdAt).toLocaleDateString()})
-                </span>
-              ))}
-              .
-              <button className="ml-2 font-medium underline" onClick={() => void doImport(true)}>Import again anyway</button>
-            </div>
-          )}
+          <label className="mt-3 block text-slate-700">
+            Apply selected sections to
+            <select aria-label="Import destination" className="ml-2 rounded border p-2" value={destination} onChange={(e) => setDestination(e.target.value)} disabled={busy}>
+              <option value="new">New notebook</option>
+              {notebooks.map((n) => <option key={n.id} value={n.id}>Append to {n.data.title}</option>)}
+            </select>
+          </label>
+          <button className="mt-2 text-slate-500" disabled={busy} onClick={() => p.setRaw("", "")}>Cancel preview</button>
           {error && <p className="mt-2 text-xs text-rose-700">{error}</p>}
           {p.imported ? (
             <p className="mt-3 text-emerald-700">
@@ -682,7 +723,7 @@ function Review(p: {
             </p>
           ) : (
             result.ok && (
-              <button className="mt-3 rounded-lg bg-slate-900 px-4 py-2 font-medium text-white disabled:opacity-30" disabled={!ticked.size || busy} onClick={() => void doImport()}>
+              <button className="mt-3 rounded-lg bg-slate-900 px-4 py-2 font-medium text-white disabled:opacity-30" disabled={!ticked.size || busy || deferredRaw !== p.raw} onClick={() => void doImport()}>
                 {busy ? "Importing…" : ticked.size === total ? `Import ${total} section${total === 1 ? "" : "s"}` : `Import ${ticked.size} of ${total} sections`}
               </button>
             )
@@ -697,4 +738,17 @@ function blockSummary(blocks: { type: string }[]) {
   const counts = new Map<string, number>();
   for (const b of blocks) if (b.type !== "space" && b.type !== "divider") counts.set(b.type, (counts.get(b.type) ?? 0) + 1);
   return [...counts].map(([t, n]) => (n > 1 ? `${n} ${t}` : t)).join(" · ");
+}
+
+function ImportBlockPreview({ block }: { block: Block }) {
+  switch (block.type) {
+    case "markdown": return <div className="prose-pad" dangerouslySetInnerHTML={{ __html: renderMarkdown(block.text) }} />;
+    case "code": return <pre className="hljs overflow-auto rounded p-3"><code dangerouslySetInnerHTML={{ __html: highlight(block.code, block.language) }} /></pre>;
+    case "image": return <figure>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={block.src} alt={block.alt ?? ""} style={{ width: `${(block.width ?? 0.6) * 100}%` }} />{block.caption && <figcaption>{block.caption}</figcaption>}</figure>;
+    case "space": return <div className="study-lines" style={{ height: typeof block.size === "number" ? block.size : SPACE_PX[block.size] }} />;
+    case "divider": return <hr className="my-4" />;
+    default: return <StudyBlock block={block} />;
+  }
 }

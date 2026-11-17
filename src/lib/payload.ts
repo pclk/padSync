@@ -187,7 +187,7 @@ Block =
 HOW TO USE IT
 - Do not position anything; padSync lays blocks out vertically on a landscape iPad page (1376px wide, ~1032px per screen).
 - Every question needs room to answer: a "space" block after it (be generous for multi-step work), or "space" on recall items.
-- One question per section. Put shared context (definitions, a lecture excerpt) in its own section first.
+- For practice or tests, use one question per section. For explanations and note skeletons, organize each section around a coherent topic. Put shared context (definitions, a lecture excerpt) in its own section first.
 - For understanding: callouts for definitions and theorems, "steps" for derivations and worked examples (always say why), a conceptMap for how ideas connect.
 - For handwritten notes on top: kind "notes" sections that follow the lecture's structure, with cloze blanks for the key facts, blankWhy derivations, rewrite and prompt blocks, and a margin with prompts. Leave real space; I will write in it.
 - Hidden material (solution, cloze answers, recall "a", "why" with blankWhy) must be correct and complete: I use it to check myself.

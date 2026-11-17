@@ -30,7 +30,7 @@ export const PRESETS: { label: string; goals: string[]; request: string }[] = [
 ];
 
 /** The small inline files every import job carries; lecture files go as uploads. */
-export function importInlineFiles(c: Pick<ImportConfig, "request" | "goals">, attachments: Pick<AttachmentMeta, "name" | "mime" | "kind">[]): BundleFile[] {
+export function importInlineFiles(c: Pick<ImportConfig, "request" | "goals">, attachments: Pick<AttachmentMeta, "name" | "mime" | "kind" | "persistentId" | "sourceFilename" | "selectedPages">[]): BundleFile[] {
   const paths = attachmentPaths(attachments);
   const request = [
     "# Request",
@@ -41,7 +41,8 @@ export function importInlineFiles(c: Pick<ImportConfig, "request" | "goals">, at
     ...(GOALS.filter((g) => c.goals.includes(g.id)).map((g) => `- ${g.label}`) as string[]),
     "",
     "## Attached files (in this order)",
-    ...attachments.map((a, i) => `${i + 1}. \`${paths[i]}\`: ${a.name.replace(/[`\n\r]/g, "")} (${a.kind})`),
+    "Use only the selected pages where listed; otherwise use all pages. Cite the original filename and page numbers in section tags or captions. Create explanations, worked examples and handwritten note skeletons according to the goals, not only practice questions.",
+    ...attachments.map((a, i) => `${i + 1}. \`${paths[i]}\`: ${a.name.replace(/[`\n\r]/g, "")} (${a.kind})${a.selectedPages?.length ? `; selected pages: ${a.selectedPages.join(", ")}` : ""}${a.persistentId ? `; attachment: ${a.persistentId}` : ""}`),
   ].join("\n");
   return [
     { path: "INSTRUCTIONS.md", mime: "text/markdown", text: buildPrompt({ request: c.request, goals: c.goals, files: attachments.map((a) => a.name), delivery: "file" }) + "\n" },
@@ -50,8 +51,8 @@ export function importInlineFiles(c: Pick<ImportConfig, "request" | "goals">, at
 }
 
 /** The prompt to paste into a chat by hand when the bridge isn't available. */
-export function chatPrompt(c: Pick<ImportConfig, "request" | "goals">, attachments: Pick<AttachmentMeta, "name">[]) {
-  return buildPrompt({ request: c.request, goals: c.goals, files: attachments.map((a) => a.name), delivery: "chat" });
+export function chatPrompt(c: Pick<ImportConfig, "request" | "goals">, attachments: Pick<AttachmentMeta, "name" | "selectedPages" | "persistentId">[]) {
+  return buildPrompt({ request: c.request, goals: c.goals, files: attachments.map((a) => a.name), delivery: "chat" }) + "\n\nSOURCE PAGES\nUse only selected pages where specified; otherwise all pages. Cite filenames and page numbers.\n" + attachments.map(a => `${a.name}: ${a.selectedPages?.length ? `selected pages: ${a.selectedPages.join(", ")}` : "all pages"}${a.persistentId ? `; attachment: ${a.persistentId}` : ""}`).join("\n");
 }
 
 export function uploadSpecs(items: { path: string; mime: string; base64: string }[]): UploadSpec[] {

@@ -20,6 +20,7 @@ const TOOLS: { kind: ToolKind; label: string; icon: string; key: string }[] = [
 ];
 
 interface Props {
+  notebookId?: string;
   title: string;
   tool: ToolState;
   setTool: (t: ToolState) => void;
@@ -59,6 +60,7 @@ export function Toolbar(p: Props) {
         <button className="rounded-lg px-2 py-1 text-xs tabular-nums text-slate-500 hover:bg-slate-100" onClick={p.onZoomReset} title="Reset zoom">
           {Math.round(p.zoom * 100)}%
         </button>
+        {p.notebookId && <Link href={`/import?notebookId=${encodeURIComponent(p.notebookId)}`} className="rounded-lg px-2 py-1 text-xs text-blue-700">AI & PDFs</Link>}
         <SyncBadge />
         <button
           className={`rounded-lg px-3 py-2 text-sm ${p.panelOpen ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"}`}

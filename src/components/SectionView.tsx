@@ -149,7 +149,7 @@ const KIND_LABEL: Record<NonNullable<SectionData["kind"]>, [string, string]> = {
 
 function SectionHeader({ section, index }: { section: SectionEntity; index: number }) {
   const d = section.data;
-  if (!d.title && d.marks == null && d.timeLimitMinutes == null && !d.kind && !d.objectives?.length) return null;
+  if (!d.title && d.marks == null && d.timeLimitMinutes == null && !d.kind && !d.objectives?.length && !d.sources?.length) return null;
   const kind = d.kind ? KIND_LABEL[d.kind] : null;
   return (
     <div className="mb-3 border-b border-slate-200 pb-2 text-slate-500">
@@ -160,6 +160,7 @@ function SectionHeader({ section, index }: { section: SectionEntity; index: numb
         {d.timeLimitMinutes != null && <span className="text-sm">{d.timeLimitMinutes} min</span>}
         {d.tags?.length ? <span className="ml-auto text-xs">{d.tags.join(" · ")}</span> : null}
       </div>
+      {d.sources?.map(source => <p key={source.attachmentId} className="mt-1 text-xs text-slate-500">Source: {source.name ?? "Lecture PDF"}{source.pages?.length ? ` · pages ${source.pages.join(", ")}` : " · all pages"}</p>)}
       {d.objectives?.length ? (
         <ul className="mt-1 text-sm text-slate-600">
           {d.objectives.map((o, i) => (
