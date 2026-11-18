@@ -29,6 +29,31 @@ export interface ToolState {
   penSensitivity?: number;
 }
 
+/**
+ * The parts of a PointerEvent the controller reads. Live input passes the browser's PointerEvent;
+ * replay (replay.ts) passes plain objects built from a recording, so recorded writing goes through
+ * exactly the same processing without synthesising DOM events.
+ */
+export interface InkPointer {
+  type: string;
+  pointerType: string;
+  pointerId: number;
+  button: number;
+  buttons: number;
+  clientX: number;
+  clientY: number;
+  pressure: number;
+  timeStamp: number;
+  altitudeAngle?: number;
+  azimuthAngle?: number;
+  preventDefault(): void;
+  getCoalescedEvents?(): InkPointer[];
+  getPredictedEvents?(): InkPointer[];
+}
+
+/** Which controller entry point an input reached: the page surface or the selection's grab box. */
+export type InputKind = "down" | "move" | "up" | "lost" | "grab";
+
 export interface SectionHandle {
   id: string;
   el: HTMLElement;
@@ -59,6 +84,21 @@ export interface ControllerCallbacks {
   onSelection: (s: Selection | null) => void;
   onDragging: (ids: Set<string> | null) => void;
   onTextCreate: (sectionId: string, x: number, y: number) => void;
+  /** Every input as it reaches the controller, before any filtering (the Pencil recorder). */
+  onInput?: (kind: InputKind, e: InkPointer, sec: SectionHandle) => void;
+  /** A pen or highlighter stroke that passed the filters, as it is committed. */
+  onCommit?: (sectionId: string, data: StrokeData, id: string) => void;
+  /** A pen or highlighter gesture the stray-dot filter threw away (replay reports count them). */
+  onDiscard?: (sectionId: string, data: StrokeData) => void;
+}
+
+export interface ControllerOptions {
+  /** False keeps strokes out of the notebook store, undo and the event log (Pencil lab, tests). */
+  persist?: boolean;
+  /** Wall clock for StrokeData.t0; replay passes the recorded time so output is deterministic. */
+  now?: () => number;
+  /** StrokeData.device for new strokes (default: this browser's deviceId); replay fixes it. */
+  device?: string;
 }
 
 const round = (v: number, f: number) => Math.round(v * f) / f;
@@ -83,12 +123,19 @@ export class InkController {
   private liveSized = false;
   private liveRelease: ReturnType<typeof setTimeout> | null = null;
   private cb: ControllerCallbacks;
+  private persist: boolean;
+  private now: () => number;
+  private device: string | undefined;
+  private unsaved = 0;
 
-  constructor(notebookId: string, tool: ToolState, cb: ControllerCallbacks) {
+  constructor(notebookId: string, tool: ToolState, cb: ControllerCallbacks, opts: ControllerOptions = {}) {
     this.notebookId = notebookId;
     this.tool = tool;
     this.setPen(tool);
     this.cb = cb;
+    this.persist = opts.persist ?? true;
+    this.now = opts.now ?? Date.now;
+    this.device = opts.device;
   }
 
   configure(tool: ToolState, zoom: number) {
@@ -175,11 +222,11 @@ export class InkController {
     return this.gesture !== null;
   }
 
-  private local(e: PointerEvent, rect: DOMRect): [number, number] {
+  private local(e: InkPointer, rect: DOMRect): [number, number] {
     return [(e.clientX - rect.left) / this.zoom, (e.clientY - rect.top) / this.zoom];
   }
 
-  private accepts(e: PointerEvent) {
+  private accepts(e: InkPointer) {
     if (e.pointerType === "touch") return false;
     if (e.pointerType === "mouse" && e.button !== 0) return false;
     return true;
@@ -195,7 +242,8 @@ export class InkController {
     setInking(g !== null);
   }
 
-  down(e: PointerEvent, sec: SectionHandle) {
+  down(e: InkPointer, sec: SectionHandle) {
+    this.cb.onInput?.("down", e, sec);
     if (!this.accepts(e)) return;
     // A new pointerdown while a gesture is open means the old pointer's pointerup/pointercancel
     // never reached us (capture lost, Scribble, a system gesture). Finish it and take the new one;
@@ -238,9 +286,9 @@ export class InkController {
         color: hl ? this.tool.hlColor : this.tool.penColor,
         size: hl ? this.tool.hlSize : this.tool.penSize,
         pts: [],
-        t0: Date.now(),
+        t0: this.now(),
         input: e.pointerType,
-        device: deviceId(),
+        device: this.device ?? deviceId(),
         ...(hl || !Object.keys(this.penOverrides).length ? {} : { pen: this.penOverrides }),
       };
       const g: Extract<Gesture, { type: "ink" }> = { type: "ink", sec, rect, data, predicted: [], t0: e.timeStamp, contact: { durationMs: 0, maxPressure: 0 }, pointerId: e.pointerId };
@@ -250,7 +298,8 @@ export class InkController {
     this.requestFrame();
   }
 
-  move(e: PointerEvent, sec: SectionHandle) {
+  move(e: InkPointer, sec: SectionHandle) {
+    this.cb.onInput?.("move", e, sec);
     let g = this.gesture;
     // The pointer is hovering with nothing pressed: its pointerup was lost. End the gesture.
     if (g && e.pointerId === g.pointerId && e.buttons === 0) {
@@ -302,7 +351,8 @@ export class InkController {
    * Starts moving the selection from a press on its box. Unlike drawing, any pointer may do this,
    * a finger included, so on the iPad the selection can be dragged by hand.
    */
-  grab(e: PointerEvent, sec: SectionHandle, target: Element) {
+  grab(e: InkPointer, sec: SectionHandle, target: Pick<Element, "setPointerCapture">) {
+    this.cb.onInput?.("grab", e, sec);
     const sel = this.selection;
     if (!sel || sel.sectionId !== sec.id) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
@@ -327,14 +377,16 @@ export class InkController {
     this.requestFrame();
   }
 
-  up(e: PointerEvent) {
+  up(e: InkPointer, sec?: SectionHandle) {
+    if (sec) this.cb.onInput?.("up", e, sec);
     const g = this.gesture;
     if (!g || e.pointerId !== g.pointerId) return;
     this.end(g, e.type === "pointercancel" ? null : e);
   }
 
   /** Capture was taken away mid-gesture (element detached, system gesture): the up may never come. */
-  lostCapture(e: PointerEvent, sec: SectionHandle) {
+  lostCapture(e: InkPointer, sec: SectionHandle) {
+    this.cb.onInput?.("lost", e, sec);
     const g = this.gesture;
     // Only the gesture's own section: a stale gesture's section losing capture to a new stroke with
     // the same pointerId must not end that new stroke.
@@ -347,7 +399,7 @@ export class InkController {
     if (g && (!sectionId || g.sec.id === sectionId)) this.end(g, null);
   }
 
-  private end(g: Gesture, last: PointerEvent | null) {
+  private end(g: Gesture, last: InkPointer | null) {
     if (this.gesture === g) this.setGesture(null);
     if (last && g.type === "ink") this.addPoints(g, [last]);
 
@@ -376,7 +428,7 @@ export class InkController {
     void logEvent(this.notebookId, sel.sectionId, "lasso_delete", { ids });
   }
 
-  private addPoints(g: Extract<Gesture, { type: "ink" }>, evs: PointerEvent[]) {
+  private addPoints(g: Extract<Gesture, { type: "ink" }>, evs: InkPointer[]) {
     const pts = g.data.pts;
     for (const ev of evs) {
       // Tracked for every event, stored or not: a held dot has duplicate points but real duration.
@@ -403,8 +455,20 @@ export class InkController {
   private async commitInk(g: Extract<Gesture, { type: "ink" }>) {
     if (!g.data.pts.length) return;
     // Pencil bounce, a resting tip or a cancelled Scribble touch: not ink.
-    if (isStrayDot(g.data, g.contact, this.pen)) return;
+    if (isStrayDot(g.data, g.contact, this.pen)) {
+      this.cb.onDiscard?.(g.sec.id, g.data);
+      return;
+    }
+    if (!this.persist) {
+      // Not stored: the host paints it (and acks the id) or only inspects it.
+      const id = `unsaved-${++this.unsaved}`;
+      this.cb.onCommit?.(g.sec.id, g.data, id);
+      // With no overlay (headless replay) there is nothing to paint, and no Path2D to build.
+      if (this.live) this.pending.set(id, { data: g.data, path: strokePath(g.data), sec: g.sec, until: performance.now() + 1500 });
+      return;
+    }
     const stroke = newEntity<"stroke", StrokeData>("stroke", this.notebookId, g.sec.id, g.data);
+    this.cb.onCommit?.(g.sec.id, g.data, stroke.id);
     const path = strokePath(g.data);
     this.pending.set(stroke.id, { data: g.data, path, sec: g.sec, until: performance.now() + 1500 });
     const [saved] = await putEntities([stroke]);
@@ -427,11 +491,11 @@ export class InkController {
     if (!hits.length) return;
     const ids = hits.map((h) => h.id);
     ids.forEach((id) => g.erased.add(id));
-    void setDeleted(ids, true);
+    if (this.persist) void setDeleted(ids, true);
   }
 
   private commitErase(g: Extract<Gesture, { type: "erase" }>) {
-    if (!g.erased.size) return;
+    if (!g.erased.size || !this.persist) return;
     const ids = [...g.erased];
     const at = Date.now();
     whenIdle(() => emitActivity({ notebookId: this.notebookId, source: "local", kinds: ["stroke"], at }));
@@ -449,7 +513,7 @@ export class InkController {
   private async commitDrag(g: Extract<Gesture, { type: "drag" }>) {
     const { dx, dy, strokes } = g;
     const sel = this.selection;
-    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) {
+    if ((Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) || !this.persist) {
       this.cb.onDragging(null);
       return;
     }
@@ -467,7 +531,8 @@ export class InkController {
   }
 
   requestFrame() {
-    if (this.frame) return;
+    // No overlay attached (headless replay, tests): draw() would have nothing to draw on.
+    if (this.frame || !this.live) return;
     this.frame = requestAnimationFrame(() => {
       this.frame = 0;
       this.draw();

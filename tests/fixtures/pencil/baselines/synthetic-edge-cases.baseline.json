@@ -1,0 +1,280 @@
+{
+ "harnessVersion": 1,
+ "options": {
+  "useCoalesced": true,
+  "usePredicted": true,
+  "pen": null,
+  "toolOverride": false
+ },
+ "strokes": [
+  {
+   "index": 0,
+   "sectionId": "synthetic-section",
+   "afterSeq": 13,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#1e293b",
+   "size": 3,
+   "points": 37,
+   "durationMs": 150,
+   "pressure": {
+    "min": 0.03,
+    "max": 0.48,
+    "mean": 0.391
+   },
+   "altitude": {
+    "min": 0.95,
+    "max": 1.05
+   },
+   "azimuth": {
+    "min": 2,
+    "max": 2.2
+   },
+   "box": {
+    "minX": 100,
+    "minY": 300,
+    "maxX": 180,
+    "maxY": 320
+   },
+   "rawLength": 82.462,
+   "processed": {
+    "points": 73,
+    "length": 82.462,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.002,
+    "meanDeviation": 0.001
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 114
+   }
+  },
+  {
+   "index": 1,
+   "sectionId": "synthetic-section",
+   "afterSeq": 30,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#1e293b",
+   "size": 3,
+   "points": 49,
+   "durationMs": 200,
+   "pressure": {
+    "min": 0.03,
+    "max": 0.48,
+    "mean": 0.394
+   },
+   "altitude": {
+    "min": 0.95,
+    "max": 1.05
+   },
+   "azimuth": {
+    "min": 2,
+    "max": 2.2
+   },
+   "box": {
+    "minX": 100,
+    "minY": 360,
+    "maxX": 180,
+    "maxY": 400
+   },
+   "rawLength": 113.137,
+   "processed": {
+    "points": 97,
+    "length": 112.452,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.435,
+    "meanDeviation": 0.007
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 136
+   }
+  },
+  {
+   "index": 2,
+   "sectionId": "synthetic-section",
+   "afterSeq": 106,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#1e293b",
+   "size": 3,
+   "points": 217,
+   "durationMs": 900,
+   "pressure": {
+    "min": 0.1,
+    "max": 0.7,
+    "mean": 0.4
+   },
+   "altitude": {
+    "min": 0.5,
+    "max": 1.4
+   },
+   "azimuth": {
+    "min": 1,
+    "max": 4
+   },
+   "box": {
+    "minX": 100,
+    "minY": 450,
+    "maxX": 300,
+    "maxY": 452
+   },
+   "rawLength": 200.011,
+   "processed": {
+    "points": 217,
+    "length": 200.01,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.004,
+    "meanDeviation": 0.001
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 258
+   }
+  },
+  {
+   "index": 3,
+   "sectionId": "synthetic-section",
+   "afterSeq": 117,
+   "tool": "pen",
+   "input": "mouse",
+   "color": "#1e293b",
+   "size": 3,
+   "points": 37,
+   "durationMs": 150,
+   "pressure": {
+    "min": 0.5,
+    "max": 0.5,
+    "mean": 0.5
+   },
+   "altitude": {
+    "min": 0.95,
+    "max": 1.05
+   },
+   "azimuth": {
+    "min": 2,
+    "max": 2.2
+   },
+   "box": {
+    "minX": 100,
+    "minY": 520,
+    "maxX": 160,
+    "maxY": 560
+   },
+   "rawLength": 72.111,
+   "processed": {
+    "points": 37,
+    "length": 72.111,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0,
+    "meanDeviation": 0
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 112
+   }
+  },
+  {
+   "index": 4,
+   "sectionId": "synthetic-section",
+   "afterSeq": 131,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#1e293b",
+   "size": 3,
+   "points": 39,
+   "durationMs": 158,
+   "pressure": {
+    "min": 0.03,
+    "max": 0.48,
+    "mean": 0.391
+   },
+   "altitude": {
+    "min": 0.95,
+    "max": 1.05
+   },
+   "azimuth": {
+    "min": 2,
+    "max": 2.2
+   },
+   "box": {
+    "minX": 100,
+    "minY": 600,
+    "maxX": 200,
+    "maxY": 640
+   },
+   "rawLength": 107.703,
+   "processed": {
+    "points": 77,
+    "length": 107.703,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.002,
+    "meanDeviation": 0
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 120
+   }
+  }
+ ],
+ "discarded": {
+  "count": 1,
+  "points": [
+   1
+  ]
+ },
+ "totals": {
+  "strokes": 5,
+  "points": 379,
+  "processedPoints": 501,
+  "outlinePoints": 740,
+  "rawLength": 575.424,
+  "processedLength": 574.738
+ },
+ "fingerprint": "fec24554",
+ "outlineFingerprint": "ceae103f",
+ "capture": {
+  "matches": true,
+  "differences": []
+ },
+ "recording": {
+  "id": "synthetic-edge-cases",
+  "label": "SYNTHETIC: edge cases",
+  "source": "synthetic",
+  "durationMs": 2615.666,
+  "sections": 1,
+  "events": {
+   "total": 132,
+   "byType": {
+    "pointermove": 118,
+    "pointerdown": 7,
+    "pointercancel": 1,
+    "lostpointercapture": 1,
+    "pointerup": 5
+   },
+   "byPointerType": {
+    "pen": 111,
+    "touch": 10,
+    "mouse": 11
+   }
+  },
+  "samples": {
+   "dispatched": 132,
+   "coalesced": 406,
+   "predicted": 206
+  },
+  "gestures": {
+   "downs": 7,
+   "ups": 5,
+   "cancels": 1,
+   "lostCaptures": 1
+  },
+  "penIntervalMs": 4.167
+ }
+}
