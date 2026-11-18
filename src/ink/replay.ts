@@ -81,6 +81,7 @@ export class PencilReplayer {
   private speedValue = 1;
   private anchor = 0;
   private timer: unknown = null;
+  private waitingFor = 0;
   private frames = new Map<number, Mapper>();
   private stateValue: ReplayState = "ready";
   /** Events whose section the host couldn't place. */
@@ -148,6 +149,7 @@ export class PencilReplayer {
     if (this.next >= this.length) this.restart();
     this.stateValue = "playing";
     this.anchor = this.sched.now() - this.playhead / this.speedValue;
+    this.waitingFor = 0;
     this.opts.onChange?.();
     this.tick();
   }
@@ -166,6 +168,7 @@ export class PencilReplayer {
     this.speedValue = speed;
     if (this.stateValue === "playing") {
       this.anchor = this.sched.now() - this.playhead / speed;
+      this.waitingFor = 0;
       if (this.timer !== null) this.sched.clear(this.timer);
       this.tick();
     }
@@ -194,9 +197,12 @@ export class PencilReplayer {
   private tick = () => {
     this.timer = null;
     if (this.stateValue !== "playing") return;
-    this.stepTo((this.sched.now() - this.anchor) * this.speedValue);
+    // The timer was set for the next event's time; rounding in now() - anchor must not leave it
+    // just short, or the timer re-arms for ~0 ms forever.
+    this.stepTo(Math.max((this.sched.now() - this.anchor) * this.speedValue, this.waitingFor));
     if (this.stateValue !== "playing" || this.next >= this.length) return;
-    const wait = Math.max(0, (this.due[this.next] - this.playhead) / this.speedValue);
+    this.waitingFor = this.due[this.next];
+    const wait = Math.max(0, (this.waitingFor - this.playhead) / this.speedValue);
     this.timer = this.sched.set(this.tick, wait);
   };
 
