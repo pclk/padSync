@@ -10,6 +10,19 @@ import { strokeBox } from "./geometry";
 
 export const TILE_H = 768;
 
+/** iOS caps canvas size; at 2.95× a full-width tile stays under 4096 px wide (~37 MB a bitmap). */
+export const MAX_TILE_SCALE = 2.95;
+
+/**
+ * Device pixels per page unit for a tile: what the zoom shows, rounded up to quarter steps (half
+ * steps with the flag off) so small zoom changes keep the bitmaps, and capped at MAX_TILE_SCALE.
+ * On a 2× iPad that is 0.5 at 25% and the cap from ~148% up, so ink above that is upscaled.
+ */
+export function tileScale(zoom: number, dpr: number, quarterSteps = true) {
+  const steps = quarterSteps ? 4 : 2;
+  return Math.min(Math.ceil(dpr * zoom * steps) / steps, MAX_TILE_SCALE);
+}
+
 export interface TilePlan {
   top: number;
   h: number;

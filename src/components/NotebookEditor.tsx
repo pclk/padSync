@@ -13,7 +13,7 @@ import { useLayoutMode, useStoredState } from "@/lib/hooks";
 import { addTextBox, insertSectionAfter, liveSections, logEvent, putEntities } from "@/lib/store";
 import { registerDebugProbe } from "@/lib/sync-debug";
 import { renderFlag } from "@/lib/render-flags";
-import { SIDEBAR_W, TOOLBAR_H, clampZoom, columnLayout, fitZoom, gutterFor, overlayInsets, pinchPlacement, toolbarVariant, verticalPadding, type PinchPlacement, type PinchStart } from "@/lib/notebook-viewport";
+import { SIDEBAR_W, TOOLBAR_H, columnLayout, fitZoom, gutterFor, overlayInsets, pinchPlacement, toolbarVariant, verticalPadding, type PinchPlacement, type PinchStart } from "@/lib/notebook-viewport";
 import { PAGE_WIDTH, type NotebookEntity, type PresenceData, type PresenceEntity, type SectionEntity } from "@/lib/types";
 import { SectionView } from "./SectionView";
 import { SidePanel } from "./SidePanel";
@@ -111,7 +111,6 @@ function Editor({ notebookId }: { notebookId: string }) {
   const perSection = renderFlag("sectionScale");
   const [pageH, setPageH] = useState(0);
   const els = useRef(new Map<string, HTMLElement>());
-  const zoomAnchor = useRef<{ lx: number; ly: number; cx: number; cy: number } | null>(null);
 
   const controller = useMemo(
     () =>
@@ -223,31 +222,51 @@ function Editor({ notebookId }: { notebookId: string }) {
     return () => document.removeEventListener("visibilitychange", vis);
   }, [notebookId, kind]);
 
-  // --- zoom, anchored so the point under the fingers/cursor stays put -------------------------
-  const zoomAt = useCallback(
-    (next: number, lx: number, ly: number, cx: number, cy: number) => {
-      zoomAnchor.current = { lx, ly, cx, cy };
-      setZoom(clampZoom(next));
+  // --- zoom: pinch, ctrl+wheel and reset all go through pinchPlacement, so the point under the
+  //     fingers/cursor stays put as far as the pan limits at the new zoom allow ------------------
+  /** The column and window now, for a zoom about the client point `anchor`. */
+  const measureZoom = useCallback(
+    (anchor: [number, number]): PinchStart | null => {
+      const outer = pinchRef.current;
+      const wrap = wrapRef.current;
+      if (!outer || !wrap) return null;
+      const rect = outer.getBoundingClientRect();
+      // With sections scaled one by one, the "Blank page" button at the end keeps its size.
+      const fixed = perSection ? ((wrap.lastElementChild as HTMLElement | null)?.offsetHeight ?? 0) : 0;
+      const below = parseFloat(getComputedStyle(outer).marginBottom) || 0;
+      return {
+        zoom: controller.zoom,
+        left: rect.left,
+        top: rect.top,
+        scrollX: window.scrollX,
+        scrollY: window.scrollY,
+        contentHeight: rect.bottom + window.scrollY + below,
+        viewportH: window.innerHeight,
+        scaledHeight: rect.height - fixed,
+        anchor,
+        ...geometry.current,
+      };
     },
-    [],
+    [controller, perSection],
   );
 
-  useLayoutEffect(() => {
-    const a = zoomAnchor.current;
-    const wrap = wrapRef.current;
-    if (!a || !wrap) return;
-    zoomAnchor.current = null;
-    const r = wrap.getBoundingClientRect();
-    window.scrollBy(r.left + a.lx * zoom - a.cx, r.top + a.ly * zoom - a.cy);
-    void logEvent(notebookId, null, "zoom", { zoom });
-  }, [zoom, notebookId]);
+  // The new zoom and scroll land in one frame, so the page never paints at the old zoom first.
+  const commitZoom = useCallback(
+    (placed: PinchPlacement, from: number) => {
+      flushSync(() => setZoom(placed.zoom));
+      window.scrollTo(placed.scrollX, placed.scrollY);
+      if (placed.zoom !== from) void logEvent(notebookId, null, "zoom", { zoom: placed.zoom });
+    },
+    [notebookId],
+  );
 
   const resetZoom = () => {
     const z = isIpad ? 1 : fitZoom(viewport.w, insets, gutter, PAGE_WIDTH);
-    const wrap = wrapRef.current!;
-    const r = wrap.getBoundingClientRect();
-    const cy = TOOLBAR_H + 10;
-    zoomAt(z, 0, (cy - r.top) / zoom, r.left, cy);
+    const start = measureZoom([0, 0]);
+    if (!start) return;
+    // Keeps the page's left edge and the line just under the header where they are.
+    const at: [number, number] = [start.left, TOOLBAR_H + 10];
+    commitZoom(pinchPlacement({ ...start, anchor: at }, z / start.zoom, at), start.zoom);
   };
 
   // Trackpad pinch on the Mac arrives as ctrl+wheel.
@@ -255,15 +274,15 @@ function Editor({ notebookId }: { notebookId: string }) {
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return;
       e.preventDefault();
-      const wrap = wrapRef.current;
-      if (!wrap) return;
-      const r = wrap.getBoundingClientRect();
-      const z = controller.zoom;
-      zoomAt(z * Math.exp(-e.deltaY * 0.01), (e.clientX - r.left) / z, (e.clientY - r.top) / z, e.clientX, e.clientY);
+      const at: [number, number] = [e.clientX, e.clientY];
+      const start = measureZoom(at);
+      if (!start) return;
+      const placed = pinchPlacement(start, Math.exp(-e.deltaY * 0.01), at);
+      if (placed.zoom !== start.zoom) commitZoom(placed, start.zoom);
     };
     window.addEventListener("wheel", onWheel, { passive: false });
     return () => window.removeEventListener("wheel", onWheel);
-  }, [controller, zoomAt]);
+  }, [measureZoom, commitZoom]);
 
   // --- touch: Pencil never scrolls; one finger scrolls natively; two fingers pinch/pan;
   //     two-finger tap = undo, three-finger tap = redo ---------------------------------------
@@ -287,24 +306,9 @@ function Editor({ notebookId }: { notebookId: string }) {
       if (fingers.length >= 2 && !tap) tap = { n: fingers.length, t: performance.now(), moved: false, start: fingers.map((f) => [f.clientX, f.clientY]) };
       else if (tap) tap.n = Math.max(tap.n, fingers.length);
       if (fingers.length === 1) tap = null;
-      if (fingers.length === 2 && pinchRef.current && wrapRef.current && !controller.isDrawing()) {
+      const start = fingers.length === 2 && !controller.isDrawing() ? measureZoom(mid(fingers[0], fingers[1])) : null;
+      if (start) {
         const [a, b] = fingers;
-        const rect = pinchRef.current.getBoundingClientRect();
-        // With sections scaled one by one, the "Blank page" button at the end keeps its size.
-        const fixed = perSection ? ((wrapRef.current.lastElementChild as HTMLElement | null)?.offsetHeight ?? 0) : 0;
-        const below = parseFloat(getComputedStyle(pinchRef.current).marginBottom) || 0;
-        const start: PinchStart = {
-          zoom: controller.zoom,
-          left: rect.left,
-          top: rect.top,
-          scrollX: window.scrollX,
-          scrollY: window.scrollY,
-          contentHeight: rect.bottom + window.scrollY + below,
-          viewportH: window.innerHeight,
-          scaledHeight: rect.height - fixed,
-          anchor: mid(a, b),
-          ...geometry.current,
-        };
         pinch = { d0: dist(a, b), zooming: false, start, placed: null };
       }
     };
@@ -344,13 +348,8 @@ function Editor({ notebookId }: { notebookId: string }) {
         pinch = null;
         const wrap = pinchRef.current;
         if (wrap) wrap.style.transform = "";
-        // Commit the new zoom and scroll in the same frame the pinch transform comes off, so the
-        // page never paints a frame back at the old zoom and re-rasterizes twice.
-        if (placed) {
-          flushSync(() => setZoom(placed.zoom));
-          window.scrollTo(placed.scrollX, placed.scrollY);
-          if (placed.zoom !== start.zoom) void logEvent(notebookId, null, "zoom", { zoom: placed.zoom });
-        }
+        // In the same frame the transform comes off, so the page never paints back at the old zoom.
+        if (placed) commitZoom(placed, start.zoom);
       }
       if (tap && fingers.length === 0) {
         const quick = performance.now() - tap.t < 280 && !tap.moved;
@@ -371,7 +370,7 @@ function Editor({ notebookId }: { notebookId: string }) {
       window.removeEventListener("touchend", onEnd);
       window.removeEventListener("touchcancel", onEnd);
     };
-  }, [controller, notebookId, perSection, undo, redo]);
+  }, [controller, measureZoom, commitZoom, undo, redo]);
 
   // --- keyboard (Mac) ---------------------------------------------------------------------
   useEffect(() => {

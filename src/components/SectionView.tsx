@@ -7,16 +7,13 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import type { InkController, Selection, SectionHandle } from "@/ink/controller";
 import { strokeBox, unionBox } from "@/ink/geometry";
 import { paintStrokes } from "@/ink/render";
-import { paintDelta, planTiles, sameVersions } from "@/ink/tiles";
+import { paintDelta, planTiles, sameVersions, tileScale } from "@/ink/tiles";
 import { highlight, renderInline, renderMarkdown } from "@/lib/markdown";
 import { liveChildren, logEvent, putEntities, setDeleted, updateData } from "@/lib/store";
 import { PAGE_WIDTH, SPACE_PX, type Block, type SectionData, type SectionEntity, type StrokeEntity, type TextBoxData, type TextBoxEntity } from "@/lib/types";
 
 import { PdfBackground } from "./PdfBackground";
 import { StudyBlock } from "./StudyBlocks";
-
-// iOS caps canvas area; 2.95 keeps a full-width tile under 4096px wide.
-const MAX_SCALE = 2.95;
 
 interface Props {
   section: SectionEntity;
@@ -317,10 +314,8 @@ const InkTile = memo(function InkTile({ top, height, strokes, zoom, hidden, cont
       painted.current = null;
       return;
     }
-    // In quarter steps: close to what the zoom shows (half steps drew 80% zoom at 2.0x for 1.6x,
-    // 56% more pixels), while small zoom changes still keep the bitmaps.
-    const steps = renderFlag("quarterSteps") ? 4 : 2;
-    const scale = Math.min(Math.ceil((window.devicePixelRatio || 1) * zoom * steps) / steps, MAX_SCALE);
+    // Quarter steps: half steps drew 80% zoom at 2.0x for 1.6x, 56% more pixels.
+    const scale = tileScale(zoom, window.devicePixelRatio || 1, renderFlag("quarterSteps"));
     const paint = () => {
       const paintStarted = debugNow();
       const w = Math.round(PAGE_WIDTH * scale);

@@ -283,3 +283,53 @@ Pencil lab Save and Pencil test Save at least.
    `filters.ts` constants, `schema.ts` enums, `sync-policy.ts` timings). They aren't dead, but most
    could drop `export`. Low value, so I left them.
 2. The format tag for the two Pencil file types (above).
+
+## 2026-11-19 03:30 — zoom: one placement for pinch, Ctrl+wheel and reset
+
+**Changed.**
+- Mac Ctrl+wheel and the zoom reset button now go through `pinchPlacement`, like the iPad pinch
+  (the 00:30 run's next step 2). `NotebookEditor` has one `measureZoom(anchor)` (the column and
+  window now, shared with the pinch's touchstart) and one `commitZoom(placed)` (`flushSync`
+  setZoom, then `scrollTo`, then the `zoom` log event). `zoomAt`, its `zoomAnchor` ref and the
+  layout effect that applied the anchor are gone.
+- A small bug this removes: Ctrl+wheel past 300% or 25% (or reset at the zoom you're already at)
+  set the anchor but the zoom didn't change, so the effect never ran and the anchor stayed. The
+  next zoom change from anywhere else (the Mac refitting when the side panel opens, for example)
+  then applied the old scroll offset and logged a stray `zoom` event. Now nothing is committed
+  when a wheel step doesn't change the zoom.
+- The ink tile density formula moved from `SectionView` into `tileScale(zoom, dpr, quarterSteps)`
+  in `src/ink/tiles.ts`, with `MAX_TILE_SCALE` (2.95) shared with the Pencil test page's canvas.
+  Same numbers as before.
+
+**Checked (density and memory, no change made).**
+- Ink tiles on a 2× iPad: 0.5 at 25%, 2 at 100%, capped at 2.95 from ~148% up. Tiles span the
+  page's full width, so at 300% most of each 37 MB tile is off screen sideways, and ink is drawn
+  at about half the density the screen shows (2.95 against 6). Making it sharp would mean tiles
+  split across the width too (a canvas at 6× and full width is ~38 MP, over iOS's ~16.7 MP limit).
+  That's a larger change for a daytime run, and only worth it if the device shows the softness.
+- At 25% each tile is ~1 MB, so the many tiles in view cost less than at 100%.
+- PDF backgrounds stop at the screen density (`pdfDensity` ≤ dpr, `rasterScale` ≤ 2). Raising it
+  to the 16 MP limit would only reach ~2.5× for a normal page (25% sharper) and costs ~60 MB per
+  decoded page plus a slower PNG encode, so I left it.
+- Following the iPad and position restore store offsets in page units and multiply by the
+  current zoom, so they hold across different zooms on the two devices.
+
+**Checked.** New tests: `tileScale` at 25–300%, the cap and the per-tile size
+(`tests/zoom-memory.test.ts`); reset keeps the line under the header and the page's left edge;
+30 Ctrl+wheel steps from 90% to 300% with the cursor near the right edge stay inside the pan limits
+and keep the point under the cursor until the limit (`tests/notebook-viewport.test.ts`).
+`npm run typecheck`, `npm run lint`, `npx vitest run` (802 passed), `npm run test:pencil`
+(33 passed, baselines unchanged).
+
+**Needs a device check.**
+- Mac: trackpad pinch (Ctrl+wheel) in and out, and against the left/right edges at 200%+: no
+  drift or jumps. Every wheel event now re-renders through `flushSync`; check that a fast trackpad
+  pinch still feels smooth with a long notebook.
+- Reset (the zoom % button) on both devices keeps the line under the header in place.
+- iPad pinch is unchanged apart from the shared measuring code; a quick pinch at 25% and 300% to confirm.
+
+**Next (zoom).**
+1. Black blocks during a long iPad pinch (whole-column transform), if the device shows them.
+2. Sharper ink above ~150%: tiles split across the width, so each canvas stays under the iOS limit.
+3. Position save after a zoom that doesn't scroll the window (pinch at the very top): the scroll
+   listener doesn't fire, so the saved offset waits for the next scroll. Small, not fixed.

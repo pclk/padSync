@@ -349,6 +349,38 @@ describe("pinch placement", () => {
     expect(r.scrollY).toBeCloseTo(realMax);
   });
 
+  it("resets about the page's left edge and the line under the header", () => {
+    // The reset button: anchor and target are the same point, so that line stays put.
+    const p = startAt(2, 50, 4000, [0, 0]);
+    const at: [number, number] = [p.left, 66];
+    const r = pinchPlacement({ ...p, anchor: at }, 1 / 2, at);
+    expect(r.zoom).toBe(1);
+    expect(r.top + (66 - p.top) / 2).toBeCloseTo(66);
+    expect(r.left).toBeCloseTo(p.left);
+  });
+
+  it("keeps Mac ctrl+wheel steps inside the pan limits and the cursor's point under it", () => {
+    // Each wheel event is its own placement from where the page is now.
+    const mac = overlayInsets({ kind: "desktop", sidebarOpen: true, panelWidth: 0 });
+    const g = gutterFor("desktop");
+    const w = 1440;
+    const cursor: [number, number] = [1400, 400];
+    const col0 = columnLayout(w, PAGE_WIDTH * 0.9, mac, g);
+    let p: PinchStart = { ...startAt(0.9, 0, 2000, cursor), viewportW: w, insets: mac, gutter: g, left: col0.left, scrollX: 0 };
+    for (let i = 0; i < 30; i++) {
+      const r = pinchPlacement(p, Math.exp(0.05), cursor);
+      const col = columnLayout(w, PAGE_WIDTH * r.zoom, mac, g);
+      expect(r.scrollX).toBeGreaterThanOrEqual(0);
+      expect(r.scrollX).toBeLessThanOrEqual(col.maxScrollX);
+      expect(r.left).toBeCloseTo(col.left - r.scrollX);
+      const k = r.zoom / p.zoom;
+      // Off the page's right edge the pan limit wins; otherwise the point stays under the cursor.
+      if (r.scrollX < col.maxScrollX) expect(r.left + (cursor[0] - p.left) * k).toBeCloseTo(cursor[0]);
+      p = { ...p, zoom: r.zoom, left: r.left, top: r.top, scrollX: r.scrollX, scrollY: r.scrollY, scaledHeight: p.scaledHeight * k, contentHeight: p.contentHeight + p.scaledHeight * (k - 1) };
+    }
+    expect(p.zoom).toBe(MAX_ZOOM);
+  });
+
   it("only pans at the zoom limits", () => {
     const p = startAt(MAX_ZOOM, 1000, 4000, [700, 500]);
     const r = pinchPlacement(p, 1.4, [760, 520]);

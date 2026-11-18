@@ -10,6 +10,7 @@ import { PencilRecorder } from "@/ink/recording/recorder";
 import { parseRecording, recordingFileName, serializeRecording, type Capabilities, type PencilRecording, type RecordingStats, type RecordingTool, type SampleField } from "@/ink/recording/schema";
 import { paintStroke, strokePath } from "@/ink/render";
 import { appendPoint, toLocal } from "@/ink/samples";
+import { MAX_TILE_SCALE } from "@/ink/tiles";
 import { deviceId } from "@/lib/db";
 import { usePencilNoScroll } from "@/lib/hooks";
 import { downloadFile } from "@/lib/download";
@@ -130,11 +131,11 @@ export default function PencilTestView() {
     });
   }, [draw]);
 
-  // Backing store at the zoom shown, capped like ink tiles (2.95× keeps it under 4096 px wide).
+  // Backing store at the zoom shown, capped like ink tiles.
   useEffect(() => {
     const c = canvasRef.current;
     if (!c) return;
-    const scale = Math.min((window.devicePixelRatio || 1) * zoom, 2.95);
+    const scale = Math.min((window.devicePixelRatio || 1) * zoom, MAX_TILE_SCALE);
     c.width = Math.round(PAGE_WIDTH * scale);
     c.height = Math.round(PAGE_HEIGHT * scale);
     requestFrame();
