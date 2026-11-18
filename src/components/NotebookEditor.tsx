@@ -246,9 +246,6 @@ function Editor({ notebookId }: { notebookId: string }) {
         const rect = pinchRef.current.getBoundingClientRect();
         const page = wrapRef.current.getBoundingClientRect();
         pinch = { d0: dist(a, b), m0: mid(a, b), m: mid(a, b), s: 1, rect, page, z: controller.zoom };
-        // Scale the page's existing raster on the GPU while the fingers move; without this
-        // Safari re-rasterizes the whole page every frame and shows the background meanwhile.
-        pinchRef.current.style.willChange = "transform";
       }
     };
 
@@ -279,10 +276,7 @@ function Editor({ notebookId }: { notebookId: string }) {
         const { page, m0, m, s, z } = pinch;
         pinch = null;
         const wrap = pinchRef.current;
-        if (wrap) {
-          wrap.style.transform = "";
-          wrap.style.willChange = "";
-        }
+        if (wrap) wrap.style.transform = "";
         // Commit the new zoom in the same frame the pinch transform comes off (the anchor scroll
         // measures the page untransformed), so the page never paints a frame back at the old zoom
         // and re-rasterizes twice.

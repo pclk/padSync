@@ -87,7 +87,7 @@ export const SectionView = memo(function SectionView(p: Props) {
       className={`paper template-${section.data.template} relative mx-auto bg-white shadow-[0_1px_3px_rgb(15_23_42/0.08),0_8px_24px_-8px_rgb(15_23_42/0.12)]`}
       style={{ width: PAGE_WIDTH, height }}
     >
-      {section.data.pdf && <PdfBackground page={section.data.pdf} />}
+      {section.data.pdf && <PdfBackground page={section.data.pdf} zoom={p.zoom} />}
       {margin && <MarginColumn margin={margin} width={marginPx} />}
       <div ref={contentRef} className="section-content absolute top-0 px-14 pt-8 pb-6" style={{ left: margin?.side === "left" ? marginPx : 0, right: margin && margin.side !== "left" ? marginPx : 0 }}>
         {!section.data.pdf && <SectionHeader section={section} index={p.index} />}
@@ -291,7 +291,8 @@ const InkTile = memo(function InkTile({ top, height, strokes, zoom, hidden, cont
   useEffect(() => {
     const el = holder.current;
     if (!el) return;
-    const io = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { rootMargin: "100% 0px" });
+    // Half a screen of ink ready either side; every tile kept is a bitmap of up to ~37 MB.
+    const io = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { rootMargin: "50% 0px" });
     io.observe(el);
     return () => io.disconnect();
   }, []);
@@ -305,14 +306,17 @@ const InkTile = memo(function InkTile({ top, height, strokes, zoom, hidden, cont
       painted.current = null;
       return;
     }
-    const scale = Math.min((window.devicePixelRatio || 1) * zoom, MAX_SCALE);
+    // In half steps, so most zoom changes keep the bitmaps instead of reallocating every tile.
+    const scale = Math.min(Math.ceil((window.devicePixelRatio || 1) * zoom * 2) / 2, MAX_SCALE);
     const paint = () => {
       const paintStarted = debugNow();
       const w = Math.round(PAGE_WIDTH * scale);
       const h = Math.round(height * scale);
       const shown = hidden ? strokes.filter((s) => !hidden.has(s.id)) : strokes;
       const prev = painted.current;
-      const ctx = c.getContext("2d")!;
+      // Null once Safari's canvas memory is spent; skip rather than throw and take the page down.
+      const ctx = c.getContext("2d");
+      if (!ctx) return;
       const delta = prev && prev.scale === scale && prev.hidden === hidden && c.width === w && c.height === h ? paintDelta(prev.strokes, shown) : null;
       if (delta) {
         ctx.setTransform(scale, 0, 0, scale, 0, -top * scale);
