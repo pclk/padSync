@@ -36,6 +36,8 @@ export const jobOptionsSchema = z
     allowEdits: z.boolean().optional(),
     /** Claude also gets Bash (Codex always runs commands in its sandbox). */
     allowCode: z.boolean().optional(),
+    /** Which Codex login on the Mac runs it (bridge/catalog.ts); the bridge checks it is one it has. */
+    account: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/, "account: letters, digits, _ and - only").optional(),
   })
   .strict();
 export type JobOptions = z.infer<typeof jobOptionsSchema>;
@@ -301,9 +303,9 @@ export async function updateJob(sql: Sql, id: string, deviceId: string, u: z.inf
        files = case when $5::text is not null then null else files end,
        result_files = coalesce($8::jsonb, result_files)
      where id = $1 and claimed_by = $2 and status = 'running'
-     returning id, status, thread_id, agent, turn
+     returning id, status, thread_id, agent, turn, options
      ), session_update as (
-       update chat_threads set agent_session = jsonb_build_object('agent', u.agent, 'sessionId', $9::text), updated_at = now()
+       update chat_threads set agent_session = jsonb_build_object('agent', u.agent, 'sessionId', $9::text, 'account', u.options->>'account'), updated_at = now()
        from u where chat_threads.id = u.thread_id and $9::text is not null and u.status = 'done'
      ), keep_inputs as (
        insert into chat_input_parts(job_id, path, part, data)

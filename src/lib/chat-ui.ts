@@ -3,7 +3,7 @@ import {
   MAX_FILE_BYTES,
   MAX_TOTAL_BYTES,
 } from "@/lib/uploads";
-import type { ThreadSummary, Turn } from "@/lib/chat-types";
+import type { CatalogAccount, ChatAgent, ChatOptions, ThreadSummary, Turn } from "@/lib/chat-types";
 
 export type ThreadFilter = "notebook" | "all" | "archived";
 export function sortThreads(threads: ThreadSummary[]) {
@@ -200,4 +200,128 @@ export function validateAttachments(
   return files.reduce((total, file) => total + file.size, 0) > MAX_TOTAL_BYTES
     ? "Attachments must total at most 40 MB."
     : null;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Model picker, thread list and context defaults (docs/chat-revamp-2026-11-18.md)
+
+/** The built-in choices, for when no bridge has sent its catalog yet. */
+export function fallbackCatalog(): CatalogAccount[] {
+  return (["claude", "codex"] as const).map((agent) => ({
+    id: agent,
+    agent,
+    label: agent === "claude" ? "Claude" : "Codex",
+    models: MODELS[agent]
+      .filter(([id]) => id)
+      .map(([id, label]) => ({ id, label, efforts: EFFORTS[agent] })),
+  }));
+}
+
+/** The account a thread runs on: its named login, else the agent's default one. */
+export function accountFor(
+  accounts: CatalogAccount[],
+  s: { agent: ChatAgent; options: ChatOptions },
+) {
+  const mine = accounts.filter((a) => a.agent === s.agent);
+  return (
+    mine.find((a) => a.id === s.options.account) ??
+    (s.agent === "codex" && s.options.account
+      ? undefined
+      : (mine.find((a) => a.id === s.agent) ?? mine[0]))
+  );
+}
+
+/** What the picker shows for a thread's (or turn's) settings. */
+export function describeModel(
+  accounts: CatalogAccount[],
+  s: { agent: ChatAgent; options: ChatOptions },
+) {
+  const account = accountFor(accounts, s);
+  const id = s.options.model || account?.defaultModel;
+  const model = account?.models.find((m) => m.id === id);
+  const label = model?.label ?? s.options.model ?? (s.agent === "claude" ? "Claude" : "Codex");
+  const effort = s.options.effort || undefined;
+  return { account, model, label, effort };
+}
+
+/** Settings after picking `model` on `account`: an effort the new model lacks is dropped. */
+export function chooseModel(
+  options: ChatOptions,
+  account: Pick<CatalogAccount, "id" | "agent">,
+  model: { id: string; efforts?: string[] },
+): { agent: ChatAgent; options: ChatOptions } {
+  const keepEffort =
+    options.effort && (!model.efforts || model.efforts.includes(options.effort));
+  return {
+    agent: account.agent,
+    options: {
+      ...options,
+      model: model.id,
+      account: account.agent === "codex" ? account.id : undefined,
+      effort: keepEffort ? options.effort : undefined,
+    },
+  };
+}
+
+/** Case-insensitive match on model label, id, description and account. */
+export function filterModels(accounts: CatalogAccount[], q: string) {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return accounts;
+  return accounts
+    .map((a) => ({
+      ...a,
+      models: a.models.filter((m) => {
+        const hay = `${m.label} ${m.id} ${m.description ?? ""} ${a.label} ${a.detail ?? ""}`.toLowerCase();
+        return words.every((w) => hay.includes(w));
+      }),
+    }))
+    .filter((a) => a.models.length);
+}
+
+/** Web search and code are on unless the thread turned them off. */
+export const toolsOf = (o: ChatOptions) => ({
+  webSearch: o.webSearch !== false,
+  allowCode: o.allowCode !== false,
+});
+
+/** An untouched thread "New chat" should reuse instead of making another empty one. */
+export function reusableThread(
+  threads: ThreadSummary[],
+  notebookId: string,
+  current?: { id: string; turns: number },
+) {
+  const empty = (t: ThreadSummary) =>
+    t.turnCount === 0 &&
+    !t.archived &&
+    t.notebookId === notebookId &&
+    !(current && t.id === current.id && current.turns > 0);
+  return (
+    threads.find((t) => current && t.id === current.id && empty(t)) ??
+    threads.find(empty) ??
+    null
+  );
+}
+
+export type DateGroup = "Pinned" | "Today" | "Yesterday" | "Previous 7 days" | "Previous 30 days" | "Older";
+/** Sidebar sections by last activity, in local days. */
+export function dateGroup(thread: ThreadSummary, now: number): DateGroup {
+  if (thread.pinned) return "Pinned";
+  const at = new Date(thread.lastMessageAt ?? thread.updatedAt);
+  const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((day(new Date(now)) - day(at)) / 86_400_000);
+  return days <= 0 ? "Today" : days === 1 ? "Yesterday" : days < 7 ? "Previous 7 days" : days < 30 ? "Previous 30 days" : "Older";
+}
+
+/** The section the context means by "this section": where the iPad is, else the Mac's own. */
+export function focusedSection<S extends { id: string }>(
+  sections: S[],
+  current: S | null,
+  ipad: { notebookId: string; sectionId: string | null } | null,
+  notebookId: string,
+): { section: S | null; fromIpad: boolean } {
+  const there =
+    ipad && ipad.notebookId === notebookId
+      ? sections.find((s) => s.id === ipad.sectionId)
+      : undefined;
+  return there ? { section: there, fromIpad: true } : { section: current, fromIpad: false };
 }

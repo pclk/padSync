@@ -10,6 +10,39 @@ export interface ChatOptions {
   webSearch?: boolean;
   allowEdits?: boolean;
   allowCode?: boolean;
+  /** Which login on the Mac runs it (a Codex home such as "codex_work"); unset = the CLI default. */
+  account?: string;
+}
+
+/** A model one of the Mac's logins can run (bridge/catalog.ts sends these). */
+export interface CatalogModel {
+  id: string;
+  label: string;
+  description?: string;
+  badge?: string;
+  /** Older or less common: listed under "More models". */
+  more?: boolean;
+  efforts: string[];
+  defaultEffort?: string;
+  contextWindow?: number;
+}
+
+export interface CatalogAccount {
+  /** "claude", or a Codex home's name ("codex", "codex_work"). */
+  id: string;
+  agent: ChatAgent;
+  label: string;
+  /** e.g. "you@example.com · Plus" */
+  detail?: string;
+  defaultModel?: string;
+  defaultEffort?: string;
+  models: CatalogModel[];
+}
+
+export interface CatalogResponse {
+  /** null until a bridge has sent one (older bridges never do). */
+  accounts: CatalogAccount[] | null;
+  updatedAt: string | null;
 }
 
 /** What a turn sent from the notebook, for the chip on the user message. */

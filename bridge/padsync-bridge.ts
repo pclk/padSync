@@ -22,6 +22,7 @@ import {
   BridgeApi,
   LAUNCHD_LABEL,
   agentCommand,
+  agentEnv,
   attachedImages,
   buildAgentPrompt,
   buildBundlePrompt,
@@ -43,8 +44,9 @@ import {
   type ClaimedJob,
   type JobFile,
 } from "./lib.ts";
+import { discoverCatalog, type Catalog } from "./catalog.ts";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 const POLL_MS = 3000;
 const MAX_BACKOFF_MS = 60_000;
 const FLUSH_MS = 1000;
@@ -59,6 +61,8 @@ const STALE_JOB_DIR_MS = 60 * 60_000;
 // On SIGTERM/SIGINT: how long the "bridge stopped" report may take, and the hard exit after that.
 const SHUTDOWN_REPORT_MS = 5000;
 const SHUTDOWN_EXIT_MS = 10_000;
+// Re-read the Claude/Codex logins and model caches this often; sent to padSync only when they change.
+const CATALOG_MS = 5 * 60_000;
 const TOKEN_RE = /^psd_[A-Za-z0-9_-]{43}$/;
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a);
@@ -104,6 +108,8 @@ async function status() {
   if (!cfg) return console.log("Not set up. Run: pbpaste | node bridge/padsync-bridge.ts setup --server <url>");
   console.log(`server  ${cfg.server}\ntoken   ${maskToken(cfg.token)}\nconfig  ${configPath()}`);
   for (const a of cfg.agents ?? AGENTS) console.log(`${a.padEnd(7)} ${available(a, cfg) ?? "not found"}`);
+  const catalog = await discoverCatalog({ agents: cfg.agents ?? AGENTS, codexHomes: cfg.codexHomes });
+  for (const a of catalog.accounts) console.log(`account ${a.id.padEnd(16)} ${a.label}${a.detail ? ` (${a.detail})` : ""}: ${a.models.length} models${catalog.homes[a.id] ? `, ${catalog.homes[a.id]}` : ""}`);
   try {
     const me = await new BridgeApi(cfg).whoami();
     console.log(`auth    ok (device "${me.device.name}")`);
@@ -122,12 +128,23 @@ function reportStopped(api: BridgeApi, jobId: string, output = "") {
     .catch((e) => log(`could not report job ${jobId} as stopped: ${(e as Error).message}`));
 }
 
+/** The latest discovered catalog; handleJob maps a job's account to its CODEX_HOME with it. */
+let catalog: Catalog = { accounts: [], homes: {} };
+
 async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
   const isImport = job.kind === "import";
   // An import's result is a file in out/, so it may always write there.
   const o = cleanOptions(job.agent, isImport ? { ...job.options, allowEdits: true } : job.options);
   const how = [isImport && "import", o.model, o.effort && `effort ${o.effort}`, o.webSearch && "web search", o.allowEdits && "edits", o.allowCode && "code", (job.files?.length || job.uploads?.length) && `${(job.files?.length ?? 0) + (job.uploads?.length ?? 0)} files`].filter(Boolean).join(", ");
   log(`job ${job.id} (${job.agent}${how ? `: ${how}` : ""}): ${job.question.slice(0, 80)}`);
+  // A Codex job runs under the login it names; one this Mac doesn't have fails instead of silently
+  // using another account's limits.
+  const codexHome = job.agent === "codex" && o.account ? catalog.homes[o.account] : undefined;
+  if (job.agent === "codex" && o.account && !codexHome) {
+    log(`job ${job.id}: unknown Codex account ${o.account}`);
+    await api.update(job.id, { status: "error", error: `Codex account "${o.account}" isn't set up on this Mac. Pick another model.` }).catch(() => {});
+    return;
+  }
   const abort = new AbortController();
   const onShutdown = () => abort.abort();
   shutdown.signal.addEventListener("abort", onShutdown);
@@ -176,7 +193,9 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
       // Only bundle jobs have an out/ to write to; a legacy job stays read-only whatever it asks.
       const runOpts = bundle ? o : { ...o, allowEdits: false, allowCode: false };
       let session = job.thread?.agent_session;
-      if (session?.agent !== job.agent) session = null;
+      // A Codex session lives in one CODEX_HOME, so another account starts over from history.md.
+      const sameLogin = job.agent !== "codex" || (session?.account ?? undefined) === o.account;
+      if (session?.agent !== job.agent || !sameLogin) session = null;
       const historyPath = join(d.dir, '.padsync-chat', 'history.md');
       const historyPrompt = async () => {
         await mkdir(dirname(historyPath), { recursive: true, mode: 0o700 });
@@ -192,6 +211,7 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
         timeoutMs: isImport ? IMPORT_TIMEOUT_MS : JOB_TIMEOUT_MS,
         onText: (t) => (latest = t),
         signal: abort.signal,
+        ...(codexHome ? { env: { ...agentEnv(), CODEX_HOME: codexHome } as unknown as NodeJS.ProcessEnv } : {}),
       });
       const result = job.kind === 'chat'
         ? await runChatWithFallback(!!session, async (resume, history) => {
@@ -272,9 +292,26 @@ async function run() {
   process.on("SIGTERM", () => stop("SIGTERM"));
   process.on("SIGINT", () => stop("SIGINT"));
   log(`bridge ${VERSION} polling ${cfg.server} as ${maskToken(cfg.token)}`);
+  let sentCatalog = "";
+  let catalogAt = 0;
+  const refreshCatalog = async () => {
+    catalogAt = Date.now();
+    try {
+      catalog = await discoverCatalog({ agents, codexHomes: cfg.codexHomes });
+      const body = JSON.stringify(catalog.accounts);
+      if (body === sentCatalog) return;
+      await api.catalog(catalog.accounts);
+      sentCatalog = body;
+      log(`accounts: ${catalog.accounts.map((a) => `${a.id} (${a.models.length} models)`).join(", ")}`);
+    } catch (e) {
+      // An older padSync has no catalog endpoint; the picker then falls back to its built-in list.
+      log(`could not send the model list: ${(e as Error).message}`);
+    }
+  };
 
   let backoff = POLL_MS;
   while (!shutdown.signal.aborted) {
+    if (Date.now() - catalogAt > CATALOG_MS) await refreshCatalog();
     try {
       active = api.claim(agents, info).then(async ({ job }) => {
         if (!job) return false;

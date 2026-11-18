@@ -26,6 +26,9 @@ interface Props {
   /** Strokes lassoed in the current section. */
   lassoCount: number;
   summary: string;
+  /** The chat picks the scope and the code switch itself (src/components/chat). */
+  hideScope?: boolean;
+  hideCode?: boolean;
 }
 
 const SCOPES: [ContextScope, string][] = [
@@ -44,6 +47,7 @@ export function ContextControls(p: Props) {
   const sel = o.scope === "selection";
   return (
     <div className="space-y-2 text-xs" data-testid="context-controls">
+      {!p.hideScope && (
       <div className="flex rounded-lg border border-slate-300 bg-white p-0.5" role="radiogroup" aria-label="What to send">
         {SCOPES.map(([v, label]) => (
           <button
@@ -57,6 +61,7 @@ export function ContextControls(p: Props) {
           </button>
         ))}
       </div>
+      )}
 
       {o.scope === "sections" && (
         <div className="rounded-lg border border-slate-200 bg-white p-2">
@@ -122,7 +127,7 @@ export function ContextControls(p: Props) {
       </div>
       <div className="flex flex-wrap gap-x-3 gap-y-1">
         {toggle("allowEdits", "let AI edit a copy", "The AI may write changed copies to an out/ folder; you review them before anything changes here.")}
-        {toggle("allowCode", "allow running code", "Claude Code also gets Bash, in its sandbox. Codex always runs commands in its own sandbox.", !o.allowEdits)}
+        {!p.hideCode && toggle("allowCode", "allow running code", "Claude Code also gets Bash, in its sandbox. Codex always runs commands in its own sandbox.", !o.allowEdits)}
       </div>
       <p className="text-slate-500" data-testid="context-summary">
         {p.summary}

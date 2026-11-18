@@ -7,6 +7,7 @@ import { constants as fsc } from "node:fs";
 import { chmod, lstat, mkdir, mkdtemp, open, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
+import { ACCOUNT_RE, type CatalogAccount } from "./catalog.ts";
 
 export type Agent = "claude" | "codex";
 export const AGENTS: Agent[] = ["claude", "codex"];
@@ -22,6 +23,8 @@ export interface JobOptions {
   allowEdits?: boolean;
   /** Claude also gets Bash, in Claude Code's sandbox. */
   allowCode?: boolean;
+  /** Which login runs it: a Codex home from bridge/catalog.ts ("codex_work"); ignored for Claude. */
+  account?: string;
 }
 
 /** A file of the job's context bundle (src/lib/context.ts), or one the agent wrote to out/. */
@@ -44,7 +47,7 @@ export interface ClaimedJob {
   id: string;
   /** "import": make a padSync notebook from the attached lecture files. Default "ask". */
   kind?: "ask" | "import" | "chat";
-  thread?: { agent: Agent; agent_session: {agent: Agent; sessionId: string} | null };
+  thread?: { agent: Agent; agent_session: {agent: Agent; sessionId: string; account?: string | null} | null };
   history?: {question:string;output:string}[];
   notebookId: string;
   sectionId: string | null;
@@ -65,6 +68,8 @@ export interface BridgeConfig {
   agents?: Agent[];
   claudeBin?: string;
   codexBin?: string;
+  /** Extra Codex logins besides the ~/.codex* folders found automatically: account id → CODEX_HOME. */
+  codexHomes?: Record<string, string>;
 }
 
 type Env = Record<string, string | undefined>;
@@ -522,6 +527,7 @@ export function cleanOptions(agent: Agent, o: JobOptions = {}): JobOptions {
     webSearch: o.webSearch === true,
     allowEdits: o.allowEdits === true,
     allowCode: o.allowEdits === true && o.allowCode === true,
+    account: agent === "codex" && typeof o.account === "string" && ACCOUNT_RE.test(o.account) ? o.account : undefined,
   };
 }
 
@@ -769,6 +775,11 @@ export class BridgeApi {
   claim(agents: Agent[], info: { hostname?: string; version?: string }) {
     // "import": this bridge fetches uploads and runs import jobs (older bridges don't get them).
     return this.call<{ job: ClaimedJob | null }>("POST", "/api/bridge/claim", { agents, info, features: ["import", "chat"] });
+  }
+
+  /** What this Mac can run, for padSync's model picker (bridge/catalog.ts). */
+  catalog(accounts: CatalogAccount[]) {
+    return this.call<{ ok: true }>("POST", "/api/bridge/catalog", { accounts });
   }
 
   input(jobId: string, path: string, part: number, opts?: { signal?: AbortSignal }) {

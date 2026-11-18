@@ -1,4 +1,5 @@
 import type {
+  CatalogResponse,
   NewThread,
   NewTurn,
   ThreadPatch,
@@ -78,6 +79,7 @@ export const forkThread = (id: string, uptoTurn: number, title?: string) =>
     uptoTurn,
     title,
   });
+export const getCatalog = () => call<CatalogResponse>("/api/chat/catalog");
 export const cancelTurn = (jobId: string) =>
   call<unknown>(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, "POST");
 export function mergeTurns(prev: Turn[], incoming: Turn[]): Turn[] {

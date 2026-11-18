@@ -150,6 +150,9 @@ export async function migrate(sql: Sql) {
       updated_at timestamptz not null default now(), last_message_at timestamptz, deleted_at timestamptz,
       next_turn integer not null default 0
     )`,
+    // What the bridge can run (bridge/catalog.ts): logins and their models, for the model picker.
+    `alter table device_tokens add column if not exists catalog jsonb`,
+    `alter table device_tokens add column if not exists catalog_at timestamptz`,
     `alter table jobs add column if not exists thread_id text`,
     `alter table jobs add column if not exists turn integer`,
     `alter table jobs add column if not exists chat_context jsonb`,
