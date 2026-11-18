@@ -25,22 +25,31 @@ export const PRESSURE_MAX_STEP = 0.03;
  * Smoothed per-point pressure for a stroke's flat point array. Causal (each value depends only on
  * the samples before it), so the live stroke and the committed stroke get the same widths.
  */
-export function smoothPressure(pts: number[]): number[] {
+export interface PressureFilter {
+  pressureFloor: number;
+  pressureFallback: number;
+  pressureAlpha: number;
+  pressureMaxStep: number;
+}
+
+const PRESSURE_DEFAULTS: PressureFilter = { pressureFloor: PRESSURE_FLOOR, pressureFallback: PRESSURE_FALLBACK, pressureAlpha: PRESSURE_ALPHA, pressureMaxStep: PRESSURE_MAX_STEP };
+
+export function smoothPressure(pts: number[], f: PressureFilter = PRESSURE_DEFAULTS): number[] {
   const n = pts.length / STROKE_STRIDE;
   const out = new Array<number>(n);
   let first = -1;
   for (let i = 0; i < n; i++) {
-    if (pts[i * STROKE_STRIDE + 2] >= PRESSURE_FLOOR) {
+    if (pts[i * STROKE_STRIDE + 2] >= f.pressureFloor) {
       first = i;
       break;
     }
   }
-  let s = first < 0 ? PRESSURE_FALLBACK : pts[first * STROKE_STRIDE + 2];
+  let s = first < 0 ? f.pressureFallback : pts[first * STROKE_STRIDE + 2];
   for (let i = 0; i < n; i++) {
     const raw = pts[i * STROKE_STRIDE + 2];
-    if (raw >= PRESSURE_FLOOR) {
-      const step = PRESSURE_ALPHA * (raw - s);
-      s += Math.max(-PRESSURE_MAX_STEP, Math.min(PRESSURE_MAX_STEP, step));
+    if (raw >= f.pressureFloor) {
+      const step = f.pressureAlpha * (raw - s);
+      s += Math.max(-f.pressureMaxStep, Math.min(f.pressureMaxStep, step));
     }
     out[i] = s;
   }
@@ -66,16 +75,24 @@ export interface Contact {
  * what the Pencil bouncing on touchdown or lift, a resting tip, or a Scribble pointerdown that is
  * cancelled at once look like. A period or an i-dot is kept: it is held a little or pressed.
  */
-export function isStrayDot(d: Pick<StrokeData, "pts" | "input">, c: Contact): boolean {
+export interface DotFilter {
+  dotMaxExtent: number;
+  dotMinMs: number;
+  dotMinPressure: number;
+}
+
+const DOT_DEFAULTS: DotFilter = { dotMaxExtent: DOT_MAX_EXTENT, dotMinMs: DOT_MIN_MS, dotMinPressure: DOT_MIN_PRESSURE };
+
+export function isStrayDot(d: Pick<StrokeData, "pts" | "input">, c: Contact, f: DotFilter = DOT_DEFAULTS): boolean {
   if (d.input !== "pen") return false;
   const pts = d.pts;
   if (!pts.length) return true;
   const x0 = pts[0];
   const y0 = pts[1];
   for (let i = STROKE_STRIDE; i < pts.length; i += STROKE_STRIDE) {
-    if (Math.hypot(pts[i] - x0, pts[i + 1] - y0) > DOT_MAX_EXTENT) return false;
+    if (Math.hypot(pts[i] - x0, pts[i + 1] - y0) > f.dotMaxExtent) return false;
   }
-  return c.durationMs < DOT_MIN_MS && c.maxPressure < DOT_MIN_PRESSURE;
+  return c.durationMs < f.dotMinMs && c.maxPressure < f.dotMinPressure;
 }
 
 /**
@@ -92,7 +109,7 @@ export const BACKTRACK_MAX = 6;
  * once, so it is kept. Samples whose time runs backwards are dropped too. The first and last
  * points always stay, and the input array is returned unchanged when nothing is dropped.
  */
-export function dropBacktracks(input: number[][], times?: number[]): number[][] {
+export function dropBacktracks(input: number[][], times?: number[], max = BACKTRACK_MAX): number[][] {
   const n = input.length;
   if (n < 4) return input;
   const out: number[][] = [input[0]];
@@ -109,7 +126,7 @@ export function dropBacktracks(input: number[][], times?: number[]): number[][] 
         const sx = p[0] - prev[0];
         const sy = p[1] - prev[1];
         const next = input[i + 1];
-        if (dx * sx + dy * sy < 0 && Math.hypot(sx, sy) <= BACKTRACK_MAX && dx * (next[0] - prev[0]) + dy * (next[1] - prev[1]) > 0) continue;
+        if (dx * sx + dy * sy < 0 && Math.hypot(sx, sy) <= max && dx * (next[0] - prev[0]) + dy * (next[1] - prev[1]) > 0) continue;
       }
     }
     if (times) lastT = Math.max(lastT, times[i]);
@@ -177,7 +194,7 @@ export const MAX_POINT_GAP = 1.5;
  */
 export function interpolateGaps(input: number[][], gap = MAX_POINT_GAP): number[][] {
   const n = input.length;
-  if (n < 2) return input;
+  if (n < 2 || !(gap > 0)) return input;
   let needed = false;
   for (let i = 1; i < n && !needed; i++) needed = Math.hypot(input[i][0] - input[i - 1][0], input[i][1] - input[i - 1][1]) > gap;
   if (!needed) return input;
@@ -211,20 +228,20 @@ export const HOOK_MAX_LENGTH = 6;
  * runs at either end where the tip skids while the pressure ramps up or falls away. Only the
  * light ends are cut, never more than HOOK_MAX_LENGTH, and at least two points always remain.
  */
-export function hookTrim(input: number[][], rawPressure: number[]): [number, number] {
+export function hookTrim(input: number[][], rawPressure: number[], pressure = HOOK_PRESSURE, maxLength = HOOK_MAX_LENGTH): [number, number] {
   const n = input.length;
   let start = 0;
   let len = 0;
-  while (start < n - 2 && rawPressure[start] < HOOK_PRESSURE) {
+  while (start < n - 2 && rawPressure[start] < pressure) {
     len += Math.hypot(input[start + 1][0] - input[start][0], input[start + 1][1] - input[start][1]);
-    if (len > HOOK_MAX_LENGTH) break;
+    if (len > maxLength) break;
     start++;
   }
   let end = n;
   len = 0;
-  while (end - 1 > start + 1 && rawPressure[end - 1] < HOOK_PRESSURE) {
+  while (end - 1 > start + 1 && rawPressure[end - 1] < pressure) {
     len += Math.hypot(input[end - 1][0] - input[end - 2][0], input[end - 1][1] - input[end - 2][1]);
-    if (len > HOOK_MAX_LENGTH) break;
+    if (len > maxLength) break;
     end--;
   }
   return [start, end];

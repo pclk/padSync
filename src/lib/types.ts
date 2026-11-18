@@ -76,9 +76,11 @@ export interface StrokeData {
   /** "pen" | "mouse" — the input that produced the stroke. */
   input: string;
   device: string;
-  /** Pen feel chosen when the stroke was drawn, 0–1 (see penFeel). Absent on older strokes. */
+  /** Quick pen feel (0–1) kept by strokes drawn before `pen` existed (see strokePen). */
   smoothing?: number;
   sensitivity?: number;
+  /** Pen parameters the stroke was drawn with that differ from the defaults (see pen-feel.ts). */
+  pen?: Partial<Record<string, number | boolean | string>>;
 }
 
 export const STROKE_STRIDE = 6;

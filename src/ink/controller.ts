@@ -4,7 +4,7 @@ import { logEvent, moveStrokes, newEntity, putEntities, setDeleted } from "@/lib
 import { PAGE_WIDTH, STROKE_STRIDE, type StrokeData, type StrokeEntity } from "@/lib/types";
 import { isStrayDot, type Contact } from "./filters";
 import { dataBox, hitStrokes, lassoStrokes, strokeBox, unionBox, type Box } from "./geometry";
-import { DEFAULT_SENSITIVITY, DEFAULT_SMOOTHING } from "./pen-feel";
+import { penOverrides, withOverrides, type PenParams } from "./pen-feel";
 import { paintStroke, strokePath, cachedPath, seedPath } from "./render";
 import { UndoStack } from "./undo";
 
@@ -21,7 +21,9 @@ export interface ToolState {
   hlColor: string;
   hlSize: number;
   eraserSize: number;
-  /** Pen feel, 0–1; absent in tool state saved before it existed. */
+  /** Pen parameters changed from the defaults (pen-feel.ts). */
+  pen?: Partial<PenParams>;
+  /** Quick pen feel from before `pen` existed; read once to migrate saved tool state. */
   penSmoothing?: number;
   penSensitivity?: number;
 }
@@ -60,18 +62,14 @@ export interface ControllerCallbacks {
 
 const round = (v: number, f: number) => Math.round(v * f) / f;
 
-/**
- * Predicted events extend the live stroke towards where the Pencil is going. Only the nearest are
- * used: far predictions overshoot on direction changes and at the stroke end, where the line then
- * visibly retracts when the prediction is dropped.
- */
-const MAX_PREDICTED = 2;
-
 export class InkController {
   tool: ToolState;
   zoom = 1;
   notebookId: string;
   readonly undo = new UndoStack();
+  /** The tool's pen parameters, and the part of them new pen strokes store. */
+  private pen!: PenParams;
+  private penOverrides!: Partial<PenParams>;
   selection: Selection | null = null;
 
   private live: HTMLCanvasElement | null = null;
@@ -85,10 +83,12 @@ export class InkController {
   constructor(notebookId: string, tool: ToolState, cb: ControllerCallbacks) {
     this.notebookId = notebookId;
     this.tool = tool;
+    this.setPen(tool);
     this.cb = cb;
   }
 
   configure(tool: ToolState, zoom: number) {
+    if (tool.pen !== this.tool.pen) this.setPen(tool);
     this.tool = tool;
     this.zoom = zoom;
   }
@@ -155,6 +155,11 @@ export class InkController {
     return true;
   }
 
+  private setPen(tool: ToolState) {
+    this.pen = withOverrides(tool.pen);
+    this.penOverrides = penOverrides(this.pen);
+  }
+
   private setGesture(g: Gesture | null) {
     this.gesture = g;
     setInking(g !== null);
@@ -206,7 +211,7 @@ export class InkController {
         t0: Date.now(),
         input: e.pointerType,
         device: deviceId(),
-        ...(hl ? {} : { smoothing: this.tool.penSmoothing ?? DEFAULT_SMOOTHING, sensitivity: this.tool.penSensitivity ?? DEFAULT_SENSITIVITY }),
+        ...(hl || !Object.keys(this.penOverrides).length ? {} : { pen: this.penOverrides }),
       };
       const g: Extract<Gesture, { type: "ink" }> = { type: "ink", sec, rect, data, predicted: [], t0: e.timeStamp, contact: { durationMs: 0, maxPressure: 0 }, pointerId: e.pointerId };
       this.setGesture(g);
@@ -237,7 +242,9 @@ export class InkController {
 
     if (g.type === "ink") {
       this.addPoints(g, evs);
-      const predicted = (e.getPredictedEvents?.() ?? []).slice(0, MAX_PREDICTED);
+      // Only the nearest predictions are used: far ones overshoot on direction changes and at the
+      // stroke end, where the line then visibly retracts when the prediction is dropped.
+      const predicted = (e.getPredictedEvents?.() ?? []).slice(0, this.pen.maxPredicted);
       const pts = g.data.pts;
       // Predictions carry the last real pressure and time, so they can't change the line's width.
       const lastP = pts[pts.length - 4];
@@ -350,7 +357,7 @@ export class InkController {
       // Drop exact duplicates (pointerup often repeats the last move).
       if (n && pts[n - 6] === round(x, 100) && pts[n - 5] === round(y, 100)) continue;
       // Drop samples older than the last one stored: WebKit can hand an earlier sample over again.
-      if (n && Math.round(ev.timeStamp - g.t0) < pts[n - 1]) continue;
+      if (this.pen.dropOutOfOrder && n && Math.round(ev.timeStamp - g.t0) < pts[n - 1]) continue;
       const pressure = ev.pointerType === "pen" ? ev.pressure : 0.5;
       pts.push(
         round(x, 100),
@@ -366,7 +373,7 @@ export class InkController {
   private async commitInk(g: Extract<Gesture, { type: "ink" }>) {
     if (!g.data.pts.length) return;
     // Pencil bounce, a resting tip or a cancelled Scribble touch: not ink.
-    if (isStrayDot(g.data, g.contact)) return;
+    if (isStrayDot(g.data, g.contact, this.pen)) return;
     const stroke = newEntity<"stroke", StrokeData>("stroke", this.notebookId, g.sec.id, g.data);
     const path = strokePath(g.data);
     this.pending.set(stroke.id, { data: g.data, path, sec: g.sec, until: performance.now() + 1500 });

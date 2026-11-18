@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import { InkController, type Selection, type ToolState } from "@/ink/controller";
-import { DEFAULT_SENSITIVITY, DEFAULT_SMOOTHING } from "@/ink/pen-feel";
+import { legacyOverrides } from "@/ink/pen-feel";
 import { emitActivity } from "@/lib/activity";
 import { db, deviceId, deviceKind } from "@/lib/db";
 import { useLayoutMode, useStoredState } from "@/lib/hooks";
@@ -44,8 +44,6 @@ const DEFAULT_TOOL: ToolState = {
   hlColor: "#facc15",
   hlSize: 22,
   eraserSize: 24,
-  penSmoothing: DEFAULT_SMOOTHING,
-  penSensitivity: DEFAULT_SENSITIVITY,
 };
 
 export default function NotebookEditor() {
@@ -83,8 +81,11 @@ function Editor({ notebookId }: { notebookId: string }) {
   );
 
   const [storedTool, setToolState] = useStoredState<ToolState>("padsync.tool", DEFAULT_TOOL);
-  // Tool state saved by an older version lacks newer fields such as the pen feel.
-  const tool = useMemo(() => ({ ...DEFAULT_TOOL, ...storedTool }), [storedTool]);
+  // Tool state saved by an older version lacks newer fields; its quick pen feel becomes pen overrides.
+  const tool = useMemo(() => {
+    const { penSmoothing, penSensitivity, ...rest } = storedTool;
+    return { ...DEFAULT_TOOL, ...rest, pen: rest.pen ?? legacyOverrides(penSmoothing, penSensitivity) };
+  }, [storedTool]);
   const [panelOpen, setPanelOpen] = useStoredState("padsync.panel", !isIpad);
   const [follow, setFollow] = useStoredState("padsync.follow", !isIpad);
   const [zoom, setZoom] = useState(() => (isIpad ? 1 : fitZoom(panelOpen, 360)));
