@@ -61,7 +61,7 @@ export const DOT_MAX_EXTENT = 1.5;
 /** Contact shorter than this is a bounce or a glancing touch; a deliberate tap lasts ~60 ms or more. */
 export const DOT_MIN_MS = 45;
 /** Pressure at or above this makes even a quick tap deliberate (a firmly placed period). */
-export const DOT_MIN_PRESSURE = 0.2;
+export const DOT_MIN_PRESSURE = 0.1;
 
 export interface Contact {
   /** ms from pointerdown to the last event of the gesture, including ones not stored as points. */
@@ -218,18 +218,29 @@ export function interpolateGaps(input: number[][], gap = MAX_POINT_GAP): number[
   return out;
 }
 
-/** Raw Pencil pressure below this at a stroke's ends is the tip landing or lifting, not ink. */
-export const HOOK_PRESSURE = 0.12;
-/** At most this much of a stroke's length (section units) is trimmed from either end. */
-export const HOOK_MAX_LENGTH = 6;
+/**
+ * Share of the stroke's median pressure below which its ends are the tip landing or lifting. It is
+ * relative because people write at very different pressures: with a fixed threshold (0.12, before)
+ * a light writer's strokes were cut at both ends, shortening a "c" to "(" and opening every "o".
+ */
+export const HOOK_PRESSURE = 0.3;
+/**
+ * At most this much of a stroke's length (section units) is trimmed from either end; 0, the
+ * default, is off. Any trim takes real ink off the ends of letters, and Noteful trims nothing.
+ */
+export const HOOK_MAX_LENGTH = 0;
 
 /**
  * Index range [start, end) of a pen stroke without its touchdown and lift-off hooks: the short
  * runs at either end where the tip skids while the pressure ramps up or falls away. Only the
- * light ends are cut, never more than HOOK_MAX_LENGTH, and at least two points always remain.
+ * ends lighter than `share` of the stroke's median pressure are cut, never more than `maxLength`,
+ * and at least two points always remain.
  */
-export function hookTrim(input: number[][], rawPressure: number[], pressure = HOOK_PRESSURE, maxLength = HOOK_MAX_LENGTH): [number, number] {
+export function hookTrim(input: number[][], rawPressure: number[], share = HOOK_PRESSURE, maxLength = HOOK_MAX_LENGTH): [number, number] {
   const n = input.length;
+  if (n < 3 || share <= 0 || maxLength <= 0) return [0, n];
+  const sorted = rawPressure.slice().sort((a, b) => a - b);
+  const pressure = share * sorted[sorted.length >> 1];
   let start = 0;
   let len = 0;
   while (start < n - 2 && rawPressure[start] < pressure) {
@@ -255,31 +266,35 @@ export function hookTrim(input: number[][], rawPressure: number[], pressure = HO
 export const STOP_RADIUS = 1.5;
 
 /**
- * Index range [start, end) without the knots where the pen stood still at the start and end: the
- * run of points within `radius` of where the pen stopped is collapsed onto that point. At least two
- * points always remain.
+ * Pen points with the knots where the pen stood still at the start and end thinned out: the points
+ * jittering within `radius` of where the pen stopped are dropped, but the stop point and the very
+ * last point stay (and the first point and landing spot at the start), so the stroke keeps its
+ * full length and an "o" still closes.
  */
-export function trimStops(input: number[][], radius = STOP_RADIUS): [number, number] {
+export function collapseStops(input: number[][], radius = STOP_RADIUS): number[][] {
   const n = input.length;
-  if (n < 3 || radius <= 0) return [0, n];
+  if (n < 4 || radius <= 0) return input;
   const near = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[1]) <= radius;
   // End: the earliest k such that every point after k stays within radius of k.
-  let end = n;
+  let stop = n - 1;
   for (let k = n - 2; k >= 1; k--) {
     let all = true;
     for (let j = k + 1; j < n && all; j++) all = near(input[j], input[k]);
     if (!all) break;
-    end = k + 1;
+    stop = k;
   }
   // Start: the latest k such that every point before k is within radius of k.
-  let start = 0;
-  for (let k = 1; k < end - 1; k++) {
+  let land = 0;
+  for (let k = 1; k < stop; k++) {
     let all = true;
     for (let j = 0; j < k && all; j++) all = near(input[j], input[k]);
     if (!all) break;
-    start = k;
+    land = k;
   }
-  return end - start >= 2 ? [start, end] : [0, n];
+  if (land === 0 && stop === n - 1) return input;
+  const head = land > 0 ? [input[0]] : [];
+  const tail = stop < n - 1 ? [input[n - 1]] : [];
+  return [...head, ...input.slice(land, stop + 1), ...tail];
 }
 
 /**
@@ -330,12 +345,14 @@ export function tapDot(pts: number[], size = TAP_DOT_SIZE): [number, number] | n
 }
 
 /**
- * Longest lift-off or landing tail (section units) that is trimmed. Moving on to the next stroke,
+ * Longest lift-off or landing tail (section units) that is trimmed; 0, the default, is off. At
+ * handwriting size a sharp turn near an end is usually part of the letter (the top of an "f" or a
+ * "7", the bars of a "z", the loop of a "6"), and cutting those made letters unreadable. Moving on to the next stroke,
  * the tip often keeps touching for a few millimetres: a fraction bar ends in a hook, the top of an
  * "=" bends into a "2", a "0" gets a tail inside it. Such a tail turns sharply away from the
  * stroke and is lighter or faster than the rest of it.
  */
-export const TAIL_MAX_LENGTH = 15;
+export const TAIL_MAX_LENGTH = 0;
 /** Smallest turn (degrees) between a stroke and a tail. */
 export const TAIL_MIN_TURN = 70;
 /** A tail is never more than this share of the stroke's length. */
@@ -346,7 +363,7 @@ const TAIL_SPEED = 1.5;
 
 /**
  * Index range [start, end) without a lift-off tail at the end or a landing tail at the start: the
- * part after the sharpest turn within TAIL_MAX_LENGTH of an end, when that part is lighter or
+ * part after the sharpest turn within `maxLength` of an end, when that part is both lighter and
  * faster than the stroke. Firm, steady turns (the foot of a "2", the hook of a "J") stay.
  */
 export function tailTrim(input: number[][], raw: number[], times: number[], maxLength = TAIL_MAX_LENGTH, minTurn = TAIL_MIN_TURN): [number, number] {
@@ -378,7 +395,7 @@ export function tailTrim(input: number[][], raw: number[], times: number[], maxL
   const speed = (from: number, to: number) => (s[to] - s[from]) / Math.max(1, times[to] - times[from]);
   // Lighter or faster than the body of the stroke.
   const loose = (tail: [number, number], body: [number, number]) =>
-    mean(tail[0], tail[1] + 1) < TAIL_PRESSURE * median(body[0], body[1] + 1) || speed(tail[0], tail[1]) > TAIL_SPEED * speed(body[0], body[1]);
+    mean(tail[0], tail[1] + 1) < TAIL_PRESSURE * median(body[0], body[1] + 1) && speed(tail[0], tail[1]) > TAIL_SPEED * speed(body[0], body[1]);
 
   let end = n;
   let best = -1;

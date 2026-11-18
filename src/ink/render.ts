@@ -1,6 +1,6 @@
 import { getStroke, type StrokeOptions } from "perfect-freehand";
 import { STROKE_STRIDE, type StrokeData, type StrokeEntity } from "@/lib/types";
-import { dropBacktracks, hookTrim, interpolateGaps, smoothPositions, smoothPressure, tailTrim, tapDot, trimStops } from "./filters";
+import { dropBacktracks, hookTrim, interpolateGaps, smoothPositions, smoothPressure, tailTrim, tapDot, collapseStops } from "./filters";
 import { DEFAULT_PEN, EASINGS, strokePen, type PenParams } from "./pen-feel";
 
 // Stroke geometry lives in section-local coordinates (1 unit = 1 CSS px at zoom 1).
@@ -43,7 +43,7 @@ export function strokeOptions(d: PenFields, last: boolean): StrokeOptions {
 
 /**
  * perfect-freehand input. Pencil input is cleaned here, at render time, never in storage, so
- * existing strokes improve too: touchdown/lift-off hooks are trimmed (hookTrim), re-sent samples
+ * existing strokes improve too: optional hook and tail trims (hookTrim, tailTrim), re-sent samples
  * that step backwards are dropped (dropBacktracks), sparse samples are joined by curves
  * (interpolateGaps), and positions are smoothed along the stroke (smoothPositions), each by the
  * stroke's own pen parameters.
@@ -63,9 +63,7 @@ export function toInput(pts: number[], input?: string, p: PenParams = DEFAULT_PE
   let [start, end] = hookTrim(out, raw, p.hookPressure, p.hookMaxLength);
   const [t0, t1] = tailTrim(out.slice(start, end), raw.slice(start, end), times.slice(start, end), p.tailMaxLength, p.tailMinTurn);
   [start, end] = [start + t0, start + t1];
-  const [s0, s1] = trimStops(out.slice(start, end), p.stopRadius);
-  [start, end] = [start + s0, start + s1];
-  const kept = dropBacktracks(out.slice(start, end), times.slice(start, end), p.backtrackMax);
+  const kept = collapseStops(dropBacktracks(out.slice(start, end), times.slice(start, end), p.backtrackMax), p.stopRadius);
   return smoothPositions(interpolateGaps(kept, p.maxPointGap), p.positionSigma);
 }
 

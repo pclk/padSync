@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getStroke } from "perfect-freehand";
-import { STOP_RADIUS, TAIL_MAX_LENGTH, TAP_DOT_SIZE, tailTrim, tapDot, trimStops } from "@/ink/filters";
+import { STOP_RADIUS, TAIL_MAX_LENGTH, TAP_DOT_SIZE, collapseStops, tailTrim, tapDot } from "@/ink/filters";
 import { dotCentre, dotRadius, strokeOptions, toInput } from "@/ink/render";
 import { strokePen } from "@/ink/pen-feel";
 import type { StrokeData } from "@/lib/types";
@@ -10,28 +10,65 @@ import type { StrokeData } from "@/lib/types";
 const pts = (list: [number, number, number][]) => list.flatMap(([x, y, p], i) => [x, y, p, 1, 0, i * 4]);
 const pen = (p: number[]): StrokeData => ({ tool: "pen", color: "#000", size: 3.4, pts: p, t0: 0, input: "pen", device: "d" });
 
-describe("trimStops", () => {
+describe("collapseStops", () => {
   const xy = (list: [number, number][]) => list.map(([x, y]) => [x, y, 0.5]);
+  const xs = (p: number[][]) => p.map(([x, y]) => [x, y]);
 
-  it("collapses the knot where the pen rests before lifting", () => {
+  it("drops the jitter where the pen rests before lifting, keeping the stop and the last point", () => {
     const line = xy([[0, 0], [5, 0], [10, 0], [10.4, 0.3], [9.8, -0.4], [10.2, 0.5], [10.5, 0]]);
-    expect(trimStops(line)).toEqual([0, 3]);
+    expect(xs(collapseStops(line))).toEqual([[0, 0], [5, 0], [10, 0], [10.5, 0]]);
   });
 
-  it("collapses the knot where the pen lands, and leaves clean strokes alone", () => {
+  it("drops the jitter where the pen lands, and leaves clean strokes alone", () => {
     const landing = xy([[0, 0], [0.5, 0.4], [-0.3, 0.2], [0.2, 0], [5, 0], [10, 0]]);
-    expect(trimStops(landing)).toEqual([3, 6]);
+    expect(xs(collapseStops(landing))).toEqual([[0, 0], [0.2, 0], [5, 0], [10, 0]]);
     const clean = xy([[0, 0], [5, 0], [10, 0], [15, 0]]);
-    expect(trimStops(clean)).toEqual([0, 4]);
+    expect(collapseStops(clean)).toBe(clean);
   });
 
-  it("keeps at least two points, and 0 turns it off", () => {
-    const knot = xy([[0, 0], [0.2, 0], [0.4, 0], [0.6, 0]]);
-    const [s, e] = trimStops(knot);
-    expect(e - s).toBeGreaterThanOrEqual(2);
-    expect(trimStops(xy([[0, 0], [5, 0], [10, 0], [10.2, 0]]), 0)).toEqual([0, 4]);
+  it("never shortens a stroke: the first and last points always stay; 0 turns it off", () => {
+    const knot = xy([[0, 0], [0.2, 0], [0.4, 0], [0.6, 0], [0.8, 0]]);
+    const out = collapseStops(knot);
+    expect(out[0]).toBe(knot[0]);
+    expect(out[out.length - 1]).toBe(knot[knot.length - 1]);
+    const line = xy([[0, 0], [5, 0], [10, 0], [10.2, 0], [10.3, 0]]);
+    expect(collapseStops(line, 0)).toBe(line);
     expect(STOP_RADIUS).toBeGreaterThan(0);
   });
+});
+
+describe("default settings keep every part of a letter", () => {
+  // A light writer (pressure ~0.15) whose strokes ramp in and out, as in the alphabet sample:
+  // with absolute hook thresholds and the tail cut, the top of an f and a 7, the bars of a z and
+  // the end of an o disappeared.
+  function letter(way: [number, number][]): StrokeData {
+    const raw: [number, number][] = [];
+    for (let k = 1; k < way.length; k++) {
+      const [x0, y0] = way[k - 1], [x1, y1] = way[k];
+      const n = Math.max(2, Math.round(Math.hypot(x1 - x0, y1 - y0) / 0.9));
+      for (let j = k === 1 ? 0 : 1; j <= n; j++) {
+        const u = j / n;
+        const e = u * u * (3 - 2 * u);
+        raw.push([x0 + (x1 - x0) * e, y0 + (y1 - y0) * e]);
+      }
+    }
+    const n = raw.length;
+    return pen(raw.flatMap(([x, y], i) => [x, y, 0.15 * Math.min(1, (i + 1) / 6, (n - i) / 5), 1, 0, i * 4]));
+  }
+  const letters: Record<string, [number, number][]> = {
+    f: [[9, 1], [6, -1], [4, 2], [4, 14]],
+    "7": [[0, 0], [8, 0], [2, 13]],
+    z: [[0, 4], [7, 4], [0, 12], [8, 12]],
+    o: [[4, 4], [1, 7], [2, 11], [6, 12], [8, 8], [6, 4], [4, 4.5]],
+  };
+  for (const [name, way] of Object.entries(letters)) {
+    it(`${name} keeps its first and last point`, () => {
+      const out = toInput(letter(way).pts, "pen", strokePen({}));
+      const [first, last] = [out[0], out[out.length - 1]];
+      expect(Math.hypot(first[0] - way[0][0], first[1] - way[0][1])).toBeLessThan(0.5);
+      expect(Math.hypot(last[0] - way[way.length - 1][0], last[1] - way[way.length - 1][1])).toBeLessThan(0.5);
+    });
+  }
 });
 
 describe("taps drawn as dots", () => {
@@ -100,8 +137,9 @@ describe("lift-off tails", () => {
     }
     return { input, raw, times };
   }
-  const endOf = (r: ReturnType<typeof path>, ...rest: [number?, number?]) => {
-    const [s, e] = tailTrim(r.input, r.raw, r.times, ...rest);
+  // The tail cut is off by default; these use the length it had when it was on.
+  const endOf = (r: ReturnType<typeof path>, maxLength = 15, minTurn?: number) => {
+    const [s, e] = tailTrim(r.input, r.raw, r.times, maxLength, minTurn);
     return { s, last: r.input[e - 1] };
   };
 
@@ -110,9 +148,9 @@ describe("lift-off tails", () => {
     expect(endOf(bar).last.slice(0, 2)).toEqual([70, 20]);
   });
 
-  it("cuts a fast tail even at full pressure", () => {
+  it("keeps a fast turn at full pressure: fast alone is part of the letter", () => {
     const bar = path([10, 20], [{ to: [70, 20], speed: 1, p: [0.4, 0.4] }, { to: [62, 28], speed: 4, p: [0.4, 0.4] }]);
-    expect(endOf(bar).last.slice(0, 2)).toEqual([70, 20]);
+    expect(endOf(bar).last.slice(0, 2)).toEqual([62, 28]);
   });
 
   it("cuts the tail a 0 gets inside it, and a light landing tail", () => {
@@ -139,6 +177,7 @@ describe("lift-off tails", () => {
     expect(endOf(bar, 0).last.slice(0, 2)).toEqual([60, 30]);
     const bend = path([0, 0], [{ to: [60, 0], speed: 1.5, p: [0.4, 0.4] }, { to: [70, 4], speed: 3, p: [0.35, 0.15] }]);
     expect(endOf(bend).last.slice(0, 2)).toEqual([70, 4]);
-    expect(TAIL_MAX_LENGTH).toBeGreaterThan(0);
+    expect(TAIL_MAX_LENGTH).toBe(0);
+    expect(tailTrim(bar.input, bar.raw, bar.times)).toEqual([0, bar.input.length]);
   });
 });

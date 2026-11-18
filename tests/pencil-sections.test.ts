@@ -120,18 +120,22 @@ describe("interpolateGaps", () => {
 describe("hookTrim", () => {
   const line = (n: number) => Array.from({ length: n }, (_, i) => [i, 0, 0.5]);
 
-  it("cuts the light touchdown and lift-off ends", () => {
+  it("is off by default, and when on cuts ends light relative to the stroke's own pressure", () => {
     const raw = [0.02, 0.06, 0.3, 0.4, 0.4, 0.4, 0.3, 0.05, 0];
-    expect(hookTrim(line(9), raw)).toEqual([2, 7]);
+    expect(HOOK_MAX_LENGTH).toBe(0);
+    expect(hookTrim(line(9), raw)).toEqual([0, 9]);
+    expect(hookTrim(line(9), raw, 0.3, 6)).toEqual([2, 7]);
+    // A light writer: the same shape at a third of the pressure is trimmed the same way.
+    expect(hookTrim(line(9), raw.map((p) => p / 3), 0.3, 6)).toEqual([2, 7]);
   });
 
-  it("never cuts more than HOOK_MAX_LENGTH from an end, or below two points", () => {
-    const raw = Array.from({ length: 20 }, () => 0.01);
-    const [start, end] = hookTrim(line(20), raw);
-    expect(start).toBeLessThanOrEqual(HOOK_MAX_LENGTH);
+  it("never cuts more than its length from an end, or below two points", () => {
+    const raw = [...Array.from({ length: 10 }, () => 0.01), ...Array.from({ length: 10 }, () => 0.5)];
+    const [start, end] = hookTrim(line(20), raw, 0.3, 4);
+    expect(start).toBeLessThanOrEqual(5);
     expect(end - start).toBeGreaterThanOrEqual(2);
-    const [s3, e3] = hookTrim(line(3), [0, 0, 0]);
-    expect(e3 - s3).toBe(2);
+    const [s3, e3] = hookTrim(line(3), [0, 0.5, 0], 0.3, 4);
+    expect(e3 - s3).toBeGreaterThanOrEqual(2);
   });
 });
 

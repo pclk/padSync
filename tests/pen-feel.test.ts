@@ -165,7 +165,7 @@ describe("capture settings", () => {
     for (const [pen, kept] of [[{}, 0], [{ dotMinMs: 0 }, 1]] as const) {
       store.putEntities.mockClear();
       const c = await controller(pen);
-      c.down(ev("pointerdown", 5, 100, 0.1), sec);
+      c.down(ev("pointerdown", 5, 100, 0.05), sec);
       c.up(ev("pointerup", 5, 110, 0));
       await new Promise((r) => setTimeout(r, 0));
       expect(store.putEntities).toHaveBeenCalledTimes(kept);

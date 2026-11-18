@@ -127,9 +127,9 @@ export const PEN_GROUPS: { title: string; tab: string; note?: string; params: Pe
     params: [
       { key: "maxPointGap", label: "Curve between samples", kind: "range", min: 0.5, max: 20, step: 0.5, unit: "px", help: "Samples further apart than this are joined by a curve. Large values draw straight pieces." },
       { key: "backtrackMax", label: "Drop backward jumps", kind: "range", min: 0, max: 20, step: 0.5, unit: "px", help: "A single sample stepping back by up to this much is dropped. 0 turns it off." },
-      { key: "hookPressure", label: "Hook pressure", kind: "range", min: 0, max: 0.5, step: 0.01, help: "Stroke ends lighter than this are trimmed as touchdown or lift-off hooks. 0 turns it off." },
-      { key: "hookMaxLength", label: "Hook length", kind: "range", min: 0, max: 30, step: 0.5, unit: "px", help: "Most that is trimmed from either end." },
-      { key: "tailMaxLength", label: "Lift-off tails", kind: "range", min: 0, max: 40, step: 1, unit: "px", help: "A sharp turn this close to either end, lighter or faster than the stroke, is cut off: the hook a fraction bar or \"=\" gets as you move to the next stroke. 0 turns it off." },
+      { key: "hookPressure", label: "Hook pressure", kind: "range", min: 0, max: 1, step: 0.05, help: "Stroke ends lighter than this share of the stroke's usual pressure are trimmed as touchdown or lift-off hooks. 0 turns it off." },
+      { key: "hookMaxLength", label: "Hook length", kind: "range", min: 0, max: 30, step: 0.5, unit: "px", help: "Most that is trimmed from either end. Large values shorten letters." },
+      { key: "tailMaxLength", label: "Lift-off tails", kind: "range", min: 0, max: 40, step: 1, unit: "px", help: "A sharp turn this close to either end, lighter and faster than the stroke, is cut off: a hook as you move to the next stroke. Off (0) by default: at handwriting size it also cuts real parts of letters (f, 7, z, 6)." },
       { key: "tailMinTurn", label: "Tail turn angle", kind: "range", min: 20, max: 180, step: 5, unit: "°", help: "How sharply a tail must turn away from the stroke to be cut. Lower cuts more." },
       { key: "stopRadius", label: "Ignore stops at the ends", kind: "range", min: 0, max: 6, step: 0.5, unit: "px", help: "Where the pen rests and wiggles before lifting (or after landing), points within this distance count as one, so ends don't blob. 0 turns it off." },
     ],
