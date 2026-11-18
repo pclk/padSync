@@ -13,11 +13,6 @@ it('bounds event/request history and returns snapshots isolated from later updat
   setSyncDebugEnabled(true);
   for (let i=0;i<200;i++) recordSyncDebug('timer','scheduled',{delay:i});
   for (let i=0;i<60;i++) beginSyncDebugRequest('poll');
-  // Everything from the last 30 s is kept for the window averages.
-  expect(getSyncDebugSnapshot().events.length).toBeGreaterThan(200);
-  expect(getSyncDebugSnapshot().requests).toHaveLength(60);
-  vi.advanceTimersByTime(31000);
-  recordSyncDebug('timer','scheduled',{delay:200}); beginSyncDebugRequest('poll');
   const snapshot=getSyncDebugSnapshot();
   expect(snapshot.events).toHaveLength(150); expect(snapshot.requests).toHaveLength(40);
   snapshot.events[0].details.delay=-1;
@@ -52,10 +47,21 @@ it('keeps a negative edit age visible as clock skew and discards updates to clea
   expect(getSyncDebugSnapshot().requests).toEqual([]);
 });
 
-it('averages the last 30 s by received, sent and all, and formats a pasteable report', () => {
+it('keeps the last 300 edit requests past the 40-request cap', () => {
   setSyncDebugEnabled(true);
-  const old=beginSyncDebugRequest('poll'); updateSyncDebugRequest(old,{totalMs:9999,httpMs:9999});
-  vi.advanceTimersByTime(31000);
+  for (let i=0;i<350;i++) {
+    const r=beginSyncDebugRequest('local edit'); updateSyncDebugRequest(r,{totalMs:1,pushedContent:1});
+    beginSyncDebugRequest('poll');
+  }
+  const kept=getSyncDebugSnapshot().requests;
+  expect(kept.filter(r=>r.pushedContent)).toHaveLength(300);
+  expect(kept.filter(r=>!r.pushedContent)).toHaveLength(40);
+  expect(syncDebugStats()[2].count).toBe(300);
+});
+
+it('averages edits by received, sent and all, and formats a pasteable report', () => {
+  setSyncDebugEnabled(true);
+  const empty=beginSyncDebugRequest('poll'); updateSyncDebugRequest(empty,{totalMs:9999,httpMs:9999});
   const recv=beginSyncDebugRequest('realtime notification'); updateSyncDebugRequest(recv,{totalMs:600,httpMs:400,newConnection:true,connectMs:200,appliedContent:1,remoteAgeMs:1000});
   const sent=beginSyncDebugRequest('local edit'); updateSyncDebugRequest(sent,{totalMs:100,httpMs:60,newConnection:false,connectMs:0,pushedContent:2,sendAgeMs:300});
   const [received,sentGroup,all]=syncDebugStats();
@@ -64,5 +70,7 @@ it('averages the last 30 s by received, sent and all, and formats a pasteable re
   expect(all.count).toBe(2); expect(all.avg.totalMs).toBe(350); expect(all.max.httpMs).toBe(400);
   const report=formatSyncDebugReport(['Device: test']);
   expect(report).toContain('Device: test'); expect(report).toContain('Received edits n=1');
-  expect(report).toContain('realtime notification'); expect(report).not.toContain('9999');
+  expect(report).toContain('realtime notification'); expect(report).toContain('2 of up to 300 edit requests');
+  // The empty poll is listed but left out of the averages.
+  expect(all.max.totalMs).toBe(600);
 });

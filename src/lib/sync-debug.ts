@@ -15,9 +15,8 @@ export type SyncDebugRequest = {
   sendAgeMs?: number;
 };
 const MAX_EVENTS = 150, MAX_REQUESTS = 40;
-/** Requests and events this recent are always kept, so the window averages see all of them. */
-export const STATS_WINDOW_MS = 30000;
-const MAX_WINDOW_ITEMS = 1000;
+/** Requests that sent or received edits are kept separately, so the averages cover this many. */
+export const MAX_EDITS = 300;
 let enabled = false, sequence = 0;
 let events: SyncDebugEvent[] = [];
 let requests: SyncDebugRequest[] = [];
@@ -31,14 +30,19 @@ export function setSyncDebugEnabled(value: boolean) {
   clearSyncDebug();
   if (enabled) recordSyncDebug('debug', 'Recording started');
 }
-function prune(list: { at: number }[], keep: number) {
-  const cutoff = Date.now() - STATS_WINDOW_MS;
-  while (list.length > MAX_WINDOW_ITEMS || (list.length > keep && list[0].at < cutoff)) list.shift();
+const isEdit = (r: SyncDebugRequest) => (r.pushedContent ?? 0) > 0 || (r.appliedContent ?? 0) > 0;
+// The newest 40 requests of any kind stay for the history picker; edit requests stay up to 300,
+// so empty polls and presence-only requests never push edits out.
+function pruneRequests() {
+  let others = 0, edits = 0;
+  for (let i = requests.length - 1; i >= 0; i--) {
+    if (isEdit(requests[i]) ? ++edits > MAX_EDITS : ++others > MAX_REQUESTS) requests.splice(i, 1);
+  }
 }
 export function recordSyncDebug(kind: string, message: string, details: Record<string, DebugValue> = {}) {
   if (!enabled) return;
   events.push({ id: ++sequence, at: Date.now(), kind, message, details });
-  prune(events, MAX_EVENTS);
+  if (events.length > MAX_EVENTS) events.shift();
 }
 export function beginSyncDebugRequest(trigger: string, queueMs = 0, timerLateMs = 0) {
   if (!enabled) return undefined;
@@ -47,7 +51,7 @@ export function beginSyncDebugRequest(trigger: string, queueMs = 0, timerLateMs 
     visibility: typeof document === 'undefined' ? 'unknown' : document.visibilityState,
   };
   requests.push(request);
-  prune(requests, MAX_REQUESTS);
+  pruneRequests();
   return request;
 }
 export function updateSyncDebugRequest(request: SyncDebugRequest | undefined, patch: Partial<SyncDebugRequest>) {
@@ -118,7 +122,7 @@ export function recordNetworkTiming(request: SyncDebugRequest | undefined, fetch
   });
 }
 
-// --- 30 s window statistics -------------------------------------------------------------------
+// --- statistics over the last 300 edits ------------------------------------------------------
 type Num = keyof { [K in keyof SyncDebugRequest as SyncDebugRequest[K] extends number | undefined ? K : never]: 1 };
 export const STAT_METRICS: [Num | 'serverTotal', string][] = [
   ['queueMs', 'Scheduled wait'], ['timerLateMs', 'Timer late'], ['readMs', 'Read local queue'], ['encodeMs', 'Encode upload'],
@@ -129,9 +133,9 @@ export const STAT_METRICS: [Num | 'serverTotal', string][] = [
 export type StatGroup = { label: string; count: number; newConnections: number; protocols: string[]; avg: Record<string, number | undefined>; max: Record<string, number | undefined> };
 const metric = (r: SyncDebugRequest, key: Num | 'serverTotal') => key === 'serverTotal' ? r.server?.total : r[key];
 
-/** Averages over the requests that finished in the last 30 s: ink received, ink sent, and all. */
-export function syncDebugStats(now = Date.now(), list = requests) {
-  const recent = list.filter(r => r.at >= now - STATS_WINDOW_MS && r.totalMs !== undefined);
+/** Averages over the kept edit requests: received from the other device, sent from this one, and both. */
+export function syncDebugStats(list = requests) {
+  const recent = list.filter(r => r.totalMs !== undefined && isEdit(r));
   const group = (label: string, rows: SyncDebugRequest[]): StatGroup => {
     const avg: StatGroup['avg'] = {}, max: StatGroup['max'] = {};
     for (const [key] of STAT_METRICS) {
@@ -144,25 +148,27 @@ export function syncDebugStats(now = Date.now(), list = requests) {
   return [
     group('Received edits', recent.filter(r => (r.appliedContent ?? 0) > 0)),
     group('Sent edits', recent.filter(r => (r.pushedContent ?? 0) > 0)),
-    group('All requests', recent),
+    group('All edits', recent),
   ];
 }
 
 const f = (v?: number) => v === undefined ? '—' : `${Math.round(v)}`;
 const clock = (at: number) => new Date(at).toISOString().slice(11, 23);
-/** A plain-text report of the last 30 s, meant to be pasted into a chat. No notebook content. */
+/** A plain-text report of the last 300 edit requests, meant to be pasted into a chat. No notebook content. */
 export function formatSyncDebugReport(header: string[], now = Date.now()) {
-  const stats = syncDebugStats(now);
-  const lines = [`padSync sync stats · ${new Date(now).toISOString()} · last ${STATS_WINDOW_MS / 1000} s`, ...header, ''];
+  const stats = syncDebugStats();
+  const edits = requests.filter(isEdit);
+  const since = edits.length ? ` since ${clock(edits[0].at)}` : '';
+  const lines = [`padSync sync stats · ${new Date(now).toISOString()} · last ${edits.length} of up to ${MAX_EDITS} edit requests${since}`, ...header, ''];
   lines.push(`ms (avg / max)`.padEnd(26) + stats.map(g => `${g.label} n=${g.count}`.padEnd(24)).join(''));
   for (const [key, label] of STAT_METRICS) lines.push(label.padEnd(26) + stats.map(g => `${f(g.avg[key])} / ${f(g.max[key])}`.padEnd(24)).join(''));
   lines.push('New connections'.padEnd(26) + stats.map(g => `${g.newConnections}/${g.count} ${g.protocols.join(',')}`.padEnd(24)).join(''));
-  lines.push('', 'Requests:');
-  for (const r of requests.filter(r => r.at >= now - STATS_WINDOW_MS)) {
+  lines.push('', 'Requests (edits, plus the newest 40 of any kind):');
+  for (const r of requests) {
     lines.push(`#${r.id} ${clock(r.at)} ${r.trigger} · ${r.phase} ${r.status ?? ''} · ↑${r.pushedContent ?? 0}/${r.pushed ?? 0} ↓${r.appliedContent ?? 0}/${r.applied ?? 0} · wait ${f(r.queueMs)} http ${f(r.httpMs)} (${r.newConnection ? 'new' : r.newConnection === false ? 'reused' : '?'} conn ${f(r.connectMs)}, ttfb ${f(r.ttfbMs)}, server ${f(r.server?.total)}, dl ${f(r.downloadMs)}) total ${f(r.totalMs)} · sentAge ${f(r.sendAgeMs)} recvAge ${f(r.remoteAgeMs)} paint ${f(r.applyToPaintMs)}`);
   }
   lines.push('', 'Events:');
-  for (const e of events.filter(e => e.at >= now - STATS_WINDOW_MS)) {
+  for (const e of events) {
     const details = Object.entries(e.details).map(([k, v]) => `${k}=${typeof v === 'number' ? Math.round(v * 10) / 10 : v}`).join(' ');
     lines.push(`${clock(e.at)} ${e.kind} · ${e.message}${details ? ` · ${details}` : ''}`);
   }

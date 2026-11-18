@@ -5,7 +5,7 @@ import { deviceId, deviceKind } from '@/lib/db';
 import { useSyncDebug } from '@/lib/settings';
 import { getSyncTiming, requestSync } from '@/lib/sync';
 import { useStoredState } from '@/lib/hooks';
-import { STAT_METRICS, STATS_WINDOW_MS, clearSyncDebug, formatSyncDebugReport, getSyncDebugSnapshot, setSyncDebugEnabled, syncDebugStats, type SyncDebugRequest } from '@/lib/sync-debug';
+import { MAX_EDITS, STAT_METRICS, clearSyncDebug, formatSyncDebugReport, getSyncDebugSnapshot, setSyncDebugEnabled, syncDebugStats, type SyncDebugRequest } from '@/lib/sync-debug';
 
 type Snapshot = ReturnType<typeof getSyncDebugSnapshot>;
 type Timing = ReturnType<typeof getSyncTiming>;
@@ -22,7 +22,7 @@ const stages: [keyof SyncDebugRequest, string][] = [
 function WindowStats() {
   const stats = syncDebugStats();
   return <details className="mt-3 text-xs" open>
-    <summary className="cursor-pointer font-semibold">Last {STATS_WINDOW_MS / 1000} s averages (ms)</summary>
+    <summary className="cursor-pointer font-semibold">Averages over the last {MAX_EDITS} edits (ms)</summary>
     <div className="mt-1 grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-1 tabular-nums">
       <span />{stats.map(g => <span key={g.label} className="text-right font-medium">{g.label.split(' ')[0]} ({g.count})</span>)}
       {STAT_METRICS.map(([key, label]) => <div key={key} className="contents">
@@ -140,7 +140,7 @@ export function SyncDebugOverlay() {
       `Device: ${env?.device} · ${env?.visibility} · ${env?.focused ? 'focused' : 'unfocused'} · ${env?.standalone ? 'PWA' : 'browser tab'} · ${env?.online ? 'online' : 'offline'} · realtime ${t.realtimeStatus}`,
       `Config: send ${t.debounceMs} · visible ${t.visiblePollMs} · hidden ${t.hiddenPollMs} · retry ${t.retryBaseMs} · effective poll ${t.effectivePollMs} ms`,
     ]);
-    try { await navigator.clipboard.writeText(report); setMessage('Last 30 s stats copied.'); }
+    try { await navigator.clipboard.writeText(report); setMessage('Stats copied.'); }
     catch { setMessage('Clipboard unavailable.'); }
   }
   function download() {
