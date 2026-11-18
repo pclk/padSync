@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useState } from "react";
 import type { ToolKind, ToolState } from "@/ink/controller";
 import { SyncBadge } from "./SyncBadge";
 import { Icon, type IconName } from "./Icons";
+import { PenSettings } from "./PenSettings";
 
 const PEN_COLORS = ["#111827", "#1d4ed8", "#dc2626", "#047857", "#7c3aed"];
 const HL_COLORS = ["#facc15", "#4ade80", "#f472b6", "#60a5fa"];
@@ -42,6 +44,10 @@ export function Toolbar(p: Props) {
   const color = tool.kind === "highlighter" ? tool.hlColor : tool.penColor;
   const sizes = tool.kind === "highlighter" ? HL_SIZES : tool.kind === "eraser" ? ERASER_SIZES : PEN_SIZES;
   const size = tool.kind === "highlighter" ? tool.hlSize : tool.kind === "eraser" ? tool.eraserSize : tool.penSize;
+  // Tapping the pen again while it is selected opens its settings (smoothness, pressure).
+  const [penMenuY, setPenMenuY] = useState<number | null>(null);
+  const closePenMenu = useCallback(() => setPenMenuY(null), []);
+  const penMenuOpen = penMenuY !== null && tool.kind === "pen";
   const showColors = tool.kind === "pen" || tool.kind === "highlighter";
   const showSizes = showColors || tool.kind === "eraser";
 
@@ -83,10 +89,19 @@ export function Toolbar(p: Props) {
           {TOOLS.map((t) => (
             <button
               key={t.kind}
-              title={`${t.label} (${t.key})`}
+              title={t.kind === "pen" ? `${t.label} (${t.key}) — tap again for settings` : `${t.label} (${t.key})`}
               aria-label={t.label}
               aria-pressed={tool.kind === t.kind}
-              onClick={() => setTool({ ...tool, kind: t.kind })}
+              {...(t.kind === "pen" ? { "data-pen-tool": "", "aria-haspopup": "dialog" as const, "aria-expanded": penMenuOpen } : {})}
+              onClick={(e) => {
+                if (t.kind === "pen" && tool.kind === "pen") {
+                  const r = e.currentTarget.getBoundingClientRect();
+                  setPenMenuY(penMenuOpen ? null : r.top + r.height / 2);
+                  return;
+                }
+                setPenMenuY(null);
+                setTool({ ...tool, kind: t.kind });
+              }}
               className={`flex h-11 w-11 items-center justify-center rounded-xl text-xl transition-colors ${tool.kind === t.kind ? "bg-brand-600 text-on-accent shadow-sm" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"}`}
             >
               <Icon name={t.icon} />
@@ -135,6 +150,7 @@ export function Toolbar(p: Props) {
           </button>
         </div>
       </aside>
+      {penMenuOpen && <PenSettings tool={tool} setTool={setTool} anchorY={penMenuY} onClose={closePenMenu} />}
     </>
   );
 }

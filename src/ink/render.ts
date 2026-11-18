@@ -1,32 +1,27 @@
 import { getStroke, type StrokeOptions } from "perfect-freehand";
 import { STROKE_STRIDE, type StrokeData, type StrokeEntity } from "@/lib/types";
 import { smoothPressure } from "./filters";
+import { penFeel } from "./pen-feel";
 
 // Stroke geometry lives in section-local coordinates (1 unit = 1 CSS px at zoom 1).
 // The outline polygon is computed once per (id, hlc) and cached as a Path2D.
 
-export function strokeOptions(d: Pick<StrokeData, "tool" | "size" | "input">, last: boolean): StrokeOptions {
+export function strokeOptions(d: Pick<StrokeData, "tool" | "size" | "input" | "smoothing" | "sensitivity">, last: boolean): StrokeOptions {
   if (d.tool === "highlighter") {
     return { size: d.size, thinning: 0, smoothing: 0.5, streamline: 0.4, simulatePressure: false, last, start: { cap: false }, end: { cap: false } };
   }
   if (d.input === "pen") {
-    // Pencil pressure arrives smoothed (smoothPressure), so it can drive width without wobble.
-    // Slightly less thinning and more streamline than before keep pen lines as calm as mouse ones.
-    return {
-      size: d.size,
-      thinning: 0.5,
-      smoothing: 0.6,
-      streamline: 0.45,
-      simulatePressure: false,
-      easing: (t) => Math.sin((t * Math.PI) / 2),
-      last,
-    };
+    // Pencil pressure arrives smoothed (smoothPressure). Linear easing makes `size` the line width
+    // at mid pressure; the old sine easing drew pen lines ~1.4× the chosen size.
+    return { size: d.size, ...penFeel(d.smoothing, d.sensitivity), simulatePressure: false, easing: (t) => t, last };
   }
+  // Mouse and trackpad keep their simulated pressure; only the smoothness setting applies.
+  const feel = d.smoothing === undefined ? { streamline: 0.32, smoothing: 0.5 } : penFeel(d.smoothing);
   return {
     size: d.size,
     thinning: 0.55,
-    smoothing: 0.5,
-    streamline: 0.32,
+    smoothing: feel.smoothing,
+    streamline: feel.streamline,
     simulatePressure: true,
     easing: (t) => Math.sin((t * Math.PI) / 2),
     last,

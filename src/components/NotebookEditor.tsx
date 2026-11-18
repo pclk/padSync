@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { InkController, type Selection, type ToolState } from "@/ink/controller";
+import { DEFAULT_SENSITIVITY, DEFAULT_SMOOTHING } from "@/ink/pen-feel";
 import { emitActivity } from "@/lib/activity";
 import { db, deviceId, deviceKind } from "@/lib/db";
 import { useLayoutMode, useStoredState } from "@/lib/hooks";
@@ -35,7 +36,16 @@ function readPosition(notebookId: string): Position | null {
   }
 }
 
-const DEFAULT_TOOL: ToolState = { kind: "pen", penColor: "#111827", penSize: 3.4, hlColor: "#facc15", hlSize: 22, eraserSize: 24 };
+const DEFAULT_TOOL: ToolState = {
+  kind: "pen",
+  penColor: "#111827",
+  penSize: 3.4,
+  hlColor: "#facc15",
+  hlSize: 22,
+  eraserSize: 24,
+  penSmoothing: DEFAULT_SMOOTHING,
+  penSensitivity: DEFAULT_SENSITIVITY,
+};
 
 export default function NotebookEditor() {
   const id = useSearchParams().get("id") ?? "";
@@ -71,7 +81,9 @@ function Editor({ notebookId }: { notebookId: string }) {
     [notebookId, sectionCache],
   );
 
-  const [tool, setToolState] = useStoredState<ToolState>("padsync.tool", DEFAULT_TOOL);
+  const [storedTool, setToolState] = useStoredState<ToolState>("padsync.tool", DEFAULT_TOOL);
+  // Tool state saved by an older version lacks newer fields such as the pen feel.
+  const tool = useMemo(() => ({ ...DEFAULT_TOOL, ...storedTool }), [storedTool]);
   const [panelOpen, setPanelOpen] = useStoredState("padsync.panel", !isIpad);
   const [follow, setFollow] = useStoredState("padsync.follow", !isIpad);
   const [zoom, setZoom] = useState(() => (isIpad ? 1 : fitZoom(panelOpen, 360)));
@@ -118,9 +130,13 @@ function Editor({ notebookId }: { notebookId: string }) {
     (t: ToolState) => {
       if (t.kind !== tool.kind) controller.setSelection(null);
       setToolState(t);
-      void logEvent(notebookId, null, "tool", { kind: t.kind, color: t.kind === "highlighter" ? t.hlColor : t.penColor });
+      // Log tool and colour picks, not every step of a pen-feel slider.
+      const color = t.kind === "highlighter" ? t.hlColor : t.penColor;
+      if (t.kind !== tool.kind || color !== (tool.kind === "highlighter" ? tool.hlColor : tool.penColor)) {
+        void logEvent(notebookId, null, "tool", { kind: t.kind, color });
+      }
     },
-    [controller, notebookId, setToolState, tool.kind],
+    [controller, notebookId, setToolState, tool],
   );
 
   const undo = useCallback(async () => {

@@ -4,6 +4,7 @@ import { logEvent, moveStrokes, newEntity, putEntities, setDeleted } from "@/lib
 import { STROKE_STRIDE, type StrokeData, type StrokeEntity } from "@/lib/types";
 import { isStrayDot, type Contact } from "./filters";
 import { dataBox, hitStrokes, lassoStrokes, strokeBox, unionBox, type Box } from "./geometry";
+import { DEFAULT_SENSITIVITY, DEFAULT_SMOOTHING } from "./pen-feel";
 import { paintStroke, strokePath, cachedPath, seedPath } from "./render";
 import { UndoStack } from "./undo";
 
@@ -20,6 +21,9 @@ export interface ToolState {
   hlColor: string;
   hlSize: number;
   eraserSize: number;
+  /** Pen feel, 0–1; absent in tool state saved before it existed. */
+  penSmoothing?: number;
+  penSensitivity?: number;
 }
 
 export interface SectionHandle {
@@ -205,6 +209,7 @@ export class InkController {
         t0: Date.now(),
         input: e.pointerType,
         device: deviceId(),
+        ...(hl ? {} : { smoothing: this.tool.penSmoothing ?? DEFAULT_SMOOTHING, sensitivity: this.tool.penSensitivity ?? DEFAULT_SENSITIVITY }),
       };
       const g: Extract<Gesture, { type: "ink" }> = { type: "ink", sec, rect, data, predicted: [], t0: e.timeStamp, contact: { durationMs: 0, maxPressure: 0 }, pointerId: e.pointerId };
       this.setGesture(g);
