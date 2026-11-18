@@ -1,14 +1,25 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import * as api from "@/lib/chat-api";
-import type { ThreadPatch, ThreadSummary, Turn } from "@/lib/chat-types";
+import type {
+  CatalogAccount,
+  ChatAgent,
+  ChatOptions,
+  ThreadPatch,
+  ThreadSummary,
+  Turn,
+} from "@/lib/chat-types";
 import {
   createPollScheduler,
+  describeModel,
   exportMarkdown,
+  fallbackCatalog,
   groupThreads,
   pollDelay,
   readDraft,
   readStored,
+  reusableThread,
+  toolsOf,
   writeDraft,
   writeStored,
   type ThreadFilter,
@@ -24,7 +35,20 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ThreadFilter>("notebook");
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsedState] = useState(() =>
+    readStored("padsync.chat.sidebarCollapsed", false),
+  );
+  const setCollapsed = (v: boolean) => {
+    setCollapsedState(v);
+    writeStored("padsync.chat.sidebarCollapsed", v);
+  };
+  // Model and tools for the next new chat: whatever was picked last.
+  const [defaults, setDefaults] = useState<{ agent: ChatAgent; options: ChatOptions }>(() =>
+    readStored("padsync.chat.defaults", { agent: "claude", options: {} }),
+  );
+  const [catalog, setCatalog] = useState<CatalogAccount[] | null>(null);
+  const catalogAt = useRef(0);
+  const [loadedId, setLoadedId] = useState("");
   const [error, setError] = useState("");
   const [draft, setDraft] = useState(() => readDraft(""));
   const [busy, setBusy] = useState(false);
@@ -79,6 +103,16 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
     return () => document.removeEventListener("visibilitychange", change);
   }, []);
   useEffect(() => {
+    if (!p.visible || !tabVisible || Date.now() - catalogAt.current < 5 * 60_000) return;
+    catalogAt.current = Date.now();
+    api
+      .getCatalog()
+      .then((data) => setCatalog(data.accounts))
+      .catch(() => {
+        catalogAt.current = 0;
+      });
+  }, [p.visible, tabVisible]);
+  useEffect(() => {
     const scheduler = createPollScheduler(
       async () => {
         try {
@@ -116,6 +150,7 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
           if (!live || selected.current !== id) return;
           setThread(data.thread);
           setTurns((old) => api.mergeTurns(old, data.turns));
+          setLoadedId(id);
           since.current = data.now;
           setBridge(data.bridgeSeenAt);
           setNow(Date.now());
@@ -152,16 +187,39 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
       .then(refresh)
       .catch((e) => setError((e as Error).message));
   };
+  const focusComposer = () =>
+    setTimeout(
+      () =>
+        document
+          .querySelector<HTMLTextAreaElement>("[data-chat-composer]")
+          ?.focus(),
+      0,
+    );
+  /** "New chat" goes to an untouched chat if there is one, else makes one. */
   const create = async () => {
+    const empty = reusableThread(threads, p.notebookId, {
+      id,
+      turns: turns.length,
+    });
+    if (empty) {
+      if (empty.id !== id) {
+        select(empty.id);
+        setThread(empty);
+      }
+      focusComposer();
+      return empty;
+    }
+    const options = { ...defaults.options, ...toolsOf(defaults.options) };
     const data = await api.createThread({
       notebookId: p.notebookId,
-      agent: thread?.agent ?? "claude",
-      options: thread?.options ?? {},
+      agent: defaults.agent,
+      options,
     });
     setThreads((old) => [data.thread, ...old]);
     select(data.thread.id);
     setThread(data.thread);
     refresh();
+    focusComposer();
     return data.thread;
   };
   const patch = (input: ThreadPatch) => {
@@ -171,6 +229,20 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
         setThread(data.thread);
       });
   };
+  const settings = thread
+    ? { agent: thread.agent, options: thread.options }
+    : defaults;
+  /** Model, effort and tools apply to the open chat's next turns and to new chats. */
+  const setSettings = (next: { agent: ChatAgent; options: ChatOptions }) => {
+    setDefaults(next);
+    writeStored("padsync.chat.defaults", next);
+    if (!thread) return;
+    setThread({ ...thread, ...next });
+    patch(next);
+  };
+  const accounts = catalog?.length ? catalog : fallbackCatalog();
+  const modelLabel = (s: { agent: ChatAgent; options: ChatOptions }) =>
+    describeModel(accounts, s).label;
   const download = (t: ThreadSummary, messages: Turn[]) => {
     const url = URL.createObjectURL(
       new Blob([exportMarkdown(t, messages)], { type: "text/markdown" }),
@@ -237,12 +309,18 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
       );
       const bundle = await context?.prepare();
       const target = thread ?? (await create());
+      const tools = toolsOf(target.options);
       const sent = await api.sendTurn(target.id, {
         question: text,
         files: bundle?.files ?? [],
         uploads: api.uploadSpecs(inputs),
         context: bundle?.context,
-        options: { ...target.options, ...bundle?.options },
+        // Running code needs the writable job folder, so it brings edits with it.
+        options: {
+          ...target.options,
+          ...tools,
+          allowEdits: (bundle?.options.allowEdits ?? true) || tools.allowCode,
+        },
       });
       await api.uploadTurnInputs(sent.turn.jobId, inputs, onProgress);
       if (selected.current === target.id) setDraft("");
@@ -287,9 +365,10 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
       );
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setCollapsed(false);
-        const details = document.querySelector("[data-chat-switcher]");
-        if (details) details.setAttribute("open", "");
+        if (collapsed) setCollapsed(false);
+        document
+          .querySelector("[data-chat-switcher]")
+          ?.dispatchEvent(new Event("chat-open-switcher"));
         setTimeout(
           () =>
             [
@@ -328,6 +407,13 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
     thread,
     turns,
     id,
+    settings,
+    setSettings,
+    accounts,
+    fallbackModels: !catalog?.length,
+    modelLabel,
+    loading: !!id && loadedId !== id,
+    focusComposer,
     draft,
     setDraft,
     busy,

@@ -294,19 +294,22 @@ async function run() {
   log(`bridge ${VERSION} polling ${cfg.server} as ${maskToken(cfg.token)}`);
   let sentCatalog = "";
   let catalogAt = 0;
+  // Discovery is local and quick, so jobs always see current logins; the upload runs beside the
+  // claim loop so a slow server never delays a job.
   const refreshCatalog = async () => {
     catalogAt = Date.now();
-    try {
-      catalog = await discoverCatalog({ agents, codexHomes: cfg.codexHomes });
-      const body = JSON.stringify(catalog.accounts);
-      if (body === sentCatalog) return;
-      await api.catalog(catalog.accounts);
-      sentCatalog = body;
-      log(`accounts: ${catalog.accounts.map((a) => `${a.id} (${a.models.length} models)`).join(", ")}`);
-    } catch (e) {
-      // An older padSync has no catalog endpoint; the picker then falls back to its built-in list.
-      log(`could not send the model list: ${(e as Error).message}`);
-    }
+    catalog = await discoverCatalog({ agents, codexHomes: cfg.codexHomes }).catch(() => catalog);
+    const body = JSON.stringify(catalog.accounts);
+    if (body === sentCatalog) return;
+    sentCatalog = body;
+    api.catalog(catalog.accounts).then(
+      () => log(`accounts: ${catalog.accounts.map((a) => `${a.id} (${a.models.length} models)`).join(", ")}`),
+      (e: Error) => {
+        // An older padSync has no catalog endpoint; the picker then shows its built-in list.
+        sentCatalog = "";
+        log(`could not send the model list: ${e.message}`);
+      },
+    );
   };
 
   let backoff = POLL_MS;

@@ -68,6 +68,14 @@ it("since/from polls return changed turns and delta output; captures final sessi
     )[0].agent_session,
   ).toEqual({ agent: "claude", sessionId: "session" });
 });
+it("remembers which Codex login a session belongs to", async () => {
+  const t = (await c.createThread(sql, { notebookId: "nb", title: "", agent: "codex", options: { account: "codex_work" } }))!;
+  const a = (await c.createTurn(sql, t.id, { question: "q", files: [], uploads: [] }))!;
+  await claimJob(sql, "b", ["codex"], ["chat"]);
+  await updateJob(sql, a.jobId, "b", { status: "done", sessionId: "s1" });
+  const rows = await sql.query<{ agent_session: unknown }>("select agent_session from chat_threads where id=$1", [t.id]);
+  expect(rows[0].agent_session).toEqual({ agent: "codex", sessionId: "s1", account: "codex_work" });
+});
 it("Regenerate only last; fork copies done turns up to N without session", async () => {
   const t = (await thread())!;
   await turn(t.id);

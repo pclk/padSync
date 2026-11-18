@@ -305,7 +305,7 @@ export async function updateJob(sql: Sql, id: string, deviceId: string, u: z.inf
      where id = $1 and claimed_by = $2 and status = 'running'
      returning id, status, thread_id, agent, turn, options
      ), session_update as (
-       update chat_threads set agent_session = jsonb_build_object('agent', u.agent, 'sessionId', $9::text, 'account', u.options->>'account'), updated_at = now()
+       update chat_threads set agent_session = jsonb_strip_nulls(jsonb_build_object('agent', u.agent, 'sessionId', $9::text, 'account', u.options->>'account')), updated_at = now()
        from u where chat_threads.id = u.thread_id and $9::text is not null and u.status = 'done'
      ), keep_inputs as (
        insert into chat_input_parts(job_id, path, part, data)

@@ -118,7 +118,7 @@ describe("side panel copy buttons", () => {
 
   it("leave the Ask AI answer copy and other controls alone", () => {
     const html = panel();
-    expect(html).toContain("Ask ⌘↵");
+    expect(html).toContain('aria-label="Send"');
     expect(html.match(/<button/g)!.length).toBeGreaterThanOrEqual(6);
   });
 });
