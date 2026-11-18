@@ -14,7 +14,7 @@ been tested on an iPad or with an Apple Pencil.** Every recording checked in is 
 | Harness | `src/ink/replay-harness.ts` | `runReplay(rec, opts)` → `ReplayReport` (below). `replayStrokes`, `baselineOf`, `compareBaselines`. Options: `tool`, `pen` (pen parameter overrides to try a writing change), `useCoalesced`, `usePredicted`, `includeSvg`. |
 | Pencil lab | `/pencil-lab` (`src/components/PencilLab.tsx`), linked from Settings → Notebook | Record, Save file, Load file, Replay (0.25×/1×/4×, pause/resume), Replay at once, Clear, and the headless report with Copy JSON. Uses the notebook's saved pen settings (read only). Nothing is written to a notebook. |
 | Synthetic generator | `tests/helpers/synthetic-pencil.ts`, specs in `tests/helpers/pencil-fixtures.ts` | Generates Pencil-like input (240 Hz samples coalesced into 60 Hz moves, 2 predicted samples per move, pressure ramps, tilt drift) and captures it through the real controller and `PencilRecorder`. Output is marked `source: "synthetic"` and labelled `SYNTHETIC: …`. |
-| Fixtures | `tests/fixtures/pencil/*.pencil.json` and `baselines/*.baseline.json` | `synthetic-words`, `synthetic-zoomed-two-sections`, `synthetic-edge-cases` (cancel, lost capture with a late up, a finger, a bounce, a slow stroke with tilt changes, a mouse stroke, a stroke still open at stop). |
+| Fixtures | `tests/fixtures/pencil/*.pencil.json` and `baselines/*.baseline.json` | `synthetic-words`, `synthetic-zoomed-two-sections`, `synthetic-edge-cases` (cancel, lost capture with a late up, a finger, a bounce, a slow stroke with tilt changes, a mouse stroke, a stroke still open at stop). Real: `ipad-handwriting-2026-11-18`, 66 pen strokes on the iPad lab at 98% zoom, the sentence "Both pages now ignore scrolling for Pencil touches on the writing area" (light pressure, peak 0.19–0.35). |
 | Tests | `tests/pencil-replay.test.ts`, `tests/pencil-regression.test.ts`, `tests/pencil-fixtures.test.ts` | `npm run test:pencil` (31 tests; they also run in `npm test`). |
 
 ## The report (what you can measure)
@@ -74,6 +74,16 @@ Workflow for a writing change (filters, pen defaults, controller): make the chan
 `strokes[3].processed.endGap: 0 → 1.8`. Decide whether that is better. If it is, update the
 baselines in the same commit and say why. To compare options without editing code, call
 `runReplay(rec, { pen: { … } })` from a test.
+
+## What the first iPad recording showed
+
+- iPadOS Safari reports Pencil `clientX/Y` on a 0.5 CSS px grid (device pixels at DPR 2), for
+  dispatched and coalesced samples alike. On a fast, steep stroke the samples are 1.5–2.5 units
+  apart, so the 1.5-unit position smoothing still leaves a faint staircase; a wider sigma
+  (2–3) did not reduce measured wobble and doubled the distance from the pen.
+- Replay matches capture exactly; no stroke was discarded; drawn centre lines stay within ~1 unit
+  of the pen (mean 0.19) and no stroke end is cut (`startGap`/`endGap` 0).
+- Coalesced samples arrive at ~4 ms (240 Hz); about 1.7 coalesced samples per dispatched move.
 
 ## Limitations and open questions
 
