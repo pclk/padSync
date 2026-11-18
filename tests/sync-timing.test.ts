@@ -197,3 +197,20 @@ it('records response parsing failures with the actual phase',async()=>{
  expect(debug.getSyncDebugSnapshot().requests[0].phase).toContain('Error during Read response body + JSON (SyntaxError)');
  expect(sync.getSyncState().status).toBe('error');
 });
+
+it('holds a sync during a stroke and sends it the moment the stroke ends',async()=>{
+ const { setInking } = await import('@/lib/activity');
+ sync.startSync(); await vi.advanceTimersByTimeAsync(0);
+ const syncs=()=>fetchMock.mock.calls.filter(c=>c[0]==='/api/sync').length;
+ const before=syncs();
+ setInking(true); sync.requestSync(); await vi.advanceTimersByTimeAsync(400);
+ expect(syncs()).toBe(before);
+ setInking(false); await vi.advanceTimersByTimeAsync(0);
+ expect(syncs()).toBe(before+1);
+ // A gesture that never ends still lets the sync through after the cap (send delay 400 + 3000).
+ setInking(true); sync.requestSync(); await vi.advanceTimersByTimeAsync(3300);
+ expect(syncs()).toBe(before+1);
+ await vi.advanceTimersByTimeAsync(100);
+ expect(syncs()).toBe(before+2);
+ setInking(false);
+});

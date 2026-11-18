@@ -8,6 +8,7 @@ export type SyncDebugRequest = {
   status?: number; serverRegion?: string; serverBuild?: string; pushed?: number; events?: number; pulled?: number; applied?: number;
   since?: number; cursor?: number; more?: boolean; server?: Record<string, number>;
   remoteAgeMs?: number; versions?: string[];
+  protocol?: string; newConnection?: boolean; connectMs?: number; ttfbMs?: number; downloadMs?: number;
 };
 const MAX_EVENTS = 150, MAX_REQUESTS = 40;
 let enabled = false, sequence = 0;
@@ -84,4 +85,23 @@ export function recordSyncPaint(entities: readonly { id: string; hlc: string }[]
     if (request) updateSyncDebugRequest(request, { applyToPaintMs: Math.max(request.applyToPaintMs ?? 0, lag) });
   }
   recordSyncDebug('paint', 'Ink canvas painted', { paintMs, receivedVersions: matched, applyToPaintMs: matched ? longest : null, requests: [...requestLags.keys()].join(', ') });
+}
+/** Splits the HTTP time using the browser's Resource Timing entry for this request: whether it
+ * opened a new connection (DNS + TCP + TLS), request sent → first byte, and body download. */
+export function recordNetworkTiming(request: SyncDebugRequest | undefined, fetchStart: number) {
+  if (!enabled || !request || typeof performance === 'undefined' || !performance.getEntriesByType) return;
+  const entries = performance.getEntriesByType('resource') as PerformanceResourceTiming[];
+  const entry = entries.find(e => e.startTime >= fetchStart - 1 && new URL(e.name, 'http://x').pathname === '/api/sync');
+  // The buffer holds 250 entries by default; keep room for the next requests while recording.
+  if (entries.length > 200) performance.clearResourceTimings();
+  if (!entry || !entry.responseStart) return;
+  const connectStart = entry.domainLookupStart || entry.connectStart;
+  const newConnection = entry.connectEnd > entry.connectStart || entry.domainLookupEnd > entry.domainLookupStart;
+  updateSyncDebugRequest(request, {
+    protocol: entry.nextHopProtocol || undefined,
+    newConnection,
+    connectMs: newConnection ? entry.connectEnd - connectStart : 0,
+    ttfbMs: entry.responseStart - (entry.requestStart || entry.startTime),
+    downloadMs: entry.responseEnd - entry.responseStart,
+  });
 }

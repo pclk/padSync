@@ -1,6 +1,6 @@
-import { emitActivity, hlcDevice, isInking, type ActivityKind } from "./activity";
+import { emitActivity, hlcDevice, isInking, onInkEnd, type ActivityKind } from "./activity";
 import { deviceId } from "./db";
-import { beginSyncDebugRequest, debugNow, parseServerTiming, recordRemoteApplied, recordSyncDebug, syncDebugEnabled, updateSyncDebugRequest } from "./sync-debug";
+import { beginSyncDebugRequest, debugNow, parseServerTiming, recordNetworkTiming, recordRemoteApplied, recordSyncDebug, syncDebugEnabled, updateSyncDebugRequest } from "./sync-debug";
 import { startRealtime, type RealtimeStatus } from "./sync-realtime";
 import { DEFAULT_DEBOUNCE_MS, validDebounce, DEFAULT_SYNC_CONFIG, normalizeSyncConfig, type SyncConfig } from "./sync-policy";
 import { db, getMeta, setMeta } from "./db";
@@ -24,9 +24,10 @@ function pollDelay() {
 }
 let debounceMs = DEFAULT_DEBOUNCE_MS;
 let config = { ...DEFAULT_SYNC_CONFIG };
-const INK_HOLD_STEP_MS = 250;
 const INK_HOLD_MAX_MS = 3000;
 let inkHeldSince = 0;
+let heldForInk: string | null = null;
+let stopInkWake: (() => void) | undefined;
 // Strokes are a few KB each; keep requests well under Vercel's 4.5 MB body limit.
 const ENTITY_BATCH = 100;
 const EVENT_BATCH = 500;
@@ -158,6 +159,14 @@ export function startSync() {
     window.removeEventListener('offline', stateChanged);
     document.removeEventListener("visibilitychange", visible);
   };
+  // A sync held for a stroke runs in the gap right after it. Re-checking on a timer instead
+  // mostly landed mid-stroke during handwriting, so the iPad's uploads waited for the 3 s cap.
+  stopInkWake = onInkEnd(() => {
+    if (!heldForInk) return;
+    const trigger = heldForInk;
+    heldForInk = null;
+    schedule(0, trigger);
+  });
   requestSync(0);
 }
 async function runSync(context = { trigger: "manual", queueMs: 0, timerLateMs: 0 }) {
@@ -166,9 +175,16 @@ async function runSync(context = { trigger: "manual", queueMs: 0, timerLateMs: 0
   // (bounded, so a stuck or very long gesture never stalls sync).
   if (isInking() && context.trigger !== "manual") {
     inkHeldSince ||= Date.now();
-    if (Date.now() - inkHeldSince < INK_HOLD_MAX_MS) { schedule(INK_HOLD_STEP_MS, context.trigger); return; }
+    const left = INK_HOLD_MAX_MS - (Date.now() - inkHeldSince);
+    if (left > 0) {
+      heldForInk = context.trigger;
+      recordSyncDebug("schedule", "Held until the stroke ends", { trigger: context.trigger, maxWaitMs: left });
+      schedule(left, context.trigger);
+      return;
+    }
   }
   inkHeldSince = 0;
+  heldForInk = null;
   if (running) { again = true; recordSyncDebug("schedule", "Waiting for in-flight request", { trigger: context.trigger }); return; }
   running = true;
   const current = generation;
@@ -254,9 +270,11 @@ export async function syncOnce(context = { trigger: "manual", queueMs: 0, timerL
       return false;
     }
 
+    const fetchStart = phaseStart;
     phaseStart = debugNow();
     const body = (await res.json()) as { changes: Omit<Entity, "dirty">[]; cursor: number; more: boolean };
 
+    recordNetworkTiming(trace, fetchStart);
     updateSyncDebugRequest(trace, { decodeMs: debugNow() - phaseStart, pulled: body.changes.length, cursor: body.cursor, more: body.more, phase: 'Apply to IndexedDB' });
     phaseStart = debugNow();
     let applied: typeof body.changes = [];
@@ -298,6 +316,7 @@ export function stopSync() {
   generation++;
   started = false; again = false;
   stopWakeListeners?.(); stopWakeListeners = undefined;
+  stopInkWake?.(); stopInkWake = undefined; heldForInk = null; inkHeldSince = 0;
   stopRealtime?.(); stopRealtime = undefined;
   realtimeStatus = 'suspended';
   if (timer) clearTimeout(timer);

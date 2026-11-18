@@ -39,6 +39,12 @@ export function SyncDebugDetails({ snapshot, timing, environment, selected }: { 
       <div className="mt-2 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs tabular-nums">
         {stages.map(([key, label]) => <div key={key} className="contents"><span>{label}</span><span>{ms(selected[key] as number | undefined)}</span></div>)}
       </div>
+      {selected.ttfbMs !== undefined && <div className="mt-2 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs tabular-nums">
+        <span>Network ({selected.protocol ?? 'protocol unknown'}) · {selected.newConnection ? 'new connection' : 'reused connection'}</span><span />
+        <span className="pl-3">DNS + TCP + TLS</span><span>{ms(selected.connectMs)}</span>
+        <span className="pl-3">Request sent → first byte</span><span>{ms(selected.ttfbMs)}</span>
+        <span className="pl-3">Response download</span><span>{ms(selected.downloadMs)}</span>
+      </div>}
       <p className="mt-2 text-xs">Batch: ↑ {selected.pushed ?? '—'} entities + {selected.events ?? '—'} events · ↓ {selected.pulled ?? '—'} entities · applied {selected.applied ?? '—'}. Cursor {selected.since ?? '—'} → {selected.cursor ?? '—'}{selected.more ? ' · more pages' : ''}.</p>
       {selected.serverRegion && <p className="mt-2 text-xs">Server region: {selected.serverRegion}{selected.serverBuild ? ` · backend build ${selected.serverBuild}` : ''}</p>}
       {selected.server && Object.keys(selected.server).length > 0 && <details className="mt-2 text-xs" open>

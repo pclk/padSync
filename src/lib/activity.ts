@@ -28,10 +28,18 @@ export const hlcDevice = (hlc: string) => hlc.split("-").slice(2).join("-");
 // True while a pen/mouse gesture is on the page, so background work (sync) can wait for the
 // stroke to end instead of competing with pointer events for the main thread.
 let inking = false;
+const inkEndListeners = new Set<() => void>();
 export const setInking = (v: boolean) => {
+  const ended = inking && !v;
   inking = v;
+  if (ended) for (const l of inkEndListeners) l();
 };
 export const isInking = () => inking;
+/** Called when a gesture ends, the gap between strokes where sync can run without competing. */
+export function onInkEnd(listener: () => void): () => void {
+  inkEndListeners.add(listener);
+  return () => inkEndListeners.delete(listener);
+}
 
 /** Runs bookkeeping after the current input has been handled and painted. */
 export function whenIdle(fn: () => void) {
