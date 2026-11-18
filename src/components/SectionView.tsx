@@ -113,8 +113,8 @@ export const SectionView = memo(function SectionView(p: Props) {
           controller.down(e.nativeEvent, handle);
         }}
         onPointerMove={(e) => controller.move(e.nativeEvent, handle)}
-        onPointerUp={(e) => controller.up(e.nativeEvent)}
-        onPointerCancel={(e) => controller.up(e.nativeEvent)}
+        onPointerUp={(e) => controller.up(e.nativeEvent, handle)}
+        onPointerCancel={(e) => controller.up(e.nativeEvent, handle)}
         onLostPointerCapture={(e) => controller.lostCapture(e.nativeEvent, handle)}
         onPointerLeave={() => controller.leave()}
       />
@@ -142,8 +142,8 @@ export const SectionView = memo(function SectionView(p: Props) {
             controller.grab(e.nativeEvent, handle, e.currentTarget);
           }}
           onPointerMove={(e) => controller.move(e.nativeEvent, handle)}
-          onPointerUp={(e) => controller.up(e.nativeEvent)}
-          onPointerCancel={(e) => controller.up(e.nativeEvent)}
+          onPointerUp={(e) => controller.up(e.nativeEvent, handle)}
+          onPointerCancel={(e) => controller.up(e.nativeEvent, handle)}
           onLostPointerCapture={(e) => controller.lostCapture(e.nativeEvent, handle)}
           title="Drag to move"
         >

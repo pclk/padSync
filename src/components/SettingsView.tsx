@@ -104,6 +104,11 @@ export default function SettingsView() {
             <span className="block text-xs text-slate-500">Show timing, visibility and realtime diagnostics on this device. Enable separately on the iPad and Mac. Recording stays in memory and stops when switched off.</span></span>
           <input type="checkbox" className="switch" checked={syncDebug} onChange={e => setSyncDebug(e.target.checked)} />
         </label>
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <span><span className="block text-slate-800">Pencil lab</span>
+            <span className="block text-xs text-slate-500">Record Pencil writing to a file and replay it through the pen, for testing. Nothing is saved to a notebook.</span></span>
+          <Link href="/pencil-lab" className="btn">Open</Link>
+        </div>
       </section>
 
       <section className="card mb-5 p-5">

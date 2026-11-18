@@ -12,6 +12,7 @@ const views = {
   notebook: dynamic(() => import("./NotebookEditor"), { ssr: false }),
   import: dynamic(() => import("./AiImportView"), { ssr: false }),
   settings: dynamic(() => import("./SettingsView"), { ssr: false }),
+  pencilLab: dynamic(() => import("./PencilLab"), { ssr: false }),
 };
 // Browser-only too: it reads its settings from localStorage, so server HTML would never match.
 const SyncDebugOverlay = dynamic(() => import("./SyncDebugOverlay").then((m) => m.SyncDebugOverlay), { ssr: false });
