@@ -22,8 +22,19 @@ export const PRESSURE_ALPHA = 0.2;
 export const PRESSURE_MAX_STEP = 0.03;
 
 /**
- * Smoothed per-point pressure for a stroke's flat point array. Causal (each value depends only on
- * the samples before it), so the live stroke and the committed stroke get the same widths.
+ * What iPadOS Safari reports as the pressure of the first ~30 ms of every Pencil stroke (0.08 as a
+ * float32, coalesced samples included): an estimate iPadOS later corrects, but Safari never sends
+ * the corrected values. Measured in both iPad recordings: every stroke starts with 1–11 of them.
+ */
+export const PLACEHOLDER_PRESSURE = 0.08;
+const isPlaceholder = (p: number) => Math.abs(p - PLACEHOLDER_PRESSURE) < 1e-6;
+
+/**
+ * Smoothed per-point pressure for a stroke's flat point array. The leading placeholder samples
+ * (PLACEHOLDER_PRESSURE) carry no measurement: they take the first real reading, which also starts
+ * the average, so the stroke's start and a quick tap aren't drawn from the estimate. Otherwise
+ * causal (each value depends only on the samples before it): the live stroke changes once, when
+ * the first real reading arrives, and from then on matches the committed stroke.
  */
 export interface PressureFilter {
   pressureFloor: number;
@@ -37,17 +48,19 @@ const PRESSURE_DEFAULTS: PressureFilter = { pressureFloor: PRESSURE_FLOOR, press
 export function smoothPressure(pts: number[], f: PressureFilter = PRESSURE_DEFAULTS): number[] {
   const n = pts.length / STROKE_STRIDE;
   const out = new Array<number>(n);
-  let first = -1;
-  for (let i = 0; i < n; i++) {
-    if (pts[i * STROKE_STRIDE + 2] >= f.pressureFloor) {
-      first = i;
-      break;
-    }
-  }
+  let lead = 0;
+  while (lead < n && isPlaceholder(pts[lead * STROKE_STRIDE + 2])) lead++;
+  const firstFrom = (from: number) => {
+    for (let i = from; i < n; i++) if (pts[i * STROKE_STRIDE + 2] >= f.pressureFloor) return i;
+    return -1;
+  };
+  let first = firstFrom(lead);
+  // No real reading after the placeholders: they are all there is, so they are used.
+  if (first < 0 && lead > 0) [lead, first] = [0, firstFrom(0)];
   let s = first < 0 ? f.pressureFallback : pts[first * STROKE_STRIDE + 2];
   for (let i = 0; i < n; i++) {
     const raw = pts[i * STROKE_STRIDE + 2];
-    if (raw >= f.pressureFloor) {
+    if (i >= lead && raw >= f.pressureFloor) {
       const step = f.pressureAlpha * (raw - s);
       s += Math.max(-f.pressureMaxStep, Math.min(f.pressureMaxStep, step));
     }

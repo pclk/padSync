@@ -84,6 +84,13 @@ baselines in the same commit and say why. To compare options without editing cod
 - Replay matches capture exactly; no stroke was discarded; drawn centre lines stay within ~1 unit
   of the pen (mean 0.19) and no stroke end is cut (`startGap`/`endGap` 0).
 - Coalesced samples arrive at ~4 ms (240 Hz); about 1.7 coalesced samples per dispatched move.
+- Every stroke starts with 1–11 samples (median ~29 ms) at pressure exactly 0.08 (float32), coalesced
+  samples included: Safari's placeholder estimate, never corrected. `smoothPressure` gives these the
+  first real reading (`PLACEHOLDER_PRESSURE` in `src/ink/filters.ts`). The pen moves a median 1.8–2
+  units (up to 16.5) during them.
+- The pointerup sample (pressure 0) lands a median 3.3–3.6 units (p90 6–6.5) past the last move,
+  about 4× a normal step, and is drawn at the held pressure: a short full-width flick at the end of
+  most strokes, and much of the i-dot "ticks" below.
 - Maths recording: all colon dots become round dots, with their lift-off slides hidden. Two
   i-dots ("info", the second in "minimize") draw as 9-unit ticks: a landing drag at pressure
   0.08, a 4-unit firm tick and a 4.6-unit fading lift-off slide. At thinning 0.3 a light writer's

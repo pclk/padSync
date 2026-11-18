@@ -33,6 +33,19 @@ describe("smoothPressure", () => {
     expect(smoothPressure(pts(raw.slice(0, 5)))).toEqual(full.slice(0, 5));
   });
 
+  it("gives Safari's leading 0.08 placeholder samples the first real reading", () => {
+    const f32 = Math.fround(0.08);
+    const out = smoothPressure(pts([f32, f32, f32, 0.2, 0.2, 0.2, 0]));
+    expect(out.slice(0, 4)).toEqual([0.2, 0.2, 0.2, 0.2]);
+    // Only the leading run is a placeholder: a real 0.08 later in the stroke still counts.
+    expect(smoothPressure(pts([0.2, 0.08, 0.08]))[2]).toBeLessThan(0.2);
+  });
+
+  it("keeps placeholders when a stroke has nothing else", () => {
+    const f32 = Math.fround(0.08);
+    expect(smoothPressure(pts([f32, f32, 0]))).toEqual([f32, f32, f32]);
+  });
+
   it("falls back when a stroke never leaves the floor", () => {
     expect(smoothPressure(pts([0, 0.01, 0]))).toEqual([PRESSURE_FALLBACK, PRESSURE_FALLBACK, PRESSURE_FALLBACK]);
   });
