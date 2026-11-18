@@ -3,6 +3,83 @@
 Each overnight run (00:00–06:00, every 30 min) appends an entry: what changed, what was checked,
 what's next. Runs commit to local `main`; the 06:00 run pushes.
 
+## Morning summary — 2026-11-19 (06:00 run)
+
+Twelve commits tonight (524970b … 1b9a698) plus one small 06:00 cleanup, all pushed to
+`origin/main`. All checks pass on the final tree: `npm run typecheck`, `npm run lint`,
+`npx vitest run` (806 passed, 2 skipped), `npm run test:pencil` (33 passed) and `npm run build`.
+No run left uncommitted work, and **nothing was reverted**.
+
+**Handwriting.**
+- Stroke starts and taps now use the Pencil's real pressure, not Safari's 0.08 placeholder. On by
+  default; the change is slight (fuller starts, under 0.5% of ink pixels).
+- New pen setting **Clean-up → "Ignore the lift-off point"**, off by default. It drops iPadOS's
+  estimated lift-off point only when that point hooks back (a turn of 90° or more), so fast y/g/e
+  tails stay. It fixes the end hooks on "3", "+" and "1152". It's waiting for your call on whether
+  it should be the default.
+
+**Zoom.**
+- The iPad pinch stays steady at the pan limits and on lift-off (a 3% dead zone, one placement
+  shared by the preview and the commit).
+- The pinch no longer snaps back on notebooks shorter than the window.
+- Mac Ctrl+wheel and the zoom-% reset button use the same placement as the iPad pinch. This also
+  fixed a stray scroll jump after a wheel step that hit 25% or 300%.
+- The ink tile density was checked and left as it is: at 300% it's about half the screen's
+  density, which only matters if it looks soft on the device.
+
+**Features.** **Duplicate** in the lasso selection menu. The copy is painted on top of ink written
+since the originals (04:30 bug fix).
+
+**UI.**
+- Settings now runs Account and sync → Appearance → Notebook → … → Troubleshooting, and both
+  Pencil tools sit under Troubleshooting.
+- The pen popover opens on Smoothness and Pressure. The 28 detailed settings are under a closed
+  **Fine-tune** row that shows "N changed".
+
+**Bugs.**
+- Pinch snap-back on short notebooks.
+- Pinch jitter at the pan limits.
+- Duplicated ink drawn under newer ink.
+- Stray zoom anchor after a wheel step at 25% or 300%.
+
+**Simplification.**
+- Removed dead code and shared one file-download helper (`src/lib/download.ts`).
+- The notebook loads zod and html-to-image only when they're needed: 17% less notebook JS
+  (−42 KB gzipped).
+- 06:00: `PLACEHOLDER_PRESSURE` is no longer exported (only `filters.ts` uses it). The review found
+  no debug code, TODOs or dead new exports.
+
+**Still open.**
+- Splitting `NotebookEditor.tsx` and `Toolbar.tsx`.
+- A format tag for the two Pencil file types.
+- "=" curls with lift-off turns of 45–80°.
+- A ⌘D shortcut for Duplicate.
+
+### Try on the iPad
+- [ ] Write normally: stroke starts don't "pop" and tap dots look right.
+- [ ] Pen popover: tap the pen twice and check Smoothness and Pressure come first. Open Fine-tune,
+      scroll Clean-up: the tab strip stays put and the notebook doesn't scroll. Check dark mode too.
+- [ ] Turn on Clean-up → "Ignore the lift-off point" and write fast y/g/e/s/c and 3, 8, +, =.
+      Tails should be complete with no end hooks. **Decide whether it becomes the default.**
+- [ ] Pinch at the left/right limits at 150–300% and out to 25%: no snap on lift-off. The start of
+      a pinch shouldn't feel sticky, and there should be no black blocks in a long pinch.
+- [ ] On a one- or two-section notebook at 25%, pinch in near the bottom: it doesn't settle back.
+- [ ] Two-finger tap undo still works.
+- [ ] Lasso → Duplicate. Drag the copy with a finger. The menu fits near the left edge. Duplicate
+      black ink over blue writing: the copy is on top.
+- [ ] Settings in portrait: the "Open" buttons and the sign-in button don't squeeze the text.
+- [ ] Pencil lab Save and Pencil test Save still open the share sheet.
+- [ ] Side panel: "Show returned files" on an Ask job and Apply one change. "Copy image" on a
+      section still copies a PNG.
+
+### Try on the Mac
+- [ ] Trackpad pinch in and out, including at the edges at 200%+: no drift or jumps, and it stays
+      smooth on a long notebook.
+- [ ] The zoom-% reset button keeps the line under the header in place (check on the iPad too).
+- [ ] Settings page order and the Troubleshooting section look right.
+- [ ] "Copy image" and "Show returned files" → Apply still work.
+
+
 ## 2026-11-19 00:00 — handwriting: Safari's placeholder pressure
 
 **Changed.** `smoothPressure` (`src/ink/filters.ts`) no longer starts from Safari's placeholder.
@@ -478,3 +555,11 @@ clipboard.
 **Next (simplify).** `NotebookEditor.tsx` / `Toolbar.tsx` splits (from 03:00) are still open. The
 chat panel (~45 KB of our code) loads with the notebook before anyone opens it; loading it on first
 open is the next startup win to measure.
+
+## 2026-11-19 06:00 — verify, commit and push
+
+**Checked.** The working tree was clean (no unfinished runs). `npm run typecheck`, `npm run lint`,
+`npx vitest run` (806 passed, 2 skipped), `npm run test:pencil` (33 passed), `npm run build`: all
+pass. Reviewed tonight's diff: no debug logging, TODOs or dead files. One leftover fixed:
+`PLACEHOLDER_PRESSURE` was exported but only used in `filters.ts`. Nothing reverted. Pushed to
+`origin/main`.
