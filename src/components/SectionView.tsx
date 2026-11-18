@@ -125,10 +125,21 @@ export const SectionView = memo(function SectionView(p: Props) {
         />
       ))}
 
-      {sel && !p.draggingIds && (
+      {sel && (
+        // The box is the drag handle: press anywhere in it (Pencil, mouse or finger) and move. It
+        // stays mounted, just invisible, while dragging so it keeps the pointer capture.
         <div
-          className="pointer-events-none absolute rounded border-2 border-dashed border-blue-500/80 bg-blue-500/5"
+          className={`ink-grab absolute cursor-move touch-none rounded border-2 border-dashed border-blue-500/80 bg-blue-500/5 ${p.draggingIds ? "opacity-0" : ""}`}
           style={{ left: sel.box.minX, top: sel.box.minY, width: sel.box.maxX - sel.box.minX, height: sel.box.maxY - sel.box.minY }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            controller.grab(e.nativeEvent, handle, e.currentTarget);
+          }}
+          onPointerMove={(e) => controller.move(e.nativeEvent, handle)}
+          onPointerUp={(e) => controller.up(e.nativeEvent)}
+          onPointerCancel={(e) => controller.up(e.nativeEvent)}
+          onLostPointerCapture={(e) => controller.lostCapture(e.nativeEvent, handle)}
+          title="Drag to move"
         >
           <div className="pointer-events-auto absolute -top-11 left-0 flex gap-1 rounded-xl bg-slate-900 p-1 text-sm text-white shadow-lg">
             <button className="rounded px-3 py-1 hover:bg-slate-700" onPointerDown={(e) => e.stopPropagation()} onClick={() => controller.deleteSelection()}>

@@ -234,7 +234,7 @@ function Editor({ notebookId }: { notebookId: string }) {
     const onStart = (e: TouchEvent) => {
       const target = e.target as HTMLElement;
       if ([...e.touches].some((t) => t.touchType === "stylus")) {
-        if (target.closest(".ink-surface")) e.preventDefault();
+        if (target.closest(".ink-surface, .ink-grab")) e.preventDefault();
         return;
       }
       const fingers = direct(e.touches);
@@ -254,7 +254,7 @@ function Editor({ notebookId }: { notebookId: string }) {
 
     const onMove = (e: TouchEvent) => {
       if ([...e.touches].some((t) => t.touchType === "stylus")) {
-        if ((e.target as HTMLElement).closest(".ink-surface")) e.preventDefault();
+        if ((e.target as HTMLElement).closest(".ink-surface, .ink-grab")) e.preventDefault();
         return;
       }
       const fingers = direct(e.touches);

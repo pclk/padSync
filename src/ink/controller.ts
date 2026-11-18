@@ -1,7 +1,7 @@
 import { emitActivity, setInking, whenIdle } from "@/lib/activity";
 import { db, deviceId } from "@/lib/db";
 import { logEvent, moveStrokes, newEntity, putEntities, setDeleted } from "@/lib/store";
-import { STROKE_STRIDE, type StrokeData, type StrokeEntity } from "@/lib/types";
+import { PAGE_WIDTH, STROKE_STRIDE, type StrokeData, type StrokeEntity } from "@/lib/types";
 import { isStrayDot, type Contact } from "./filters";
 import { dataBox, hitStrokes, lassoStrokes, strokeBox, unionBox, type Box } from "./geometry";
 import { DEFAULT_SENSITIVITY, DEFAULT_SMOOTHING } from "./pen-feel";
@@ -185,10 +185,7 @@ export class InkController {
 
     const sel = this.selection;
     if (sel && sel.sectionId === sec.id && inBox(sel.box, x, y, 12)) {
-      const strokes = sec.strokes().filter((s) => sel.ids.has(s.id));
-      this.setGesture({ type: "drag", sec, rect, start: [x, y], dx: 0, dy: 0, strokes, pointerId: e.pointerId });
-      this.cb.onDragging(sel.ids);
-      this.requestFrame();
+      this.startDrag(sec, rect, x, y, e.pointerId);
       return;
     }
     if (sel) this.setSelection(null);
@@ -259,9 +256,37 @@ export class InkController {
       for (const ev of evs) g.poly.push(this.local(ev, g.rect));
     } else if (g.type === "drag") {
       const [x, y] = this.local(e, g.rect);
-      g.dx = x - g.start[0];
-      g.dy = y - g.start[1];
+      [g.dx, g.dy] = this.selection ? clampMove(this.selection.box, x - g.start[0], y - g.start[1], g.rect.height / this.zoom) : [x - g.start[0], y - g.start[1]];
     }
+    this.requestFrame();
+  }
+
+  /**
+   * Starts moving the selection from a press on its box. Unlike drawing, any pointer may do this,
+   * a finger included, so on the iPad the selection can be dragged by hand.
+   */
+  grab(e: PointerEvent, sec: SectionHandle, target: Element) {
+    const sel = this.selection;
+    if (!sel || sel.sectionId !== sec.id) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (this.gesture) this.end(this.gesture, null);
+    e.preventDefault();
+    try {
+      target.setPointerCapture(e.pointerId);
+    } catch {
+      // The pointer is already gone; the drag still follows any moves that arrive.
+    }
+    const rect = sec.el.getBoundingClientRect();
+    const [x, y] = this.local(e, rect);
+    this.hover = null;
+    this.startDrag(sec, rect, x, y, e.pointerId);
+  }
+
+  private startDrag(sec: SectionHandle, rect: DOMRect, x: number, y: number, pointerId: number) {
+    const sel = this.selection!;
+    const strokes = sec.strokes().filter((s) => sel.ids.has(s.id));
+    this.setGesture({ type: "drag", sec, rect, start: [x, y], dx: 0, dy: 0, strokes, pointerId });
+    this.cb.onDragging(sel.ids);
     this.requestFrame();
   }
 
@@ -492,6 +517,15 @@ export class InkController {
       }
     }
   }
+}
+
+/**
+ * A selection move limited to the page: the box stays within the page width and the section's
+ * height. A box already past an edge may stay there but not go further out.
+ */
+export function clampMove(b: Box, dx: number, dy: number, height: number): [number, number] {
+  const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, Math.min(0, lo)), Math.max(0, hi));
+  return [clamp(dx, -b.minX, PAGE_WIDTH - b.maxX), clamp(dy, -b.minY, height - b.maxY)];
 }
 
 function inBox(b: Box, x: number, y: number, pad: number) {
