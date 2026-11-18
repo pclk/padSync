@@ -1,6 +1,6 @@
 import { getStroke, type StrokeOptions } from "perfect-freehand";
 import { STROKE_STRIDE, type StrokeData, type StrokeEntity } from "@/lib/types";
-import { smoothPressure } from "./filters";
+import { dropBacktracks, smoothPositions, smoothPressure } from "./filters";
 import { penFeel } from "./pen-feel";
 
 // Stroke geometry lives in section-local coordinates (1 unit = 1 CSS px at zoom 1).
@@ -28,12 +28,21 @@ export function strokeOptions(d: Pick<StrokeData, "tool" | "size" | "input" | "s
   };
 }
 
-/** perfect-freehand input; Pencil pressure is filtered here, at render time, never in storage. */
+/**
+ * perfect-freehand input. Pencil input is cleaned here, at render time, never in storage:
+ * pressure is smoothed, re-sent samples that step backwards are dropped (dropBacktracks) and
+ * positions are lightly smoothed along the stroke (smoothPositions).
+ */
 export function toInput(pts: number[], input?: string): number[][] {
-  const pressure = input === "pen" ? smoothPressure(pts) : null;
+  const pen = input === "pen";
+  const pressure = pen ? smoothPressure(pts) : null;
   const out: number[][] = [];
-  for (let i = 0, j = 0; i < pts.length; i += STROKE_STRIDE, j++) out.push([pts[i], pts[i + 1], pressure ? pressure[j] : pts[i + 2]]);
-  return out;
+  const times: number[] = [];
+  for (let i = 0, j = 0; i < pts.length; i += STROKE_STRIDE, j++) {
+    out.push([pts[i], pts[i + 1], pressure ? pressure[j] : pts[i + 2]]);
+    times.push(pts[i + 5]);
+  }
+  return pen ? smoothPositions(dropBacktracks(out, times)) : out;
 }
 
 export function outlineToPath(outline: number[][]): Path2D {

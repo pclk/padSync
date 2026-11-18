@@ -324,6 +324,8 @@ export class InkController {
       const n = pts.length;
       // Drop exact duplicates (pointerup often repeats the last move).
       if (n && pts[n - 6] === round(x, 100) && pts[n - 5] === round(y, 100)) continue;
+      // Drop samples older than the last one stored: WebKit can hand an earlier sample over again.
+      if (n && Math.round(ev.timeStamp - g.t0) < pts[n - 1]) continue;
       const pressure = ev.pointerType === "pen" ? ev.pressure : 0.5;
       pts.push(
         round(x, 100),
