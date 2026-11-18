@@ -13,6 +13,7 @@ import { useLayoutMode, useStoredState } from "@/lib/hooks";
 import { addTextBox, insertSectionAfter, liveSections, logEvent, putEntities } from "@/lib/store";
 import { registerDebugProbe } from "@/lib/sync-debug";
 import { renderFlag } from "@/lib/render-flags";
+import { SIDEBAR_W, TOOLBAR_H, clampZoom, columnLayout, fitZoom, gutterFor, overlayInsets, toolbarVariant, verticalPadding } from "@/lib/notebook-viewport";
 import { PAGE_WIDTH, type NotebookEntity, type PresenceData, type PresenceEntity, type SectionEntity } from "@/lib/types";
 import { SectionView } from "./SectionView";
 import { SidePanel } from "./SidePanel";
@@ -21,13 +22,8 @@ import { Icon } from "./Icons";
 
 const emitLocalText = (notebookId: string) => emitActivity({ notebookId, source: "local", kinds: ["text"], at: Date.now() });
 
-const TOOLBAR_H = 56;
 // The Mac only follows the iPad after this long without input of its own.
 const FOLLOW_IDLE_MS = 15000;
-
-const MIN_ZOOM = 0.4;
-const MAX_ZOOM = 3;
-const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 
 // Where this device last was in each notebook: a section and the logical offset into it.
 type Position = { sectionId: string; offsetY: number };
@@ -92,7 +88,13 @@ function Editor({ notebookId }: { notebookId: string }) {
   }, [storedTool]);
   const [panelOpen, setPanelOpen] = useStoredState("padsync.panel", !isIpad);
   const [follow, setFollow] = useStoredState("padsync.follow", !isIpad);
-  const [zoom, setZoom] = useState(() => (isIpad ? 1 : fitZoom(panelOpen, 360)));
+  // The Mac's tool sidebar; the iPad keeps its floating rail.
+  const variant = toolbarVariant(kind);
+  const [sidebarOpen, setSidebarOpen] = useStoredState("padsync.toolSidebar", true);
+  const gutter = gutterFor(kind);
+  const viewport = useViewport();
+  // A first guess until the layout mode knows the panel width; the refit below corrects it.
+  const [zoom, setZoom] = useState(() => (isIpad ? 1 : fitZoom(viewport.w, overlayInsets({ kind, sidebarOpen, panelWidth: panelOpen ? viewport.w / 2 : 0 }), gutter, PAGE_WIDTH)));
   const [selection, setSelection] = useState<Selection | null>(null);
   const [dragging, setDragging] = useState<Set<string> | null>(null);
   const [editingText, setEditingText] = useState<string | null>(null);
@@ -123,8 +125,14 @@ function Editor({ notebookId }: { notebookId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [notebookId],
   );
-  const layout = useLayoutMode(notebookId, controller);
+  const sidebarW = variant === "sidebar" ? (sidebarOpen ? SIDEBAR_W.expanded : SIDEBAR_W.collapsed) : 0;
+  const layout = useLayoutMode(notebookId, controller, sidebarW);
   const panelWidth = isIpad ? 360 : layout.width;
+  // What covers the window around the page, and where the page sits so every part of it can be
+  // panned clear of the header, the tools and the side panel (see notebook-viewport).
+  const insets = useMemo(() => overlayInsets({ kind, sidebarOpen, panelWidth: panelOpen ? panelWidth : 0 }), [kind, sidebarOpen, panelOpen, panelWidth]);
+  const column = columnLayout(viewport.w, PAGE_WIDTH * zoom, insets, gutter);
+  const vpad = verticalPadding(insets, gutter);
   useLayoutEffect(() => {
     controller.configure(tool, zoom);
   }, [controller, tool, zoom]);
@@ -138,10 +146,14 @@ function Editor({ notebookId }: { notebookId: string }) {
         sections: els.current.size,
         undo: controller.undo.canUndo,
         scrollY: Math.round(window.scrollY),
+        scrollX: Math.round(window.scrollX),
         pageHeight: document.documentElement.scrollHeight,
+        pageWidth: document.documentElement.scrollWidth,
         panelOpen,
+        sidebarOpen: variant === "sidebar" ? sidebarOpen : null,
+        insets: `${insets.top} ${insets.right} ${insets.bottom} ${insets.left}`,
       })),
-    [controller, panelOpen],
+    [controller, panelOpen, sidebarOpen, variant, insets],
   );
 
   const undoState = useSyncExternalStore(
@@ -223,7 +235,7 @@ function Editor({ notebookId }: { notebookId: string }) {
   }, [zoom, notebookId]);
 
   const resetZoom = () => {
-    const z = isIpad ? 1 : fitZoom(panelOpen, panelWidth);
+    const z = isIpad ? 1 : fitZoom(viewport.w, insets, gutter, PAGE_WIDTH);
     const wrap = wrapRef.current!;
     const r = wrap.getBoundingClientRect();
     const cy = TOOLBAR_H + 10;
@@ -343,6 +355,7 @@ function Editor({ notebookId }: { notebookId: string }) {
       const map: Record<string, ToolState["kind"]> = { p: "pen", h: "highlighter", e: "eraser", l: "lasso", t: "text" };
       const k = map[e.key.toLowerCase()];
       if (k) setTool({ ...tool, kind: k });
+      if (e.key === "\\" && variant === "sidebar") setSidebarOpen(!sidebarOpen);
       if ((e.key === "Backspace" || e.key === "Delete") && controller.selection) void controller.deleteSelection();
       if (e.key === "Escape") controller.setSelection(null);
     };
@@ -365,7 +378,7 @@ function Editor({ notebookId }: { notebookId: string }) {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("beforeinput", onBeforeInput, true);
     };
-  }, [controller, undo, redo, setTool, tool]);
+  }, [controller, undo, redo, setTool, tool, variant, sidebarOpen, setSidebarOpen]);
 
   // --- current section + presence ---------------------------------------------------------
   const lastPresence = useRef(0);
@@ -483,25 +496,28 @@ function Editor({ notebookId }: { notebookId: string }) {
     window.scrollBy({ top: delta, behavior: "smooth" });
   }, [follow, ipad, notebookId, controller, idleAt]);
 
+  // The Mac refits its zoom when the side panel or tool sidebar changes the visible strip, keeping
+  // the line at the top of the screen in place.
+  const fit = isIpad ? 1 : fitZoom(viewport.w, insets, gutter, PAGE_WIDTH);
   useLayoutEffect(() => {
     if (isIpad) return;
     const entry = [...els.current].find(([, el]) => el.getBoundingClientRect().bottom > TOOLBAR_H);
     const offset = entry ? (TOOLBAR_H - entry[1].getBoundingClientRect().top) / controller.zoom : 0;
-    let done = false;
+    let frame = 0;
+    // Once the panel or sidebar has slid into place (or straight away if nothing animates).
     const finish = () => {
-      if (done) return;
-      done = true;
-      const next = fitZoom(panelOpen, panelWidth);
-      setZoom(next);
-      requestAnimationFrame(() => {
-        if (entry) window.scrollBy(0, entry[1].getBoundingClientRect().top + offset * next - TOOLBAR_H);
+      clearTimeout(timer);
+      window.removeEventListener("transitionend", end);
+      setZoom(fit);
+      frame = requestAnimationFrame(() => {
+        if (entry) window.scrollBy(0, entry[1].getBoundingClientRect().top + offset * fit - TOOLBAR_H);
       });
     };
-    const end = (event: TransitionEvent) => { if (event.propertyName === "padding-right") finish(); };
+    const end = (event: TransitionEvent) => { if (event.propertyName === "width") finish(); };
     window.addEventListener("transitionend", end);
-    const timer = setTimeout(finish, 400);
-    return () => { clearTimeout(timer); window.removeEventListener("transitionend", end); };
-  }, [panelWidth, panelOpen, isIpad, controller]);
+    const timer = setTimeout(finish, controller.zoom === fit ? 0 : 300);
+    return () => { clearTimeout(timer); cancelAnimationFrame(frame); window.removeEventListener("transitionend", end); };
+  }, [fit, isIpad, controller]);
 
   const loaded = sections !== undefined && notebook !== undefined;
   useLayoutEffect(() => {
@@ -557,8 +573,7 @@ function Editor({ notebookId }: { notebookId: string }) {
   const showPanel = panelOpen;
 
   return (
-    <div className="editor min-h-screen bg-canvas" style={{ paddingTop: TOOLBAR_H + 16, paddingRight: showPanel ? panelWidth : 0 }}>
-      <style>{` .editor { transition: padding-right 250ms; } .editor > aside { transition: width 250ms; } @media (prefers-reduced-motion: reduce) { .editor, .editor > aside { transition: none; } } `}</style>
+    <div className="editor min-h-screen bg-canvas" style={{ paddingTop: vpad.top, minWidth: column.contentWidth }} data-variant={variant}>
       <Toolbar
         notebookId={notebookId}
         layout={isIpad ? undefined : layout}
@@ -573,11 +588,14 @@ function Editor({ notebookId }: { notebookId: string }) {
         onZoomReset={resetZoom}
         panelOpen={showPanel}
         onTogglePanel={() => setPanelOpen(!panelOpen)}
+        variant={variant}
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
       />
 
       {/* Not one transform over the whole notebook: on the iPad a scaled layer that tall (300k px for
           150 sections) loses tiles, which show as black blocks, and runs Safari out of memory. */}
-      <div ref={pinchRef} className="mx-auto mb-[50vh]" style={perSection ? { width: PAGE_WIDTH * zoom } : { width: PAGE_WIDTH * zoom, height: pageH * zoom }}>
+      <div ref={pinchRef} style={{ marginLeft: column.left, marginBottom: `max(${vpad.bottomShare * 100}vh, ${vpad.bottomMin}px)`, width: PAGE_WIDTH * zoom, ...(perSection ? {} : { height: pageH * zoom }) }}>
       <div ref={wrapRef} className="page-wrap flex flex-col" style={perSection ? { width: PAGE_WIDTH * zoom, gap: 24 * zoom } : { width: PAGE_WIDTH, gap: 24, transform: `scale(${zoom})`, transformOrigin: "0 0" }}>
         {sections.map((s, i) => (
           <SectionView
@@ -625,8 +643,18 @@ function Editor({ notebookId }: { notebookId: string }) {
   );
 }
 
-function fitZoom(withPanel: boolean, width: number) {
-  if (typeof window === "undefined") return 1;
-  const avail = window.innerWidth - (withPanel ? width : 0) - 32;
-  return clampZoom(Math.min(1, avail / PAGE_WIDTH));
+/** Window width in CSS px, without the vertical scrollbar where one takes up room. */
+function useViewport() {
+  const read = () => ({ w: typeof window === "undefined" ? 1024 : document.documentElement.clientWidth || window.innerWidth });
+  const [size, setSize] = useState(read);
+  useEffect(() => {
+    const update = () => setSize((prev) => {
+      const next = read();
+      return prev.w === next.w ? prev : next;
+    });
+    window.addEventListener("resize", update);
+    update();
+    return () => window.removeEventListener("resize", update);
+  }, []);
+  return size;
 }

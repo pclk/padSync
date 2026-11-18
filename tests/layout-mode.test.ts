@@ -30,9 +30,12 @@ describe("layout-mode reducer", () => {
 });
 it("panelWidth splits the window 50/50 for drawing and 25/75 for chat", () => {
   expect(panelWidth("drawing", 1440)).toBe(720);
-  expect(panelWidth("chat", 1440)).toBe(1080);
+  // Chat gives way just enough to keep a whole 25% page beside it.
+  expect(panelWidth("chat", 1440)).toBe(1064);
+  expect(panelWidth("chat", 2560)).toBe(1920);
   expect(panelWidth("drawing", 901)).toBe(451);
-  expect(panelWidth("chat", 800)).toBe(600);
+  // A window this narrow keeps a whole 25% page beside chat (see notebook-viewport tests).
+  expect(panelWidth("chat", 800)).toBe(424);
 });
 it("nextTickDelay returns only the remaining deadline", () => {
   expect(nextTickDelay(initial, 0)).toBeNull();
