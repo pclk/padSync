@@ -26,7 +26,7 @@ export const PRESSURE_MAX_STEP = 0.03;
  * float32, coalesced samples included): an estimate iPadOS later corrects, but Safari never sends
  * the corrected values. Measured in both iPad recordings: every stroke starts with 1–11 of them.
  */
-export const PLACEHOLDER_PRESSURE = 0.08;
+const PLACEHOLDER_PRESSURE = 0.08;
 const isPlaceholder = (p: number) => Math.abs(p - PLACEHOLDER_PRESSURE) < 1e-6;
 
 /**
