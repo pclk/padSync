@@ -12,6 +12,8 @@ import {
   MAX_POINT_GAP,
   POSITION_SIGMA,
   STOP_RADIUS,
+  TAIL_MAX_LENGTH,
+  TAIL_MIN_TURN,
   TAP_DOT_SIZE,
   PRESSURE_ALPHA,
   PRESSURE_FALLBACK,
@@ -44,6 +46,8 @@ export interface PenParams {
   hookPressure: number;
   hookMaxLength: number;
   stopRadius: number;
+  tailMaxLength: number;
+  tailMinTurn: number;
   tapDotSize: number;
   pressureFloor: number;
   pressureFallback: number;
@@ -72,6 +76,8 @@ export const DEFAULT_PEN: PenParams = {
   hookPressure: HOOK_PRESSURE,
   hookMaxLength: HOOK_MAX_LENGTH,
   stopRadius: STOP_RADIUS,
+  tailMaxLength: TAIL_MAX_LENGTH,
+  tailMinTurn: TAIL_MIN_TURN,
   tapDotSize: TAP_DOT_SIZE,
   pressureFloor: PRESSURE_FLOOR,
   pressureFallback: PRESSURE_FALLBACK,
@@ -123,6 +129,8 @@ export const PEN_GROUPS: { title: string; tab: string; note?: string; params: Pe
       { key: "backtrackMax", label: "Drop backward jumps", kind: "range", min: 0, max: 20, step: 0.5, unit: "px", help: "A single sample stepping back by up to this much is dropped. 0 turns it off." },
       { key: "hookPressure", label: "Hook pressure", kind: "range", min: 0, max: 0.5, step: 0.01, help: "Stroke ends lighter than this are trimmed as touchdown or lift-off hooks. 0 turns it off." },
       { key: "hookMaxLength", label: "Hook length", kind: "range", min: 0, max: 30, step: 0.5, unit: "px", help: "Most that is trimmed from either end." },
+      { key: "tailMaxLength", label: "Lift-off tails", kind: "range", min: 0, max: 40, step: 1, unit: "px", help: "A sharp turn this close to either end, lighter or faster than the stroke, is cut off: the hook a fraction bar or \"=\" gets as you move to the next stroke. 0 turns it off." },
+      { key: "tailMinTurn", label: "Tail turn angle", kind: "range", min: 20, max: 180, step: 5, unit: "°", help: "How sharply a tail must turn away from the stroke to be cut. Lower cuts more." },
       { key: "stopRadius", label: "Ignore stops at the ends", kind: "range", min: 0, max: 6, step: 0.5, unit: "px", help: "Where the pen rests and wiggles before lifting (or after landing), points within this distance count as one, so ends don't blob. 0 turns it off." },
     ],
   },

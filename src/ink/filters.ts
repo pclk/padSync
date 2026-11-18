@@ -289,11 +289,13 @@ export function trimStops(input: number[][], radius = STOP_RADIUS): [number, num
  * TAP_FIRM of the stroke's peak count: a lift-off slide fades out, while a deliberate short dash
  * (a superscript minus) keeps its pressure along its length and stays a dash. The whole touch,
  * slide included, must also fit within TAP_SPREAD times the size, so a letter that ends in a hard
- * press is never mistaken for a dot.
+ * press is never mistaken for a dot. And a tap is held still while it is firm (slower than
+ * TAP_STILL units per ms), while a quick flick (the bar of a "5") is already moving.
  */
 export const TAP_DOT_SIZE = 3;
 export const TAP_FIRM = 0.6;
 export const TAP_SPREAD = 2.5;
+export const TAP_STILL = 0.1;
 
 /** Centre of a tap drawn as a dot (where the pressure peaked), or null for a real stroke. */
 export function tapDot(pts: number[], size = TAP_DOT_SIZE): [number, number] | null {
@@ -311,5 +313,89 @@ export function tapDot(pts: number[], size = TAP_DOT_SIZE): [number, number] | n
     }
     return Math.hypot(maxX - minX, maxY - minY);
   };
-  return extent(-Infinity) <= size * TAP_SPREAD && extent(pts[best + 2] * TAP_FIRM) <= size ? [pts[best], pts[best + 1]] : null;
+  const firm = pts[best + 2] * TAP_FIRM;
+  // Speed over the firm part: path length from its first to its last firm sample, per ms.
+  let first = -1;
+  let last = -1;
+  for (let i = 0; i < pts.length; i += STROKE_STRIDE) {
+    if (pts[i + 2] < firm) continue;
+    if (first < 0) first = i;
+    last = i;
+  }
+  let travel = 0;
+  for (let i = first + STROKE_STRIDE; i <= last; i += STROKE_STRIDE) travel += Math.hypot(pts[i] - pts[i - STROKE_STRIDE], pts[i + 1] - pts[i + 1 - STROKE_STRIDE]);
+  const still = travel / Math.max(4, pts[last + 5] - pts[first + 5]) <= TAP_STILL;
+  const isTap = still && extent(-Infinity) <= size * TAP_SPREAD && extent(firm) <= size;
+  return isTap ? [pts[best], pts[best + 1]] : null;
+}
+
+/**
+ * Longest lift-off or landing tail (section units) that is trimmed. Moving on to the next stroke,
+ * the tip often keeps touching for a few millimetres: a fraction bar ends in a hook, the top of an
+ * "=" bends into a "2", a "0" gets a tail inside it. Such a tail turns sharply away from the
+ * stroke and is lighter or faster than the rest of it.
+ */
+export const TAIL_MAX_LENGTH = 15;
+/** Smallest turn (degrees) between a stroke and a tail. */
+export const TAIL_MIN_TURN = 70;
+/** A tail is never more than this share of the stroke's length. */
+const TAIL_MAX_SHARE = 0.4;
+/** Lighter than this share of the stroke's median pressure, or faster than this multiple of its speed. */
+const TAIL_PRESSURE = 0.8;
+const TAIL_SPEED = 1.5;
+
+/**
+ * Index range [start, end) without a lift-off tail at the end or a landing tail at the start: the
+ * part after the sharpest turn within TAIL_MAX_LENGTH of an end, when that part is lighter or
+ * faster than the stroke. Firm, steady turns (the foot of a "2", the hook of a "J") stay.
+ */
+export function tailTrim(input: number[][], raw: number[], times: number[], maxLength = TAIL_MAX_LENGTH, minTurn = TAIL_MIN_TURN): [number, number] {
+  const n = input.length;
+  if (n < 6 || maxLength <= 0) return [0, n];
+  const s = new Array<number>(n);
+  s[0] = 0;
+  for (let i = 1; i < n; i++) s[i] = s[i - 1] + Math.hypot(input[i][0] - input[i - 1][0], input[i][1] - input[i - 1][1]);
+  const total = s[n - 1];
+  const reach = Math.min(maxLength, TAIL_MAX_SHARE * total);
+  const ARM = 3;
+  // Turn at k: angle between the 3-unit run into k and the 3-unit run out of it.
+  const turn = (k: number) => {
+    let a = k;
+    while (a > 0 && s[k] - s[a] < ARM) a--;
+    let b = k;
+    while (b < n - 1 && s[b] - s[k] < ARM) b++;
+    if (a === k || b === k) return 0;
+    const ux = input[k][0] - input[a][0], uy = input[k][1] - input[a][1];
+    const vx = input[b][0] - input[k][0], vy = input[b][1] - input[k][1];
+    const cos = (ux * vx + uy * vy) / (Math.hypot(ux, uy) * Math.hypot(vx, vy) || 1);
+    return (Math.acos(Math.max(-1, Math.min(1, cos))) * 180) / Math.PI;
+  };
+  const median = (from: number, to: number) => {
+    const v = raw.slice(from, to).sort((x, y) => x - y);
+    return v.length ? v[v.length >> 1] : 0;
+  };
+  const mean = (from: number, to: number) => raw.slice(from, to).reduce((a, b) => a + b, 0) / Math.max(1, to - from);
+  const speed = (from: number, to: number) => (s[to] - s[from]) / Math.max(1, times[to] - times[from]);
+  // Lighter or faster than the body of the stroke.
+  const loose = (tail: [number, number], body: [number, number]) =>
+    mean(tail[0], tail[1] + 1) < TAIL_PRESSURE * median(body[0], body[1] + 1) || speed(tail[0], tail[1]) > TAIL_SPEED * speed(body[0], body[1]);
+
+  let end = n;
+  let best = -1;
+  let bestTurn = minTurn;
+  for (let k = n - 2; k > 0 && s[n - 1] - s[k] <= reach; k--) {
+    const t = turn(k);
+    if (t >= bestTurn) [best, bestTurn] = [k, t];
+  }
+  if (best > 0 && loose([best, n - 1], [0, best])) end = best + 1;
+
+  let start = 0;
+  best = -1;
+  bestTurn = minTurn;
+  for (let k = 1; k < end - 1 && s[k] <= reach; k++) {
+    const t = turn(k);
+    if (t >= bestTurn) [best, bestTurn] = [k, t];
+  }
+  if (best > 0 && loose([0, best], [best, end - 1])) start = best;
+  return end - start >= 2 ? [start, end] : [0, n];
 }
