@@ -43,7 +43,7 @@ export function strokeOptions(d: PenFields, last: boolean): StrokeOptions {
 
 /**
  * perfect-freehand input. Pencil input is cleaned here, at render time, never in storage, so
- * existing strokes improve too: the optional lift-off point, hook and tail trims (withoutLiftOff,
+ * existing strokes improve too: the optional lift-off hook, hook and tail trims (withoutLiftOff,
  * hookTrim, tailTrim), re-sent samples that step backwards are dropped (dropBacktracks), sparse
  * samples are joined by curves (interpolateGaps), and positions are smoothed along the stroke
  * (smoothPositions), each by the stroke's own pen parameters.

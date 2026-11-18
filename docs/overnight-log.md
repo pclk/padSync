@@ -399,3 +399,39 @@ should be on top.
 
 **Next (bugs).** The third-finger pinch case above is the most likely real one; it needs a test
 harness for the touch handler (it lives in a `NotebookEditor` effect, not a pure function).
+
+## 2026-11-19 05:00 — handwriting: review of tonight's changes
+
+**Reviewed.** Both iPad recordings rendered in full at 3× (sharp + jiti, scratchpad) three ways:
+the 6f106f9 pipeline (its `filters`/`render`/`pen-feel` copied out of git), the current default,
+and the current default with "Ignore the lift-off point" on. I also made pixel diffs. Only two of
+tonight's changes affect how ink looks: the placeholder pressure fix (00:00, on by default) and
+`dropLiftOff` (02:00, off by default). Everything else under `src/ink` since 6f106f9 is recording,
+replay or lasso code and doesn't change stored points.
+
+- **Placeholder pressure: kept.** 0.34% / 0.39% of ink pixels change (slightly fuller starts), and
+  you can't see it at 1×. No letter got worse.
+- **`dropLiftOff`: toned down.** Always dropping the zero-pressure last point fixed the "3"→"8",
+  "1152" dots and "+" ticks, but it also cut real fast tails: the "y" in "scrolling", the "g" in
+  "writing", the "e" in "the" (13–15% of ink pixels changed). `withoutLiftOff` now drops the point
+  only when it turns 90° or more against the stroke's last 2 units (the iPadOS estimate the 02:00
+  run measured), or after a tap with no heading. A point that carries on forward is kept. With
+  that, 29/66 and 91/217 strokes change (5–6% of ink pixels). The y/g/e tails stay, the 3/1152/+
+  fixes stay, and tap dots are unchanged (1, 10). The "=" curls only partly go: those turn 45–80°,
+  and 45°/60° thresholds cut the "e" tail again, so I kept 90°. Still off by default.
+- **Simplify: nothing removed.** `tailTrim`/`hookTrim` (both off by default) partly overlap the
+  lift-off option, but strokes may store overrides for them, and removing them would restyle that
+  ink. I left them in place. A daytime decision: if `dropLiftOff` becomes the default after a
+  device check, "Lift-off tails" is the candidate to retire.
+
+**Checked.** New test in `tests/pencil-ends.test.ts` (a forward lift-off point is kept, a 90° turn
+is dropped); the existing lift-off tests pass unchanged. `npm run typecheck`, `npm run lint`,
+`npx vitest run` (805 passed), `npm run test:pencil` (33 passed, baselines unchanged because the
+default is unchanged). Before/after summary added to `docs/pencil-test-handoff.md`.
+
+**Needs a device check.** Toggle on: fast y/g/e/s/c endings are complete; 3, 8, + and = have no end
+hooks. Then decide the default.
+
+**Next (handwriting).** "=" curls (45–80° lift-off turns) need something other than a turn angle,
+for example comparing the lift-off segment's length with the steps before it. The 0.5 px staircase
+and the i-dot ticks are still open.

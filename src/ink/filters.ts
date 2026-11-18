@@ -69,16 +69,29 @@ export function smoothPressure(pts: number[], f: PressureFilter = PRESSURE_DEFAU
   return out;
 }
 
+/** How far back from the last pressed point the stroke's heading is measured (section units). */
+const LIFT_OFF_HEADING = 2;
+
 /**
- * A pen stroke's points without Safari's lift-off point: the pointerup sample, the only one with
- * pressure exactly 0. In both iPad recordings it lands a median 3.4 units (p90 6) from the last
- * pressed sample and turns more than 90° back against the stroke in about half of them: where
- * iPadOS estimates the tip left the glass, not where it drew, so drawn as is every stroke ends in
- * a small hook. Strokes of fewer than three points keep it; otherwise returns `pts` unchanged.
+ * A pen stroke's points without Safari's lift-off point when it hooks back: the pointerup sample,
+ * the only one with pressure exactly 0, turning 90° or more against the stroke's heading over its
+ * last LIFT_OFF_HEADING units. In both iPad recordings it lands a median 3.4 units (p90 6) from the
+ * last pressed sample and turns back like this in about half of strokes: where iPadOS estimates the
+ * tip left the glass, not where it drew, so those strokes end in a small hook (a "3" closing into
+ * an "8"). One that carries on the way the stroke was going is kept, since it can be the real end
+ * of a fast tail (y, g, e). So is one after a tap that has no heading. Strokes of fewer than three
+ * points keep it. Returns `pts` itself when nothing is left out.
  */
 export function withoutLiftOff(pts: number[]): number[] {
-  const n = pts.length;
-  return n >= 3 * STROKE_STRIDE && pts[n - STROKE_STRIDE + 2] === 0 ? pts.slice(0, n - STROKE_STRIDE) : pts;
+  const S = STROKE_STRIDE;
+  const n = pts.length / S;
+  if (n < 3 || pts[(n - 1) * S + 2] !== 0) return pts;
+  const [lx, ly] = [pts[(n - 2) * S], pts[(n - 2) * S + 1]];
+  let k = n - 3;
+  while (k > 0 && Math.hypot(lx - pts[k * S], ly - pts[k * S + 1]) < LIFT_OFF_HEADING) k--;
+  const [hx, hy] = [lx - pts[k * S], ly - pts[k * S + 1]];
+  const forward = Math.hypot(hx, hy) >= LIFT_OFF_HEADING && (pts[(n - 1) * S] - lx) * hx + (pts[(n - 1) * S + 1] - ly) * hy > 0;
+  return forward ? pts : pts.slice(0, (n - 1) * S);
 }
 
 /** A stroke whose points all lie within this distance (section units) of the first has no length. */

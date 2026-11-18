@@ -133,7 +133,7 @@ export const PEN_GROUPS: { title: string; tab: string; note?: string; params: Pe
       { key: "hookMaxLength", label: "Hook length", kind: "range", min: 0, max: 30, step: 0.5, unit: "px", help: "Most that is trimmed from either end. Large values shorten letters." },
       { key: "tailMaxLength", label: "Lift-off tails", kind: "range", min: 0, max: 40, step: 1, unit: "px", help: "A sharp turn this close to either end, lighter and faster than the stroke, is cut off: a hook as you move to the next stroke. Off (0) by default: at handwriting size it also cuts real parts of letters (f, 7, z, 6)." },
       { key: "tailMinTurn", label: "Tail turn angle", kind: "range", min: 20, max: 180, step: 5, unit: "°", help: "How sharply a tail must turn away from the stroke to be cut. Lower cuts more." },
-      { key: "dropLiftOff", label: "Ignore the lift-off point", kind: "toggle", help: "Safari's last point of a stroke (where the Pencil lifted, with no pressure) often hooks back 2–6 px. On ignores it; off draws it, as written." },
+      { key: "dropLiftOff", label: "Ignore the lift-off point", kind: "toggle", help: "Safari's last point of a stroke (where the Pencil lifted, with no pressure) often hooks back 2–6 px. On ignores it when it turns back against the stroke; off draws it, as written." },
       { key: "stopRadius", label: "Ignore stops at the ends", kind: "range", min: 0, max: 6, step: 0.5, unit: "px", help: "Where the pen rests and wiggles before lifting (or after landing), points within this distance count as one, so ends don't blob. 0 turns it off." },
     ],
   },

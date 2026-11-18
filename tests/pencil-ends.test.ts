@@ -206,6 +206,13 @@ describe("Safari's lift-off point", () => {
     expect(withoutLiftOff(pts([[0, 0, 0.2], [1, 0, 0.2], [3, 2, 0]]))).toEqual(pts([[0, 0, 0.2], [1, 0, 0.2]]));
   });
 
+  it("keeps a lift-off point that carries on the way the stroke was going, like the end of a fast y tail", () => {
+    const tail = pts([[0, 0, 0.2], [2, 0, 0.2], [4, 0, 0.2], [6, 0, 0.2], [8, 0, 0.15], [11, 1.5, 0]]);
+    expect(withoutLiftOff(tail)).toBe(tail);
+    // Turned 90° or more against the last 2 units of the stroke: a hook.
+    expect(withoutLiftOff(pts([[0, 0, 0.2], [2, 0, 0.2], [4, 0, 0.2], [4, 3, 0]]))).toHaveLength(3 * 6);
+  });
+
   it("doesn't count towards a tap's size when left out: a dot with a long lift-off slide stays a dot", () => {
     // Firm and still, then the up sample lands 9 units away: too spread out for a dot when drawn.
     const tap = pts([[0, 0, 0.2], [0.2, 0, 0.22], [0.2, 0.2, 0.2], [0.6, 0.4, 0.12], [7, 6, 0]]);

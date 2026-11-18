@@ -95,14 +95,35 @@ baselines in the same commit and say why. To compare options without editing cod
   half of all strokes (median turn 80°), so every stroke ends in a small hook, and the stroke's end
   jumps a median 3 units when the pen lifts (the live stroke ended at the last move). Pen settings →
   Clean-up → "Ignore the lift-off point" (`dropLiftOff`, `withoutLiftOff` in `src/ink/filters.ts`)
-  leaves it out at render time. It is off by default because it shortens each stroke by that last
-  segment. Turned on, the end no longer jumps (median 0) and hooks such as an "=" bending into a "2" go.
+  leaves it out at render time when it turns 90° or more against the stroke. It is off by default
+  (no ink removed by default). See the review below for what it does.
 - Maths recording: all colon dots become round dots, with their lift-off slides hidden. Two
   i-dots ("info", the second in "minimize") draw as 9-unit ticks: a landing drag at pressure
   0.08, a 4-unit firm tick and a 4.6-unit fading lift-off slide. At thinning 0.3 a light writer's
   whole pressure range (0.08–0.2) gives almost the same width (0.37–0.41 × size), so the drags
   draw at full weight. Pressure relative to each stroke's own level thins them only a little,
   because smoothPressure's 20 ms average and 0.03 step limit hold the pressure up through a quick fade.
+
+## Handwriting changes of 2026-11-19, reviewed against 6f106f9
+
+Both iPad recordings rendered three ways through `strokeSvgPath` at 3×: the 6f106f9 pipeline, the
+current default, and the current default with "Ignore the lift-off point" on.
+
+| Change | Default? | Handwriting (66 strokes) | Maths (217 strokes) | Verdict |
+| --- | --- | --- | --- | --- |
+| Placeholder pressure: stroke starts take the first real reading, not Safari's 0.08 (`smoothPressure`) | on | 64 outlines change; 0.34% of ink pixels, at most ~18 px in any 60 px cell at 3× | 191 change; 0.39% | Kept. Can't be seen at 1×, but stroke starts and taps are now drawn from real readings instead of the estimate. Nothing got worse. |
+| Ignore the lift-off point (`dropLiftOff`), first version: always drop the zero-pressure last point | off | 65 change; 13% of ink pixels | 207 change; 15% | **Toned down.** Fixed real problems ("3" closing into "8", dots after "1152", "+" ticks, "=" curls), but also cut the fast tails of "y" (scrolling), "g" (writing) and "e" (the). |
+| Same option, now: drop it only when it turns ≥ 90° back against the last 2 units of the stroke (or after a tap with no heading) | off | 29 change; 5% | 91 change; 6% | Keeps the y/g/e tails. Still fixes the "3", "1152" and "+" cases. Tap dots unchanged (1 and 10). The "=" bars still curl a little: that lift-off point turns only 45–80°, and a 45° or 60° threshold also cuts the "e" tail again, so I didn't go lower. |
+
+Nothing tonight changed the stored ink, and the default still draws every point.
+
+**Needs checking on the iPad.**
+1. With "Ignore the lift-off point" on, write fast "y", "g", "e", "s" and "c" endings: nothing
+   real should be missing. Write "3", "8", "+" and "=": no hooks should be left at the ends. Loading
+   both fixtures in the Pencil lab with the toggle on shows the same thing.
+2. If that looks right, it could become the default (`dropLiftOff: true` in `DEFAULT_PEN`, then
+   `PENCIL_UPDATE_BASELINES=1`). That's your call, because it leaves out a point Safari sent.
+3. Stroke starts don't visibly "pop" when the first real pressure arrives (~30 ms in).
 
 ## Limitations and open questions
 
