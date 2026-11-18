@@ -22,3 +22,9 @@ export function panelWidth(effective: PanelMode, viewportWidth: number) {
 export function nextTickDelay(state: LayoutState, now: number, idleMs = 15000, minDrawingMs = 4000): number | null {
   return state.mode !== "auto" || state.effective !== "drawing" ? null : Math.max(0, Math.max(state.lastActivityAt + idleMs, state.drawingSince + minDrawingMs) - now);
 }
+// Width of the docked drawing-tools sidebar on the Mac (the iPad keeps its floating rail).
+export const TOOL_SIDEBAR_W = 64;
+// Notebook column width left between the tools sidebar and the side panel, less a 16px gutter each side.
+export function notebookViewportWidth(viewportWidth: number, panel: number, sidebar: number) {
+  return Math.max(0, viewportWidth - panel - sidebar - 32);
+}

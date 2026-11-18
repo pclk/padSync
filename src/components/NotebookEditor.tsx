@@ -10,6 +10,7 @@ import { legacyOverrides } from "@/ink/pen-feel";
 import { emitActivity } from "@/lib/activity";
 import { db, deviceId, deviceKind } from "@/lib/db";
 import { useLayoutMode, useStoredState } from "@/lib/hooks";
+import { notebookViewportWidth, TOOL_SIDEBAR_W } from "@/lib/layout-mode";
 import { addTextBox, insertSectionAfter, liveSections, logEvent, putEntities } from "@/lib/store";
 import { registerDebugProbe } from "@/lib/sync-debug";
 import { renderFlag } from "@/lib/render-flags";
@@ -25,7 +26,7 @@ const TOOLBAR_H = 56;
 // The Mac only follows the iPad after this long without input of its own.
 const FOLLOW_IDLE_MS = 15000;
 
-const MIN_ZOOM = 0.4;
+const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 3;
 const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 
@@ -92,7 +93,10 @@ function Editor({ notebookId }: { notebookId: string }) {
   }, [storedTool]);
   const [panelOpen, setPanelOpen] = useStoredState("padsync.panel", !isIpad);
   const [follow, setFollow] = useStoredState("padsync.follow", !isIpad);
-  const [zoom, setZoom] = useState(() => (isIpad ? 1 : fitZoom(panelOpen, 360)));
+  // The Mac docks the drawing tools in a collapsible sidebar; the iPad keeps its floating rail.
+  const [toolsOpen, setToolsOpen] = useStoredState("padsync.toolSidebar", true);
+  const sidebarWidth = !isIpad && toolsOpen ? TOOL_SIDEBAR_W : 0;
+  const [zoom, setZoom] = useState(() => (isIpad ? 1 : fitZoom(panelOpen, 360, sidebarWidth)));
   const [selection, setSelection] = useState<Selection | null>(null);
   const [dragging, setDragging] = useState<Set<string> | null>(null);
   const [editingText, setEditingText] = useState<string | null>(null);
@@ -140,8 +144,9 @@ function Editor({ notebookId }: { notebookId: string }) {
         scrollY: Math.round(window.scrollY),
         pageHeight: document.documentElement.scrollHeight,
         panelOpen,
+        toolsOpen: !isIpad && toolsOpen,
       })),
-    [controller, panelOpen],
+    [controller, panelOpen, isIpad, toolsOpen],
   );
 
   const undoState = useSyncExternalStore(
@@ -223,7 +228,7 @@ function Editor({ notebookId }: { notebookId: string }) {
   }, [zoom, notebookId]);
 
   const resetZoom = () => {
-    const z = isIpad ? 1 : fitZoom(panelOpen, panelWidth);
+    const z = isIpad ? 1 : fitZoom(panelOpen, panelWidth, sidebarWidth);
     const wrap = wrapRef.current!;
     const r = wrap.getBoundingClientRect();
     const cy = TOOLBAR_H + 10;
@@ -491,17 +496,17 @@ function Editor({ notebookId }: { notebookId: string }) {
     const finish = () => {
       if (done) return;
       done = true;
-      const next = fitZoom(panelOpen, panelWidth);
+      const next = fitZoom(panelOpen, panelWidth, sidebarWidth);
       setZoom(next);
       requestAnimationFrame(() => {
         if (entry) window.scrollBy(0, entry[1].getBoundingClientRect().top + offset * next - TOOLBAR_H);
       });
     };
-    const end = (event: TransitionEvent) => { if (event.propertyName === "padding-right") finish(); };
+    const end = (event: TransitionEvent) => { if (event.propertyName === "padding-right" || event.propertyName === "padding-left") finish(); };
     window.addEventListener("transitionend", end);
     const timer = setTimeout(finish, 400);
     return () => { clearTimeout(timer); window.removeEventListener("transitionend", end); };
-  }, [panelWidth, panelOpen, isIpad, controller]);
+  }, [panelWidth, panelOpen, sidebarWidth, isIpad, controller]);
 
   const loaded = sections !== undefined && notebook !== undefined;
   useLayoutEffect(() => {
@@ -557,8 +562,10 @@ function Editor({ notebookId }: { notebookId: string }) {
   const showPanel = panelOpen;
 
   return (
-    <div className="editor min-h-screen bg-canvas" style={{ paddingTop: TOOLBAR_H + 16, paddingRight: showPanel ? panelWidth : 0 }}>
-      <style>{` .editor { transition: padding-right 250ms; } .editor > aside { transition: width 250ms; } @media (prefers-reduced-motion: reduce) { .editor, .editor > aside { transition: none; } } `}</style>
+    // On the Mac the editor grows to the notebook's width, so a column wider than the room between the
+    // tools sidebar and the panel scrolls sideways instead of sliding under either of them.
+    <div className={`editor min-h-screen bg-canvas ${isIpad ? "" : "w-max min-w-full"}`} style={{ paddingTop: TOOLBAR_H + 16, paddingRight: showPanel ? panelWidth : 0, paddingLeft: sidebarWidth }}>
+      <style>{` .editor { transition: padding-right 250ms, padding-left 250ms; } .editor > aside { transition: width 250ms; } @media (prefers-reduced-motion: reduce) { .editor, .editor > aside { transition: none; } } `}</style>
       <Toolbar
         notebookId={notebookId}
         layout={isIpad ? undefined : layout}
@@ -573,6 +580,7 @@ function Editor({ notebookId }: { notebookId: string }) {
         onZoomReset={resetZoom}
         panelOpen={showPanel}
         onTogglePanel={() => setPanelOpen(!panelOpen)}
+        sidebar={isIpad ? undefined : { open: toolsOpen, onToggle: () => setToolsOpen(!toolsOpen) }}
       />
 
       {/* Not one transform over the whole notebook: on the iPad a scaled layer that tall (300k px for
@@ -625,8 +633,8 @@ function Editor({ notebookId }: { notebookId: string }) {
   );
 }
 
-function fitZoom(withPanel: boolean, width: number) {
+function fitZoom(withPanel: boolean, width: number, sidebar: number) {
   if (typeof window === "undefined") return 1;
-  const avail = window.innerWidth - (withPanel ? width : 0) - 32;
+  const avail = notebookViewportWidth(window.innerWidth, withPanel ? width : 0, sidebar);
   return clampZoom(Math.min(1, avail / PAGE_WIDTH));
 }

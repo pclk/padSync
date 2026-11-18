@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import type { ToolKind, ToolState } from "@/ink/controller";
+import { TOOL_SIDEBAR_W } from "@/lib/layout-mode";
 import { SyncBadge } from "./SyncBadge";
 import { Icon, type IconName } from "./Icons";
 import { PenSettings } from "./PenSettings";
@@ -36,6 +37,8 @@ interface Props {
   onZoomReset: () => void;
   panelOpen: boolean;
   onTogglePanel: () => void;
+  /** Mac only: dock the tools in a collapsible sidebar. Without it (iPad) they float in a rail. */
+  sidebar?: { open: boolean; onToggle: () => void };
 }
 
 export function Toolbar(p: Props) {
@@ -55,14 +58,36 @@ export function Toolbar(p: Props) {
   const setSize = (s: number) =>
     setTool(tool.kind === "highlighter" ? { ...tool, hlSize: s } : tool.kind === "eraser" ? { ...tool, eraserSize: s } : { ...tool, penSize: s });
 
+  const docked = p.sidebar;
+  const toggleSidebar = () => {
+    setPenMenuY(null);
+    docked?.onToggle();
+  };
+  const current = TOOLS.find((t) => t.kind === tool.kind) ?? TOOLS[0];
+
   // The top bar keeps navigation and status; the drawing tools sit in a rail on the left edge,
-  // within thumb reach while the other hand holds the Pencil.
+  // within thumb reach while the other hand holds the Pencil. On the Mac the same tools dock in a
+  // sidebar that the notebook makes room for, and the header button shows or hides it.
   return (
     <>
       <header className="toolbar fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-1.5 border-b border-slate-200/80 bg-white/90 px-2 backdrop-blur-md sm:gap-2 sm:px-3">
         <Link href="/" className="btn btn-ghost px-2" aria-label="Library">
           <Icon name="back" className="text-lg" /><span className="hidden sm:inline">Library</span>
         </Link>
+        {docked && (
+          <button
+            className="btn btn-ghost px-2.5"
+            aria-expanded={docked.open}
+            aria-controls="drawing-tools"
+            onClick={toggleSidebar}
+            title={docked.open ? "Hide drawing tools" : "Show drawing tools"}
+          >
+            <Icon name="sidebar" className="text-lg" />
+            <span className="hidden sm:inline">Tools</span>
+            {/* Collapsed, the button still shows which tool is active. */}
+            {!docked.open && <Icon name={current.icon} aria-label={`${current.label} selected`} className="text-brand-600" />}
+          </button>
+        )}
         <span aria-hidden="true" className="h-5 w-px bg-slate-200" />
         <div className="mr-auto min-w-0 max-w-[40ch] truncate px-1 text-sm font-semibold text-slate-900">{p.title}</div>
 
@@ -84,7 +109,17 @@ export function Toolbar(p: Props) {
         </button>
       </header>
 
-      <aside className="tool-rail fixed left-3 top-1/2 z-40 flex max-h-[calc(100dvh-5rem)] -translate-y-1/2 flex-col items-center gap-2 overflow-y-auto rounded-2xl border border-slate-200/80 bg-white/90 p-1.5 shadow-lift backdrop-blur-md">
+      <aside
+        id="drawing-tools"
+        aria-label="Drawing tools"
+        inert={docked && !docked.open}
+        className={
+          docked
+            ? `tool-rail tool-sidebar fixed bottom-0 left-0 top-14 z-40 flex flex-col items-center gap-2 overflow-y-auto border-r border-slate-200/80 bg-white/95 py-2 backdrop-blur-md transition-transform duration-250 motion-reduce:transition-none ${docked.open ? "" : "-translate-x-full"}`
+            : "tool-rail fixed left-3 top-1/2 z-40 flex max-h-[calc(100dvh-5rem)] -translate-y-1/2 flex-col items-center gap-2 overflow-y-auto rounded-2xl border border-slate-200/80 bg-white/90 p-1.5 shadow-lift backdrop-blur-md"
+        }
+        style={docked ? { width: TOOL_SIDEBAR_W } : undefined}
+      >
         <div className="flex flex-col gap-0.5">
           {TOOLS.map((t) => (
             <button
