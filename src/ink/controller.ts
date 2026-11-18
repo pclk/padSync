@@ -7,6 +7,7 @@ import { isStrayDot, type Contact } from "./filters";
 import { dataBox, hitStrokes, lassoStrokes, strokeBox, unionBox, type Box } from "./geometry";
 import { penOverrides, withOverrides, type PenParams } from "./pen-feel";
 import { paintStroke, strokePath, cachedPath, seedPath } from "./render";
+import { appendPoint, toLocal } from "./samples";
 import { UndoStack } from "./undo";
 
 // Turns pointer input on a section into strokes, erasures and lasso moves. The in-progress
@@ -176,7 +177,7 @@ export class InkController {
   }
 
   private local(e: PointerEvent, rect: DOMRect): [number, number] {
-    return [(e.clientX - rect.left) / this.zoom, (e.clientY - rect.top) / this.zoom];
+    return toLocal(e.clientX, e.clientY, rect, this.zoom);
   }
 
   private accepts(e: PointerEvent) {
@@ -383,20 +384,7 @@ export class InkController {
       g.contact.durationMs = Math.max(g.contact.durationMs, ev.timeStamp - g.t0);
       if (ev.pointerType === "pen") g.contact.maxPressure = Math.max(g.contact.maxPressure, ev.pressure);
       const [x, y] = this.local(ev, g.rect);
-      const n = pts.length;
-      // Drop exact duplicates (pointerup often repeats the last move).
-      if (n && pts[n - 6] === round(x, 100) && pts[n - 5] === round(y, 100)) continue;
-      // Drop samples older than the last one stored: WebKit can hand an earlier sample over again.
-      if (this.pen.dropOutOfOrder && n && Math.round(ev.timeStamp - g.t0) < pts[n - 1]) continue;
-      const pressure = ev.pointerType === "pen" ? ev.pressure : 0.5;
-      pts.push(
-        round(x, 100),
-        round(y, 100),
-        round(pressure, 1000),
-        round(ev.altitudeAngle ?? Math.PI / 2, 1000),
-        round(ev.azimuthAngle ?? 0, 1000),
-        Math.max(0, Math.round(ev.timeStamp - g.t0)),
-      );
+      appendPoint(pts, x, y, ev, g.t0, this.pen.dropOutOfOrder);
     }
   }
 
