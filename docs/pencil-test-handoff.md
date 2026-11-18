@@ -91,6 +91,12 @@ baselines in the same commit and say why. To compare options without editing cod
 - The pointerup sample (pressure 0) lands a median 3.3–3.6 units (p90 6–6.5) past the last move,
   about 4× a normal step, and is drawn at the held pressure: a short full-width flick at the end of
   most strokes, and much of the i-dot "ticks" below.
+  It is not where the pen was heading: it turns more than 90° back against the stroke in about
+  half of all strokes (median turn 80°), so every stroke ends in a small hook, and the stroke's end
+  jumps a median 3 units when the pen lifts (the live stroke ended at the last move). Pen settings →
+  Clean-up → "Ignore the lift-off point" (`dropLiftOff`, `withoutLiftOff` in `src/ink/filters.ts`)
+  leaves it out at render time. It is off by default because it shortens each stroke by that last
+  segment. Turned on, the end no longer jumps (median 0) and hooks such as an "=" bending into a "2" go.
 - Maths recording: all colon dots become round dots, with their lift-off slides hidden. Two
   i-dots ("info", the second in "minimize") draw as 9-unit ticks: a landing drag at pressure
   0.08, a 4-unit firm tick and a 4.6-unit fading lift-off slide. At thinning 0.3 a light writer's

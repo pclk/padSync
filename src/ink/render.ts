@@ -1,6 +1,6 @@
 import { getStroke, type StrokeOptions } from "perfect-freehand";
 import { STROKE_STRIDE, type StrokeData, type StrokeEntity } from "@/lib/types";
-import { dropBacktracks, hookTrim, interpolateGaps, smoothPositions, smoothPressure, tailTrim, tapDot, collapseStops } from "./filters";
+import { dropBacktracks, hookTrim, interpolateGaps, smoothPositions, smoothPressure, tailTrim, tapDot, collapseStops, withoutLiftOff } from "./filters";
 import { DEFAULT_PEN, EASINGS, strokePen, type PenParams } from "./pen-feel";
 
 // Stroke geometry lives in section-local coordinates (1 unit = 1 CSS px at zoom 1).
@@ -43,13 +43,14 @@ export function strokeOptions(d: PenFields, last: boolean): StrokeOptions {
 
 /**
  * perfect-freehand input. Pencil input is cleaned here, at render time, never in storage, so
- * existing strokes improve too: optional hook and tail trims (hookTrim, tailTrim), re-sent samples
- * that step backwards are dropped (dropBacktracks), sparse samples are joined by curves
- * (interpolateGaps), and positions are smoothed along the stroke (smoothPositions), each by the
- * stroke's own pen parameters.
+ * existing strokes improve too: the optional lift-off point, hook and tail trims (withoutLiftOff,
+ * hookTrim, tailTrim), re-sent samples that step backwards are dropped (dropBacktracks), sparse
+ * samples are joined by curves (interpolateGaps), and positions are smoothed along the stroke
+ * (smoothPositions), each by the stroke's own pen parameters.
  */
 export function toInput(pts: number[], input?: string, p: PenParams = DEFAULT_PEN): number[][] {
   const pen = input === "pen";
+  if (pen && p.dropLiftOff) pts = withoutLiftOff(pts);
   const pressure = pen ? smoothPressure(pts, p) : null;
   const out: number[][] = [];
   const times: number[] = [];
@@ -97,7 +98,9 @@ export function dotRadius(d: StrokeData): number {
 /** Centre of a stroke drawn as a dot: a single point, or a short Pencil tap (tapDotSize). */
 export function dotCentre(d: StrokeData): [number, number] | null {
   if (d.pts.length === STROKE_STRIDE) return [d.pts[0], d.pts[1]];
-  return d.tool !== "highlighter" && d.input === "pen" ? tapDot(d.pts, strokePen(d).tapDotSize) : null;
+  if (d.tool === "highlighter" || d.input !== "pen") return null;
+  const p = strokePen(d);
+  return tapDot(p.dropLiftOff ? withoutLiftOff(d.pts) : d.pts, p.tapDotSize);
 }
 
 export function strokePath(d: StrokeData, last = true): Path2D {

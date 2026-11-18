@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getStroke } from "perfect-freehand";
-import { STOP_RADIUS, TAIL_MAX_LENGTH, TAP_DOT_SIZE, collapseStops, tailTrim, tapDot } from "@/ink/filters";
+import { STOP_RADIUS, TAIL_MAX_LENGTH, TAP_DOT_SIZE, collapseStops, tailTrim, tapDot, withoutLiftOff } from "@/ink/filters";
 import { dotCentre, dotRadius, strokeOptions, toInput } from "@/ink/render";
 import { strokePen } from "@/ink/pen-feel";
 import type { StrokeData } from "@/lib/types";
@@ -179,5 +179,37 @@ describe("lift-off tails", () => {
     expect(endOf(bend).last.slice(0, 2)).toEqual([70, 4]);
     expect(TAIL_MAX_LENGTH).toBe(0);
     expect(tailTrim(bar.input, bar.raw, bar.times)).toEqual([0, bar.input.length]);
+  });
+});
+
+describe("Safari's lift-off point", () => {
+  // A line to the right whose pointerup sample (pressure 0) hooks back down and left, as on the iPad.
+  const line = pts([[0, 0, 0.2], [2, 0, 0.2], [4, 0, 0.2], [6, 0, 0.2], [8, 0, 0.15], [6, 3, 0]]);
+  const xs = (p: number[][]) => p.map(([x, y]) => [x, y]);
+
+  it("is drawn by default, so no ink goes missing", () => {
+    const out = toInput(line, "pen");
+    expect(xs(out).at(-1)).toEqual([6, 3]);
+  });
+
+  it("is left out when the pen setting asks for it; the last pressed point ends the stroke", () => {
+    const out = toInput(line, "pen", { ...strokePen({}), dropLiftOff: true });
+    expect(xs(out).at(-1)).toEqual([8, 0]);
+    expect(out.every(([, y]) => Math.abs(y) < 1e-9)).toBe(true);
+  });
+
+  it("only drops a zero-pressure last point, and never from a stroke shorter than three points", () => {
+    const pressed = pts([[0, 0, 0.2], [2, 0, 0.2], [4, 0, 0.1]]);
+    expect(withoutLiftOff(pressed)).toBe(pressed);
+    const tap = pts([[0, 0, 0.2], [1, 1, 0]]);
+    expect(withoutLiftOff(tap)).toBe(tap);
+    expect(withoutLiftOff(pts([[0, 0, 0.2], [1, 0, 0.2], [3, 2, 0]]))).toEqual(pts([[0, 0, 0.2], [1, 0, 0.2]]));
+  });
+
+  it("doesn't count towards a tap's size when left out: a dot with a long lift-off slide stays a dot", () => {
+    // Firm and still, then the up sample lands 9 units away: too spread out for a dot when drawn.
+    const tap = pts([[0, 0, 0.2], [0.2, 0, 0.22], [0.2, 0.2, 0.2], [0.6, 0.4, 0.12], [7, 6, 0]]);
+    expect(dotCentre(pen(tap))).toBeNull();
+    expect(dotCentre({ ...pen(tap), pen: { dropLiftOff: true } })).not.toBeNull();
   });
 });

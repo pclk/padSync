@@ -69,6 +69,18 @@ export function smoothPressure(pts: number[], f: PressureFilter = PRESSURE_DEFAU
   return out;
 }
 
+/**
+ * A pen stroke's points without Safari's lift-off point: the pointerup sample, the only one with
+ * pressure exactly 0. In both iPad recordings it lands a median 3.4 units (p90 6) from the last
+ * pressed sample and turns more than 90° back against the stroke in about half of them: where
+ * iPadOS estimates the tip left the glass, not where it drew, so drawn as is every stroke ends in
+ * a small hook. Strokes of fewer than three points keep it; otherwise returns `pts` unchanged.
+ */
+export function withoutLiftOff(pts: number[]): number[] {
+  const n = pts.length;
+  return n >= 3 * STROKE_STRIDE && pts[n - STROKE_STRIDE + 2] === 0 ? pts.slice(0, n - STROKE_STRIDE) : pts;
+}
+
 /** A stroke whose points all lie within this distance (section units) of the first has no length. */
 export const DOT_MAX_EXTENT = 1.5;
 /** Contact shorter than this is a bounce or a glancing touch; a deliberate tap lasts ~60 ms or more. */

@@ -160,3 +160,51 @@ button still sits well in its wrapping header.
 **Next (UI).** The notebook toolbar has the most controls on screen at once (layout segmented
 control, pen settings, sync badge…); a later UI run could group or tuck away the less-used ones.
 The two Pencil tools might merge into one page later: both save `padsync.pencil-recording` files, but from separate schema modules (`src/ink/recording.ts` and `src/ink/recording/schema.ts`), so check they really are one format first.
+
+## 2026-11-19 02:00 — handwriting: Safari's lift-off point
+
+**Measured first.** The 00:00 run's next step 1 was the pointerup "flick". Both iPad recordings,
+every pen stroke: the last point is the pointerup sample (pressure 0), a median 3.3–3.4 units
+(p90 6) past the last move, 8–21 ms later. It is **not** the pen carrying on. It turns more than 90°
+back against the stroke's direction in 30/65 (handwriting) and 98/212 (maths) strokes (median turn
+80°, against 25–34° for the move before it). So it's iPadOS's estimate of where contact ended,
+like the 0.08 placeholder pressure, and every stroke ends in a small hook. It also breaks live =
+committed: the live stroke ends at the last move (plus predictions), and at lift the end jumps a
+median 3.1 units (p90 5.5–6.2) to the hook.
+
+Also checked and dropped: a falling-pressure fix for the end. At thinning 0.3 pressure 0.2 → 0
+changes the width by only ~15% (0.41 → 0.35 × size, ~0.2 px at size 3), so pressure changes can't
+remove the flick. Pressure-relative width is a change to how all ink looks, so I left it for you to decide.
+
+**Changed.** New pen parameter `dropLiftOff`, Pen settings → Clean-up → "Ignore the lift-off point",
+**off by default** (the rule: no ink removed by default). When on, `withoutLiftOff`
+(`src/ink/filters.ts`) leaves the zero-pressure last point out at render time (`toInput` and the
+tap-dot check in `dotCentre`). Stored points are unchanged, so it's reversible and applies to old
+strokes drawn with it. Strokes under 3 points keep it. Like other Clean-up values, it's stored per
+stroke only when it differs from the default.
+
+**What it does when on** (scratchpad renders through `strokeSvgPath`, before/after): 65/66 and
+207/217 outlines change; tap dots unchanged (1, 10). Visibly: the "=" in "V = …" no longer bends
+into a "2", the tails on "goal", "pages", "7" and the "e" go, the ends of strokes read cleaner.
+Live end → committed end: median 0 (p90 1.1–1.6) instead of 3.1. Cost: every stroke ends one
+segment earlier (median 3.4 units), at the last point the Pencil pressed.
+
+**Checked.** New tests in `tests/pencil-ends.test.ts` (default keeps it; on drops only a zero-pressure
+last point; 3-point minimum; a tap with a long lift-off slide stays a dot when it's on).
+`npm run typecheck`, `npm run lint`, `npx vitest run` (792 passed), `npm run test:pencil` (33 passed,
+baselines unchanged because the default is unchanged). Latency: the default path only adds one boolean check
+in `toInput`/`dotCentre`; nothing in `InkController` move/draw changed.
+
+**Needs a device check / your decision.** Turn the toggle on, write, and see whether (a) strokes stop
+"growing a hook" when the Pencil lifts, (b) nothing real is missing from letter ends (fast "c",
+"s" endings, the tail of a "y"). The Pencil lab replays recordings with the notebook's pen settings,
+so loading the two fixtures there shows the difference. If it looks right, making it the default is
+a one-line change (`dropLiftOff: true` in `DEFAULT_PEN`) plus `PENCIL_UPDATE_BASELINES=1`.
+
+**Next (handwriting).**
+1. Decide the `dropLiftOff` default (above).
+2. The 0.5 px staircase (curve fitting after lift): still not started.
+3. i-dot ticks in "info"/"minimize": still lines (extent 9–10, landing drag at the placeholder
+   pressure). `tapDot`'s spread check counts the landing drag too. Next step is to measure whether
+   leaving placeholder samples out of `extent(-Infinity)` turns these into dots without turning short
+   dashes (superscript minus) into dots.
