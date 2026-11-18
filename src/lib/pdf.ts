@@ -1,6 +1,7 @@
 import { db, getMeta, setMeta } from './db';
 import { PAGE_WIDTH } from './types';
 import { pdfSignature, type PdfPage } from './pdf-meta';
+import { registerDebugProbe } from './sync-debug';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 let engine: Promise<typeof import('pdfjs-dist')> | undefined;
 export function pdfEngine() {
@@ -57,6 +58,7 @@ export function rasterScale(page: Pick<PdfPage, 'height'>, density = typeof wind
 // A small LRU of compressed rasters, shared by the viewport and exports. No 149-page canvas set.
 const renders = new Map<string, Blob>();
 let renderQueue: Promise<unknown> = Promise.resolve();
+registerDebugProbe('PDF cache', () => ({ openDocuments: documents.size, cachedRasters: renders.size, rasterMB: Math.round([...renders.values()].reduce((a, b) => a + b.size, 0) / 10485.76) / 100 }));
 export function pdfRaster(page: PdfPage, density?: number): Promise<Blob> {
   const scale = rasterScale(page, density);
   const key = `${page.documentId}:${page.page}:${scale}`;

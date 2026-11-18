@@ -239,7 +239,7 @@ export async function syncOnce(context = { trigger: "manual", queueMs: 0, timerL
       since, changes: dirty.map(e => ({ ...e, dirty: undefined })),
       events: events.map(e => ({ ...e, synced: undefined })),
     });
-    updateSyncDebugRequest(trace, { encodeMs: debugNow() - phaseStart, phase: 'HTTP round trip' });
+    updateSyncDebugRequest(trace, { encodeMs: debugNow() - phaseStart, uploadBytes: payload.length, phase: 'HTTP round trip' });
 
     let res: Response;
     try {

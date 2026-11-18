@@ -6,7 +6,9 @@ import { useSyncDebug } from '@/lib/settings';
 import { getSyncTiming, requestSync } from '@/lib/sync';
 import { useStoredState } from '@/lib/hooks';
 import { startInputWatch } from '@/lib/input-watch';
-import { MAX_EDITS, STAT_METRICS, clearSyncDebug, formatSyncDebugReport, getSyncDebugSnapshot, setSyncDebugEnabled, syncDebugStats, type SyncDebugRequest } from '@/lib/sync-debug';
+import { MAX_EDITS, STAT_METRICS, clearSyncDebug, getSyncDebugSnapshot, setSyncDebugEnabled, syncDebugStats, type SyncDebugRequest } from '@/lib/sync-debug';
+import { buildDebugReport } from '@/lib/debug-report';
+import { getResourceSnapshot, startPerfWatch } from '@/lib/perf-watch';
 
 type Snapshot = ReturnType<typeof getSyncDebugSnapshot>;
 type Timing = ReturnType<typeof getSyncTiming>;
@@ -84,6 +86,20 @@ export function SyncDebugDetails({ snapshot, timing, environment, selected }: { 
   </>;
 }
 
+/** Live resource numbers (refreshed with the panel); the full set goes into the copied stats. */
+function ResourceStats() {
+  const r = getResourceSnapshot();
+  const keys = ['Frames per second', 'Canvas memory MB', 'Decoded image MB', 'JS heap used MB', 'DOM elements', 'Storage used MB', 'DB entities', 'DB unsent entities'];
+  const shown = keys.filter(k => k in r);
+  if (!shown.length) return null;
+  return <details className="mb-3 text-xs" open>
+    <summary className="cursor-pointer font-semibold">Resources</summary>
+    <dl className="mt-1 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 tabular-nums">
+      {shown.map(k => <div key={k} className="contents"><dt>{k}</dt><dd className="text-right">{String(r[k])}</dd></div>)}
+    </dl>
+  </details>;
+}
+
 export function SyncDebugOverlay() {
   const [enabled, setEnabled] = useSyncDebug();
   const [expanded, setExpanded] = useState(true);
@@ -123,32 +139,21 @@ export function SyncDebugOverlay() {
     update();
     const timer = setInterval(update, 250);
     const stopWatch = startInputWatch();
-    return () => { clearInterval(timer); stopWatch(); };
+    const stopPerf = startPerfWatch();
+    return () => { clearInterval(timer); stopWatch(); stopPerf(); };
   }, [enabled]);
   if (!enabled) return null;
   const snapshot = sample?.snapshot;
   const selected = selectedId === 'latest' ? snapshot?.requests.at(-1) : snapshot?.requests.find(request => String(request.id) === selectedId);
-  function trace() {
-    // Read immediately, so export includes events since the most recent UI refresh.
-    return JSON.stringify({ exportedAt: new Date().toISOString(), environment: sample?.environment, timing: getSyncTiming(), ...getSyncDebugSnapshot() }, null, 2);
-  }
-  async function copy() {
-    try { await navigator.clipboard.writeText(trace()); setMessage('Trace copied.'); }
-    catch { setMessage('Clipboard unavailable. Use Download trace.'); }
-  }
-  async function copyStats() {
+  async function copyReport(trace: boolean) {
     const env = sample?.environment, t = getSyncTiming();
-    const report = formatSyncDebugReport([
+    // Built at the moment of the tap, so it includes everything since the last panel refresh.
+    const report = buildDebugReport([
       `Device: ${env?.device} · ${env?.visibility} · ${env?.focused ? 'focused' : 'unfocused'} · ${env?.standalone ? 'PWA' : 'browser tab'} · ${env?.online ? 'online' : 'offline'} · realtime ${t.realtimeStatus}`,
       `Config: send ${t.debounceMs} · visible ${t.visiblePollMs} · hidden ${t.hiddenPollMs} · retry ${t.retryBaseMs} · effective poll ${t.effectivePollMs} ms`,
-    ]);
-    try { await navigator.clipboard.writeText(report); setMessage('Stats copied.'); }
+    ], { trace });
+    try { await navigator.clipboard.writeText(report); setMessage(trace ? 'Stats and trace copied.' : 'Summary stats copied.'); }
     catch { setMessage('Clipboard unavailable.'); }
-  }
-  function download() {
-    const url = URL.createObjectURL(new Blob([trace()], { type: 'application/json' }));
-    const link = document.createElement('a'); link.href = url; link.download = `padsync-sync-debug-${Date.now()}.json`; link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   // CSS keeps a saved spot on screen after the window shrinks or rotates.
   const placed = pos && { left: `min(${pos.x}px, calc(100vw - 8rem))`, top: `min(${pos.y}px, calc(100dvh - 44px))` };
@@ -162,13 +167,13 @@ export function SyncDebugOverlay() {
     {expanded && <div id="sync-debug-panel" style={pos ? { maxHeight: `max(12rem, calc(100dvh - ${pos.y}px - 52px))` } : undefined} className="max-h-[65dvh] w-[min(30rem,calc(100vw-1rem))] overflow-auto rounded-b-lg rounded-tl-lg border border-slate-300 bg-white p-3 text-slate-900 shadow-xl">
       <div className="mb-3 flex flex-wrap gap-2 text-xs">
         <button type="button" className="min-h-11 rounded border px-2" onClick={() => requestSync(0, 'debug sync now')}>Sync now</button>
-        <button type="button" className="min-h-11 rounded border px-2 font-semibold" onClick={copyStats}>Copy stats</button>
-        <button type="button" className="min-h-11 rounded border px-2" onClick={copy}>Copy trace</button>
-        <button type="button" className="min-h-11 rounded border px-2" onClick={download}>Download trace</button>
+        <button type="button" className="min-h-11 rounded border px-2 font-semibold" onClick={() => copyReport(false)}>Copy sum stats</button>
+        <button type="button" className="min-h-11 rounded border px-2" onClick={() => copyReport(true)}>Copy stats and trace</button>
         <button type="button" className="min-h-11 rounded border px-2" onClick={() => { clearSyncDebug(); setSelectedId('latest'); setMessage('Trace cleared.'); }}>Clear</button>
         <button type="button" className="min-h-11 rounded border px-2" onClick={() => setEnabled(false)}>Turn off</button>
       </div>
       {message && <p role="status" className="mb-2 text-xs">{message}</p>}
+      {sample && <ResourceStats />}
       {sample && <>
         <label className="mb-3 block text-xs">Request history
           <select className="mt-1 w-full rounded border bg-white p-2" value={selectedId} onChange={event => setSelectedId(event.target.value)}>

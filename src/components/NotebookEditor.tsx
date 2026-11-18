@@ -11,6 +11,7 @@ import { emitActivity } from "@/lib/activity";
 import { db, deviceId, deviceKind } from "@/lib/db";
 import { useLayoutMode, useStoredState } from "@/lib/hooks";
 import { addTextBox, insertSectionAfter, liveSections, logEvent, putEntities } from "@/lib/store";
+import { registerDebugProbe } from "@/lib/sync-debug";
 import { PAGE_WIDTH, type NotebookEntity, type PresenceData, type PresenceEntity, type SectionEntity } from "@/lib/types";
 import { SectionView } from "./SectionView";
 import { SidePanel } from "./SidePanel";
@@ -120,6 +121,21 @@ function Editor({ notebookId }: { notebookId: string }) {
   useLayoutEffect(() => {
     controller.configure(tool, zoom);
   }, [controller, tool, zoom]);
+  useEffect(
+    () =>
+      registerDebugProbe("Editor", () => ({
+        zoom: Math.round(controller.zoom * 100) / 100,
+        tool: controller.tool.kind,
+        drawing: controller.isDrawing(),
+        selected: controller.selection?.ids.size ?? 0,
+        sections: els.current.size,
+        undo: controller.undo.canUndo,
+        scrollY: Math.round(window.scrollY),
+        pageHeight: document.documentElement.scrollHeight,
+        panelOpen,
+      })),
+    [controller, panelOpen],
+  );
 
   const undoState = useSyncExternalStore(
     (fn) => controller.undo.subscribe(fn),

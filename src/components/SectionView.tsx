@@ -1,5 +1,5 @@
 "use client";
-import { debugNow, recordSyncPaint } from "@/lib/sync-debug";
+import { debugNow, recordSyncPaint, registerDebugProbe } from "@/lib/sync-debug";
 
 import { useLiveQuery } from "dexie-react-hooks";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -246,6 +246,7 @@ function BlockView({ block }: { block: Block }) {
 // Repaints after a zoom run once the frame has painted, a few tiles per frame.
 const repaints = new Set<() => void>();
 let repaintScheduled = false;
+registerDebugProbe("Ink tiles", () => ({ queuedRepaints: repaints.size }));
 
 function queueRepaint(paint: () => void) {
   repaints.add(paint);

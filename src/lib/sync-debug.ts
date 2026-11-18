@@ -13,6 +13,8 @@ export type SyncDebugRequest = {
   pushedContent?: number; appliedContent?: number;
   /** Sender side: how long the oldest edit in this push waited on this device before the server acked it. */
   sendAgeMs?: number;
+  /** Request body size, and the response body size the browser reports (compressed, when known). */
+  uploadBytes?: number; downloadBytes?: number;
 };
 const MAX_EVENTS = 150, MAX_REQUESTS = 40;
 /** Requests that sent or received edits are kept separately, so the averages cover this many. */
@@ -27,9 +29,61 @@ let anomalies: SyncDebugEvent[] = [];
 const MAX_TRAIL = 80;
 let trail: { at: number; text: string }[] = [];
 const pendingPaint = new Map<string, { appliedAt: number; requestId: number }>();
+// Summaries for the stats report: counters, value statistics, errors and a resource timeline.
+// Probes are registered by modules (editor, ink tiles, PDF cache) and read when a report is made.
+export type DebugStat = { n: number; sum: number; max: number; min: number; last: number };
+const counters = new Map<string, number>();
+const stats = new Map<string, DebugStat>();
+const probes = new Map<string, () => Record<string, DebugValue>>();
+const MAX_ERRORS = 20, MAX_TIMELINE = 120;
+let errors: { at: number; kind: string; message: string }[] = [];
+let timeline: { at: number; values: Record<string, DebugValue> }[] = [];
+let recordingSince = Date.now();
 export const debugNow = () => typeof performance === 'undefined' ? Date.now() : performance.now();
 export const syncDebugEnabled = () => enabled;
-export function clearSyncDebug() { events = []; requests = []; anomalies = []; trail = []; pendingPaint.clear(); }
+export function clearSyncDebug() {
+  events = []; requests = []; anomalies = []; trail = []; errors = []; timeline = [];
+  counters.clear(); stats.clear(); pendingPaint.clear(); recordingSince = Date.now();
+}
+export function countDebug(name: string, n = 1) {
+  if (enabled) counters.set(name, (counters.get(name) ?? 0) + n);
+}
+export function observeDebug(name: string, value: number) {
+  if (!enabled || !Number.isFinite(value)) return;
+  const s = stats.get(name);
+  if (s) { s.n++; s.sum += value; s.max = Math.max(s.max, value); s.min = Math.min(s.min, value); s.last = value; }
+  else stats.set(name, { n: 1, sum: value, max: value, min: value, last: value });
+}
+/** Registers live values read into every report; returns the unregister function. */
+export function registerDebugProbe(name: string, read: () => Record<string, DebugValue>) {
+  probes.set(name, read);
+  return () => { if (probes.get(name) === read) probes.delete(name); };
+}
+export function readDebugProbes() {
+  const out: Record<string, Record<string, DebugValue>> = {};
+  for (const [name, read] of probes) {
+    try { out[name] = read(); } catch (error) { out[name] = { error: error instanceof Error ? error.name : 'failed' }; }
+  }
+  return out;
+}
+/** Error text is trimmed; it names code paths, not notebook content. */
+export function recordDebugError(kind: string, message: string) {
+  if (!enabled) return;
+  countDebug(`Errors · ${kind}`);
+  errors.push({ at: Date.now(), kind, message: message.slice(0, 200) });
+  if (errors.length > MAX_ERRORS) errors.shift();
+}
+export function recordDebugSample(values: Record<string, DebugValue>) {
+  if (!enabled) return;
+  timeline.push({ at: Date.now(), values });
+  if (timeline.length > MAX_TIMELINE) timeline.shift();
+}
+export function getDebugSummaries() {
+  return {
+    since: recordingSince, counters: new Map(counters), stats: new Map([...stats].map(([k, v]) => [k, { ...v }])),
+    errors: errors.map(e => ({ ...e })), timeline: timeline.map(t => ({ at: t.at, values: { ...t.values } })),
+  };
+}
 export function setSyncDebugEnabled(value: boolean) {
   if (enabled === value) return;
   enabled = value;
@@ -105,6 +159,8 @@ export function recordRemoteApplied(request: SyncDebugRequest | undefined, entit
 }
 export function recordSyncPaint(entities: readonly { id: string; hlc: string }[], paintMs: number) {
   if (!enabled) return;
+  observeDebug('Ink tile paint ms', paintMs);
+  observeDebug('Strokes per tile paint', entities.length);
   let matched = 0, longest = 0;
   const requestLags = new Map<number, number>();
   for (const entity of entities) {
@@ -136,6 +192,7 @@ export function recordNetworkTiming(request: SyncDebugRequest | undefined, fetch
     connectMs: newConnection ? entry.connectEnd - connectStart : 0,
     ttfbMs: entry.responseStart - (entry.requestStart || entry.startTime),
     downloadMs: entry.responseEnd - entry.responseStart,
+    downloadBytes: entry.encodedBodySize || entry.transferSize || undefined,
   });
 }
 
@@ -170,10 +227,24 @@ export function syncDebugStats(list = requests) {
 }
 
 const f = (v?: number) => v === undefined ? '—' : `${Math.round(v)}`;
-const clock = (at: number) => new Date(at).toISOString().slice(11, 23);
+export const clock = (at: number) => new Date(at).toISOString().slice(11, 23);
 const details = (e: SyncDebugEvent) => Object.entries(e.details).map(([k, v]) => `${k}=${typeof v === 'number' ? Math.round(v * 10) / 10 : v}`).join(' ');
-/** A plain-text report of the last 300 edit requests, meant to be pasted into a chat. No notebook content. */
-export function formatSyncDebugReport(header: string[], now = Date.now()) {
+/** Request outcomes over everything kept: what triggered them, how they ended and the bytes moved. */
+export function syncDebugTotals(list = requests) {
+  const done = list.filter(r => r.totalMs !== undefined);
+  const by = (key: (r: SyncDebugRequest) => string) => {
+    const m = new Map<string, number>();
+    for (const r of done) m.set(key(r), (m.get(key(r)) ?? 0) + 1);
+    return [...m].sort((a, b) => b[1] - a[1]);
+  };
+  const sum = (key: 'uploadBytes' | 'downloadBytes') => done.reduce((a, r) => a + (r[key] ?? 0), 0);
+  return { count: done.length, triggers: by(r => r.trigger), outcomes: by(r => `${r.phase}${r.status ? ` ${r.status}` : ''}`), uploadBytes: sum('uploadBytes'), downloadBytes: sum('downloadBytes'), pulled: done.reduce((a, r) => a + (r.pulled ?? 0), 0), pushed: done.reduce((a, r) => a + (r.pushed ?? 0), 0) };
+}
+
+export const kb = (bytes: number) => bytes < 1024 ? `${bytes} B` : bytes < 1048576 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1048576).toFixed(2)} MB`;
+
+/** The sync part of the summary: averages of the last 300 edit requests, totals and anomaly counts. */
+export function formatSyncSummary(header: string[], now = Date.now()) {
   const stats = syncDebugStats();
   const edits = requests.filter(isEdit);
   const since = edits.length ? ` since ${clock(edits[0].at)}` : '';
@@ -181,7 +252,24 @@ export function formatSyncDebugReport(header: string[], now = Date.now()) {
   lines.push(`ms (avg / max)`.padEnd(26) + stats.map(g => `${g.label} n=${g.count}`.padEnd(24)).join(''));
   for (const [key, label] of STAT_METRICS) lines.push(label.padEnd(26) + stats.map(g => `${f(g.avg[key])} / ${f(g.max[key])}`.padEnd(24)).join(''));
   lines.push('New connections'.padEnd(26) + stats.map(g => `${g.newConnections}/${g.count} ${g.protocols.join(',')}`.padEnd(24)).join(''));
-  lines.push('', `Input and main-thread stalls (last ${MAX_ANOMALIES}):`);
+  const t = syncDebugTotals();
+  lines.push('', `Requests kept: ${t.count} · ↑ ${t.pushed} entities, ${kb(t.uploadBytes)} · ↓ ${t.pulled} entities, ${kb(t.downloadBytes)}${t.count ? ` · avg ↑ ${kb(Math.round(t.uploadBytes / t.count))} ↓ ${kb(Math.round(t.downloadBytes / t.count))}` : ''}`);
+  if (t.triggers.length) lines.push(`  Triggers: ${t.triggers.map(([k, n]) => `${k} ${n}`).join(' · ')}`);
+  if (t.outcomes.length) lines.push(`  Outcomes: ${t.outcomes.map(([k, n]) => `${k} ×${n}`).join(' · ')}`);
+  lines.push('', `Input and main-thread stalls: ${anomalies.length ? '' : 'none recorded'}`);
+  const kinds = new Map<string, { n: number; max: number }>();
+  for (const e of anomalies) {
+    const k = kinds.get(e.message) ?? { n: 0, max: 0 };
+    k.n++; if (typeof e.details.ms === 'number') k.max = Math.max(k.max, e.details.ms);
+    kinds.set(e.message, k);
+  }
+  for (const [message, k] of kinds) lines.push(`  ${message}: ${k.n}${k.max ? ` · longest ${Math.round(k.max)} ms` : ''}`);
+  return lines;
+}
+
+/** The individual records: anomalies, raw input, requests and events. */
+export function formatSyncTrace() {
+  const lines = ['', `Input and main-thread stalls (last ${MAX_ANOMALIES}):`];
   if (!anomalies.length) lines.push('none recorded');
   for (const e of anomalies) lines.push(`${clock(e.at)} ${e.message} · ${details(e)}`);
   lines.push('', `Recent input (last ${MAX_TRAIL}):`);
@@ -189,12 +277,20 @@ export function formatSyncDebugReport(header: string[], now = Date.now()) {
   for (const t of trail) lines.push(`${clock(t.at)} ${t.text}`);
   lines.push('', 'Requests (edits, plus the newest 40 of any kind):');
   for (const r of requests) {
-    lines.push(`#${r.id} ${clock(r.at)} ${r.trigger} · ${r.phase} ${r.status ?? ''} · ↑${r.pushedContent ?? 0}/${r.pushed ?? 0} ↓${r.appliedContent ?? 0}/${r.applied ?? 0} · wait ${f(r.queueMs)} http ${f(r.httpMs)} (${r.newConnection ? 'new' : r.newConnection === false ? 'reused' : '?'} conn ${f(r.connectMs)}, ttfb ${f(r.ttfbMs)}, server ${f(r.server?.total)}, dl ${f(r.downloadMs)}) total ${f(r.totalMs)} · sentAge ${f(r.sendAgeMs)} recvAge ${f(r.remoteAgeMs)} paint ${f(r.applyToPaintMs)}`);
+    lines.push(`#${r.id} ${clock(r.at)} ${r.trigger} · ${r.phase} ${r.status ?? ''} · ↑${r.pushedContent ?? 0}/${r.pushed ?? 0} ↓${r.appliedContent ?? 0}/${r.applied ?? 0} · wait ${f(r.queueMs)} http ${f(r.httpMs)} (${r.newConnection ? 'new' : r.newConnection === false ? 'reused' : '?'} conn ${f(r.connectMs)}, ttfb ${f(r.ttfbMs)}, server ${f(r.server?.total)}, dl ${f(r.downloadMs)}) total ${f(r.totalMs)} · ${r.uploadBytes !== undefined ? `${kb(r.uploadBytes)} up` : '? up'} ${r.downloadBytes !== undefined ? `${kb(r.downloadBytes)} down` : '? down'} · sentAge ${f(r.sendAgeMs)} recvAge ${f(r.remoteAgeMs)} paint ${f(r.applyToPaintMs)}`);
   }
+  lines.push('', 'Errors and console messages:');
+  if (!errors.length) lines.push('none recorded');
+  for (const e of errors) lines.push(`${clock(e.at)} ${e.kind} · ${e.message}`);
   lines.push('', 'Events:');
   for (const e of events) {
     const d = details(e);
     lines.push(`${clock(e.at)} ${e.kind} · ${e.message}${d ? ` · ${d}` : ''}`);
   }
-  return lines.join('\n');
+  return lines;
+}
+
+/** A plain-text report meant to be pasted into a chat: the summary, then the records. No notebook content. */
+export function formatSyncDebugReport(header: string[], now = Date.now()) {
+  return [...formatSyncSummary(header, now), ...formatSyncTrace()].join('\n');
 }
