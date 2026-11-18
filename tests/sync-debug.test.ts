@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { beginSyncDebugRequest, clearSyncDebug, getSyncDebugSnapshot, parseServerTiming, recordRemoteApplied, recordSyncDebug, recordSyncPaint, setSyncDebugEnabled, updateSyncDebugRequest } from '@/lib/sync-debug';
+import { beginSyncDebugRequest, clearSyncDebug, formatSyncDebugReport, syncDebugStats, getSyncDebugSnapshot, parseServerTiming, recordRemoteApplied, recordSyncDebug, recordSyncPaint, setSyncDebugEnabled, updateSyncDebugRequest } from '@/lib/sync-debug';
 beforeEach(() => { setSyncDebugEnabled(false); vi.useFakeTimers(); });
 afterEach(() => { setSyncDebugEnabled(false); vi.useRealTimers(); vi.unstubAllGlobals(); });
 it('records nothing until enabled and clears recordings when disabled', () => {
@@ -13,6 +13,11 @@ it('bounds event/request history and returns snapshots isolated from later updat
   setSyncDebugEnabled(true);
   for (let i=0;i<200;i++) recordSyncDebug('timer','scheduled',{delay:i});
   for (let i=0;i<60;i++) beginSyncDebugRequest('poll');
+  // Everything from the last 30 s is kept for the window averages.
+  expect(getSyncDebugSnapshot().events.length).toBeGreaterThan(200);
+  expect(getSyncDebugSnapshot().requests).toHaveLength(60);
+  vi.advanceTimersByTime(31000);
+  recordSyncDebug('timer','scheduled',{delay:200}); beginSyncDebugRequest('poll');
   const snapshot=getSyncDebugSnapshot();
   expect(snapshot.events).toHaveLength(150); expect(snapshot.requests).toHaveLength(40);
   snapshot.events[0].details.delay=-1;
@@ -45,4 +50,19 @@ it('keeps a negative edit age visible as clock skew and discards updates to clea
   expect(getSyncDebugSnapshot().requests[0].remoteAgeMs).toBe(-1000);
   clearSyncDebug(); updateSyncDebugRequest(request,{status:200});
   expect(getSyncDebugSnapshot().requests).toEqual([]);
+});
+
+it('averages the last 30 s by received, sent and all, and formats a pasteable report', () => {
+  setSyncDebugEnabled(true);
+  const old=beginSyncDebugRequest('poll'); updateSyncDebugRequest(old,{totalMs:9999,httpMs:9999});
+  vi.advanceTimersByTime(31000);
+  const recv=beginSyncDebugRequest('realtime notification'); updateSyncDebugRequest(recv,{totalMs:600,httpMs:400,newConnection:true,connectMs:200,appliedContent:1,remoteAgeMs:1000});
+  const sent=beginSyncDebugRequest('local edit'); updateSyncDebugRequest(sent,{totalMs:100,httpMs:60,newConnection:false,connectMs:0,pushedContent:2,sendAgeMs:300});
+  const [received,sentGroup,all]=syncDebugStats();
+  expect(received).toMatchObject({count:1,newConnections:1}); expect(received.avg.httpMs).toBe(400);
+  expect(sentGroup.avg.sendAgeMs).toBe(300);
+  expect(all.count).toBe(2); expect(all.avg.totalMs).toBe(350); expect(all.max.httpMs).toBe(400);
+  const report=formatSyncDebugReport(['Device: test']);
+  expect(report).toContain('Device: test'); expect(report).toContain('Received edits n=1');
+  expect(report).toContain('realtime notification'); expect(report).not.toContain('9999');
 });

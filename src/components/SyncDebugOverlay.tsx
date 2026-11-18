@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { deviceId, deviceKind } from '@/lib/db';
 import { useSyncDebug } from '@/lib/settings';
 import { getSyncTiming, requestSync } from '@/lib/sync';
-import { clearSyncDebug, getSyncDebugSnapshot, setSyncDebugEnabled, type SyncDebugRequest } from '@/lib/sync-debug';
+import { useStoredState } from '@/lib/hooks';
+import { STAT_METRICS, STATS_WINDOW_MS, clearSyncDebug, formatSyncDebugReport, getSyncDebugSnapshot, setSyncDebugEnabled, syncDebugStats, type SyncDebugRequest } from '@/lib/sync-debug';
 
 type Snapshot = ReturnType<typeof getSyncDebugSnapshot>;
 type Timing = ReturnType<typeof getSyncTiming>;
@@ -17,6 +18,22 @@ const stages: [keyof SyncDebugRequest, string][] = [
   ['decodeMs', 'Body download + JSON'], ['applyMs', 'Apply to local storage'], ['totalMs', 'Request total (excludes wait)'],
   ['applyToPaintMs', 'Received storage → ink painted (separate)'],
 ];
+
+function WindowStats() {
+  const stats = syncDebugStats();
+  return <details className="mt-3 text-xs" open>
+    <summary className="cursor-pointer font-semibold">Last {STATS_WINDOW_MS / 1000} s averages (ms)</summary>
+    <div className="mt-1 grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-1 tabular-nums">
+      <span />{stats.map(g => <span key={g.label} className="text-right font-medium">{g.label.split(' ')[0]} ({g.count})</span>)}
+      {STAT_METRICS.map(([key, label]) => <div key={key} className="contents">
+        <span className={label.startsWith(' ') ? 'pl-3' : ''}>{label.trim()}</span>
+        {stats.map(g => <span key={g.label} className="text-right">{g.avg[key] === undefined ? '—' : Math.round(g.avg[key]!)}</span>)}
+      </div>)}
+      <span>New connections</span>{stats.map(g => <span key={g.label} className="text-right">{g.newConnections}/{g.count}</span>)}
+    </div>
+    <p className="mt-1 text-[10px] text-slate-500">Received = requests that applied ink, text or sections from another device; Sent = requests that uploaded them. Edit ages use device clocks and include clock skew.</p>
+  </details>;
+}
 
 export function SyncDebugDetails({ snapshot, timing, environment, selected }: { snapshot: Snapshot; timing: Timing; environment: Environment; selected?: SyncDebugRequest }) {
   const waiting = timing.nextDueAt === null ? 'none' : `${Math.max(0, timing.nextDueAt - timing.end)} ms`;
@@ -33,6 +50,7 @@ export function SyncDebugDetails({ snapshot, timing, environment, selected }: { 
     </dl>
     {environment.visibility === 'hidden' && <p className="mt-3 rounded bg-amber-100 p-2 text-xs text-amber-950">This tab is hidden. Realtime is deliberately disconnected; receiving relies on the hidden poll interval. The browser can also throttle or suspend timers.</p>}
     {timing.realtimeStatus !== 'live' && environment.visibility === 'visible' && <p className="mt-3 rounded bg-amber-100 p-2 text-xs text-amber-950">Realtime is not live. Remote changes arrive through polling. Check the event log for access failures or reconnection.</p>}
+    <WindowStats />
     {selected ? <div className="mt-3">
       <p className="text-xs font-semibold">#{selected.id} · {time(selected.at)} · {selected.trigger}</p>
       <p className="mt-1 text-xs">Started {selected.visibility} · {selected.phase} · HTTP {selected.status ?? '—'}</p>
@@ -71,6 +89,25 @@ export function SyncDebugOverlay() {
   const [selectedId, setSelectedId] = useState('latest');
   const [sample, setSample] = useState<{ snapshot: Snapshot; timing: Timing; environment: Environment } | null>(null);
   const [message, setMessage] = useState('');
+  // Dragged position (top-left, px), per device; null keeps the bottom-right corner.
+  const [pos, setPos] = useStoredState<{ x: number; y: number } | null>('padsync.syncDebugPos', null);
+  const asideRef = useRef<HTMLElement>(null);
+  const drag = useRef<{ dx: number; dy: number } | null>(null);
+  const clamp = (x: number, y: number) => {
+    const el = asideRef.current;
+    const w = el?.offsetWidth ?? 200;
+    return { x: Math.round(Math.min(Math.max(0, x), window.innerWidth - w)), y: Math.round(Math.min(Math.max(0, y), window.innerHeight - 44)) };
+  };
+  const startDrag = (e: ReactPointerEvent<HTMLElement>) => {
+    const r = asideRef.current!.getBoundingClientRect();
+    drag.current = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+    e.currentTarget.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  };
+  const moveDrag = (e: ReactPointerEvent<HTMLElement>) => {
+    if (drag.current) setPos(clamp(e.clientX - drag.current.dx, e.clientY - drag.current.dy));
+  };
+  const endDrag = () => { drag.current = null; };
   useEffect(() => {
     setSyncDebugEnabled(enabled);
     if (!enabled) return;
@@ -97,18 +134,33 @@ export function SyncDebugOverlay() {
     try { await navigator.clipboard.writeText(trace()); setMessage('Trace copied.'); }
     catch { setMessage('Clipboard unavailable. Use Download trace.'); }
   }
+  async function copyStats() {
+    const env = sample?.environment, t = getSyncTiming();
+    const report = formatSyncDebugReport([
+      `Device: ${env?.device} · ${env?.visibility} · ${env?.focused ? 'focused' : 'unfocused'} · ${env?.standalone ? 'PWA' : 'browser tab'} · ${env?.online ? 'online' : 'offline'} · realtime ${t.realtimeStatus}`,
+      `Config: send ${t.debounceMs} · visible ${t.visiblePollMs} · hidden ${t.hiddenPollMs} · retry ${t.retryBaseMs} · effective poll ${t.effectivePollMs} ms`,
+    ]);
+    try { await navigator.clipboard.writeText(report); setMessage('Last 30 s stats copied.'); }
+    catch { setMessage('Clipboard unavailable.'); }
+  }
   function download() {
     const url = URL.createObjectURL(new Blob([trace()], { type: 'application/json' }));
     const link = document.createElement('a'); link.href = url; link.download = `padsync-sync-debug-${Date.now()}.json`; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  return <aside aria-label="Sync debug menu" className="fixed right-2 z-[100] max-w-[calc(100vw-1rem)]" style={{ bottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
-    <button type="button" aria-expanded={expanded} aria-controls="sync-debug-panel" onClick={() => setExpanded(!expanded)} className="ml-auto block min-h-11 rounded-t-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white shadow-lg">
-      Sync debug · {sample?.environment.visibility ?? '…'} · {sample?.timing.realtimeStatus ?? '…'} {expanded ? '▾' : '▴'}
-    </button>
-    {expanded && <div id="sync-debug-panel" className="max-h-[65dvh] w-[min(30rem,calc(100vw-1rem))] overflow-auto rounded-b-lg rounded-tl-lg border border-slate-300 bg-white p-3 text-slate-900 shadow-xl">
+  // CSS keeps a saved spot on screen after the window shrinks or rotates.
+  const placed = pos && { left: `min(${pos.x}px, calc(100vw - 8rem))`, top: `min(${pos.y}px, calc(100dvh - 44px))` };
+  return <aside ref={asideRef} aria-label="Sync debug menu" className={`fixed z-[100] max-w-[calc(100vw-1rem)] ${placed ? '' : 'right-2'}`} style={placed ?? { bottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
+    <div className="ml-auto flex w-fit rounded-t-lg bg-slate-900 text-xs font-medium text-white shadow-lg">
+      <span role="button" tabIndex={-1} aria-label="Move sync debug menu" title="Drag to move · double-click to reset" className="flex min-h-11 cursor-move touch-none select-none items-center px-3" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onDoubleClick={() => setPos(null)}>⠿</span>
+      <button type="button" aria-expanded={expanded} aria-controls="sync-debug-panel" onClick={() => setExpanded(!expanded)} className="min-h-11 py-2 pr-3">
+        Sync debug · {sample?.environment.visibility ?? '…'} · {sample?.timing.realtimeStatus ?? '…'} {expanded ? '▾' : '▴'}
+      </button>
+    </div>
+    {expanded && <div id="sync-debug-panel" style={pos ? { maxHeight: `max(12rem, calc(100dvh - ${pos.y}px - 52px))` } : undefined} className="max-h-[65dvh] w-[min(30rem,calc(100vw-1rem))] overflow-auto rounded-b-lg rounded-tl-lg border border-slate-300 bg-white p-3 text-slate-900 shadow-xl">
       <div className="mb-3 flex flex-wrap gap-2 text-xs">
         <button type="button" className="min-h-11 rounded border px-2" onClick={() => requestSync(0, 'debug sync now')}>Sync now</button>
+        <button type="button" className="min-h-11 rounded border px-2 font-semibold" onClick={copyStats}>Copy stats</button>
         <button type="button" className="min-h-11 rounded border px-2" onClick={copy}>Copy trace</button>
         <button type="button" className="min-h-11 rounded border px-2" onClick={download}>Download trace</button>
         <button type="button" className="min-h-11 rounded border px-2" onClick={() => { clearSyncDebug(); setSelectedId('latest'); setMessage('Trace cleared.'); }}>Clear</button>

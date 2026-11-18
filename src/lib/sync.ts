@@ -297,7 +297,9 @@ export async function syncOnce(context = { trigger: "manual", queueMs: 0, timerL
       await db.meta.put({ key: "cursor", value: body.cursor });
     });
 
-    updateSyncDebugRequest(trace, { applyMs: debugNow() - phaseStart, applied: applied.length, phase: 'Done' });
+    const sentContent = dirty.filter(e => e.kind !== "presence");
+    const sentWalls = sentContent.map(e => Number(e.hlc.split("-")[0])).filter(Number.isFinite);
+    updateSyncDebugRequest(trace, { applyMs: debugNow() - phaseStart, applied: applied.length, pushedContent: sentContent.length, sendAgeMs: sentWalls.length ? Date.now() - Math.min(...sentWalls) : undefined, phase: 'Done' });
     recordRemoteApplied(trace, applied);
     if (applied.some(e => e.kind === "stroke" || e.kind === "textbox" || e.kind === "section")) emitRemoteActivity(applied);
     completed = true;

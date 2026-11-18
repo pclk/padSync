@@ -9,8 +9,15 @@ export type SyncDebugRequest = {
   since?: number; cursor?: number; more?: boolean; server?: Record<string, number>;
   remoteAgeMs?: number; versions?: string[];
   protocol?: string; newConnection?: boolean; connectMs?: number; ttfbMs?: number; downloadMs?: number;
+  /** Non-presence entities sent / applied, so averages can separate ink from presence and empty polls. */
+  pushedContent?: number; appliedContent?: number;
+  /** Sender side: how long the oldest edit in this push waited on this device before the server acked it. */
+  sendAgeMs?: number;
 };
 const MAX_EVENTS = 150, MAX_REQUESTS = 40;
+/** Requests and events this recent are always kept, so the window averages see all of them. */
+export const STATS_WINDOW_MS = 30000;
+const MAX_WINDOW_ITEMS = 1000;
 let enabled = false, sequence = 0;
 let events: SyncDebugEvent[] = [];
 let requests: SyncDebugRequest[] = [];
@@ -24,10 +31,14 @@ export function setSyncDebugEnabled(value: boolean) {
   clearSyncDebug();
   if (enabled) recordSyncDebug('debug', 'Recording started');
 }
+function prune(list: { at: number }[], keep: number) {
+  const cutoff = Date.now() - STATS_WINDOW_MS;
+  while (list.length > MAX_WINDOW_ITEMS || (list.length > keep && list[0].at < cutoff)) list.shift();
+}
 export function recordSyncDebug(kind: string, message: string, details: Record<string, DebugValue> = {}) {
   if (!enabled) return;
   events.push({ id: ++sequence, at: Date.now(), kind, message, details });
-  if (events.length > MAX_EVENTS) events.shift();
+  prune(events, MAX_EVENTS);
 }
 export function beginSyncDebugRequest(trigger: string, queueMs = 0, timerLateMs = 0) {
   if (!enabled) return undefined;
@@ -36,7 +47,7 @@ export function beginSyncDebugRequest(trigger: string, queueMs = 0, timerLateMs 
     visibility: typeof document === 'undefined' ? 'unknown' : document.visibilityState,
   };
   requests.push(request);
-  if (requests.length > MAX_REQUESTS) requests.shift();
+  prune(requests, MAX_REQUESTS);
   return request;
 }
 export function updateSyncDebugRequest(request: SyncDebugRequest | undefined, patch: Partial<SyncDebugRequest>) {
@@ -66,6 +77,7 @@ export function recordRemoteApplied(request: SyncDebugRequest | undefined, entit
   const sample = content.length ? content : entities;
   const walls = sample.map(entity => /^\d{13}-\d{4}-.+$/.test(entity.hlc) ? Number(entity.hlc.slice(0, 13)) : NaN).filter(Number.isFinite);
   updateSyncDebugRequest(request, {
+    appliedContent: content.length,
     versions: sample.slice(0, 8).map(entity => `${entity.kind}:${entity.id}@${entity.hlc}`),
     remoteAgeMs: walls.length ? Date.now() - Math.max(...walls) : undefined,
   });
@@ -104,4 +116,55 @@ export function recordNetworkTiming(request: SyncDebugRequest | undefined, fetch
     ttfbMs: entry.responseStart - (entry.requestStart || entry.startTime),
     downloadMs: entry.responseEnd - entry.responseStart,
   });
+}
+
+// --- 30 s window statistics -------------------------------------------------------------------
+type Num = keyof { [K in keyof SyncDebugRequest as SyncDebugRequest[K] extends number | undefined ? K : never]: 1 };
+export const STAT_METRICS: [Num | 'serverTotal', string][] = [
+  ['queueMs', 'Scheduled wait'], ['timerLateMs', 'Timer late'], ['readMs', 'Read local queue'], ['encodeMs', 'Encode upload'],
+  ['httpMs', 'HTTP → headers'], ['connectMs', '  DNS + TCP + TLS'], ['ttfbMs', '  Sent → first byte'], ['serverTotal', '  Server total'],
+  ['downloadMs', '  Response download'], ['decodeMs', 'Body + JSON'], ['applyMs', 'Apply to storage'], ['totalMs', 'Request total'],
+  ['applyToPaintMs', 'Storage → ink painted'], ['sendAgeMs', 'Sent edit age at ack'], ['remoteAgeMs', 'Received edit age'],
+];
+export type StatGroup = { label: string; count: number; newConnections: number; protocols: string[]; avg: Record<string, number | undefined>; max: Record<string, number | undefined> };
+const metric = (r: SyncDebugRequest, key: Num | 'serverTotal') => key === 'serverTotal' ? r.server?.total : r[key];
+
+/** Averages over the requests that finished in the last 30 s: ink received, ink sent, and all. */
+export function syncDebugStats(now = Date.now(), list = requests) {
+  const recent = list.filter(r => r.at >= now - STATS_WINDOW_MS && r.totalMs !== undefined);
+  const group = (label: string, rows: SyncDebugRequest[]): StatGroup => {
+    const avg: StatGroup['avg'] = {}, max: StatGroup['max'] = {};
+    for (const [key] of STAT_METRICS) {
+      const values = rows.map(r => metric(r, key)).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+      avg[key] = values.length ? values.reduce((a, b) => a + b, 0) / values.length : undefined;
+      max[key] = values.length ? Math.max(...values) : undefined;
+    }
+    return { label, count: rows.length, newConnections: rows.filter(r => r.newConnection).length, protocols: [...new Set(rows.map(r => r.protocol).filter((p): p is string => !!p))], avg, max };
+  };
+  return [
+    group('Received edits', recent.filter(r => (r.appliedContent ?? 0) > 0)),
+    group('Sent edits', recent.filter(r => (r.pushedContent ?? 0) > 0)),
+    group('All requests', recent),
+  ];
+}
+
+const f = (v?: number) => v === undefined ? '—' : `${Math.round(v)}`;
+const clock = (at: number) => new Date(at).toISOString().slice(11, 23);
+/** A plain-text report of the last 30 s, meant to be pasted into a chat. No notebook content. */
+export function formatSyncDebugReport(header: string[], now = Date.now()) {
+  const stats = syncDebugStats(now);
+  const lines = [`padSync sync stats · ${new Date(now).toISOString()} · last ${STATS_WINDOW_MS / 1000} s`, ...header, ''];
+  lines.push(`ms (avg / max)`.padEnd(26) + stats.map(g => `${g.label} n=${g.count}`.padEnd(24)).join(''));
+  for (const [key, label] of STAT_METRICS) lines.push(label.padEnd(26) + stats.map(g => `${f(g.avg[key])} / ${f(g.max[key])}`.padEnd(24)).join(''));
+  lines.push('New connections'.padEnd(26) + stats.map(g => `${g.newConnections}/${g.count} ${g.protocols.join(',')}`.padEnd(24)).join(''));
+  lines.push('', 'Requests:');
+  for (const r of requests.filter(r => r.at >= now - STATS_WINDOW_MS)) {
+    lines.push(`#${r.id} ${clock(r.at)} ${r.trigger} · ${r.phase} ${r.status ?? ''} · ↑${r.pushedContent ?? 0}/${r.pushed ?? 0} ↓${r.appliedContent ?? 0}/${r.applied ?? 0} · wait ${f(r.queueMs)} http ${f(r.httpMs)} (${r.newConnection ? 'new' : r.newConnection === false ? 'reused' : '?'} conn ${f(r.connectMs)}, ttfb ${f(r.ttfbMs)}, server ${f(r.server?.total)}, dl ${f(r.downloadMs)}) total ${f(r.totalMs)} · sentAge ${f(r.sendAgeMs)} recvAge ${f(r.remoteAgeMs)} paint ${f(r.applyToPaintMs)}`);
+  }
+  lines.push('', 'Events:');
+  for (const e of events.filter(e => e.at >= now - STATS_WINDOW_MS)) {
+    const details = Object.entries(e.details).map(([k, v]) => `${k}=${typeof v === 'number' ? Math.round(v * 10) / 10 : v}`).join(' ');
+    lines.push(`${clock(e.at)} ${e.kind} · ${e.message}${details ? ` · ${details}` : ''}`);
+  }
+  return lines.join('\n');
 }

@@ -104,6 +104,15 @@ not a measured end-to-end latency. Ink paint events measure canvas work and elap
 received storage application; they do not prove physical screen presentation. Only rendered canvas
 tiles report paint events. Local saves made inside a larger transaction may not have committed yet.
 
+Drag the ⠿ handle to move the menu (double-click it to reset); the position is stored per device.
+Everything from the last 30 seconds is kept beyond the usual 40-request/150-event caps, and the
+**Last 30 s averages** table splits requests into *Received* (applied another device's ink, text or
+sections), *Sent* (uploaded them) and *All*. Network rows come from Resource Timing: a new
+connection's DNS + TCP + TLS, sent → first byte, and response download. *Sent edit age at ack* is
+how long the oldest uploaded edit waited on the sender (send delay, stroke hold, request).
+**Copy stats** puts a plain-text report of that window (averages, maxima, every request and event)
+on the clipboard, for pasting into a chat; it holds no notebook content.
+
 To diagnose a slow update, enable recording on both devices, reproduce one edit, then select the
 receiving request with nonzero applied entities and inspect the preceding visibility/realtime
 events. **Copy trace** or **Download trace** exports local JSON; matching version IDs helps compare
