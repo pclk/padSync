@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from "vitest";
-import { formatSyncDebugReport, getSyncDebugSnapshot, recordInputAnomaly, recordSyncDebug, setSyncDebugEnabled } from "@/lib/sync-debug";
+import { formatSyncDebugReport, getSyncDebugSnapshot, recordInputAnomaly, recordInputTrail, recordSyncDebug, setSyncDebugEnabled } from "@/lib/sync-debug";
 
 // Stalls and input oddities on the iPad get their own list in the stats report, so the sync
 // event chatter (150 events) never pushes the evidence of a freeze out.
@@ -28,4 +28,13 @@ it("says so when nothing was recorded, and keeps only the newest 40", () => {
   const kept = getSyncDebugSnapshot().anomalies;
   expect(kept).toHaveLength(40);
   expect(kept[0].details.ms).toBe(305);
+});
+
+it("lists recent raw input in the report, newest 80", () => {
+  setSyncDebugEnabled(true);
+  for (let i = 0; i < 85; i++) recordInputTrail(`down pen #${i} on page`);
+  const report = formatSyncDebugReport([]);
+  expect(report).toContain("Recent input (last 80):");
+  expect(report).not.toContain("down pen #4 on page");
+  expect(report).toContain("down pen #84 on page");
 });

@@ -23,10 +23,13 @@ let requests: SyncDebugRequest[] = [];
 // Main-thread stalls and input oddities, kept apart so sync chatter never pushes them out.
 const MAX_ANOMALIES = 40;
 let anomalies: SyncDebugEvent[] = [];
+// Raw input as it arrived (downs, ups, cancels, focus, text input), to see what took the Pencil.
+const MAX_TRAIL = 80;
+let trail: { at: number; text: string }[] = [];
 const pendingPaint = new Map<string, { appliedAt: number; requestId: number }>();
 export const debugNow = () => typeof performance === 'undefined' ? Date.now() : performance.now();
 export const syncDebugEnabled = () => enabled;
-export function clearSyncDebug() { events = []; requests = []; anomalies = []; pendingPaint.clear(); }
+export function clearSyncDebug() { events = []; requests = []; anomalies = []; trail = []; pendingPaint.clear(); }
 export function setSyncDebugEnabled(value: boolean) {
   if (enabled === value) return;
   enabled = value;
@@ -53,6 +56,11 @@ export function recordInputAnomaly(message: string, details: Record<string, Debu
   if (anomalies.length > MAX_ANOMALIES) anomalies.shift();
   recordSyncDebug('input', message, details);
 }
+export function recordInputTrail(text: string) {
+  if (!enabled) return;
+  trail.push({ at: Date.now(), text });
+  if (trail.length > MAX_TRAIL) trail.shift();
+}
 export function beginSyncDebugRequest(trigger: string, queueMs = 0, timerLateMs = 0) {
   if (!enabled) return undefined;
   const request: SyncDebugRequest = {
@@ -67,7 +75,7 @@ export function updateSyncDebugRequest(request: SyncDebugRequest | undefined, pa
   if (enabled && request && requests.includes(request)) Object.assign(request, patch);
 }
 export function getSyncDebugSnapshot() {
-  return { enabled, events: events.map(event => ({ ...event, details: { ...event.details } })), anomalies: anomalies.map(event => ({ ...event, details: { ...event.details } })), requests: requests.map(request => ({ ...request, versions: request.versions?.slice(), server: request.server && { ...request.server } })) };
+  return { enabled, events: events.map(event => ({ ...event, details: { ...event.details } })), anomalies: anomalies.map(event => ({ ...event, details: { ...event.details } })), trail: trail.map(entry => ({ ...entry })), requests: requests.map(request => ({ ...request, versions: request.versions?.slice(), server: request.server && { ...request.server } })) };
 }
 export function parseServerTiming(header: string | null): Record<string, number> {
   const result: Record<string, number> = {};
@@ -176,6 +184,9 @@ export function formatSyncDebugReport(header: string[], now = Date.now()) {
   lines.push('', `Input and main-thread stalls (last ${MAX_ANOMALIES}):`);
   if (!anomalies.length) lines.push('none recorded');
   for (const e of anomalies) lines.push(`${clock(e.at)} ${e.message} · ${details(e)}`);
+  lines.push('', `Recent input (last ${MAX_TRAIL}):`);
+  if (!trail.length) lines.push('none recorded');
+  for (const t of trail) lines.push(`${clock(t.at)} ${t.text}`);
   lines.push('', 'Requests (edits, plus the newest 40 of any kind):');
   for (const r of requests) {
     lines.push(`#${r.id} ${clock(r.at)} ${r.trigger} · ${r.phase} ${r.status ?? ''} · ↑${r.pushedContent ?? 0}/${r.pushed ?? 0} ↓${r.appliedContent ?? 0}/${r.applied ?? 0} · wait ${f(r.queueMs)} http ${f(r.httpMs)} (${r.newConnection ? 'new' : r.newConnection === false ? 'reused' : '?'} conn ${f(r.connectMs)}, ttfb ${f(r.ttfbMs)}, server ${f(r.server?.total)}, dl ${f(r.downloadMs)}) total ${f(r.totalMs)} · sentAge ${f(r.sendAgeMs)} recvAge ${f(r.remoteAgeMs)} paint ${f(r.applyToPaintMs)}`);

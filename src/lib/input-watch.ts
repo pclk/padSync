@@ -1,6 +1,6 @@
 import { isInking } from "./activity";
 import { getSyncTiming } from "./sync";
-import { recordInputAnomaly, type DebugValue } from "./sync-debug";
+import { recordInputAnomaly, recordInputTrail, type DebugValue } from "./sync-debug";
 
 // Sync debug only: catches the iPad page "not accepting input" in the act. Either the main thread
 // is busy (frames stop, input waits) or input arrives and goes nowhere (the browser cancels the
@@ -42,6 +42,7 @@ export function startInputWatch() {
   };
   const down = (e: PointerEvent) => {
     delay(e);
+    recordInputTrail(`down ${e.pointerType} #${e.pointerId} on ${where(e.target)}`);
     if (e.pointerType !== "pen") return;
     pensDown.add(e.pointerId);
     const on = where(e.target);
@@ -53,13 +54,32 @@ export function startInputWatch() {
   };
   const up = (e: PointerEvent) => {
     pensDown.delete(e.pointerId);
+    recordInputTrail(`${e.type === "pointercancel" ? "cancel" : "up"} ${e.pointerType} #${e.pointerId} on ${where(e.target)}`);
     if (e.type === "pointercancel") recordInputAnomaly("Browser cancelled the pointer", { pointer: e.pointerType, on: where(e.target), ...context() });
   };
   const touch = (e: TouchEvent) => {
     delay(e);
+    trailTouch(e);
     const changed = new Set([...e.changedTouches].map((t) => t.identifier));
     const stale = [...e.touches].filter((t) => t.touchType === "stylus" && !changed.has(t.identifier));
     if (stale.length && !pensDown.size) recordInputAnomaly("Stylus touch still listed after the Pencil lifted", { touches: e.touches.length, stale: stale.length, on: where(e.target), ...context() });
+  };
+
+  // Touch lists show a resting palm or finger (touches stays above zero) and the Pencil
+  // (stylus) separately from the pointer events above.
+  const trailTouch = (e: TouchEvent) => {
+    const kinds = [...e.changedTouches].map((t) => (t.touchType === "stylus" ? "stylus" : "finger")).join("+");
+    recordInputTrail(`${e.type} ${kinds} · ${e.touches.length} on screen · on ${where(e.target)}${e.cancelable ? "" : " · not cancelable"}`);
+  };
+  const touchEnd = (e: TouchEvent) => trailTouch(e);
+  // Scribble turns Pencil writing near a text field into typing: it shows up as focus and input.
+  const focus = (e: FocusEvent) => recordInputTrail(`focus ${where(e.target)}${e.target instanceof HTMLElement && e.target.dataset.textbox ? " (text box)" : ""}`);
+  const input = (e: Event) => recordInputTrail(`text input ${(e as InputEvent).inputType || e.type} in ${where(e.target)}`);
+  let scrolling = 0;
+  const scroll = () => {
+    if (!scrolling) recordInputTrail("page scrolling");
+    clearTimeout(scrolling);
+    scrolling = window.setTimeout(() => { scrolling = 0; }, 500);
   };
 
   const opts = { capture: true, passive: true } as const;
@@ -67,6 +87,11 @@ export function startInputWatch() {
   window.addEventListener("pointerup", up, opts);
   window.addEventListener("pointercancel", up, opts);
   window.addEventListener("touchstart", touch, opts);
+  window.addEventListener("touchend", touchEnd, opts);
+  window.addEventListener("touchcancel", touchEnd, opts);
+  window.addEventListener("focusin", focus, opts);
+  window.addEventListener("input", input, opts);
+  window.addEventListener("scroll", scroll, opts);
   document.addEventListener("visibilitychange", reset);
   window.addEventListener("pageshow", reset);
   return () => {
@@ -75,6 +100,12 @@ export function startInputWatch() {
     window.removeEventListener("pointerup", up, opts);
     window.removeEventListener("pointercancel", up, opts);
     window.removeEventListener("touchstart", touch, opts);
+    window.removeEventListener("touchend", touchEnd, opts);
+    window.removeEventListener("touchcancel", touchEnd, opts);
+    window.removeEventListener("focusin", focus, opts);
+    window.removeEventListener("input", input, opts);
+    window.removeEventListener("scroll", scroll, opts);
+    clearTimeout(scrolling);
     document.removeEventListener("visibilitychange", reset);
     window.removeEventListener("pageshow", reset);
   };
