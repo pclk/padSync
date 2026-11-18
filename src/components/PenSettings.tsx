@@ -51,6 +51,8 @@ interface Props {
   setTool: (t: ToolState) => void;
   /** Viewport y of the pen button's centre; the popover's header lines up with it. */
   anchorY: number;
+  /** Viewport x of the popover's left edge; by default it sits just right of the iPad rail. */
+  left?: number;
   onClose: () => void;
 }
 
@@ -58,7 +60,7 @@ interface Props {
  * Pen settings, opened by tapping the pen tool again while it is selected: two quick sliders and
  * every pen parameter in tabs, each adjustable and resettable on its own.
  */
-export function PenSettings({ tool, setTool, anchorY, onClose }: Props) {
+export function PenSettings({ tool, setTool, anchorY, left, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const params = useMemo(() => withOverrides(tool.pen), [tool.pen]);
   const overrides = penOverrides(params);
@@ -98,7 +100,7 @@ export function PenSettings({ tool, setTool, anchorY, onClose }: Props) {
       role="dialog"
       aria-label="Pen settings"
       className="card fixed left-[4.75rem] z-50 flex w-80 max-w-[calc(100vw-6rem)] flex-col overflow-hidden shadow-lift"
-      style={{ top: box.top, maxHeight: box.maxHeight }}
+      style={{ top: box.top, maxHeight: box.maxHeight, ...(left === undefined ? {} : { left }) }}
     >
       <div className="shrink-0 border-b border-slate-100 px-3 pt-3">
         <div className="mb-2 flex items-center justify-between">

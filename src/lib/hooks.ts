@@ -39,7 +39,7 @@ export function useStoredState<T>(key: string, initial: T): [T, (v: T) => void] 
   return [value, setValue];
 }
 
-export function useLayoutMode(notebookId: string, controller: InkController) {
+export function useLayoutMode(notebookId: string, controller: InkController, leftInset = 0) {
   const [mode, persistMode] = useStoredState<LayoutMode>("padsync.layoutMode", "auto");
   const [idleMs] = useStoredState("padsync.layoutIdleMs", 15000);
   const [state, dispatch] = useReducer((s: LayoutState, e: LayoutEvent) => layoutReducer(s, e, idleMs), { mode, effective: mode === "drawing" ? "drawing" : "chat", lastActivityAt: 0, drawingSince: 0 });
@@ -66,5 +66,5 @@ export function useLayoutMode(notebookId: string, controller: InkController) {
     return () => { clearTimeout(timer); window.removeEventListener("pointerup", ended); window.removeEventListener("pointercancel", ended); };
   }, [state, idleMs, controller]);
   const setMode = (value: LayoutMode) => { persistMode(value); dispatch({ type: "setMode", mode: value, now: Date.now() }); };
-  return { mode, effective: state.effective, setMode, width: panelWidth(state.effective, viewport) };
+  return { mode, effective: state.effective, setMode, width: panelWidth(state.effective, viewport, leftInset) };
 }
