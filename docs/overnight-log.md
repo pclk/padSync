@@ -40,3 +40,54 @@ reading arrives (expected to be invisible: under ~4% width), and that tap dots l
    That needs an end-specific width factor, not a remap of the whole stroke.
 3. Curve fitting for the 0.5 px grid (candidate 1): not started; the handoff says a wider Gaussian
    didn't help.
+
+## 2026-11-19 00:30 — zoom: pinch preview and commit agree
+
+**Changed.** iPad pinch (`NotebookEditor` touch handler) now works out the end result once, with
+the new pure `pinchPlacement` (`src/lib/notebook-viewport.ts`), and both draws the live transform
+and commits from it. Before, the preview followed the fingers freely while the commit's
+`scrollBy` was clamped by the browser. Three jumps came from that:
+- **Pan limits.** Pinching or dragging past the left/right/top/bottom scroll limit showed the page
+  out there, then snapped it back on lift-off. Now the preview stops at the limit (the page stays
+  put while the fingers keep moving), as the commit will.
+- **Zooming out to fit.** Once the page fits the strip, `columnLayout` centres it. The preview kept
+  it under the fingers and the commit centred it. Now the preview centres it too.
+- **At 300% / 25%.** Pinching further gave scale 1 exactly, `setZoom` bailed out with the same
+  value, the anchor scroll never ran, and the two-finger pan snapped back. The commit is now
+  `flushSync(setZoom)` then `scrollTo(placed)`, so a pure pan commits too.
+- **Two-finger drags.** A 3% dead zone: two-finger drags only pan until the fingers spread or close
+  by 3%, then the scale carries on from 1 (no jump). Pans no longer leave odd zooms like 100.4%
+  behind, which re-rendered every section and repainted tiles.
+- **Native scroll during the pinch.** The preview is measured from where the column sits now, so
+  if Safari has already started scrolling with the first finger, the anchor still lands under the
+  fingers.
+- Simpler: the pinch no longer keeps two rects or goes through `zoomAt`'s anchor effect. Pinch logs
+  its own `zoom` event. Ctrl+wheel and reset are unchanged.
+
+**Checked.** 6 new tests in `tests/notebook-viewport.test.ts`: anchor stays under the midpoint in
+open space, placement matches `columnLayout` at the new zoom, left/right pan limits, centring
+when zoomed out to fit, top/bottom limits (the scroll range scales with the column), and pan-only
+at the zoom limits. `npm run typecheck`, `npm run lint`, `npx vitest run` (784 passed). Stroke
+drawing is untouched, so `test:pencil` wasn't needed.
+
+**Sharpness review (no change).** Tiles repaint at `ceil(dpr·zoom·4)/4` capped at 2.95×, so on a
+2× iPad, zoom above ~148% is slightly soft (memory cap). PDF rasters are capped at the screen
+density (`pdfDensity` ≤ dpr), so PDFs above 100% are upscaled and soft. Raising either cap costs
+iPad memory. Leave until a device check shows it matters.
+
+**Needs a device check.**
+- Pinch at the left/right limits at 150–300%, and zoom out to 25%: no snap on lift-off.
+- Two-finger tap undo still works: the pan commit may move the page by a pixel or two of finger
+  jitter.
+- That the 3% dead zone doesn't feel sticky at the start of a pinch.
+- Near the very bottom of a notebook, zooming out: the bottom limit is estimated (column height
+  scales, "Blank page" button and bottom padding don't), so a small settle there is possible.
+- Black blocks during a long pinch: the preview still transforms the whole column (`pinchRef`),
+  the same tall-layer case the per-section scaling avoided at rest.
+
+**Next.**
+1. If black blocks show while pinching, transform only the sections near the viewport during the
+   gesture (or hide off-screen ones), not the whole column.
+2. Ctrl+wheel on the Mac could use `pinchPlacement` as well, to stop wheel zoom from drifting at the
+   pan limits, and `zoomAt` could then go.
+3. Sharpness above 150% (tile and PDF caps), if the device check shows softness.

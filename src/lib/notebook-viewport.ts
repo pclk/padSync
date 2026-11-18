@@ -92,3 +92,51 @@ export function revealRange(x: number, layout: ColumnLayout, viewportW: number, 
   const hi = Math.min(layout.maxScrollX, x - insets.left);
   return lo <= hi ? [lo, hi] : null;
 }
+
+/** The column and window at the start of a pinch, measured once. */
+export interface PinchStart {
+  zoom: number;
+  /** Client position of the column's top-left corner, and the window scroll then. */
+  left: number;
+  top: number;
+  scrollX: number;
+  scrollY: number;
+  /** Largest vertical scroll then, and how much of the column's height scales with zoom. */
+  maxScrollY: number;
+  scaledHeight: number;
+  /** Client point between the fingers when the pinch began. */
+  anchor: [number, number];
+  viewportW: number;
+  insets: Insets;
+  gutter: number;
+}
+
+export interface PinchPlacement {
+  zoom: number;
+  /** Window scroll after the commit. */
+  scrollX: number;
+  scrollY: number;
+  /** Client position of the column's top-left corner after the commit. */
+  left: number;
+  top: number;
+}
+
+/**
+ * Where a pinch at scale `s`, with its midpoint now at `mid`, leaves the page once committed: the
+ * point first under the fingers moves to `mid`, as far as the scroll limits at the new zoom allow.
+ * The live preview draws this same placement, so letting go never jumps.
+ */
+export function pinchPlacement(p: PinchStart, s: number, mid: [number, number]): PinchPlacement {
+  const zoom = clampZoom(p.zoom * s);
+  const k = zoom / p.zoom;
+  const before = columnLayout(p.viewportW, PAGE_WIDTH * p.zoom, p.insets, p.gutter);
+  const after = columnLayout(p.viewportW, PAGE_WIDTH * zoom, p.insets, p.gutter);
+  // Document position of the column: centring can move it sideways; nothing above it scales.
+  const docLeft = p.left + p.scrollX + after.left - before.left;
+  const docTop = p.top + p.scrollY;
+  const maxScrollY = Math.max(0, p.maxScrollY + p.scaledHeight * (k - 1));
+  const clamp = (v: number, hi: number) => Math.min(hi, Math.max(0, v));
+  const scrollX = clamp(docLeft + (p.anchor[0] - p.left) * k - mid[0], after.maxScrollX);
+  const scrollY = clamp(docTop + (p.anchor[1] - p.top) * k - mid[1], maxScrollY);
+  return { zoom, scrollX, scrollY, left: docLeft - scrollX, top: docTop - scrollY };
+}

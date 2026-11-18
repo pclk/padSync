@@ -14,10 +14,12 @@ import {
   fitZoom,
   gutterFor,
   overlayInsets,
+  pinchPlacement,
   revealRange,
   toolbarVariant,
   verticalPadding,
   type Insets,
+  type PinchStart,
 } from "@/lib/notebook-viewport";
 import { PAGE_WIDTH, type DeviceKind, type StrokeData, type StrokeEntity } from "@/lib/types";
 
@@ -262,5 +264,83 @@ describe("toolbar markup per device", () => {
     expect(closed).not.toContain(">Pen</span>");
     // Tools and undo/redo stay one click away while collapsed.
     for (const label of ["Pen", "Highlighter", "Eraser", "Lasso", "Text", "Undo", "Redo"]) expect(closed).toContain(`aria-label="${label}"`);
+  });
+});
+
+describe("pinch placement", () => {
+  // iPad Pro 13" landscape, drawing panel closed: a 100% page is wider than the clear strip.
+  const vw = 1376;
+  const insets = overlayInsets({ kind: "ipad", sidebarOpen: false, panelWidth: 0 });
+  const gutter = gutterFor("ipad");
+  // A pinch started with the window scrolled to (sx, sy); the column sits where columnLayout says.
+  const startAt = (zoom: number, sx: number, sy: number, anchor: [number, number]): PinchStart => {
+    const col = columnLayout(vw, PAGE_WIDTH * zoom, insets, gutter);
+    const top = verticalPadding(insets, gutter).top;
+    const scaledHeight = 20 * 1032 * zoom;
+    return { zoom, left: col.left - sx, top: top - sy, scrollX: sx, scrollY: sy, maxScrollY: top + scaledHeight + 600 - 1024, scaledHeight, anchor, viewportW: vw, insets, gutter };
+  };
+  // Where the point first under the fingers ends up on screen.
+  const anchorAfter = (p: PinchStart, s: number, mid: [number, number]) => {
+    const r = pinchPlacement(p, s, mid);
+    const k = r.zoom / p.zoom;
+    return [r.left + (p.anchor[0] - p.left) * k, r.top + (p.anchor[1] - p.top) * k];
+  };
+
+  it("keeps the point under the fingers there while zooming and panning in open space", () => {
+    const p = startAt(1, 46, 4000, [700, 500]);
+    for (const [s, mid] of [[1.5, [700, 500]], [1.2, [650, 560]], [1.1, [720, 480]]] as [number, [number, number]][]) {
+      const [x, y] = anchorAfter(p, s, mid);
+      expect(x).toBeCloseTo(mid[0]);
+      expect(y).toBeCloseTo(mid[1]);
+    }
+  });
+
+  it("agrees with the column layout and scroll at the new zoom", () => {
+    const p = startAt(1, 46, 4000, [700, 500]);
+    const r = pinchPlacement(p, 1.5, [700, 500]);
+    const col = columnLayout(vw, PAGE_WIDTH * 1.5, insets, gutter);
+    expect(r.zoom).toBe(1.5);
+    expect(r.left).toBeCloseTo(col.left - r.scrollX);
+    expect(r.scrollX).toBeGreaterThanOrEqual(0);
+    expect(r.scrollX).toBeLessThanOrEqual(col.maxScrollX);
+  });
+
+  it("stops at the side pan limits instead of jumping there on commit", () => {
+    const col = columnLayout(vw, PAGE_WIDTH * 2, insets, gutter);
+    // Scrolled fully left, dragging right: the page stays clear of the rail.
+    const left = pinchPlacement(startAt(2, 0, 4000, [400, 500]), 1, [700, 500]);
+    expect(left.scrollX).toBe(0);
+    expect(left.left).toBe(col.left);
+    // Scrolled fully right, dragging left: the page's right edge stays at the window edge less the gutter.
+    const right = pinchPlacement(startAt(2, col.maxScrollX, 4000, [900, 500]), 1, [500, 500]);
+    expect(right.scrollX).toBe(col.maxScrollX);
+    expect(right.left + PAGE_WIDTH * 2).toBeCloseTo(vw - gutter);
+  });
+
+  it("centres a page zoomed out to fit, wherever the fingers are", () => {
+    const r = pinchPlacement(startAt(1, 46, 4000, [300, 500]), 0.5, [300, 500]);
+    const col = columnLayout(vw, PAGE_WIDTH * 0.5, insets, gutter);
+    expect(col.maxScrollX).toBe(0);
+    expect(r.scrollX).toBe(0);
+    expect(r.left).toBe(col.left);
+  });
+
+  it("stops at the top and the bottom of the notebook", () => {
+    const top = pinchPlacement(startAt(1, 0, 0, [700, 300]), 1, [700, 600]);
+    expect(top.scrollY).toBe(0);
+    expect(top.top).toBe(verticalPadding(insets, gutter).top);
+    const p = startAt(1, 0, 0, [700, 300]);
+    const bottom = pinchPlacement({ ...p, scrollY: p.maxScrollY, top: p.top - p.maxScrollY }, 0.5, [700, 100]);
+    // Zoomed out to half, the scalable column is half as tall and the scroll range shrinks with it.
+    expect(bottom.scrollY).toBeCloseTo(p.maxScrollY - p.scaledHeight / 2);
+  });
+
+  it("only pans at the zoom limits", () => {
+    const p = startAt(MAX_ZOOM, 1000, 4000, [700, 500]);
+    const r = pinchPlacement(p, 1.4, [760, 520]);
+    expect(r.zoom).toBe(MAX_ZOOM);
+    expect(r.scrollX).toBeCloseTo(1000 - 60);
+    expect(r.scrollY).toBeCloseTo(4000 - 20);
+    expect(pinchPlacement(startAt(MIN_ZOOM, 0, 4000, [700, 500]), 0.5, [700, 500]).zoom).toBe(MIN_ZOOM);
   });
 });

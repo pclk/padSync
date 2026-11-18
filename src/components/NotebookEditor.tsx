@@ -13,7 +13,7 @@ import { useLayoutMode, useStoredState } from "@/lib/hooks";
 import { addTextBox, insertSectionAfter, liveSections, logEvent, putEntities } from "@/lib/store";
 import { registerDebugProbe } from "@/lib/sync-debug";
 import { renderFlag } from "@/lib/render-flags";
-import { SIDEBAR_W, TOOLBAR_H, clampZoom, columnLayout, fitZoom, gutterFor, overlayInsets, toolbarVariant, verticalPadding } from "@/lib/notebook-viewport";
+import { SIDEBAR_W, TOOLBAR_H, clampZoom, columnLayout, fitZoom, gutterFor, overlayInsets, pinchPlacement, toolbarVariant, verticalPadding, type PinchPlacement, type PinchStart } from "@/lib/notebook-viewport";
 import { PAGE_WIDTH, type NotebookEntity, type PresenceData, type PresenceEntity, type SectionEntity } from "@/lib/types";
 import { SectionView } from "./SectionView";
 import { SidePanel } from "./SidePanel";
@@ -21,6 +21,9 @@ import { Toolbar } from "./Toolbar";
 import { Icon } from "./Icons";
 
 const emitLocalText = (notebookId: string) => emitActivity({ notebookId, source: "local", kinds: ["text"], at: Date.now() });
+
+// How far two fingers must spread or close (as a share of their distance) before they zoom.
+const PINCH_DEAD_ZONE = 0.03;
 
 // The Mac only follows the iPad after this long without input of its own.
 const FOLLOW_IDLE_MS = 15000;
@@ -133,6 +136,11 @@ function Editor({ notebookId }: { notebookId: string }) {
   const insets = useMemo(() => overlayInsets({ kind, sidebarOpen, panelWidth: panelOpen ? panelWidth : 0 }), [kind, sidebarOpen, panelOpen, panelWidth]);
   const column = columnLayout(viewport.w, PAGE_WIDTH * zoom, insets, gutter);
   const vpad = verticalPadding(insets, gutter);
+  // What a pinch needs to work out the scroll limits at its new zoom.
+  const geometry = useRef({ viewportW: viewport.w, insets, gutter });
+  useLayoutEffect(() => {
+    geometry.current = { viewportW: viewport.w, insets, gutter };
+  }, [viewport.w, insets, gutter]);
   useLayoutEffect(() => {
     controller.configure(tool, zoom);
   }, [controller, tool, zoom]);
@@ -260,7 +268,9 @@ function Editor({ notebookId }: { notebookId: string }) {
   // --- touch: Pencil never scrolls; one finger scrolls natively; two fingers pinch/pan;
   //     two-finger tap = undo, three-finger tap = redo ---------------------------------------
   useEffect(() => {
-    let pinch: { d0: number; m0: [number, number]; m: [number, number]; s: number; rect: DOMRect; page: DOMRect; z: number } | null = null;
+    // Until the fingers spread or close by PINCH_DEAD_ZONE a two-finger drag only pans, so a pan
+    // keeps the zoom exact; past it the scale carries on smoothly from 1.
+    let pinch: { d0: number; zooming: boolean; start: PinchStart; placed: PinchPlacement | null } | null = null;
     let tap: { n: number; t: number; moved: boolean; start: [number, number][] } | null = null;
 
     const direct = (list: TouchList) => [...list].filter((t) => t.touchType !== "stylus");
@@ -280,8 +290,21 @@ function Editor({ notebookId }: { notebookId: string }) {
       if (fingers.length === 2 && pinchRef.current && wrapRef.current && !controller.isDrawing()) {
         const [a, b] = fingers;
         const rect = pinchRef.current.getBoundingClientRect();
-        const page = wrapRef.current.getBoundingClientRect();
-        pinch = { d0: dist(a, b), m0: mid(a, b), m: mid(a, b), s: 1, rect, page, z: controller.zoom };
+        // With sections scaled one by one, the "Blank page" button at the end keeps its size.
+        const fixed = perSection ? ((wrapRef.current.lastElementChild as HTMLElement | null)?.offsetHeight ?? 0) : 0;
+        const root = document.documentElement;
+        const start: PinchStart = {
+          zoom: controller.zoom,
+          left: rect.left,
+          top: rect.top,
+          scrollX: window.scrollX,
+          scrollY: window.scrollY,
+          maxScrollY: root.scrollHeight - window.innerHeight,
+          scaledHeight: rect.height - fixed,
+          anchor: mid(a, b),
+          ...geometry.current,
+        };
+        pinch = { d0: dist(a, b), zooming: false, start, placed: null };
       }
     };
 
@@ -297,27 +320,35 @@ function Editor({ notebookId }: { notebookId: string }) {
       if (!pinch || fingers.length !== 2) return;
       e.preventDefault();
       const [a, b] = fingers;
-      pinch.m = mid(a, b);
-      pinch.s = clampZoom(pinch.z * (dist(a, b) / pinch.d0)) / pinch.z;
-      const { rect, m0, m, s } = pinch;
-      const px = m0[0] - rect.left, py = m0[1] - rect.top;
+      const d = dist(a, b);
+      if (!pinch.zooming && Math.abs(d / pinch.d0 - 1) > PINCH_DEAD_ZONE) {
+        pinch.zooming = true;
+        pinch.d0 = d;
+      }
+      const { start } = pinch;
+      const placed = (pinch.placed = pinchPlacement(start, pinch.zooming ? d / pinch.d0 : 1, mid(a, b)));
+      // Drawn exactly where the commit will put the page, scroll limits included. Measured from
+      // where the column sits now, in case Safari scrolled the window before the pinch took over.
+      const x = placed.left - (start.left + start.scrollX - window.scrollX);
+      const y = placed.top - (start.top + start.scrollY - window.scrollY);
       const wrap = pinchRef.current!;
       wrap.style.transformOrigin = "0 0";
-      wrap.style.transform = `translate(${m[0] - rect.left - px * s}px, ${m[1] - rect.top - py * s}px) scale(${s})`;
+      wrap.style.transform = `translate(${x}px, ${y}px) scale(${placed.zoom / start.zoom})`;
     };
 
     const onEnd = (e: TouchEvent) => {
       const fingers = direct(e.touches);
       if (pinch && fingers.length < 2) {
-        const { page, m0, m, s, z } = pinch;
+        const { placed, start } = pinch;
         pinch = null;
         const wrap = pinchRef.current;
         if (wrap) wrap.style.transform = "";
-        // Commit the new zoom in the same frame the pinch transform comes off (the anchor scroll
-        // measures the page untransformed), so the page never paints a frame back at the old zoom
-        // and re-rasterizes twice.
-        if (Math.abs(s - 1) > 0.01 || Math.hypot(m[0] - m0[0], m[1] - m0[1]) > 2) {
-          flushSync(() => zoomAt(z * s, (m0[0] - page.left) / z, (m0[1] - page.top) / z, m[0], m[1]));
+        // Commit the new zoom and scroll in the same frame the pinch transform comes off, so the
+        // page never paints a frame back at the old zoom and re-rasterizes twice.
+        if (placed) {
+          flushSync(() => setZoom(placed.zoom));
+          window.scrollTo(placed.scrollX, placed.scrollY);
+          if (placed.zoom !== start.zoom) void logEvent(notebookId, null, "zoom", { zoom: placed.zoom });
         }
       }
       if (tap && fingers.length === 0) {
@@ -339,7 +370,7 @@ function Editor({ notebookId }: { notebookId: string }) {
       window.removeEventListener("touchend", onEnd);
       window.removeEventListener("touchcancel", onEnd);
     };
-  }, [controller, zoomAt, undo, redo]);
+  }, [controller, notebookId, perSection, undo, redo]);
 
   // --- keyboard (Mac) ---------------------------------------------------------------------
   useEffect(() => {
