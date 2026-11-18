@@ -105,12 +105,8 @@ describe("live overlay canvas", () => {
     const canvas = { width: 0, height: 0, style: {} as Record<string, string>, getContext: () => ctx, getBoundingClientRect: () => ({ left: 0, top: 0 }) };
     c.attachLive(canvas as unknown as HTMLCanvasElement);
     expect(canvas.style).toEqual({ width: "1180px", height: "740px" });
-    // The bitmap waits for something to show: here the Pencil hovering.
-    expect([canvas.width, canvas.height]).toEqual([0, 0]);
-    const el = { getBoundingClientRect: () => ({ left: 0, top: 0 }) } as unknown as HTMLElement;
-    c.move({ pointerType: "pen", buttons: 0, pointerId: 1, clientX: 5, clientY: 5 } as unknown as PointerEvent, { id: "s", el, strokes: () => [] });
-    frames.splice(0).forEach((cb) => cb(0));
     expect([canvas.width, canvas.height]).toEqual([2360, 1480]);
+    expect(frames.length).toBeGreaterThan(0);
   });
 
   it("draws live ink relative to the overlay's own position", async () => {

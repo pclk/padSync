@@ -1,4 +1,5 @@
 import { emitActivity, setInking, whenIdle } from "@/lib/activity";
+import { renderFlag } from "@/lib/render-flags";
 import { db, deviceId } from "@/lib/db";
 import { logEvent, moveStrokes, newEntity, putEntities, setDeleted } from "@/lib/store";
 import { PAGE_WIDTH, STROKE_STRIDE, type StrokeData, type StrokeEntity } from "@/lib/types";
@@ -103,7 +104,7 @@ export class InkController {
     }
     if (this.liveRelease) clearTimeout(this.liveRelease);
     this.liveRelease = null;
-    this.liveSized = false;
+    this.liveSized = !renderFlag("lazyOverlay");
     if (!canvas) {
       // The editor is going away mid-stroke: keep what was drawn (sections end it too, but their
       // cleanup runs after this ref is detached and would find the gesture already cleared).
@@ -148,7 +149,7 @@ export class InkController {
 
   /** Frees the overlay's bitmap once nothing has been on it for a while. */
   private releaseLiveLater() {
-    if (!this.liveSized || this.liveRelease) return;
+    if (!this.liveSized || this.liveRelease || !renderFlag("lazyOverlay")) return;
     this.liveRelease = setTimeout(() => {
       this.liveRelease = null;
       if (this.gesture || this.pending.size || this.hover || !this.live) return;

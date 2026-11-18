@@ -1,5 +1,6 @@
 "use client";
 import { debugNow, recordSyncPaint, registerDebugProbe } from "@/lib/sync-debug";
+import { renderFlag } from "@/lib/render-flags";
 
 import { useLiveQuery } from "dexie-react-hooks";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -80,12 +81,17 @@ export const SectionView = memo(function SectionView(p: Props) {
   const { registerEl } = p;
   const sectionRef = useCallback((el: HTMLElement | null) => registerEl(section.id, el), [registerEl, section.id]);
 
+  // With the sectionScale flag off, the editor scales the whole notebook instead (the old way).
+  const zoom = renderFlag("sectionScale") ? p.zoom : 1;
   return (
+    // The box takes the section's size on screen; the section inside is laid out at page size and
+    // scaled into it, so each section is its own (small) scaled layer.
+    <div className="shrink-0" style={{ width: PAGE_WIDTH * zoom, height: height * zoom }}>
     <section
       ref={sectionRef}
       data-section-id={section.id}
-      className={`paper template-${section.data.template} relative mx-auto bg-white shadow-[0_1px_3px_rgb(15_23_42/0.08),0_8px_24px_-8px_rgb(15_23_42/0.12)]`}
-      style={{ width: PAGE_WIDTH, height }}
+      className={`paper template-${section.data.template} relative bg-white shadow-[0_1px_3px_rgb(15_23_42/0.08),0_8px_24px_-8px_rgb(15_23_42/0.12)]`}
+      style={{ width: PAGE_WIDTH, height, transform: zoom === 1 ? undefined : `scale(${zoom})`, transformOrigin: "0 0" }}
     >
       {section.data.pdf && <PdfBackground page={section.data.pdf} zoom={p.zoom} />}
       {margin && <MarginColumn margin={margin} width={marginPx} />}
@@ -152,6 +158,7 @@ export const SectionView = memo(function SectionView(p: Props) {
         </div>
       )}
     </section>
+    </div>
   );
 });
 
@@ -309,7 +316,8 @@ const InkTile = memo(function InkTile({ top, height, strokes, zoom, hidden, cont
     }
     // In quarter steps: close to what the zoom shows (half steps drew 80% zoom at 2.0x for 1.6x,
     // 56% more pixels), while small zoom changes still keep the bitmaps.
-    const scale = Math.min(Math.ceil((window.devicePixelRatio || 1) * zoom * 4) / 4, MAX_SCALE);
+    const steps = renderFlag("quarterSteps") ? 4 : 2;
+    const scale = Math.min(Math.ceil((window.devicePixelRatio || 1) * zoom * steps) / steps, MAX_SCALE);
     const paint = () => {
       const paintStarted = debugNow();
       const w = Math.round(PAGE_WIDTH * scale);

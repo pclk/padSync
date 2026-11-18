@@ -12,6 +12,7 @@ import { db, deviceId, deviceKind } from "@/lib/db";
 import { useLayoutMode, useStoredState } from "@/lib/hooks";
 import { addTextBox, insertSectionAfter, liveSections, logEvent, putEntities } from "@/lib/store";
 import { registerDebugProbe } from "@/lib/sync-debug";
+import { renderFlag } from "@/lib/render-flags";
 import { PAGE_WIDTH, type NotebookEntity, type PresenceData, type PresenceEntity, type SectionEntity } from "@/lib/types";
 import { SectionView } from "./SectionView";
 import { SidePanel } from "./SidePanel";
@@ -97,8 +98,12 @@ function Editor({ notebookId }: { notebookId: string }) {
   const [editingText, setEditingText] = useState<string | null>(null);
   const [currentId, setCurrentId] = useState<string | null>(null);
 
-  const wrapRef = useRef<HTMLDivElement>(null); // the page, scaled by transform; logical coords
-  const pinchRef = useRef<HTMLDivElement>(null); // sizer around it, transformed during a pinch
+  // The column of sections at screen size: each section scales itself (see SectionView), and the
+  // gaps scale with them, so (client - column origin) / zoom is still a page coordinate.
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const pinchRef = useRef<HTMLDivElement>(null); // around it, transformed during a pinch
+  // sectionScale off (render flags): the old way, one transform over the whole column.
+  const perSection = renderFlag("sectionScale");
   const [pageH, setPageH] = useState(0);
   const els = useRef(new Map<string, HTMLElement>());
   const zoomAnchor = useRef<{ lx: number; ly: number; cx: number; cy: number } | null>(null);
@@ -501,11 +506,11 @@ function Editor({ notebookId }: { notebookId: string }) {
   const loaded = sections !== undefined && notebook !== undefined;
   useLayoutEffect(() => {
     const el = wrapRef.current;
-    if (!el) return;
+    if (!el || perSection) return;
     const ro = new ResizeObserver(() => setPageH(el.offsetHeight));
     ro.observe(el);
     return () => ro.disconnect();
-  }, [loaded]);
+  }, [loaded, perSection]);
 
   useLayoutEffect(() => {
     if (!loaded || restored.current) return;
@@ -570,8 +575,10 @@ function Editor({ notebookId }: { notebookId: string }) {
         onTogglePanel={() => setPanelOpen(!panelOpen)}
       />
 
-      <div ref={pinchRef} className="mx-auto mb-[50vh]" style={{ width: PAGE_WIDTH * zoom, height: pageH * zoom }}>
-      <div ref={wrapRef} className="page-wrap flex flex-col gap-6" style={{ width: PAGE_WIDTH, transform: `scale(${zoom})`, transformOrigin: "0 0" }}>
+      {/* Not one transform over the whole notebook: on the iPad a scaled layer that tall (300k px for
+          150 sections) loses tiles, which show as black blocks, and runs Safari out of memory. */}
+      <div ref={pinchRef} className="mx-auto mb-[50vh]" style={perSection ? { width: PAGE_WIDTH * zoom } : { width: PAGE_WIDTH * zoom, height: pageH * zoom }}>
+      <div ref={wrapRef} className="page-wrap flex flex-col" style={perSection ? { width: PAGE_WIDTH * zoom, gap: 24 * zoom } : { width: PAGE_WIDTH, gap: 24, transform: `scale(${zoom})`, transformOrigin: "0 0" }}>
         {sections.map((s, i) => (
           <SectionView
             key={s.id}

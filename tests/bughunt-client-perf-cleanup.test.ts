@@ -31,15 +31,12 @@ it("cancels the queued frame and releases the old bitmap when the overlay detach
   const ctx = { setTransform: vi.fn(), clearRect: vi.fn(), fill: vi.fn(), save() {}, restore() {}, translate() {}, scale() {} };
   const canvas = { width: 0, height: 0, style: {}, getContext: () => ctx, getBoundingClientRect: () => ({ left: 0, top: 0 }) };
   c.attachLive(canvas as unknown as HTMLCanvasElement);
-  // No bitmap until something is drawn on the overlay.
-  expect(canvas.width).toBe(0);
+  expect(canvas.width).toBe(200);
 
   const el = { getBoundingClientRect: () => ({ left: 0, top: 0 }), setPointerCapture() {} } as unknown as HTMLElement;
   const sec = { id: "sec", el, strokes: () => [] };
   const ev = (type: string, x: number) => ({ type, pointerType: "pen", button: 0, buttons: 1, pointerId: 1, clientX: x, clientY: x, pressure: 0.5, timeStamp: x, preventDefault() {} }) as unknown as PointerEvent;
   c.down(ev("pointerdown", 1), sec);
-  frames.shift()!(0);
-  expect(canvas.width).toBe(200);
   c.move(ev("pointermove", 5), sec);
   expect(frames.length).toBeGreaterThan(0);
 
@@ -54,15 +51,18 @@ it("cancels the queued frame and releases the old bitmap when the overlay detach
   expect(ctx.clearRect).not.toHaveBeenCalled();
 });
 
-it("gives the overlay bitmap back after 20 s with nothing on it", async () => {
+it("with the lazyOverlay flag, gives the overlay bitmap back after 20 s with nothing on it", async () => {
   // Timeouts only: the test's own requestAnimationFrame stub drives the frames.
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  const { overrideRenderFlag } = await import("@/lib/render-flags");
+  overrideRenderFlag("lazyOverlay", true);
   try {
     const { InkController } = await import("@/ink/controller");
     const c = new InkController("nb", { kind: "pen", penColor: "#000", penSize: 3, hlColor: "#ff0", hlSize: 20, eraserSize: 20 }, { onSelection() {}, onDragging() {}, onTextCreate() {} });
     const ctx = { setTransform: vi.fn(), clearRect: vi.fn(), beginPath() {}, arc() {}, fill() {}, stroke() {} };
     const canvas = { width: 0, height: 0, style: {}, getContext: () => ctx, getBoundingClientRect: () => ({ left: 0, top: 0 }) };
     c.attachLive(canvas as unknown as HTMLCanvasElement);
+    expect(canvas.width).toBe(0);
     const el = { getBoundingClientRect: () => ({ left: 0, top: 0 }) } as unknown as HTMLElement;
     const sec = { id: "sec", el, strokes: () => [] };
     c.move({ pointerType: "pen", buttons: 0, pointerId: 1, clientX: 5, clientY: 5 } as unknown as PointerEvent, sec);
@@ -81,6 +81,7 @@ it("gives the overlay bitmap back after 20 s with nothing on it", async () => {
     frames.splice(0).forEach((cb) => cb(0));
     expect(canvas.width).toBe(200);
   } finally {
+    overrideRenderFlag("lazyOverlay", false);
     vi.useRealTimers();
   }
 });

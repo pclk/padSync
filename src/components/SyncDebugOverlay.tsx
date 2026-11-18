@@ -9,6 +9,7 @@ import { startInputWatch } from '@/lib/input-watch';
 import { MAX_EDITS, STAT_METRICS, clearSyncDebug, getSyncDebugSnapshot, setSyncDebugEnabled, syncDebugStats, type SyncDebugRequest } from '@/lib/sync-debug';
 import { buildDebugReport } from '@/lib/debug-report';
 import { getResourceSnapshot, startPerfWatch } from '@/lib/perf-watch';
+import { RENDER_FLAGS, renderFlag, setRenderFlag, storedRenderFlag, type RenderFlag } from '@/lib/render-flags';
 
 type Snapshot = ReturnType<typeof getSyncDebugSnapshot>;
 type Timing = ReturnType<typeof getSyncTiming>;
@@ -100,6 +101,22 @@ function ResourceStats() {
   </details>;
 }
 
+/** Switches today's rendering changes on and off, to find which one breaks the iPad page. */
+function RenderSwitches() {
+  const [stored, setStored] = useState(() => Object.fromEntries((Object.keys(RENDER_FLAGS) as RenderFlag[]).map(f => [f, storedRenderFlag(f)])) as Record<RenderFlag, boolean>);
+  const pending = (Object.keys(RENDER_FLAGS) as RenderFlag[]).some(f => stored[f] !== renderFlag(f));
+  return <details className="mb-3 text-xs">
+    <summary className="cursor-pointer font-semibold">Rendering switches{pending ? ' · reload to apply' : ''}</summary>
+    <div className="mt-2 space-y-2">
+      {(Object.keys(RENDER_FLAGS) as RenderFlag[]).map(f => <label key={f} className="flex min-h-11 items-center gap-2">
+        <input type="checkbox" className="size-5" checked={stored[f]} onChange={e => { setRenderFlag(f, e.target.checked); setStored({ ...stored, [f]: e.target.checked }); }} />
+        <span>{RENDER_FLAGS[f].label}{stored[f] !== RENDER_FLAGS[f].initial ? ' (changed)' : ''}</span>
+      </label>)}
+      <button type="button" className="min-h-11 rounded border px-2" onClick={() => location.reload()}>Reload</button>
+    </div>
+  </details>;
+}
+
 export function SyncDebugOverlay() {
   const [enabled, setEnabled] = useSyncDebug();
   const [expanded, setExpanded] = useState(true);
@@ -174,6 +191,7 @@ export function SyncDebugOverlay() {
       </div>
       {message && <p role="status" className="mb-2 text-xs">{message}</p>}
       {sample && <ResourceStats />}
+      <RenderSwitches />
       {sample && <>
         <label className="mb-3 block text-xs">Request history
           <select className="mt-1 w-full rounded border bg-white p-2" value={selectedId} onChange={event => setSelectedId(event.target.value)}>

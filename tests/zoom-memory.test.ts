@@ -17,6 +17,11 @@ describe("pdfDensity", () => {
     expect(pdfDensity(1, 2)).toBe(2);
     expect(pdfDensity(3, 2)).toBe(2);
   });
+  it("keeps the old tiers with the quarterSteps flag off", () => {
+    expect(pdfDensity(0.6, 2, false)).toBe(1.5);
+    expect(pdfDensity(0.8, 2, false)).toBe(2);
+    expect(pdfDensity(0.4, 2, false)).toBe(1);
+  });
   it("still covers the pixels the page shows on screen", () => {
     for (const zoom of [0.4, 0.5, 0.6, 0.75, 1, 2]) expect(rasterScale({ height: 1780 }, pdfDensity(zoom, 2))).toBeGreaterThanOrEqual(Math.min(2 * zoom, 2));
   });
