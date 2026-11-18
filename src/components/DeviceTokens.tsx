@@ -62,7 +62,7 @@ export function DeviceTokens() {
 
   return (
     <section className="card mb-5 p-5">
-      <h2 className="mb-1 text-base font-semibold text-slate-900">Device tokens</h2>
+      <h2 className="mb-1 text-base font-semibold text-slate-900">Mac bridge tokens</h2>
       <p className="mb-3 text-xs text-slate-500">
         For the Mac bridge that runs Claude Code / Codex. A token can only pick up and answer AI jobs: it cannot read your notebooks or create more tokens.
       </p>

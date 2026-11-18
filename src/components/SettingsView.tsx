@@ -71,88 +71,60 @@ export default function SettingsView() {
       <h1 className="mb-8 mt-4 text-3xl font-semibold tracking-tight text-slate-900">Settings</h1>
 
       <section className="card mb-5 p-5">
-        <h2 className="mb-3 text-base font-semibold text-slate-900">Appearance</h2>
-        <div className="flex items-center justify-between gap-3">
-          <span><span className="block text-slate-800">Theme</span>
-            <span className="block text-xs text-slate-500">System follows this device&rsquo;s light or dark setting. Pages stay light so ink keeps its colours.</span></span>
-          <div className="segmented shrink-0" role="group" aria-label="Theme">
-            {THEME_PREFERENCES.map((t) => <button key={t} type="button" aria-pressed={theme === t} onClick={() => setTheme(t)}>{THEME_LABELS[t]}</button>)}
-          </div>
-        </div>
-      </section>
-      <section className="card mb-5 p-5">
-        <h2 className="mb-3 text-base font-semibold text-slate-900">Layout</h2>
-        <p className="text-xs text-slate-500">Starts in Auto by default.</p>
-        <label>Idle delay: {idleMs / 1000} s<input aria-label="Layout idle delay" type="range" min="5" max="120" value={idleMs / 1000} onChange={e => setIdleMs(Number(e.target.value) * 1000)} className="mt-2 block w-full" /></label>
-      </section>
-      <section className="card mb-5 p-5">
-        <h2 className="mb-3 text-base font-semibold text-slate-900">Sync</h2>
-        <Row k="Status" v={sync.status} />
-        <Row k="Last synced" v={sync.lastSyncedAt ? new Date(sync.lastSyncedAt).toLocaleTimeString() : "—"} />
-        <Row k="Database" v={status ? (status.db ? "connected" : "not configured (DATABASE_URL)") : "unreachable"} />
-        <Row k="This device" v={`${deviceKind()} · ${deviceId()}`} />
-        <div className="mt-3 flex gap-2">
-          <button className="btn btn-secondary" onClick={() => requestSync(0)}>Sync now</button>
-          <button className="btn btn-secondary" onClick={() => resetCursor()}>Re-download everything</button>
-        </div>
-      </section>
-
-      <section className="card mb-5 p-5">
-        <h2 className="mb-3 text-base font-semibold text-slate-900">Diagnostics</h2>
-        <label className="flex items-center justify-between gap-3">
-          <span><span className="block text-slate-800">Show sync debug menu</span>
-            <span className="block text-xs text-slate-500">Show timing, visibility and realtime diagnostics on this device. Enable separately on the iPad and Mac. Recording stays in memory and stops when switched off.</span></span>
-          <input type="checkbox" className="switch" checked={syncDebug} onChange={e => setSyncDebug(e.target.checked)} />
-        </label>
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <span><span className="block text-slate-800">Pencil test</span>
-            <span className="block text-xs text-slate-500">Write on a test page and record the Pencil input events this browser delivers, to save as a file for replay and tests.</span></span>
-          <Link href="/pencil-test" className="btn btn-secondary">Open</Link>
-        </div>
-      </section>
-
-      <section className="card mb-5 p-5">
-        <h2 className="mb-3 text-base font-semibold text-slate-900">Sign in</h2>
+        <h2 className="mb-3 text-base font-semibold text-slate-900">Account and sync</h2>
         {status && !status.auth ? (
           <p className="text-slate-600">
             Set <code>GITHUB_CLIENT_ID</code>, <code>GITHUB_CLIENT_SECRET</code> and <code>SESSION_SECRET</code> in the Vercel project to enable sync.
           </p>
         ) : status?.authed ? (
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <p className="text-emerald-700">Signed in as @{status.login}</p>
             <button className="btn btn-secondary" onClick={logout}>Sign out</button>
           </div>
         ) : (
           <div className="flex items-center justify-between gap-3">
-            <p className="text-slate-600">Only @{status?.allowed ?? "…"} can sign in.</p>
-            <a href="/api/auth/github?next=/settings" className="btn btn-primary">Sign in with GitHub</a>
+            <p className="text-slate-600">Sign in to sync notebooks between devices. Only @{status?.allowed ?? "…"} can sign in.</p>
+            <a href="/api/auth/github?next=/settings" className="btn btn-primary shrink-0">Sign in with GitHub</a>
           </div>
         )}
         {authError && <p className="mt-2 text-rose-700">{authError}</p>}
+        <div className="mt-3">
+          <Row k="Status" v={sync.status} />
+          <Row k="Last synced" v={sync.lastSyncedAt ? new Date(sync.lastSyncedAt).toLocaleTimeString() : "—"} />
+          <Row k="Database" v={status ? (status.db ? "connected" : "not configured (DATABASE_URL)") : "unreachable"} />
+          <Row k="This device" v={`${deviceKind()} · ${deviceId()}`} />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button className="btn btn-secondary" onClick={() => requestSync(0)}>Sync now</button>
+          <button className="btn btn-secondary" onClick={() => resetCursor()} title="Fetch every notebook from the server again">Re-download everything</button>
+        </div>
+      </section>
+
+      <section className="card mb-5 p-5">
+        <h2 className="mb-3 text-base font-semibold text-slate-900">Appearance</h2>
+        <Setting title="Theme" hint={<>System follows this device&rsquo;s light or dark setting. Pages stay light so ink keeps its colours.</>}>
+          <div className="segmented shrink-0" role="group" aria-label="Theme">
+            {THEME_PREFERENCES.map((t) => <button key={t} type="button" aria-pressed={theme === t} onClick={() => setTheme(t)}>{THEME_LABELS[t]}</button>)}
+          </div>
+        </Setting>
+      </section>
+
+      <section className="card mb-5 space-y-4 p-5">
+        <h2 className="text-base font-semibold text-slate-900">Notebook</h2>
+        <label className="block">
+          <span className="block text-slate-800">Auto layout: switch to chat after {idleMs / 1000} s</span>
+          <span className="block text-xs text-slate-500">With the notebook layout on Auto, the side panel widens for chat once you stop writing for this long, and makes room for the page again when you write.</span>
+          <input aria-label="Layout idle delay" type="range" min="5" max="120" value={idleMs / 1000} onChange={e => setIdleMs(Number(e.target.value) * 1000)} className="mt-2 block w-full" />
+        </label>
+        <Setting label title="Show copy buttons" hint={<>&ldquo;Copy as image&rdquo; and &ldquo;Copy question text&rdquo; in the side panel, for pasting into a chat by hand. Ask AI through the Mac bridge doesn&rsquo;t need them.</>}>
+          <input type="checkbox" className="switch" checked={showCopy} onChange={(e) => setShowCopy(e.target.checked)} />
+        </Setting>
       </section>
 
       {status?.authed && <SyncTimingSettings />}
       {status?.authed && <DeviceTokens />}
 
       <section className="card mb-5 p-5">
-        <h2 className="mb-3 text-base font-semibold text-slate-900">Notebook</h2>
-        <label className="flex items-center justify-between gap-3">
-          <span>
-            <span className="block text-slate-800">Show copy buttons</span>
-            <span className="block text-xs text-slate-500">&ldquo;Copy as image&rdquo; and &ldquo;Copy question text&rdquo; in the side panel, for pasting into a chat by hand. Ask AI through the Mac bridge doesn&rsquo;t need them.</span>
-          </span>
-          <input type="checkbox" className="switch" checked={showCopy} onChange={(e) => setShowCopy(e.target.checked)} />
-        </label>
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <span>
-            <span className="block text-slate-800">Pencil lab</span>
-            <span className="block text-xs text-slate-500">Record Pencil writing to a file and replay it, to test how writing is processed. Nothing written there is saved.</span>
-          </span>
-          <Link href="/pencil-lab" className="btn btn-secondary shrink-0">Open</Link>
-        </div>
-      </section>
-
-      <section className="card p-5">
         <h2 className="mb-3 text-base font-semibold text-slate-900">NUS Canvas</h2>
         <Row k="Token" v={status?.canvas.configured ? "configured on server" : "not set (CANVAS_TOKEN)"} />
         <Row k="Expires" v={daysLeft == null ? "—" : daysLeft > 0 ? `in ${daysLeft} days` : "expired: generate a new one"} />
@@ -165,11 +137,42 @@ export default function SettingsView() {
           CANVAS_TOKEN_EXPIRES in Vercel.
         </p>
       </section>
+
+      <section className="card space-y-4 p-5">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">Troubleshooting</h2>
+          <p className="mt-1 text-xs text-slate-500">For checking sync and Pencil problems. Nothing here changes your notebooks.</p>
+        </div>
+        <Setting label title="Show sync debug menu" hint="Show timing, visibility and realtime diagnostics on this device. Enable separately on the iPad and Mac. Recording stays in memory and stops when switched off.">
+          <input type="checkbox" className="switch" checked={syncDebug} onChange={e => setSyncDebug(e.target.checked)} />
+        </Setting>
+        <Setting title={<>Pencil test <span className="text-slate-500">· what Safari sends</span></>} hint="Record the raw Pencil events this browser delivers (position, pressure, tilt, timing) and save them as a file. Start here to report a writing problem.">
+          <Link href="/pencil-test" className="btn btn-secondary shrink-0">Open</Link>
+        </Setting>
+        <Setting title={<>Pencil lab <span className="text-slate-500">· how padSync draws it</span></>} hint="Write with your notebook pen, then replay the recording at any speed to see how strokes are processed. Nothing written there is saved.">
+          <Link href="/pencil-lab" className="btn btn-secondary shrink-0">Open</Link>
+        </Setting>
+      </section>
     </main>
   );
 }
 
 const THEME_LABELS = { system: "System", light: "Light", dark: "Dark" } as const;
+
+// One setting: a title and a short explanation on the left, its control on the right. `label`
+// makes the whole row a <label>, so tapping the text flips a switch.
+function Setting({ title, hint, label, children }: { title: React.ReactNode; hint: React.ReactNode; label?: boolean; children: React.ReactNode }) {
+  const Tag = label ? "label" : "div";
+  return (
+    <Tag className="flex items-center justify-between gap-3">
+      <span>
+        <span className="block text-slate-800">{title}</span>
+        <span className="block text-xs text-slate-500">{hint}</span>
+      </span>
+      {children}
+    </Tag>
+  );
+}
 
 function Row({ k, v }: { k: string; v: string }) {
   return (

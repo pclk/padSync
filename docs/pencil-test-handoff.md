@@ -12,7 +12,7 @@ been tested on an iPad or with an Apple Pencil.** Every recording checked in is 
 | Recorder | `src/ink/recorder.ts` | `PencilRecorder`: plug `input` / `commit` into the controller callbacks, then `finish()`. |
 | Replay engine | `src/ink/replay.ts` | `PencilReplayer`: feeds events back through the same controller entry points, stepped, run to the end, or played at the recorded pace × speed (with an injectable `Scheduler`). Section coordinates are kept when the live section sits somewhere else or at another zoom. |
 | Harness | `src/ink/replay-harness.ts` | `runReplay(rec, opts)` → `ReplayReport` (below). `replayStrokes`, `baselineOf`, `compareBaselines`. Options: `tool`, `pen` (pen parameter overrides to try a writing change), `useCoalesced`, `usePredicted`, `includeSvg`. |
-| Pencil lab | `/pencil-lab` (`src/components/PencilLab.tsx`), linked from Settings → Notebook | Record, Save file, Load file, Replay (0.25×/1×/4×, pause/resume), Replay at once, Clear, and the headless report with Copy JSON. Uses the notebook's saved pen settings (read only). Nothing is written to a notebook. |
+| Pencil lab | `/pencil-lab` (`src/components/PencilLab.tsx`), linked from Settings → Troubleshooting | Record, Save file, Load file, Replay (0.25×/1×/4×, pause/resume), Replay at once, Clear, and the headless report with Copy JSON. Uses the notebook's saved pen settings (read only). Nothing is written to a notebook. |
 | Synthetic generator | `tests/helpers/synthetic-pencil.ts`, specs in `tests/helpers/pencil-fixtures.ts` | Generates Pencil-like input (240 Hz samples coalesced into 60 Hz moves, 2 predicted samples per move, pressure ramps, tilt drift) and captures it through the real controller and `PencilRecorder`. Output is marked `source: "synthetic"` and labelled `SYNTHETIC: …`. |
 | Fixtures | `tests/fixtures/pencil/*.pencil.json` and `baselines/*.baseline.json` | `synthetic-words`, `synthetic-zoomed-two-sections`, `synthetic-edge-cases` (cancel, lost capture with a late up, a finger, a bounce, a slow stroke with tilt changes, a mouse stroke, a stroke still open at stop). Real: `ipad-handwriting-2026-11-18`, 66 pen strokes on the iPad lab at 98% zoom, the sentence "Both pages now ignore scrolling for Pencil touches on the writing area" (light pressure, peak 0.19–0.35); `ipad-math-2026-11-18`, 217 strokes of maths working (colons, exponents, fractions). |
 | Tests | `tests/pencil-replay.test.ts`, `tests/pencil-regression.test.ts`, `tests/pencil-fixtures.test.ts` | `npm run test:pencil` (31 tests; they also run in `npm test`). |
@@ -43,7 +43,7 @@ the render pipeline (`toInput` clean-up → perfect-freehand outline → the SVG
 ## Capturing a real session (needs the iPad; not done yet)
 
 1. Run the app where the iPad can reach it (deployed, or `npm run dev` on the LAN), and open
-   Settings → Pencil lab (`/pencil-lab`) in Safari or the home-screen app.
+   Settings → Troubleshooting → Pencil lab (`/pencil-lab`) in Safari or the home-screen app.
 2. Type a label for what you'll write, e.g. "alphabet, light pressure", and add notes (iPad model,
    Pencil model, what looks wrong). Tap **Record**, write, then tap **Stop**.
 3. Check the report card. Replay vs capture should say "identical". Then tap **Save file**: Safari

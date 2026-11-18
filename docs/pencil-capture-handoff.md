@@ -16,7 +16,7 @@ unit tests with synthetic events, typecheck, lint and `next build`.
 | `src/ink/recording/recorder.ts` | `PencilRecorder`: start/stop/reset, `pointer()`, `touch()`, `marker()`, `stats()`, `capabilities()`, `toRecording()`. No DOM wiring; it takes event-shaped objects, so tests (and replay) can feed it plain objects. |
 | `src/ink/recording/capture.ts` | DOM wiring: capture-phase, passive listeners on `window` (`attachInputCapture`), `detectApis`, `captureEnvironment`, `surfaceTransform`. |
 | `src/ink/samples.ts` | `appendPoint` / `toLocal`: the one path from a pointer sample to a stored stroke point. `InkController.addPoints` now uses it (behaviour unchanged), so replay can turn recorded samples into exactly the points a live stroke stores. |
-| `src/components/PencilTestView.tsx`, `src/app/pencil-test/page.tsx` | `/pencil-test` page (linked from Settings → Diagnostics, in the SW offline shell). |
+| `src/components/PencilTestView.tsx`, `src/app/pencil-test/page.tsx` | `/pencil-test` page (linked from Settings → Troubleshooting, in the SW offline shell). |
 | `tests/pencil-recording.test.ts` | Recorder, schema round trip/rejection, file names, shared point path. |
 
 ### Recording contents

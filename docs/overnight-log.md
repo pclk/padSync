@@ -123,3 +123,40 @@ should; a 0 there would make the bottom limit too tight, not too loose).
 
 **Next.** The 00:30 run's list still stands (Ctrl+wheel through `pinchPlacement`, black blocks
 during long pinches, sharpness above 150%).
+
+## 2026-11-19 01:30 — UI: a clearer Settings page
+
+**Why Settings.** It was the screen where intent was least clear: the two Pencil tools sat under
+different headings (Pencil test under Diagnostics, Pencil lab under Notebook) with no hint of how
+they differ; "Layout · Starts in Auto by default · Idle delay" didn't say what the delay does;
+sign-in sat below Sync even though sync needs it, and everyday settings (theme, notebook) were
+mixed in between the long sync-timing and token cards.
+
+**Changed** (`src/components/SettingsView.tsx`):
+- Order is now Account and sync → Appearance → Notebook → (Sync timing, Mac bridge tokens when
+  signed in) → NUS Canvas → Troubleshooting.
+- Sign-in and sync status are one card: sign-in state first ("Sign in to sync notebooks between
+  devices"), then the status rows and Sync now / Re-download everything.
+- The idle slider moved into Notebook as "Auto layout: switch to chat after N s", with one line
+  saying what Auto does with it.
+- New "Troubleshooting" card holds the sync debug toggle and both Pencil tools, labelled by
+  purpose: "Pencil test · what Safari sends" (raw events; start here to report a problem) and
+  "Pencil lab · how padSync draws it" (record and replay through the pen). Page names and routes
+  are unchanged.
+- One small `Setting` row helper (title, hint, control) replaces four copies of the same markup.
+- "Device tokens" heading is now "Mac bridge tokens". The Pencil test page's back button is a
+  labelled "Settings" button like the Pencil lab's, not a bare icon.
+- Handoff docs updated to point at Settings → Troubleshooting.
+
+**Checked.** New `tests/settings-layout.test.ts` (section order, both Pencil tools in one card with
+their purposes, idle-delay wording). Existing Settings tests (theme, copy buttons, sync debug
+toggle) still pass. `npm run typecheck`, `npm run lint`, `npx vitest run` (788 passed). No stroke
+code touched, so `test:pencil` wasn't needed.
+
+**Needs a device check.** Settings on the iPad in portrait: the Troubleshooting rows' "Open"
+buttons and the sign-in button stay on the right without squeezing the text; the Pencil test back
+button still sits well in its wrapping header.
+
+**Next (UI).** The notebook toolbar has the most controls on screen at once (layout segmented
+control, pen settings, sync badge…); a later UI run could group or tuck away the less-used ones.
+The two Pencil tools might merge into one page later: both save `padsync.pencil-recording` files, but from separate schema modules (`src/ink/recording.ts` and `src/ink/recording/schema.ts`), so check they really are one format first.

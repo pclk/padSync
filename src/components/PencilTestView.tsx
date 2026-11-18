@@ -291,7 +291,7 @@ export default function PencilTestView() {
   return (
     <main ref={rootRef} className="mx-auto max-w-[1440px] px-3 pb-16 pt-4 sm:px-6">
       <header className="mb-4 flex flex-wrap items-center gap-3">
-        <Link href="/settings" className="icon-btn" aria-label="Back to settings" title="Back"><Icon name="back" className="text-lg" /></Link>
+        <Link href="/settings" className="btn btn-ghost -ml-2 px-2"><Icon name="back" className="text-lg" />Settings</Link>
         <h1 className="text-xl font-semibold tracking-tight text-slate-900">Pencil test</h1>
         <StatusPill state={state} durationMs={stats?.durationMs ?? 0} truncated={recorder.isTruncated()} />
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
