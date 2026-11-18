@@ -232,6 +232,33 @@ function BlockView({ block }: { block: Block }) {
   }
 }
 
+// Repaints after a zoom run once the frame has painted, a few tiles per frame.
+const repaints = new Set<() => void>();
+let repaintScheduled = false;
+
+function queueRepaint(paint: () => void) {
+  repaints.add(paint);
+  scheduleRepaints();
+  return () => void repaints.delete(paint);
+}
+
+function scheduleRepaints() {
+  if (repaintScheduled) return;
+  repaintScheduled = true;
+  requestAnimationFrame(() => setTimeout(runRepaints));
+}
+
+function runRepaints() {
+  repaintScheduled = false;
+  const end = performance.now() + 8;
+  for (const paint of repaints) {
+    repaints.delete(paint);
+    paint();
+    if (performance.now() > end) break;
+  }
+  if (repaints.size) scheduleRepaints();
+}
+
 interface TileProps {
   top: number;
   height: number;
@@ -267,28 +294,34 @@ const InkTile = memo(function InkTile({ top, height, strokes, zoom, hidden, cont
       painted.current = null;
       return;
     }
-    const paintStarted = debugNow();
     const scale = Math.min((window.devicePixelRatio || 1) * zoom, MAX_SCALE);
-    const w = Math.round(PAGE_WIDTH * scale);
-    const h = Math.round(height * scale);
-    const shown = hidden ? strokes.filter((s) => !hidden.has(s.id)) : strokes;
-    const prev = painted.current;
-    const ctx = c.getContext("2d")!;
-    const delta = prev && prev.scale === scale && prev.hidden === hidden && c.width === w && c.height === h ? paintDelta(prev.strokes, shown) : null;
-    if (delta) {
-      ctx.setTransform(scale, 0, 0, scale, 0, -top * scale);
-      paintStrokes(ctx, delta);
-    } else {
-      if (c.width !== w) c.width = w;
-      if (c.height !== h) c.height = h;
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, w, h);
-      ctx.setTransform(scale, 0, 0, scale, 0, -top * scale);
-      paintStrokes(ctx, shown);
-    }
-    painted.current = { strokes: shown, scale, hidden };
-    recordSyncPaint(delta ?? shown, debugNow() - paintStarted);
-    controller.ackPainted((delta ?? shown).map((s) => s.id));
+    const paint = () => {
+      const paintStarted = debugNow();
+      const w = Math.round(PAGE_WIDTH * scale);
+      const h = Math.round(height * scale);
+      const shown = hidden ? strokes.filter((s) => !hidden.has(s.id)) : strokes;
+      const prev = painted.current;
+      const ctx = c.getContext("2d")!;
+      const delta = prev && prev.scale === scale && prev.hidden === hidden && c.width === w && c.height === h ? paintDelta(prev.strokes, shown) : null;
+      if (delta) {
+        ctx.setTransform(scale, 0, 0, scale, 0, -top * scale);
+        paintStrokes(ctx, delta);
+      } else {
+        if (c.width !== w) c.width = w;
+        if (c.height !== h) c.height = h;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        ctx.setTransform(scale, 0, 0, scale, 0, -top * scale);
+        paintStrokes(ctx, shown);
+      }
+      painted.current = { strokes: shown, scale, hidden };
+      recordSyncPaint(delta ?? shown, debugNow() - paintStarted);
+      controller.ackPainted((delta ?? shown).map((s) => s.id));
+    };
+    // After a zoom the old bitmap still shows, stretched by CSS; repainting every tile at the new
+    // resolution right away blocks Safari from redrawing the page itself, which flashes black.
+    if (painted.current && painted.current.scale !== scale) return queueRepaint(paint);
+    paint();
   }, [visible, strokes, zoom, height, top, hidden, controller]);
 
   useEffect(() => {
@@ -314,6 +347,8 @@ function TextBox({ tb, editing, interactive, onEdit, onDone, zoom }: { tb: TextB
   const drag = useRef<{ id: number; sx: number; sy: number; x: number; y: number } | null>(null);
   const [offset, setOffset] = useState<[number, number]>([0, 0]);
   const style = { left: tb.data.x + offset[0], top: tb.data.y + offset[1], width: tb.data.w, fontSize: tb.data.fontSize, color: tb.data.color };
+  // Every section re-renders on zoom; don't re-run markdown and KaTeX for each text box then.
+  const html = useMemo(() => renderMarkdown(tb.data.text), [tb.data.text]);
 
   if (editing) return <TextEditor tb={tb} style={style} onDone={onDone} />;
 
@@ -348,7 +383,7 @@ function TextBox({ tb, editing, interactive, onEdit, onDone, zoom }: { tb: TextB
         await putEntities([{ ...tb, data: { ...tb.data, x: tb.data.x + d.x, y: tb.data.y + d.y } }]);
         setOffset([0, 0]);
       }}
-      dangerouslySetInnerHTML={{ __html: renderMarkdown(tb.data.text) }}
+      dangerouslySetInnerHTML={{ __html: html }}
     />
   );
 }

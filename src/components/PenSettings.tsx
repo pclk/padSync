@@ -17,13 +17,13 @@ export function previewPoints(): number[] {
   const pts: number[] = [];
   const add = (x: number, y: number, p: number, t: number) => pts.push(x, y, p, 1.2, 0, t);
   let t = 0;
-  // Three cursive loops.
-  for (let i = 0; i <= 90; i++, t += 4) {
-    const a = (i / 90) * Math.PI * 6;
-    add(14 + i * 1.25 + 9 * Math.sin(a), 36 - 16 * Math.abs(Math.sin(a / 2)) + 4 * Math.cos(a), 0.45 + 0.25 * Math.sin(i * 0.9) * Math.sin(i * 0.23), t);
+  // Cursive loops (a prolate trochoid), like a row of joined "l"s.
+  for (let i = 0; i <= 120; i++, t += 4) {
+    const a = (i / 120) * Math.PI * 6 - Math.PI / 2;
+    add(28 + 5 * a - 11 * Math.sin(a), 34 + 18 * Math.cos(a), 0.45 + 0.2 * Math.sin(i * 0.9) * Math.sin(i * 0.23), t);
   }
   // A zigzag with hard corners.
-  const zig = [[128, 46], [146, 18], [164, 46], [182, 18], [200, 46], [218, 18]];
+  const zig = [[138, 48], [154, 18], [170, 48], [186, 18], [202, 48], [218, 18]];
   for (let k = 1; k < zig.length; k++) {
     const [x0, y0] = zig[k - 1];
     const [x1, y1] = zig[k];
@@ -37,7 +37,7 @@ const PREVIEW_PTS = previewPoints();
 interface Props {
   tool: ToolState;
   setTool: (t: ToolState) => void;
-  /** Viewport y of the pen button's centre, so the popover sits beside it. */
+  /** Viewport y of the pen button's centre; the popover's header lines up with it. */
   anchorY: number;
   onClose: () => void;
 }
@@ -74,8 +74,8 @@ export function PenSettings({ tool, setTool, anchorY, onClose }: Props) {
       ref={ref}
       role="dialog"
       aria-label="Pen settings"
-      className="card fixed left-[4.75rem] z-50 w-64 -translate-y-1/2 p-3 shadow-lift"
-      style={{ top: `clamp(9rem, ${anchorY}px, calc(100dvh - 9rem))` }}
+      className="card fixed left-[4.75rem] z-50 max-h-[calc(100dvh-5rem)] w-64 overflow-y-auto p-3 shadow-lift"
+      style={{ top: `max(4.25rem, min(${Math.round(anchorY - 28)}px, calc(100dvh - 22rem)))` }}
     >
       <div className="mb-2 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-slate-900">Pen</h2>
