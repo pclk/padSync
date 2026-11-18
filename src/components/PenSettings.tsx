@@ -17,6 +17,7 @@ import {
 } from "@/ink/pen-feel";
 import { strokeSvgPath } from "@/ink/render";
 import { STROKE_STRIDE, type StrokeData } from "@/lib/types";
+import { Icon } from "./Icons";
 
 const PREVIEW_W = 232;
 const PREVIEW_H = 64;
@@ -46,6 +47,9 @@ export function previewPoints(): number[] {
 
 const PREVIEW_PTS = previewPoints();
 
+/** Whether Fine-tune was left open, so it reopens the same way until the page reloads. */
+let fineTuneOpen = false;
+
 interface Props {
   tool: ToolState;
   setTool: (t: ToolState) => void;
@@ -57,8 +61,8 @@ interface Props {
 }
 
 /**
- * Pen settings, opened by tapping the pen tool again while it is selected: two quick sliders and
- * every pen parameter in tabs, each adjustable and resettable on its own.
+ * Pen settings, opened by tapping the pen tool again while it is selected: two everyday sliders,
+ * and under Fine-tune every pen parameter in tabs, each adjustable and resettable on its own.
  */
 export function PenSettings({ tool, setTool, anchorY, left, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null);
@@ -66,7 +70,12 @@ export function PenSettings({ tool, setTool, anchorY, left, onClose }: Props) {
   const overrides = penOverrides(params);
   const changed = Object.keys(overrides).length;
   const update = (next: PenParams) => setTool({ ...tool, pen: penOverrides(next) });
-  const [tab, setTab] = useState("Quick");
+  const [tab, setTab] = useState(PEN_GROUPS[0].tab);
+  const [fineTune, setFineTune] = useState(fineTuneOpen);
+  const toggleFineTune = () => {
+    fineTuneOpen = !fineTune;
+    setFineTune(fineTuneOpen);
+  };
   const box = usePopoverBox(anchorY);
 
   useEffect(() => {
@@ -90,10 +99,10 @@ export function PenSettings({ tool, setTool, anchorY, left, onClose }: Props) {
     return strokeSvgPath(data);
   }, [tool.penColor, tool.penSize, params]);
 
-  const tabs = ["Quick", ...PEN_GROUPS.map((g) => g.tab)];
+  const total = PEN_GROUPS.reduce((n, g) => n + g.params.length, 0);
 
-  // A fixed header (title, preview, tabs) over a body that scrolls on its own, sized to the
-  // visible screen, so every setting is reachable however short the screen is.
+  // A fixed header (title, preview) over a body that scrolls on its own, sized to the visible
+  // screen, so every setting is reachable however short the screen is.
   return (
     <div
       ref={ref}
@@ -102,7 +111,7 @@ export function PenSettings({ tool, setTool, anchorY, left, onClose }: Props) {
       className="card fixed left-[4.75rem] z-50 flex w-80 max-w-[calc(100vw-6rem)] flex-col overflow-hidden shadow-lift"
       style={{ top: box.top, maxHeight: box.maxHeight, ...(left === undefined ? {} : { left }) }}
     >
-      <div className="shrink-0 border-b border-slate-100 px-3 pt-3">
+      <div className="shrink-0 border-b border-slate-100 p-3">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-slate-900">Pen</h2>
           <button className="btn btn-ghost btn-sm" onClick={() => update(DEFAULT_PEN)} disabled={!changed}>
@@ -114,42 +123,53 @@ export function PenSettings({ tool, setTool, anchorY, left, onClose }: Props) {
             <path d={preview} fill={tool.penColor} />
           </svg>
         </div>
-        <div role="tablist" aria-label="Pen setting groups" className="-mx-3 mt-2 flex overflow-x-auto px-2">
-          {tabs.map((t) => {
-            const group = PEN_GROUPS.find((g) => g.tab === t);
-            const dirty = group?.params.some((p) => p.key in overrides);
-            return (
-              <button
-                key={t}
-                role="tab"
-                aria-selected={tab === t}
-                onClick={() => setTab(t)}
-                className={`relative shrink-0 border-b-2 px-2 py-2 text-xs font-medium ${tab === t ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}
-              >
-                {t}
-                {dirty && <span className="absolute right-0.5 top-1.5 h-1.5 w-1.5 rounded-full bg-brand-500" aria-label="changed" />}
-              </button>
-            );
-          })}
-        </div>
       </div>
 
       <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-3 py-3">
-        <div role="tabpanel" hidden={tab !== "Quick"}>
-          <Slider label="Smoothness" low="Precise" high="Smooth" value={smoothnessOf(params)} onChange={(v) => update(setSmoothness(params, v))} />
-          <Slider label="Pressure" low="Even" high="Expressive" value={pressureOf(params)} onChange={(v) => update(setPressure(params, v))} />
-          <p className="text-xs text-slate-500">
-            These set several settings in the other tabs at once. Settings apply to new strokes; pressure only affects the Apple Pencil.
-          </p>
-        </div>
-        {PEN_GROUPS.map((g) => (
-          <div key={g.tab} role="tabpanel" aria-label={g.title} hidden={tab !== g.tab}>
-            {g.note && <p className="mb-3 text-[11px] text-slate-500">{g.note}</p>}
-            {g.params.map((spec) => (
-              <Param key={spec.key} spec={spec} value={params[spec.key]} onChange={(v) => update({ ...params, [spec.key]: v })} />
-            ))}
+        <Slider label="Smoothness" low="Precise" high="Smooth" value={smoothnessOf(params)} onChange={(v) => update(setSmoothness(params, v))} />
+        <Slider label="Pressure" low="Even" high="Expressive" value={pressureOf(params)} onChange={(v) => update(setPressure(params, v))} />
+        <p className="text-xs text-slate-500">Changes apply to new strokes. Pressure only affects the Apple Pencil.</p>
+
+        <button
+          type="button"
+          className="-mx-1 mt-3 flex min-h-11 w-[calc(100%+0.5rem)] items-center gap-1.5 rounded-lg px-1 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+          aria-expanded={fineTune}
+          aria-controls="pen-fine-tune"
+          onClick={toggleFineTune}
+        >
+          <Icon name={fineTune ? "chevronDown" : "chevronRight"} className="text-sm text-slate-400" />
+          <span className="flex-1">Fine-tune</span>
+          <span className={changed ? "text-brand-600" : "text-slate-400"}>{changed ? `${changed} changed` : `${total} settings`}</span>
+        </button>
+
+        <div id="pen-fine-tune" hidden={!fineTune}>
+          <p className="mb-1 text-[11px] text-slate-500">Smoothness and Pressure above move several of these at once.</p>
+          <div role="tablist" aria-label="Pen setting groups" className="sticky -top-3 z-10 -mx-3 mb-3 flex overflow-x-auto border-b border-slate-100 bg-white px-2">
+            {PEN_GROUPS.map((g) => {
+              const dirty = g.params.some((p) => p.key in overrides);
+              return (
+                <button
+                  key={g.tab}
+                  role="tab"
+                  aria-selected={tab === g.tab}
+                  onClick={() => setTab(g.tab)}
+                  className={`relative shrink-0 border-b-2 px-2 py-2 text-xs font-medium ${tab === g.tab ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+                >
+                  {g.tab}
+                  {dirty && <span className="absolute right-0.5 top-1.5 h-1.5 w-1.5 rounded-full bg-brand-500" aria-label="changed" />}
+                </button>
+              );
+            })}
           </div>
-        ))}
+          {PEN_GROUPS.map((g) => (
+            <div key={g.tab} role="tabpanel" aria-label={g.title} hidden={tab !== g.tab}>
+              {g.note && <p className="mb-3 text-[11px] text-slate-500">{g.note}</p>}
+              {g.params.map((spec) => (
+                <Param key={spec.key} spec={spec} value={params[spec.key]} onChange={(v) => update({ ...params, [spec.key]: v })} />
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

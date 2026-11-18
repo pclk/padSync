@@ -333,3 +333,35 @@ and keep the point under the cursor until the limit (`tests/notebook-viewport.te
 2. Sharper ink above ~150%: tiles split across the width, so each canvas stays under the iOS limit.
 3. Position save after a zoom that doesn't scroll the window (pinch at the very top): the scroll
    listener doesn't fire, so the saved offset waits for the next scroll. Small, not fixed.
+
+## 2026-11-19 04:00 — UI: pen settings show the everyday sliders first
+
+**Why the pen popover.** It opened on a "Quick" tab with five more tabs beside it (Line, Ends,
+Clean-up, Pressure, Taps) holding 28 settings. "Quick" looked like one group among equals, so it
+wasn't clear the two sliders are the settings most people need and the rest are for tuning, and
+the 02:00 run had just added another clean-up setting.
+
+**Changed** (`src/components/PenSettings.tsx`):
+- The popover now opens on the preview, then Smoothness and Pressure, then one line ("Changes apply
+  to new strokes. Pressure only affects the Apple Pencil.").
+- Below that is a **Fine-tune** row (closed by default, 44 px tall to tap) that shows "28 settings",
+  or "N changed" in the brand colour when any setting differs from the default. Opening it shows
+  the five tabs (still with their changed dots) and their settings, and a note that the two sliders
+  move several of these at once. The "Quick" tab is gone.
+- The tab strip sticks to the top of the scrolling body, so it stays visible in long tabs.
+- Whether Fine-tune is open is kept until the page reloads (one module variable), so someone tuning
+  doesn't have to reopen it every time.
+- No setting, default or stroke code changed; Reset all and per-setting Reset work as before.
+
+**Checked.** New test in `tests/pen-feel.test.ts`: sliders come before and outside Fine-tune, it
+starts closed with the setting count, and shows "2 changed" / "Reset all (2)" with two overrides.
+The existing test (every setting still rendered) passes. `npm run typecheck`, `npm run lint`,
+`npx vitest run` (803 passed), `npm run test:pencil` (33 passed, baselines unchanged).
+
+**Needs a device check.** On the iPad: tap the pen twice, open Fine-tune, scroll a long tab
+(Clean-up): the tab strip stays at the top with no gap or overlap, and scrolling inside the popover
+doesn't scroll the notebook. Also check it in dark mode (the sticky strip uses `bg-white`, which the
+dark palette remaps to the card surface).
+
+**Next (UI).** The chat panel's controls (model picker, context picker, thread switcher) and the
+library's empty state haven't been looked at yet. The notebook toolbar idea from 01:30 is still open.

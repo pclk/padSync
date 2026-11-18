@@ -195,4 +195,23 @@ describe("PenSettings", () => {
     for (const spec of PEN_GROUPS.flatMap((g) => g.params)) expect(html).toContain(`aria-label="${spec.label}"`);
     expect(html).toMatch(/<path d="M[^"]{50,}"/);
   });
+
+  it("puts the two everyday sliders first and tucks the rest under a closed Fine-tune", async () => {
+    const { PenSettings } = await import("@/components/PenSettings");
+    const tool = { kind: "pen" as const, penColor: "#111827", penSize: 3.4, hlColor: "#ff0", hlSize: 20, eraserSize: 20 };
+    const html = renderToStaticMarkup(createElement(PenSettings, { tool, setTool() {}, anchorY: 200, onClose() {} }));
+    const total = PEN_GROUPS.reduce((n, g) => n + g.params.length, 0);
+    expect(html).toMatch(/aria-expanded="false" aria-controls="pen-fine-tune"/);
+    expect(html).toContain(`${total} settings`);
+    expect(html).toMatch(/<div id="pen-fine-tune" hidden="">/);
+    // The sliders come before Fine-tune and outside it.
+    expect(html.indexOf('aria-label="Smoothness"')).toBeLessThan(html.indexOf("pen-fine-tune"));
+    expect(html.indexOf('aria-label="Pressure"')).toBeLessThan(html.indexOf("pen-fine-tune"));
+    expect(html).not.toContain(">Quick<");
+
+    const changed = { ...tool, pen: { taperEnd: 20, capStart: false } };
+    const html2 = renderToStaticMarkup(createElement(PenSettings, { tool: changed, setTool() {}, anchorY: 200, onClose() {} }));
+    expect(html2).toContain("2 changed");
+    expect(html2).toContain("Reset all (2)");
+  });
 });
