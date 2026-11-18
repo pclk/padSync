@@ -11,6 +11,8 @@ import {
   HOOK_PRESSURE,
   MAX_POINT_GAP,
   POSITION_SIGMA,
+  STOP_RADIUS,
+  TAP_DOT_SIZE,
   PRESSURE_ALPHA,
   PRESSURE_FALLBACK,
   PRESSURE_FLOOR,
@@ -41,6 +43,8 @@ export interface PenParams {
   backtrackMax: number;
   hookPressure: number;
   hookMaxLength: number;
+  stopRadius: number;
+  tapDotSize: number;
   pressureFloor: number;
   pressureFallback: number;
   pressureAlpha: number;
@@ -67,6 +71,8 @@ export const DEFAULT_PEN: PenParams = {
   backtrackMax: BACKTRACK_MAX,
   hookPressure: HOOK_PRESSURE,
   hookMaxLength: HOOK_MAX_LENGTH,
+  stopRadius: STOP_RADIUS,
+  tapDotSize: TAP_DOT_SIZE,
   pressureFloor: PRESSURE_FLOOR,
   pressureFallback: PRESSURE_FALLBACK,
   pressureAlpha: PRESSURE_ALPHA,
@@ -117,6 +123,7 @@ export const PEN_GROUPS: { title: string; tab: string; note?: string; params: Pe
       { key: "backtrackMax", label: "Drop backward jumps", kind: "range", min: 0, max: 20, step: 0.5, unit: "px", help: "A single sample stepping back by up to this much is dropped. 0 turns it off." },
       { key: "hookPressure", label: "Hook pressure", kind: "range", min: 0, max: 0.5, step: 0.01, help: "Stroke ends lighter than this are trimmed as touchdown or lift-off hooks. 0 turns it off." },
       { key: "hookMaxLength", label: "Hook length", kind: "range", min: 0, max: 30, step: 0.5, unit: "px", help: "Most that is trimmed from either end." },
+      { key: "stopRadius", label: "Ignore stops at the ends", kind: "range", min: 0, max: 6, step: 0.5, unit: "px", help: "Where the pen rests and wiggles before lifting (or after landing), points within this distance count as one, so ends don't blob. 0 turns it off." },
     ],
   },
   {
@@ -136,6 +143,7 @@ export const PEN_GROUPS: { title: string; tab: string; note?: string; params: Pe
     params: [
       { key: "dotMinMs", label: "Stray dot: shorter than", kind: "range", min: 0, max: 200, step: 5, unit: "ms", help: "A tap shorter than this, and lighter than below, is dropped as a bounce. 0 keeps every tap." },
       { key: "dotMinPressure", label: "Stray dot: lighter than", kind: "range", min: 0, max: 1, step: 0.01, help: "A tap pressed at least this hard is always kept." },
+      { key: "tapDotSize", label: "Draw taps as dots", kind: "range", min: 0, max: 15, step: 0.5, unit: "px", help: "A touch whose firmly pressed part stays within this size is drawn as a round dot, so periods and colons don't turn into dashes. 0 draws them as written." },
       { key: "dotMaxExtent", label: "Stray dot: size", kind: "range", min: 0, max: 10, step: 0.5, unit: "px", help: "Only touches that stay within this distance count as taps." },
       { key: "maxPredicted", label: "Predicted points", kind: "range", min: 0, max: 8, step: 1, help: "Points ahead of the tip drawn while writing, to hide latency. More can overshoot." },
       { key: "dropOutOfOrder", label: "Drop out-of-order samples", kind: "toggle", help: "Ignore samples older than the last one (re-sent by the browser)." },

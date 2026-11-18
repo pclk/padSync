@@ -246,3 +246,70 @@ export function hookTrim(input: number[][], rawPressure: number[], pressure = HO
   }
   return [start, end];
 }
+
+/**
+ * Jitter radius (section units) of the pen stopping at either end of a stroke. Before lifting,
+ * the tip often rests for a few samples, wobbling and pressing harder; drawn as is, that knot of
+ * points swells into a blob at the end of a "3" or an "e".
+ */
+export const STOP_RADIUS = 1.5;
+
+/**
+ * Index range [start, end) without the knots where the pen stood still at the start and end: the
+ * run of points within `radius` of where the pen stopped is collapsed onto that point. At least two
+ * points always remain.
+ */
+export function trimStops(input: number[][], radius = STOP_RADIUS): [number, number] {
+  const n = input.length;
+  if (n < 3 || radius <= 0) return [0, n];
+  const near = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[1]) <= radius;
+  // End: the earliest k such that every point after k stays within radius of k.
+  let end = n;
+  for (let k = n - 2; k >= 1; k--) {
+    let all = true;
+    for (let j = k + 1; j < n && all; j++) all = near(input[j], input[k]);
+    if (!all) break;
+    end = k + 1;
+  }
+  // Start: the latest k such that every point before k is within radius of k.
+  let start = 0;
+  for (let k = 1; k < end - 1; k++) {
+    let all = true;
+    for (let j = 0; j < k && all; j++) all = near(input[j], input[k]);
+    if (!all) break;
+    start = k;
+  }
+  return end - start >= 2 ? [start, end] : [0, n];
+}
+
+/**
+ * Largest size (section units, the diagonal of its bounds) of the firmly pressed part of a pen
+ * stroke that is drawn as a round dot: a period, an i-dot or a colon. The tip slides a little as
+ * it lifts, which would otherwise turn every dot into a short dash. Only points pressed at least
+ * TAP_FIRM of the stroke's peak count: a lift-off slide fades out, while a deliberate short dash
+ * (a superscript minus) keeps its pressure along its length and stays a dash. The whole touch,
+ * slide included, must also fit within TAP_SPREAD times the size, so a letter that ends in a hard
+ * press is never mistaken for a dot.
+ */
+export const TAP_DOT_SIZE = 3;
+export const TAP_FIRM = 0.6;
+export const TAP_SPREAD = 2.5;
+
+/** Centre of a tap drawn as a dot (where the pressure peaked), or null for a real stroke. */
+export function tapDot(pts: number[], size = TAP_DOT_SIZE): [number, number] | null {
+  if (size <= 0 || !pts.length) return null;
+  let best = 0;
+  for (let i = 0; i < pts.length; i += STROKE_STRIDE) if (pts[i + 2] > pts[best + 2]) best = i;
+  const extent = (min: number) => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (let i = 0; i < pts.length; i += STROKE_STRIDE) {
+      if (pts[i + 2] < min) continue;
+      minX = Math.min(minX, pts[i]);
+      maxX = Math.max(maxX, pts[i]);
+      minY = Math.min(minY, pts[i + 1]);
+      maxY = Math.max(maxY, pts[i + 1]);
+    }
+    return Math.hypot(maxX - minX, maxY - minY);
+  };
+  return extent(-Infinity) <= size * TAP_SPREAD && extent(pts[best + 2] * TAP_FIRM) <= size ? [pts[best], pts[best + 1]] : null;
+}

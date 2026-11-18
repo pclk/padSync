@@ -1,6 +1,6 @@
 import { getStroke, type StrokeOptions } from "perfect-freehand";
 import { STROKE_STRIDE, type StrokeData, type StrokeEntity } from "@/lib/types";
-import { dropBacktracks, hookTrim, interpolateGaps, smoothPositions, smoothPressure } from "./filters";
+import { dropBacktracks, hookTrim, interpolateGaps, smoothPositions, smoothPressure, tapDot, trimStops } from "./filters";
 import { DEFAULT_PEN, EASINGS, strokePen, type PenParams } from "./pen-feel";
 
 // Stroke geometry lives in section-local coordinates (1 unit = 1 CSS px at zoom 1).
@@ -61,7 +61,8 @@ export function toInput(pts: number[], input?: string, p: PenParams = DEFAULT_PE
   }
   if (!pen) return out;
   const [start, end] = hookTrim(out, raw, p.hookPressure, p.hookMaxLength);
-  const kept = dropBacktracks(out.slice(start, end), times.slice(start, end), p.backtrackMax);
+  const [s0, s1] = trimStops(out.slice(start, end), p.stopRadius);
+  const kept = dropBacktracks(out.slice(start + s0, start + s1), times.slice(start + s0, start + s1), p.backtrackMax);
   return smoothPositions(interpolateGaps(kept, p.maxPointGap), p.positionSigma);
 }
 
@@ -80,17 +81,29 @@ export function outlineToPath(outline: number[][]): Path2D {
   return path;
 }
 
-/** Radius of a single-point stroke (a tap), drawn as a dot. */
+/**
+ * Radius of a tap drawn as a dot. A Pencil dot is as wide as the line would be at the tap's
+ * firmest (smoothed) pressure, by the same pressure curve, so dots match the writing around them.
+ */
 export function dotRadius(d: StrokeData): number {
-  const r = d.tool === "highlighter" ? d.size / 2 : (d.size * (0.35 + 0.5 * (d.input === "pen" ? smoothPressure(d.pts, strokePen(d))[0] : 0.5))) / 2;
-  return Math.max(r, 0.8);
+  if (d.tool === "highlighter") return Math.max(d.size / 2, 0.8);
+  if (d.input !== "pen") return Math.max((d.size * 0.6) / 2, 0.8);
+  const p = strokePen(d);
+  const pressure = p.simulatePressure ? 0.5 : Math.max(...smoothPressure(d.pts, p));
+  return Math.max(d.size * EASINGS[p.easing](Math.min(1, Math.max(0, 0.5 - p.thinning * (0.5 - pressure)))), 0.8);
+}
+
+/** Centre of a stroke drawn as a dot: a single point, or a short Pencil tap (tapDotSize). */
+export function dotCentre(d: StrokeData): [number, number] | null {
+  if (d.pts.length === STROKE_STRIDE) return [d.pts[0], d.pts[1]];
+  return d.tool !== "highlighter" && d.input === "pen" ? tapDot(d.pts, strokePen(d).tapDotSize) : null;
 }
 
 export function strokePath(d: StrokeData, last = true): Path2D {
-  if (d.pts.length === STROKE_STRIDE) {
-    // A tap: draw a dot.
+  const dot = dotCentre(d);
+  if (dot) {
     const p = new Path2D();
-    p.arc(d.pts[0], d.pts[1], dotRadius(d), 0, Math.PI * 2);
+    p.arc(dot[0], dot[1], dotRadius(d), 0, Math.PI * 2);
     return p;
   }
   return outlineToPath(getStroke(toInput(d.pts, d.input, strokePen(d)), strokeOptions(d, last)));
@@ -100,8 +113,9 @@ const r1 = (n: number) => Math.round(n * 10) / 10;
 
 /** The same outline as strokePath, as an SVG path `d` (for library thumbnails, no canvas needed). */
 export function strokeSvgPath(d: StrokeData): string {
-  if (d.pts.length === STROKE_STRIDE) {
-    const [x, y, r] = [d.pts[0], d.pts[1], dotRadius(d)].map(r1);
+  const dot = dotCentre(d);
+  if (dot) {
+    const [x, y, r] = [dot[0], dot[1], dotRadius(d)].map(r1);
     return `M${r1(x - r)} ${y}a${r} ${r} 0 1 0 ${r1(2 * r)} 0a${r} ${r} 0 1 0 ${r1(-2 * r)} 0Z`;
   }
   const outline = getStroke(toInput(d.pts, d.input, strokePen(d)), strokeOptions(d, true));
