@@ -91,3 +91,35 @@ iPad memory. Leave until a device check shows it matters.
 2. Ctrl+wheel on the Mac could use `pinchPlacement` as well, to stop wheel zoom from drifting at the
    pan limits, and `zoomAt` could then go.
 3. Sharpness above 150% (tile and PDF caps), if the device check shows softness.
+
+## 2026-11-19 01:00 — bugs: pinch on a notebook shorter than the window
+
+**Fixed.** The pinch preview (`pinchPlacement`) worked out the bottom scroll limit as the
+document's scroll range at the start plus the column's growth. But the editor is
+`min-h-screen`: when the notebook is shorter than the window (a few sections at 25–50%),
+`scrollHeight` is the window height and the start range is 0 no matter how short the content is.
+Pinching in near the bottom then let the preview scroll further than the browser allows, and the
+page snapped back on lift-off. In the test case (one section at 25%, pinched to 50% and dragged
+up) the preview scrolled to 258 px against a real limit of 156 px. `PinchStart` now carries the
+notebook's own height (column bottom + bottom margin, read at pinch start) and the window height
+instead of `maxScrollY`. For notebooks taller than the window the result is the same as before.
+
+**Checked.** A new failing test first (`tests/notebook-viewport.test.ts`, "knows a short notebook
+can only scroll…"), then the fix. `npm run typecheck`, `npm run lint`, `npx vitest run` (785
+passed). Stroke drawing is untouched, so `test:pencil` wasn't needed.
+
+**Reviewed, no bug found.** Today's `usePencilNoScroll` (surfaces mount unconditionally, so the
+ref is set when the effect runs), the replay timer, the recorder, and the sync push/pull path
+(server advisory lock and seq order, client ack only when the hlc is unchanged, LWW on pull).
+Two minor things not worth a change: a truncated Pencil test recording has no `record-stop`
+marker, because the recorder stops accepting events once the limit is hit. And a lasso move
+writes back the strokes as they were at drag start, so a stroke erased on another device
+*during* that one drag would come back.
+
+**Needs a device check.** Zoomed out to 25% on a one- or two-section notebook, pinch in near the
+bottom of the screen: the page should not settle back when the fingers lift. Also check that
+`getComputedStyle(...).marginBottom` resolves the `max(50vh, …)` margin to px in iPad Safari (it
+should; a 0 there would make the bottom limit too tight, not too loose).
+
+**Next.** The 00:30 run's list still stands (Ctrl+wheel through `pinchPlacement`, black blocks
+during long pinches, sharpness above 150%).

@@ -101,8 +101,13 @@ export interface PinchStart {
   top: number;
   scrollX: number;
   scrollY: number;
-  /** Largest vertical scroll then, and how much of the column's height scales with zoom. */
-  maxScrollY: number;
+  /**
+   * The notebook's own height then (top padding, column, bottom margin), not stretched to fill the
+   * window, and the window height: a notebook shorter than the window can't scroll.
+   */
+  contentHeight: number;
+  viewportH: number;
+  /** How much of the column's height scales with zoom. */
   scaledHeight: number;
   /** Client point between the fingers when the pinch began. */
   anchor: [number, number];
@@ -134,7 +139,7 @@ export function pinchPlacement(p: PinchStart, s: number, mid: [number, number]):
   // Document position of the column: centring can move it sideways; nothing above it scales.
   const docLeft = p.left + p.scrollX + after.left - before.left;
   const docTop = p.top + p.scrollY;
-  const maxScrollY = Math.max(0, p.maxScrollY + p.scaledHeight * (k - 1));
+  const maxScrollY = Math.max(0, p.contentHeight + p.scaledHeight * (k - 1) - p.viewportH);
   const clamp = (v: number, hi: number) => Math.min(hi, Math.max(0, v));
   const scrollX = clamp(docLeft + (p.anchor[0] - p.left) * k - mid[0], after.maxScrollX);
   const scrollY = clamp(docTop + (p.anchor[1] - p.top) * k - mid[1], maxScrollY);

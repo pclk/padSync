@@ -277,7 +277,7 @@ describe("pinch placement", () => {
     const col = columnLayout(vw, PAGE_WIDTH * zoom, insets, gutter);
     const top = verticalPadding(insets, gutter).top;
     const scaledHeight = 20 * 1032 * zoom;
-    return { zoom, left: col.left - sx, top: top - sy, scrollX: sx, scrollY: sy, maxScrollY: top + scaledHeight + 600 - 1024, scaledHeight, anchor, viewportW: vw, insets, gutter };
+    return { zoom, left: col.left - sx, top: top - sy, scrollX: sx, scrollY: sy, contentHeight: top + scaledHeight + 600, viewportH: 1024, scaledHeight, anchor, viewportW: vw, insets, gutter };
   };
   // Where the point first under the fingers ends up on screen.
   const anchorAfter = (p: PinchStart, s: number, mid: [number, number]) => {
@@ -330,9 +330,23 @@ describe("pinch placement", () => {
     expect(top.scrollY).toBe(0);
     expect(top.top).toBe(verticalPadding(insets, gutter).top);
     const p = startAt(1, 0, 0, [700, 300]);
-    const bottom = pinchPlacement({ ...p, scrollY: p.maxScrollY, top: p.top - p.maxScrollY }, 0.5, [700, 100]);
+    const maxScrollY = p.contentHeight - p.viewportH;
+    const bottom = pinchPlacement({ ...p, scrollY: maxScrollY, top: p.top - maxScrollY }, 0.5, [700, 100]);
     // Zoomed out to half, the scalable column is half as tall and the scroll range shrinks with it.
-    expect(bottom.scrollY).toBeCloseTo(p.maxScrollY - p.scaledHeight / 2);
+    expect(bottom.scrollY).toBeCloseTo(maxScrollY - p.scaledHeight / 2);
+  });
+
+  it("knows a short notebook can only scroll as far as its zoomed height allows", () => {
+    // One section at 25%: the notebook is shorter than the window (min-h-screen fills the rest),
+    // so the window can't scroll. Pinching in to 50% near the bottom, dragging up: the commit can
+    // only scroll as far as the column's new height reaches past the window, not further.
+    const top = verticalPadding(insets, gutter).top;
+    const scaledHeight = 1032 * MIN_ZOOM;
+    const p: PinchStart = { ...startAt(MIN_ZOOM, 0, 0, [700, 900]), scaledHeight, contentHeight: top + scaledHeight + 600 };
+    expect(p.contentHeight).toBeLessThan(p.viewportH);
+    const r = pinchPlacement(p, 2, [700, 300]);
+    const realMax = top + scaledHeight * 2 + 600 - 1024;
+    expect(r.scrollY).toBeCloseTo(realMax);
   });
 
   it("only pans at the zoom limits", () => {

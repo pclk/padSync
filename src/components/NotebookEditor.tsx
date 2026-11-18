@@ -292,14 +292,15 @@ function Editor({ notebookId }: { notebookId: string }) {
         const rect = pinchRef.current.getBoundingClientRect();
         // With sections scaled one by one, the "Blank page" button at the end keeps its size.
         const fixed = perSection ? ((wrapRef.current.lastElementChild as HTMLElement | null)?.offsetHeight ?? 0) : 0;
-        const root = document.documentElement;
+        const below = parseFloat(getComputedStyle(pinchRef.current).marginBottom) || 0;
         const start: PinchStart = {
           zoom: controller.zoom,
           left: rect.left,
           top: rect.top,
           scrollX: window.scrollX,
           scrollY: window.scrollY,
-          maxScrollY: root.scrollHeight - window.innerHeight,
+          contentHeight: rect.bottom + window.scrollY + below,
+          viewportH: window.innerHeight,
           scaledHeight: rect.height - fixed,
           anchor: mid(a, b),
           ...geometry.current,
