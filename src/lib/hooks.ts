@@ -43,7 +43,7 @@ export function useLayoutMode(notebookId: string, controller: InkController) {
   const [mode, persistMode] = useStoredState<LayoutMode>("padsync.layoutMode", "auto");
   const [idleMs] = useStoredState("padsync.layoutIdleMs", 15000);
   const [state, dispatch] = useReducer((s: LayoutState, e: LayoutEvent) => layoutReducer(s, e, idleMs), { mode, effective: mode === "drawing" ? "drawing" : "chat", lastActivityAt: 0, drawingSince: 0 });
-  const [viewport, setViewport] = useState(1024);
+  const [viewport, setViewport] = useState(() => (typeof window === "undefined" ? 1024 : window.innerWidth));
   useEffect(() => {
     const resize = () => setViewport(window.innerWidth);
     resize();

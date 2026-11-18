@@ -13,6 +13,7 @@ import { useLayoutMode, useStoredState } from "@/lib/hooks";
 import { addTextBox, insertSectionAfter, liveSections, logEvent, putEntities } from "@/lib/store";
 import { registerDebugProbe } from "@/lib/sync-debug";
 import { renderFlag } from "@/lib/render-flags";
+import { clampZoom, fitZoom, notebookInsets, PAGE_GUTTER, pageLeft, parseZoom, stageMinWidth, type Insets } from "@/lib/viewport";
 import { PAGE_WIDTH, type NotebookEntity, type PresenceData, type PresenceEntity, type SectionEntity } from "@/lib/types";
 import { SectionView } from "./SectionView";
 import { SidePanel } from "./SidePanel";
@@ -25,21 +26,22 @@ const TOOLBAR_H = 56;
 // The Mac only follows the iPad after this long without input of its own.
 const FOLLOW_IDLE_MS = 15000;
 
-const MIN_ZOOM = 0.4;
-const MAX_ZOOM = 3;
-const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
-
-// Where this device last was in each notebook: a section and the logical offset into it.
-type Position = { sectionId: string; offsetY: number };
+// Where this device last was in each notebook: a section, the logical offset into it, and the
+// zoom (restored on the iPad; the Mac fits the page to its layout instead).
+type Position = { sectionId: string; offsetY: number; zoom?: number };
 const positionKey = (notebookId: string) => `padsync.position.${notebookId}`;
 function readPosition(notebookId: string): Position | null {
   try {
     const p = JSON.parse(localStorage.getItem(positionKey(notebookId)) ?? "null");
-    return p && typeof p.sectionId === "string" && typeof p.offsetY === "number" ? p : null;
+    if (!p || typeof p.sectionId !== "string" || typeof p.offsetY !== "number") return null;
+    const zoom = parseZoom(p.zoom);
+    return { sectionId: p.sectionId, offsetY: p.offsetY, ...(zoom === null ? {} : { zoom }) };
   } catch {
     return null;
   }
 }
+// The layout viewport without a classic scrollbar, which is what the fixed panels measure against.
+const viewportWidth = () => document.documentElement.clientWidth || window.innerWidth;
 
 const DEFAULT_TOOL: ToolState = {
   kind: "pen",
@@ -92,7 +94,6 @@ function Editor({ notebookId }: { notebookId: string }) {
   }, [storedTool]);
   const [panelOpen, setPanelOpen] = useStoredState("padsync.panel", !isIpad);
   const [follow, setFollow] = useStoredState("padsync.follow", !isIpad);
-  const [zoom, setZoom] = useState(() => (isIpad ? 1 : fitZoom(panelOpen, 360)));
   const [selection, setSelection] = useState<Selection | null>(null);
   const [dragging, setDragging] = useState<Set<string> | null>(null);
   const [editingText, setEditingText] = useState<string | null>(null);
@@ -125,6 +126,10 @@ function Editor({ notebookId }: { notebookId: string }) {
   );
   const layout = useLayoutMode(notebookId, controller);
   const panelWidth = isIpad ? 360 : layout.width;
+  // What covers the screen edges; the page is fitted and centred in the space between.
+  const insets = useMemo(() => notebookInsets({ isIpad, panelOpen, panelWidth }), [isIpad, panelOpen, panelWidth]);
+  const [savedPosition] = useState(() => readPosition(notebookId));
+  const [zoom, setZoom] = useState(() => (isIpad ? (savedPosition?.zoom ?? 1) : fitZoom(viewportWidth(), insets)));
   useLayoutEffect(() => {
     controller.configure(tool, zoom);
   }, [controller, tool, zoom]);
@@ -137,6 +142,7 @@ function Editor({ notebookId }: { notebookId: string }) {
         selected: controller.selection?.ids.size ?? 0,
         sections: els.current.size,
         undo: controller.undo.canUndo,
+        scrollX: Math.round(window.scrollX),
         scrollY: Math.round(window.scrollY),
         pageHeight: document.documentElement.scrollHeight,
         panelOpen,
@@ -222,12 +228,14 @@ function Editor({ notebookId }: { notebookId: string }) {
     void logEvent(notebookId, null, "zoom", { zoom });
   }, [zoom, notebookId]);
 
+  // Back to 100% (iPad) or the fit (Mac), keeping the line at the top of the screen in place and
+  // scrolling back to the page's left edge.
   const resetZoom = () => {
-    const z = isIpad ? 1 : fitZoom(panelOpen, panelWidth);
+    const z = isIpad ? 1 : fitZoom(viewportWidth(), insets);
     const wrap = wrapRef.current!;
     const r = wrap.getBoundingClientRect();
     const cy = TOOLBAR_H + 10;
-    zoomAt(z, 0, (cy - r.top) / zoom, r.left, cy);
+    zoomAt(z, 0, (cy - r.top) / zoom, pageLeft(viewportWidth(), insets, PAGE_WIDTH * z), cy);
   };
 
   // Trackpad pinch on the Mac arrives as ctrl+wheel.
@@ -373,9 +381,8 @@ function Editor({ notebookId }: { notebookId: string }) {
   const currentRef = useRef<string | null>(null);
   const followingScroll = useRef(0);
 
-  // Reopen where this device left the notebook. Saving waits until the restore is over, so the
-  // scroll-to-top of a fresh mount never overwrites the saved place.
-  const [savedPosition] = useState(() => readPosition(notebookId));
+  // Reopen where this device left the notebook (savedPosition, read above). Saving waits until the
+  // restore is over, so the scroll-to-top of a fresh mount never overwrites the saved place.
   const restored = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savePosition = useCallback(() => {
@@ -385,8 +392,9 @@ function Editor({ notebookId }: { notebookId: string }) {
     const el = sid ? els.current.get(sid) : undefined;
     if (!restored.current || !sid || !el) return;
     const offsetY = Math.round((TOOLBAR_H - el.getBoundingClientRect().top) / controller.zoom);
+    const zoom = Math.round(controller.zoom * 1000) / 1000;
     try {
-      localStorage.setItem(positionKey(notebookId), JSON.stringify({ sectionId: sid, offsetY } satisfies Position));
+      localStorage.setItem(positionKey(notebookId), JSON.stringify({ sectionId: sid, offsetY, zoom } satisfies Position));
     } catch {}
   }, [controller, notebookId]);
 
@@ -398,6 +406,13 @@ function Editor({ notebookId }: { notebookId: string }) {
       flush();
     };
   }, [savePosition]);
+
+  // A zoom that ends with the scroll already in place fires no scroll event; save it anyway.
+  useEffect(() => {
+    if (!restored.current) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(savePosition, 300);
+  }, [zoom, savePosition]);
 
   const publishPresence = useCallback(() => {
     const sid = currentRef.current;
@@ -483,6 +498,9 @@ function Editor({ notebookId }: { notebookId: string }) {
     window.scrollBy({ top: delta, behavior: "smooth" });
   }, [follow, ipad, notebookId, controller, idleAt]);
 
+  // The Mac refits the page whenever what covers the screen changes (chat opened, closed or
+  // resized, the window resized), once the panel has finished sliding. The line at the top of the
+  // screen stays there, and the page scrolls back to its left edge.
   useLayoutEffect(() => {
     if (isIpad) return;
     const entry = [...els.current].find(([, el]) => el.getBoundingClientRect().bottom > TOOLBAR_H);
@@ -491,17 +509,17 @@ function Editor({ notebookId }: { notebookId: string }) {
     const finish = () => {
       if (done) return;
       done = true;
-      const next = fitZoom(panelOpen, panelWidth);
+      const next = fitZoom(viewportWidth(), insets);
       setZoom(next);
       requestAnimationFrame(() => {
-        if (entry) window.scrollBy(0, entry[1].getBoundingClientRect().top + offset * next - TOOLBAR_H);
+        window.scrollBy(-window.scrollX, entry ? entry[1].getBoundingClientRect().top + offset * next - TOOLBAR_H : 0);
       });
     };
-    const end = (event: TransitionEvent) => { if (event.propertyName === "padding-right") finish(); };
+    const end = (event: TransitionEvent) => { if (event.propertyName === "padding-right" || event.propertyName === "padding-left") finish(); };
     window.addEventListener("transitionend", end);
     const timer = setTimeout(finish, 400);
     return () => { clearTimeout(timer); window.removeEventListener("transitionend", end); };
-  }, [panelWidth, panelOpen, isIpad, controller]);
+  }, [insets, isIpad, controller]);
 
   const loaded = sections !== undefined && notebook !== undefined;
   useLayoutEffect(() => {
@@ -557,8 +575,9 @@ function Editor({ notebookId }: { notebookId: string }) {
   const showPanel = panelOpen;
 
   return (
-    <div className="editor min-h-screen bg-canvas" style={{ paddingTop: TOOLBAR_H + 16, paddingRight: showPanel ? panelWidth : 0 }}>
-      <style>{` .editor { transition: padding-right 250ms; } .editor > aside { transition: width 250ms; } @media (prefers-reduced-motion: reduce) { .editor, .editor > aside { transition: none; } } `}</style>
+    <div className="editor min-h-screen bg-canvas" style={editorStyle(insets, PAGE_WIDTH * zoom)}>
+      {/* overscroll-behavior-x: a sideways pan at the page's edge must not swipe back to the library. */}
+      <style>{` html { overscroll-behavior-x: none; } .editor { transition: padding-right 250ms, padding-left 250ms; } .editor > aside { transition: width 250ms; } @media (prefers-reduced-motion: reduce) { .editor, .editor > aside { transition: none; } } `}</style>
       <Toolbar
         notebookId={notebookId}
         layout={isIpad ? undefined : layout}
@@ -625,8 +644,8 @@ function Editor({ notebookId }: { notebookId: string }) {
   );
 }
 
-function fitZoom(withPanel: boolean, width: number) {
-  if (typeof window === "undefined") return 1;
-  const avail = window.innerWidth - (withPanel ? width : 0) - 32;
-  return clampZoom(Math.min(1, avail / PAGE_WIDTH));
+// The page sits between the insets: centred when it fits, and otherwise the editor grows wider
+// than the window (stageWidth in lib/viewport) so it scrolls sideways out from under the panels.
+function editorStyle(insets: Insets, pagePx: number) {
+  return { paddingTop: TOOLBAR_H + 16, paddingLeft: insets.left + PAGE_GUTTER, paddingRight: insets.right + PAGE_GUTTER, width: `max(100%, ${stageMinWidth(insets, pagePx)}px)` };
 }
