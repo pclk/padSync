@@ -6,9 +6,9 @@ On the Mac, the notebook (drawing area) and the side panel share the screen acco
 happening on the iPad:
 
 - **Activity** (edits are arriving from another device): the drawing area takes the screen, the
-  side panel shrinks to its compact width (360 px) and stays usable.
-- **No activity** for `idleMs`: the drawing area shrinks and the side panel takes **half the
-  screen**, with a full chat client in it.
+  drawing area and the side panel split the screen **50/50**.
+- **No activity** for `idleMs`: the drawing area shrinks to **25%** and the side panel takes
+  **75%**, with a full chat client in it.
 
 The chat replaces the one-shot, per-section "Ask AI" with multi-turn **threads** that are complete
 enough that the user never needs another chat app: many threads, history, streaming, editing,
@@ -54,7 +54,7 @@ drawing / chat: fixed, ignore activity (a manual pick holds until "Auto" is chos
 
 ### Rendering
 
-- Panel width: drawing = 360 px; chat = `max(420px, 50vw)`, never more than `100vw - 480px`.
+- Panel width (2026-11-18): drawing = 50vw; chat = 75vw.
 - The width changes with a 250 ms CSS transition (none under `prefers-reduced-motion`). The
   notebook zoom (`fitZoom`) is recomputed once the transition ends (`transitionend`, with a
   timeout fallback), not on every frame.
@@ -172,9 +172,9 @@ The panel has two tabs: **Chat** (default) and **Section**. The current panel co
 iPad, section info and stats, copy image or text, solutions, reorder) moves unchanged into
 Section, which also holds "Earlier questions".
 
-**Chat mode (half screen)**: thread list on the left (240 px, collapsible), conversation on the
+**Chat mode (75%)**: thread list on the left (240 px, collapsible), conversation on the
 right.
-**Drawing mode (360 px)**: no list; a thread switcher (dropdown with search) above the
+**Drawing mode (50%)**: no list; a thread switcher (dropdown with search) above the
 conversation.
 
 Thread list

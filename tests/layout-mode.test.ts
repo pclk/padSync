@@ -28,11 +28,11 @@ describe("layout-mode reducer", () => {
     }
   });
 });
-it("panelWidth respects viewport limits", () => {
-  expect(panelWidth("drawing", 1440)).toBe(360);
-  expect(panelWidth("chat", 1440)).toBe(720);
-  expect(panelWidth("chat", 900)).toBe(420);
-  expect(panelWidth("chat", 800)).toBe(360);
+it("panelWidth splits the window 50/50 for drawing and 25/75 for chat", () => {
+  expect(panelWidth("drawing", 1440)).toBe(720);
+  expect(panelWidth("chat", 1440)).toBe(1080);
+  expect(panelWidth("drawing", 901)).toBe(451);
+  expect(panelWidth("chat", 800)).toBe(600);
 });
 it("nextTickDelay returns only the remaining deadline", () => {
   expect(nextTickDelay(initial, 0)).toBeNull();

@@ -21,6 +21,8 @@ import { Icon } from "./Icons";
 const emitLocalText = (notebookId: string) => emitActivity({ notebookId, source: "local", kinds: ["text"], at: Date.now() });
 
 const TOOLBAR_H = 56;
+// The Mac only follows the iPad after this long without input of its own.
+const FOLLOW_IDLE_MS = 15000;
 
 const MIN_ZOOM = 0.4;
 const MAX_ZOOM = 3;
@@ -444,15 +446,37 @@ function Editor({ notebookId }: { notebookId: string }) {
     return others.sort((a, b) => b.data.at - a.data.at)[0] ?? null;
   }, [presences]);
 
+  // Clicking, scrolling, typing (chat included) or opening the notebook restarts the idle clock;
+  // moving the pointer alone does not, so reading with the mouse resting on the page still follows.
+  const lastInput = useRef(0);
+  const [idleAt, setIdleAt] = useState(0);
+  useEffect(() => {
+    if (isIpad) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const mark = () => {
+      lastInput.current = performance.now();
+      clearTimeout(timer);
+      timer = setTimeout(() => setIdleAt(performance.now()), FOLLOW_IDLE_MS);
+    };
+    const inputs = ["pointerdown", "wheel", "keydown", "touchstart"] as const;
+    inputs.forEach((t) => window.addEventListener(t, mark, { passive: true, capture: true }));
+    mark();
+    return () => {
+      clearTimeout(timer);
+      inputs.forEach((t) => window.removeEventListener(t, mark, { capture: true }));
+    };
+  }, [isIpad]);
+
   useEffect(() => {
     if (!follow || !ipad || ipad.notebookId !== notebookId || !ipad.data.sectionId || controller.isDrawing()) return;
+    if (performance.now() - lastInput.current < FOLLOW_IDLE_MS) return;
     const el = els.current.get(ipad.data.sectionId);
     if (!el) return;
     const delta = el.getBoundingClientRect().top + ipad.data.offsetY * controller.zoom - TOOLBAR_H;
     if (Math.abs(delta) < 4) return;
     followingScroll.current = performance.now();
     window.scrollBy({ top: delta, behavior: "smooth" });
-  }, [follow, ipad, notebookId, controller]);
+  }, [follow, ipad, notebookId, controller, idleAt]);
 
   useLayoutEffect(() => {
     if (isIpad) return;

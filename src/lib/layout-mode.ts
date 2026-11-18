@@ -14,10 +14,10 @@ export function layoutReducer(state: LayoutState, event: LayoutEvent, idleMs = 1
   if (!event.drawing && event.now >= Math.max(state.lastActivityAt + idleMs, state.drawingSince + minDrawingMs)) return { ...state, effective: "chat" };
   return state;
 }
-const DRAWING_W = 360;
+// Share of the window the side panel takes: drawing is a 50/50 split, chat gives the page 25%.
+const PANEL_SHARE: Record<PanelMode, number> = { drawing: 0.5, chat: 0.75 };
 export function panelWidth(effective: PanelMode, viewportWidth: number) {
-  // Chat is never narrower than the drawing width, even on a small window.
-  return effective === "drawing" ? DRAWING_W : Math.max(DRAWING_W, Math.min(Math.max(420, viewportWidth / 2), viewportWidth - 480));
+  return Math.round(viewportWidth * PANEL_SHARE[effective]);
 }
 export function nextTickDelay(state: LayoutState, now: number, idleMs = 15000, minDrawingMs = 4000): number | null {
   return state.mode !== "auto" || state.effective !== "drawing" ? null : Math.max(0, Math.max(state.lastActivityAt + idleMs, state.drawingSince + minDrawingMs) - now);
