@@ -1,6 +1,6 @@
 import { getStroke, type StrokeOptions } from "perfect-freehand";
 import { STROKE_STRIDE, type StrokeData, type StrokeEntity } from "@/lib/types";
-import { dropBacktracks, smoothPositions, smoothPressure } from "./filters";
+import { dropBacktracks, hookTrim, interpolateGaps, smoothPositions, smoothPressure } from "./filters";
 import { penFeel } from "./pen-feel";
 
 // Stroke geometry lives in section-local coordinates (1 unit = 1 CSS px at zoom 1).
@@ -13,7 +13,8 @@ export function strokeOptions(d: Pick<StrokeData, "tool" | "size" | "input" | "s
   if (d.input === "pen") {
     // Pencil pressure arrives smoothed (smoothPressure). Linear easing makes `size` the line width
     // at mid pressure; the old sine easing drew pen lines ~1.4× the chosen size.
-    return { size: d.size, ...penFeel(d.smoothing, d.sensitivity), simulatePressure: false, easing: (t) => t, last };
+    const { streamline, smoothing, thinning } = penFeel(d.smoothing, d.sensitivity);
+    return { size: d.size, streamline, smoothing, thinning, simulatePressure: false, easing: (t) => t, last };
   }
   // Mouse and trackpad keep their simulated pressure; only the smoothness setting applies.
   const feel = d.smoothing === undefined ? { streamline: 0.32, smoothing: 0.5 } : penFeel(d.smoothing);
@@ -29,20 +30,27 @@ export function strokeOptions(d: Pick<StrokeData, "tool" | "size" | "input" | "s
 }
 
 /**
- * perfect-freehand input. Pencil input is cleaned here, at render time, never in storage:
- * pressure is smoothed, re-sent samples that step backwards are dropped (dropBacktracks) and
- * positions are lightly smoothed along the stroke (smoothPositions).
+ * perfect-freehand input. Pencil input is cleaned here, at render time, never in storage, so
+ * existing strokes improve too: touchdown/lift-off hooks are trimmed (hookTrim), re-sent samples
+ * that step backwards are dropped (dropBacktracks), sparse samples are joined by curves
+ * (interpolateGaps), and positions are smoothed along the stroke (smoothPositions) by an amount
+ * that follows the stroke's smoothness setting.
  */
-export function toInput(pts: number[], input?: string): number[][] {
+export function toInput(pts: number[], input?: string, smoothing?: number): number[][] {
   const pen = input === "pen";
   const pressure = pen ? smoothPressure(pts) : null;
   const out: number[][] = [];
   const times: number[] = [];
+  const raw: number[] = [];
   for (let i = 0, j = 0; i < pts.length; i += STROKE_STRIDE, j++) {
     out.push([pts[i], pts[i + 1], pressure ? pressure[j] : pts[i + 2]]);
     times.push(pts[i + 5]);
+    raw.push(pts[i + 2]);
   }
-  return pen ? smoothPositions(dropBacktracks(out, times)) : out;
+  if (!pen) return out;
+  const [start, end] = hookTrim(out, raw);
+  const kept = dropBacktracks(out.slice(start, end), times.slice(start, end));
+  return smoothPositions(interpolateGaps(kept), penFeel(smoothing).sigma);
 }
 
 export function outlineToPath(outline: number[][]): Path2D {
@@ -73,7 +81,7 @@ export function strokePath(d: StrokeData, last = true): Path2D {
     p.arc(d.pts[0], d.pts[1], dotRadius(d), 0, Math.PI * 2);
     return p;
   }
-  return outlineToPath(getStroke(toInput(d.pts, d.input), strokeOptions(d, last)));
+  return outlineToPath(getStroke(toInput(d.pts, d.input, d.smoothing), strokeOptions(d, last)));
 }
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -84,7 +92,7 @@ export function strokeSvgPath(d: StrokeData): string {
     const [x, y, r] = [d.pts[0], d.pts[1], dotRadius(d)].map(r1);
     return `M${r1(x - r)} ${y}a${r} ${r} 0 1 0 ${r1(2 * r)} 0a${r} ${r} 0 1 0 ${r1(-2 * r)} 0Z`;
   }
-  const outline = getStroke(toInput(d.pts, d.input), strokeOptions(d, true));
+  const outline = getStroke(toInput(d.pts, d.input, d.smoothing), strokeOptions(d, true));
   const n = outline.length;
   if (n < 2) return "";
   // Quadratic curves through midpoints, exactly as outlineToPath.

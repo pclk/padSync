@@ -161,3 +161,71 @@ export function smoothPositions(input: number[][], sigma = POSITION_SIGMA): numb
   out.push(input[n - 1]);
   return out;
 }
+
+/**
+ * Longest gap (section units) left between rendered Pencil points. When the Pencil delivers
+ * fewer samples than its 240 Hz (Safari often hands over one per frame), fast handwriting has
+ * 5–15 px between samples: drawn straight they make angular letters, and perfect-freehand's
+ * per-sample streamline then cuts across small loops (an "o" or an "a" collapses). Curving
+ * through the samples at this spacing makes every later step behave the same at any rate.
+ */
+export const MAX_POINT_GAP = 1.5;
+
+/**
+ * Pen points with Catmull–Rom curves through the samples wherever two are further apart than
+ * `gap`. Pressure is interpolated linearly. Dense input comes back unchanged.
+ */
+export function interpolateGaps(input: number[][], gap = MAX_POINT_GAP): number[][] {
+  const n = input.length;
+  if (n < 2) return input;
+  let needed = false;
+  for (let i = 1; i < n && !needed; i++) needed = Math.hypot(input[i][0] - input[i - 1][0], input[i][1] - input[i - 1][1]) > gap;
+  if (!needed) return input;
+  const out: number[][] = [input[0]];
+  for (let i = 1; i < n; i++) {
+    const p0 = input[Math.max(0, i - 2)];
+    const p1 = input[i - 1];
+    const p2 = input[i];
+    const p3 = input[Math.min(n - 1, i + 1)];
+    const steps = Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / gap);
+    for (let k = 1; k < steps; k++) {
+      const t = k / steps;
+      const t2 = t * t;
+      const t3 = t2 * t;
+      const cr = (a: number, b: number, c: number, d: number) =>
+        0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
+      out.push([cr(p0[0], p1[0], p2[0], p3[0]), cr(p0[1], p1[1], p2[1], p3[1]), p1[2] + (p2[2] - p1[2]) * t]);
+    }
+    out.push(p2);
+  }
+  return out;
+}
+
+/** Raw Pencil pressure below this at a stroke's ends is the tip landing or lifting, not ink. */
+export const HOOK_PRESSURE = 0.12;
+/** At most this much of a stroke's length (section units) is trimmed from either end. */
+export const HOOK_MAX_LENGTH = 6;
+
+/**
+ * Index range [start, end) of a pen stroke without its touchdown and lift-off hooks: the short
+ * runs at either end where the tip skids while the pressure ramps up or falls away. Only the
+ * light ends are cut, never more than HOOK_MAX_LENGTH, and at least two points always remain.
+ */
+export function hookTrim(input: number[][], rawPressure: number[]): [number, number] {
+  const n = input.length;
+  let start = 0;
+  let len = 0;
+  while (start < n - 2 && rawPressure[start] < HOOK_PRESSURE) {
+    len += Math.hypot(input[start + 1][0] - input[start][0], input[start + 1][1] - input[start][1]);
+    if (len > HOOK_MAX_LENGTH) break;
+    start++;
+  }
+  let end = n;
+  len = 0;
+  while (end - 1 > start + 1 && rawPressure[end - 1] < HOOK_PRESSURE) {
+    len += Math.hypot(input[end - 1][0] - input[end - 2][0], input[end - 1][1] - input[end - 2][1]);
+    if (len > HOOK_MAX_LENGTH) break;
+    end--;
+  }
+  return [start, end];
+}

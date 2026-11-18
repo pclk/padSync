@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getStroke } from "perfect-freehand";
-import { BACKTRACK_MAX, dropBacktracks, smoothPositions } from "@/ink/filters";
+import { BACKTRACK_MAX, HOOK_MAX_LENGTH, MAX_POINT_GAP, dropBacktracks, hookTrim, interpolateGaps, smoothPositions } from "@/ink/filters";
 import { strokeOptions, toInput } from "@/ink/render";
 import type { StrokeData, StrokeEntity } from "@/lib/types";
 
@@ -95,6 +95,43 @@ describe("smoothPositions", () => {
     for (let i = 1; i <= 20; i++) pts.push([20, i, 0.5]);
     const corner = smoothPositions(pts)[20];
     expect(Math.hypot(corner[0] - 20, corner[1])).toBeLessThan(1);
+  });
+});
+
+describe("interpolateGaps", () => {
+  it("curves through sparse samples, keeping every sample and the spacing small", () => {
+    // A circle of radius 6 sampled 8 times (like a fast "o" at one sample per frame).
+    const pts = Array.from({ length: 9 }, (_, i) => [6 * Math.cos((i * Math.PI) / 4), 6 * Math.sin((i * Math.PI) / 4), 0.5]);
+    const out = interpolateGaps(pts);
+    for (const p of pts) expect(out).toContainEqual(p);
+    for (let i = 1; i < out.length; i++) expect(Math.hypot(out[i][0] - out[i - 1][0], out[i][1] - out[i - 1][1])).toBeLessThanOrEqual(MAX_POINT_GAP + 0.3);
+    // Between samples the curve bulges out towards the circle instead of cutting the chord.
+    const mid = out.slice(1, -1).filter((p) => !pts.includes(p));
+    const chord = 6 * Math.cos(Math.PI / 8);
+    expect(Math.max(...mid.map(([x, y]) => Math.hypot(x, y)))).toBeGreaterThan(chord + 0.3);
+  });
+
+  it("returns dense input unchanged", () => {
+    const pts = Array.from({ length: 10 }, (_, i) => [i, 0, 0.5]);
+    expect(interpolateGaps(pts)).toBe(pts);
+  });
+});
+
+describe("hookTrim", () => {
+  const line = (n: number) => Array.from({ length: n }, (_, i) => [i, 0, 0.5]);
+
+  it("cuts the light touchdown and lift-off ends", () => {
+    const raw = [0.02, 0.06, 0.3, 0.4, 0.4, 0.4, 0.3, 0.05, 0];
+    expect(hookTrim(line(9), raw)).toEqual([2, 7]);
+  });
+
+  it("never cuts more than HOOK_MAX_LENGTH from an end, or below two points", () => {
+    const raw = Array.from({ length: 20 }, () => 0.01);
+    const [start, end] = hookTrim(line(20), raw);
+    expect(start).toBeLessThanOrEqual(HOOK_MAX_LENGTH);
+    expect(end - start).toBeGreaterThanOrEqual(2);
+    const [s3, e3] = hookTrim(line(3), [0, 0, 0]);
+    expect(e3 - s3).toBe(2);
   });
 });
 

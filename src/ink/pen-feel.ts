@@ -14,5 +14,7 @@ export const DEFAULT_SENSITIVITY = 0.4;
 export function penFeel(smoothing = DEFAULT_SMOOTHING, sensitivity = DEFAULT_SENSITIVITY) {
   const s = Math.min(1, Math.max(0, smoothing));
   const p = Math.min(1, Math.max(0, sensitivity));
-  return { streamline: 0.1 + 0.5 * s, smoothing: 0.35 + 0.4 * s, thinning: 0.75 * p };
+  // Pencil points arrive ≤ MAX_POINT_GAP apart (interpolateGaps), so streamline's per-point lag
+  // is a fixed distance; sigma is the arc-length Gaussian of smoothPositions.
+  return { streamline: 0.1 + 0.5 * s, smoothing: 0.35 + 0.4 * s, thinning: 0.75 * p, sigma: 0.5 + 2 * s };
 }

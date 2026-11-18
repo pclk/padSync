@@ -54,8 +54,9 @@ describe("pen strokes", () => {
   });
 
   it("use the feel stored on the stroke, with defaults for older strokes", () => {
-    expect(strokeOptions(pen({ smoothing: 1, sensitivity: 0 }), true)).toMatchObject({ ...penFeel(1, 0) });
-    expect(strokeOptions(pen(), true)).toMatchObject({ ...penFeel() });
+    const options = ({ streamline, smoothing, thinning }: ReturnType<typeof penFeel>) => ({ streamline, smoothing, thinning });
+    expect(strokeOptions(pen({ smoothing: 1, sensitivity: 0 }), true)).toMatchObject(options(penFeel(1, 0)));
+    expect(strokeOptions(pen(), true)).toMatchObject(options(penFeel()));
   });
 
   it("low sensitivity keeps width steady when pressure changes", () => {
