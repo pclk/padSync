@@ -5,6 +5,7 @@ import { deviceId, deviceKind } from '@/lib/db';
 import { useSyncDebug } from '@/lib/settings';
 import { getSyncTiming, requestSync } from '@/lib/sync';
 import { useStoredState } from '@/lib/hooks';
+import { startInputWatch } from '@/lib/input-watch';
 import { MAX_EDITS, STAT_METRICS, clearSyncDebug, formatSyncDebugReport, getSyncDebugSnapshot, setSyncDebugEnabled, syncDebugStats, type SyncDebugRequest } from '@/lib/sync-debug';
 
 type Snapshot = ReturnType<typeof getSyncDebugSnapshot>;
@@ -121,7 +122,8 @@ export function SyncDebugOverlay() {
     });
     update();
     const timer = setInterval(update, 250);
-    return () => clearInterval(timer);
+    const stopWatch = startInputWatch();
+    return () => { clearInterval(timer); stopWatch(); };
   }, [enabled]);
   if (!enabled) return null;
   const snapshot = sample?.snapshot;

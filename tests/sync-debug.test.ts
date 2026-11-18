@@ -4,7 +4,7 @@ beforeEach(() => { setSyncDebugEnabled(false); vi.useFakeTimers(); });
 afterEach(() => { setSyncDebugEnabled(false); vi.useRealTimers(); vi.unstubAllGlobals(); });
 it('records nothing until enabled and clears recordings when disabled', () => {
   recordSyncDebug('test', 'off'); expect(beginSyncDebugRequest('off')).toBeUndefined();
-  expect(getSyncDebugSnapshot()).toEqual({enabled:false,events:[],requests:[]});
+  expect(getSyncDebugSnapshot()).toEqual({enabled:false,events:[],anomalies:[],requests:[]});
   setSyncDebugEnabled(true); recordSyncDebug('browser', 'hidden', {visibility:'hidden'});
   expect(getSyncDebugSnapshot().events.at(-1)?.details.visibility).toBe('hidden');
   setSyncDebugEnabled(false); expect(getSyncDebugSnapshot().events).toHaveLength(0);

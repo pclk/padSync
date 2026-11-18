@@ -3,7 +3,6 @@
 import dynamic from "next/dynamic";
 import { Suspense, useEffect } from "react";
 import { startSync } from "@/lib/sync";
-import { SyncDebugOverlay } from "./SyncDebugOverlay";
 
 // Every screen reads IndexedDB, so screens render only in the browser. The server sends a
 // static shell, which the service worker caches for offline use.
@@ -14,6 +13,8 @@ const views = {
   import: dynamic(() => import("./AiImportView"), { ssr: false }),
   settings: dynamic(() => import("./SettingsView"), { ssr: false }),
 };
+// Browser-only too: it reads its settings from localStorage, so server HTML would never match.
+const SyncDebugOverlay = dynamic(() => import("./SyncDebugOverlay").then((m) => m.SyncDebugOverlay), { ssr: false });
 
 export function ClientOnly({ view }: { view: keyof typeof views }) {
   useEffect(() => {

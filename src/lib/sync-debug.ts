@@ -20,10 +20,13 @@ export const MAX_EDITS = 300;
 let enabled = false, sequence = 0;
 let events: SyncDebugEvent[] = [];
 let requests: SyncDebugRequest[] = [];
+// Main-thread stalls and input oddities, kept apart so sync chatter never pushes them out.
+const MAX_ANOMALIES = 40;
+let anomalies: SyncDebugEvent[] = [];
 const pendingPaint = new Map<string, { appliedAt: number; requestId: number }>();
 export const debugNow = () => typeof performance === 'undefined' ? Date.now() : performance.now();
 export const syncDebugEnabled = () => enabled;
-export function clearSyncDebug() { events = []; requests = []; pendingPaint.clear(); }
+export function clearSyncDebug() { events = []; requests = []; anomalies = []; pendingPaint.clear(); }
 export function setSyncDebugEnabled(value: boolean) {
   if (enabled === value) return;
   enabled = value;
@@ -44,6 +47,12 @@ export function recordSyncDebug(kind: string, message: string, details: Record<s
   events.push({ id: ++sequence, at: Date.now(), kind, message, details });
   if (events.length > MAX_EVENTS) events.shift();
 }
+export function recordInputAnomaly(message: string, details: Record<string, DebugValue> = {}) {
+  if (!enabled) return;
+  anomalies.push({ id: ++sequence, at: Date.now(), kind: 'input', message, details });
+  if (anomalies.length > MAX_ANOMALIES) anomalies.shift();
+  recordSyncDebug('input', message, details);
+}
 export function beginSyncDebugRequest(trigger: string, queueMs = 0, timerLateMs = 0) {
   if (!enabled) return undefined;
   const request: SyncDebugRequest = {
@@ -58,7 +67,7 @@ export function updateSyncDebugRequest(request: SyncDebugRequest | undefined, pa
   if (enabled && request && requests.includes(request)) Object.assign(request, patch);
 }
 export function getSyncDebugSnapshot() {
-  return { enabled, events: events.map(event => ({ ...event, details: { ...event.details } })), requests: requests.map(request => ({ ...request, versions: request.versions?.slice(), server: request.server && { ...request.server } })) };
+  return { enabled, events: events.map(event => ({ ...event, details: { ...event.details } })), anomalies: anomalies.map(event => ({ ...event, details: { ...event.details } })), requests: requests.map(request => ({ ...request, versions: request.versions?.slice(), server: request.server && { ...request.server } })) };
 }
 export function parseServerTiming(header: string | null): Record<string, number> {
   const result: Record<string, number> = {};
@@ -154,6 +163,7 @@ export function syncDebugStats(list = requests) {
 
 const f = (v?: number) => v === undefined ? '—' : `${Math.round(v)}`;
 const clock = (at: number) => new Date(at).toISOString().slice(11, 23);
+const details = (e: SyncDebugEvent) => Object.entries(e.details).map(([k, v]) => `${k}=${typeof v === 'number' ? Math.round(v * 10) / 10 : v}`).join(' ');
 /** A plain-text report of the last 300 edit requests, meant to be pasted into a chat. No notebook content. */
 export function formatSyncDebugReport(header: string[], now = Date.now()) {
   const stats = syncDebugStats();
@@ -163,14 +173,17 @@ export function formatSyncDebugReport(header: string[], now = Date.now()) {
   lines.push(`ms (avg / max)`.padEnd(26) + stats.map(g => `${g.label} n=${g.count}`.padEnd(24)).join(''));
   for (const [key, label] of STAT_METRICS) lines.push(label.padEnd(26) + stats.map(g => `${f(g.avg[key])} / ${f(g.max[key])}`.padEnd(24)).join(''));
   lines.push('New connections'.padEnd(26) + stats.map(g => `${g.newConnections}/${g.count} ${g.protocols.join(',')}`.padEnd(24)).join(''));
+  lines.push('', `Input and main-thread stalls (last ${MAX_ANOMALIES}):`);
+  if (!anomalies.length) lines.push('none recorded');
+  for (const e of anomalies) lines.push(`${clock(e.at)} ${e.message} · ${details(e)}`);
   lines.push('', 'Requests (edits, plus the newest 40 of any kind):');
   for (const r of requests) {
     lines.push(`#${r.id} ${clock(r.at)} ${r.trigger} · ${r.phase} ${r.status ?? ''} · ↑${r.pushedContent ?? 0}/${r.pushed ?? 0} ↓${r.appliedContent ?? 0}/${r.applied ?? 0} · wait ${f(r.queueMs)} http ${f(r.httpMs)} (${r.newConnection ? 'new' : r.newConnection === false ? 'reused' : '?'} conn ${f(r.connectMs)}, ttfb ${f(r.ttfbMs)}, server ${f(r.server?.total)}, dl ${f(r.downloadMs)}) total ${f(r.totalMs)} · sentAge ${f(r.sendAgeMs)} recvAge ${f(r.remoteAgeMs)} paint ${f(r.applyToPaintMs)}`);
   }
   lines.push('', 'Events:');
   for (const e of events) {
-    const details = Object.entries(e.details).map(([k, v]) => `${k}=${typeof v === 'number' ? Math.round(v * 10) / 10 : v}`).join(' ');
-    lines.push(`${clock(e.at)} ${e.kind} · ${e.message}${details ? ` · ${details}` : ''}`);
+    const d = details(e);
+    lines.push(`${clock(e.at)} ${e.kind} · ${e.message}${d ? ` · ${d}` : ''}`);
   }
   return lines.join('\n');
 }
