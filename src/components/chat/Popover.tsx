@@ -26,27 +26,6 @@ export function usePopover<T extends HTMLElement = HTMLDivElement>() {
   return { open, setOpen, ref };
 }
 
-/** A floating card; `place` is relative to the nearest positioned parent. */
-export function PopoverCard({
-  children,
-  className = "",
-  label,
-}: {
-  children: ReactNode;
-  className?: string;
-  label?: string;
-}) {
-  return (
-    <div
-      role="dialog"
-      aria-label={label}
-      className={`absolute z-40 rounded-2xl border border-slate-200 bg-white p-1.5 text-sm shadow-lift ${className}`}
-    >
-      {children}
-    </div>
-  );
-}
-
 /** A menu row: icon, label and an optional hint on the right. */
 export function MenuItem({
   children,

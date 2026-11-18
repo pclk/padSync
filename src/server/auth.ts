@@ -46,10 +46,6 @@ export function sessionLogin(req: NextRequest): string | null {
   }
 }
 
-export function isAuthed(req: NextRequest) {
-  return sessionLogin(req) !== null;
-}
-
 export function newState() {
   return randomBytes(16).toString("base64url");
 }

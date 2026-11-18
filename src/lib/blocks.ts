@@ -77,8 +77,3 @@ export function maskAnswers(b: Block): Block {
       return b;
   }
 }
-
-/** True when the block hides something from the student until revealed. */
-export function hasHiddenAnswers(b: Block): boolean {
-  return b.type === "cloze" || (b.type === "recall" && b.items.some((i) => i.a)) || (b.type === "steps" && !!b.blankWhy && b.steps.some((s) => s.why)) || (b.type === "glossary" && !!b.hideDefinitions);
-}

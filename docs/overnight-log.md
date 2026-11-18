@@ -239,3 +239,47 @@ pending-paint path).
 **Next (features).** A keyboard shortcut (⌘D on the Mac) would need the editor to find the
 selected section's handle, which is a small follow-up. Resizing the selection with a corner handle
 is the other common lasso action that's still missing.
+
+## 2026-11-19 03:00 — simplify: dead code and one download helper
+
+**The two Pencil recording systems (checked, not merged).** They share only the `format` string
+(`padsync.pencil-recording`, version 1) and a few lines. Underneath they are different data:
+- `src/ink/recording.ts` (the Pencil lab) stores one object per controller event, with the section
+  rect, zoom and tool, plus what the controller committed. Replay and the regression tests need
+  exactly this shape, and both iPad fixtures are in it.
+- `src/ink/recording/schema.ts` (the Pencil test) stores every pointer, touch and page event as
+  column tuples, plus transform snapshots, capabilities and stats, and keeps fields that aren't
+  exposed as null.
+Merging them would mean converting one into the other (Pencil test → lab replay) or a third
+format. That's new code, not less code, so I left them apart. One real catch for later: a Pencil
+test file loaded into the Pencil lab, or the other way round, passes the format/version check and
+then fails with field-level schema errors. The Pencil test format has `app.surface:
+"pencil-test"`, so giving it its own `format` value (or reading `app.surface`) would let each page
+say "that's a Pencil test file, open it in the Pencil test page" instead. That is a behaviour
+change to the file format, so it's for a daytime run.
+
+**Removed (unused anywhere in src, tests, bridge, scripts).**
+- `replayHeadless` (`src/ink/replay.ts`): an older copy of the harness's `replayStrokes`, and its
+  `ControllerClass` type.
+- `PopoverCard` (`chat/Popover.tsx`), `hasHiddenAnswers` (`lib/blocks.ts`), `relativeImages`
+  (`lib/schema.ts`), `isAuthed` (`server/auth.ts`).
+
+**One download helper.** Five places built a Blob, made an `<a download>`, clicked it and revoked
+the URL: Pencil lab Save, Pencil test Save, AI import "Download" prompt, returned-file download, and
+chat "Export" conversation. They now call `downloadFile(name, body, type)` (`src/lib/download.ts`).
+It uses the Pencil test page's version, which attaches the link to the page while clicking it and
+keeps the URL for 10 s instead of 1 s. That's the safer version for iPad Safari's save sheet and
+makes no difference elsewhere.
+
+**Checked.** `npm run typecheck`, `npm run lint`, `npx vitest run` (796 passed),
+`npm run test:pencil` (33 passed, baselines unchanged).
+
+**Needs a device check.** On the iPad, one save of each kind still opens the save/share sheet:
+Pencil lab Save and Pencil test Save at least.
+
+**Not done (next simplify run).**
+1. `NotebookEditor.tsx` (692 lines) and `Toolbar.tsx` (285): I didn't get to splitting them. The
+   unused-export scan also listed many exports that are only used in their own file (such as
+   `filters.ts` constants, `schema.ts` enums, `sync-policy.ts` timings). They aren't dead, but most
+   could drop `export`. Low value, so I left them.
+2. The format tag for the two Pencil file types (above).

@@ -136,7 +136,7 @@ changes and `recording.ts`, `recorder.ts` and `replay.ts` from
 that it added:
 
 - `onDiscard` and the `device` option, plus the headless guards, in the controller;
-- `device: "replay"` in `replayHeadless`;
+- `device: "replay"` in `replayStrokes`;
 - the harness, the lab page, the generator, the fixtures, the tests and this doc.
 
 When stage 2 lands, reconcile `src/ink/{controller,recording,recorder,replay}.ts` with it. The

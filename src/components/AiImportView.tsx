@@ -21,6 +21,7 @@ import { associatePersistentPdf } from "@/lib/persistent-attachments";
 import type { LectureSource } from "@/lib/types";
 import type { ResolvedPdf } from "@/lib/persistent-attachments";
 import { StudyBlock } from "./StudyBlocks";
+import { downloadFile } from "@/lib/download";
 import { highlight, renderMarkdown } from "@/lib/markdown";
 import { SPACE_PX, type Block } from "@/lib/types";
 
@@ -471,14 +472,7 @@ function Generate(p: {
       setShowPrompt(true);
     }
   };
-  const download = () => {
-    const url = URL.createObjectURL(new Blob([p.prompt()], { type: "text/markdown" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "padsync-prompt.md";
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
+  const download = () => downloadFile("padsync-prompt.md", p.prompt(), "text/markdown");
 
   return (
     <div className="grid gap-4 text-sm md:grid-cols-[3fr_2fr]">

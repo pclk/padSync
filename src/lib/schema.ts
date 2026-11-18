@@ -475,8 +475,3 @@ function conceptMapProblems(s: PayloadSection, prefix: string): string[] {
   });
   return out;
 }
-
-/** Relative image sources in the payload (they must be resolved against returned files). */
-export function relativeImages(p: Pick<Payload, "sections">): string[] {
-  return p.sections.flatMap((s) => s.blocks.flatMap((b) => (b.type === "image" && !IMAGE_SRC_RE.test(b.src) ? [b.src] : [])));
-}

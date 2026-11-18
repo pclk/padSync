@@ -10,6 +10,7 @@ import { strokeSvgPath } from "@/ink/render";
 import { PencilReplayer, type ReplayState } from "@/ink/replay";
 import { runReplay, type ReplayReport } from "@/ink/replay-harness";
 import { usePencilNoScroll } from "@/lib/hooks";
+import { downloadFile } from "@/lib/download";
 import { PAGE_WIDTH, type StrokeData } from "@/lib/types";
 import { Icon } from "./Icons";
 
@@ -120,12 +121,7 @@ export default function PencilLab() {
 
   const save = () => {
     if (!recording) return;
-    const blob = new Blob([serializeRecording(recording)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = recordingFileName(recording);
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    downloadFile(recordingFileName(recording), serializeRecording(recording), "application/json");
   };
 
   const load = async (file: File | undefined) => {

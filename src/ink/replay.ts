@@ -1,5 +1,5 @@
 import type { StrokeData } from "@/lib/types";
-import type { ControllerCallbacks, ControllerOptions, InkController, InkPointer, SectionHandle, ToolState } from "./controller";
+import type { InkController, InkPointer, SectionHandle, ToolState } from "./controller";
 import type { PencilRecording, RecordedEvent, RecordedSample } from "./recording";
 
 // Replays a PencilRecording through an InkController, the same entry points (down/move/up/
@@ -259,43 +259,6 @@ export interface ReplayedStroke {
   data: StrokeData;
   /** Index of the event whose dispatch committed it. */
   afterSeq: number;
-}
-
-type ControllerClass = new (notebookId: string, tool: ToolState, cb: ControllerCallbacks, opts?: ControllerOptions) => InkController;
-
-/**
- * Replays a whole recording with no page: each recorded section is a stand-in element at its
- * recorded rect, so section coordinates come out exactly as they were. Returns what the controller
- * committed. Tests pass the InkController class (with the store and canvas modules mocked).
- */
-export function replayHeadless(rec: PencilRecording, Controller: ControllerClass, opts: { tool?: ToolState } = {}): ReplayedStroke[] {
-  const out: ReplayedStroke[] = [];
-  const rects = new Map<string, RecordedEvent["rect"]>();
-  for (const e of rec.events) if (!rects.has(e.section)) rects.set(e.section, e.rect);
-  const handles = new Map<string, SectionHandle>();
-  for (const [id, r] of rects) {
-    const el = { getBoundingClientRect: () => ({ ...r, right: r.left + r.width, bottom: r.top + r.height, x: r.left, y: r.top }), setPointerCapture() {} } as unknown as HTMLElement;
-    handles.set(id, { id, el, strokes: () => [] });
-  }
-  const firstTool = rec.events.find((e) => e.tool)?.tool;
-  const tool = opts.tool ?? firstTool ?? { kind: "pen", penColor: "#000000", penSize: 3, hlColor: "#fde047", hlSize: 20, eraserSize: 20 };
-  let replayer: PencilReplayer | null = null;
-  let controller: InkController;
-  const make = () => {
-    controller = new Controller(
-      "replay",
-      tool,
-      { onSelection() {}, onDragging() {}, onTextCreate() {}, onCommit: (sectionId, data) => out.push({ sectionId, data, afterSeq: replayer!.position - 1 }) },
-      { persist: false, now: () => replayer!.clock(), device: "replay" },
-    );
-    controller.configure(tool, rec.events[0]?.zoom ?? 1);
-  };
-  make();
-  replayer = new PencilReplayer(rec, { controller: () => controller, section: (id) => handles.get(id) ?? null, reset: make }, { applyTool: !opts.tool });
-  replayer.runToEnd();
-  // The last gesture may still be open (recording stopped mid-stroke): end it as an unmount would.
-  controller!.endGesture();
-  return out;
 }
 
 /** Differences between committed strokes, ignoring t0 and device (wall clock and machine). */

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { kb } from "@/lib/context";
+import { downloadFile } from "@/lib/download";
 import { parseReturnedNotebook, type ReturnedFile } from "@/lib/roundtrip";
 import { applyNotebookChanges } from "@/lib/store";
 import type { SectionEntity } from "@/lib/types";
@@ -50,12 +51,7 @@ export function ReturnedFiles({ jobId, notebookId, sections, count }: { jobId: s
 
 function download(f: ReturnedFile) {
   const body = f.base64 != null ? Uint8Array.from(atob(f.base64), (c) => c.charCodeAt(0)) : (f.text ?? "");
-  const url = URL.createObjectURL(new Blob([body], { type: f.mime }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = f.path.replace(/\//g, "_");
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadFile(f.path.replace(/\//g, "_"), body, f.mime);
 }
 
 function ReviewChanges({ notebookId, sections, files }: { notebookId: string; sections: SectionEntity[]; files: ReturnedFile[] }) {

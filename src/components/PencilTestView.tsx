@@ -12,6 +12,7 @@ import { paintStroke, strokePath } from "@/ink/render";
 import { appendPoint, toLocal } from "@/ink/samples";
 import { deviceId } from "@/lib/db";
 import { usePencilNoScroll } from "@/lib/hooks";
+import { downloadFile } from "@/lib/download";
 import { PAGE_WIDTH, type StrokeData } from "@/lib/types";
 import { Icon } from "./Icons";
 
@@ -264,15 +265,7 @@ export default function PencilTestView() {
 
   const save = () => {
     const rec = recorder.toRecording();
-    const blob = new Blob([serializeRecording(rec)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = recordingFileName(rec);
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    downloadFile(recordingFileName(rec), serializeRecording(rec), "application/json");
   };
 
   const open = async (file: File) => {

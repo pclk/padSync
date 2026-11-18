@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import * as api from "@/lib/chat-api";
+import { downloadFile } from "@/lib/download";
 import type {
   CatalogAccount,
   ChatAgent,
@@ -243,16 +244,8 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
   const accounts = catalog?.length ? catalog : fallbackCatalog();
   const modelLabel = (s: { agent: ChatAgent; options: ChatOptions }) =>
     describeModel(accounts, s).label;
-  const download = (t: ThreadSummary, messages: Turn[]) => {
-    const url = URL.createObjectURL(
-      new Blob([exportMarkdown(t, messages)], { type: "text/markdown" }),
-    );
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "conversation.md";
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
+  const download = (t: ThreadSummary, messages: Turn[]) =>
+    downloadFile("conversation.md", exportMarkdown(t, messages), "text/markdown");
   const rowAction = (kind: string, t: ThreadSummary, title?: string) =>
     run(async () => {
       if (kind === "export")
