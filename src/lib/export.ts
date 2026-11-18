@@ -1,5 +1,4 @@
 import { pdfImage } from "./pdf";
-import { toCanvas } from "html-to-image";
 import { strokeBox, unionBox } from "@/ink/geometry";
 import { paintStrokes } from "@/ink/render";
 import { studyBlockMarkdown } from "./blocks";
@@ -16,6 +15,7 @@ export interface RenderOmit {
 
 // Renders a section (content + typed text + ink) to a PNG, cropped to what is actually on it.
 export async function sectionPng(section: SectionEntity, sectionEl: HTMLElement, scale = 2, omit: RenderOmit = {}): Promise<Blob> {
+  const { toCanvas } = await import("html-to-image");
   const strokes = await liveChildren<StrokeEntity>(section.id, "stroke");
   const texts = omit.notes ? [] : await liveChildren<TextBoxEntity>(section.id, "textbox");
   const content = sectionEl.querySelector<HTMLElement>(".section-content");

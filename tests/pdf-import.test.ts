@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { S3Client } from '@aws-sdk/client-s3';
 import { GET, POST } from '@/app/api/pdfs/route';
-import { pdfKey, ownedDocument, pdfStorage, sweepPdfs } from '@/server/pdf-storage';
+import { pdfKey, ownedDocument, pdfMetadata, pdfStorage, sweepPdfs } from '@/server/pdf-storage';
 import { rasterScale } from '@/lib/pdf';
-import { MAX_PDF_BYTES, PDF_PART_BYTES, pdfMetadata, pdfSections } from '@/lib/pdf-meta';
+import { MAX_PDF_BYTES, PDF_PART_BYTES, pdfSections } from '@/lib/pdf-meta';
 import { buildBundle, DEFAULT_CONTEXT } from '@/lib/context';
 import { configureAuthEnv, freshDb, req, sessionCookie } from './helpers/env';
 let db: Awaited<ReturnType<typeof freshDb>>;

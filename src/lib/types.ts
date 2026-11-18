@@ -5,6 +5,9 @@ export type { Block, SectionKind, SectionMargin, SpaceSize };
 // Shared data model. Everything that syncs is an Entity: a small JSON document with a
 // hybrid-logical-clock stamp. Conflicts resolve per entity, last writer (highest hlc) wins.
 
+/** The padSync payload version (see schema.ts). Kept here so code that only writes it doesn't load zod. */
+export const SCHEMA_VERSION = 2;
+
 export const PAGE_WIDTH = 1376; // iPad Pro 13" (M4) landscape width in CSS px
 export const SCREEN_HEIGHT = 1032; // landscape height, used for default section sizes
 

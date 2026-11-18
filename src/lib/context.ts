@@ -1,6 +1,5 @@
 import { maskAnswers, studyBlockMarkdown } from "./blocks";
-import { SCHEMA_VERSION } from "./schema";
-import type { Block, SectionData } from "./types";
+import { SCHEMA_VERSION, type Block, type SectionData } from "./types";
 
 // What "Ask AI" sends: a small folder of files (the bundle) that the Mac bridge writes into the
 // job's temp dir. Nothing here touches the DOM or the database, so the preview, the send and the

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SCHEMA_VERSION } from "./types";
 
 // The padSync payload: what an AI (or a file) hands padSync to create a notebook. Versioned with
 // `schemaVersion`; v1 files ("padsync": 1) are migrated. Parsing is forgiving on purpose: AI output
@@ -6,7 +7,7 @@ import { z } from "zod";
 // dropped with a warning, and each section is validated on its own so one bad section doesn't sink
 // the rest. See docs/ai-import-2026-11-17.md.
 
-export const SCHEMA_VERSION = 2;
+export { SCHEMA_VERSION };
 export const MAX_PAYLOAD_CHARS = 8_000_000;
 export const MAX_SECTIONS = 500;
 export const MAX_BLOCKS = 500;

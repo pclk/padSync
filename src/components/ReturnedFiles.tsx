@@ -3,23 +3,32 @@
 import { useEffect, useMemo, useState } from "react";
 import { kb } from "@/lib/context";
 import { downloadFile } from "@/lib/download";
-import { parseReturnedNotebook, type ReturnedFile } from "@/lib/roundtrip";
+import type { ReturnedFile } from "@/lib/roundtrip";
 import { applyNotebookChanges } from "@/lib/store";
 import type { SectionEntity } from "@/lib/types";
+
+type Parse = typeof import("@/lib/roundtrip").parseReturnedNotebook;
 
 // Files the agent wrote to out/: download any of them, and review out/notebook.json section by
 // section before applying it. Nothing changes in the notebook until "Apply".
 
 export function ReturnedFiles({ jobId, notebookId, sections, count }: { jobId: string; notebookId: string; sections: SectionEntity[]; count: number }) {
   const [files, setFiles] = useState<ReturnedFile[] | null>(null);
+  const [parse, setParse] = useState<Parse | null>(null);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || files) return;
-    fetch(`/api/jobs/${encodeURIComponent(jobId)}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then((d: { job: { resultFiles: ReturnedFile[] } }) => setFiles(d.job.resultFiles))
+    // The parser (and zod) loads with the files, so the notebook doesn't carry it at startup.
+    Promise.all([
+      fetch(`/api/jobs/${encodeURIComponent(jobId)}`).then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))),
+      import("@/lib/roundtrip"),
+    ])
+      .then(([d, { parseReturnedNotebook }]) => {
+        setParse(() => parseReturnedNotebook);
+        setFiles((d as { job: { resultFiles: ReturnedFile[] } }).job.resultFiles);
+      })
       .catch((e) => setError((e as Error).message));
   }, [open, files, jobId]);
 
@@ -42,7 +51,7 @@ export function ReturnedFiles({ jobId, notebookId, sections, count }: { jobId: s
               </li>
             ))}
           </ul>
-          {files.some((f) => f.path === "notebook.json") && <ReviewChanges notebookId={notebookId} sections={sections} files={files} />}
+          {parse && files.some((f) => f.path === "notebook.json") && <ReviewChanges notebookId={notebookId} sections={sections} files={files} parse={parse} />}
         </div>
       )}
     </div>
@@ -54,10 +63,10 @@ function download(f: ReturnedFile) {
   downloadFile(f.path.replace(/\//g, "_"), body, f.mime);
 }
 
-function ReviewChanges({ notebookId, sections, files }: { notebookId: string; sections: SectionEntity[]; files: ReturnedFile[] }) {
+function ReviewChanges({ notebookId, sections, files, parse }: { notebookId: string; sections: SectionEntity[]; files: ReturnedFile[]; parse: Parse }) {
   // Parsed once per opening: the live sections keep changing as you apply, and a re-parse would
   // then show already-applied changes as gone.
-  const [parsed] = useState(() => parseReturnedNotebook(files.find((f) => f.path === "notebook.json")!.text ?? "", sections, files));
+  const [parsed] = useState(() => parse(files.find((f) => f.path === "notebook.json")!.text ?? "", sections, files));
   const [ticked, setTicked] = useState<Set<number>>(() => new Set(parsed.changes.map((_, i) => i)));
   const [applied, setApplied] = useState<string | null>(null);
   const picked = useMemo(() => parsed.changes.filter((_, i) => ticked.has(i)), [parsed, ticked]);

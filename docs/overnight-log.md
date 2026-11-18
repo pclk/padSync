@@ -435,3 +435,46 @@ hooks. Then decide the default.
 **Next (handwriting).** "=" curls (45–80° lift-off turns) need something other than a turn angle,
 for example comparing the lift-off segment's length with the steps before it. The 0.5 px staircase
 and the i-dot ticks are still open.
+
+## 2026-11-19 05:30 — simplify: a lighter notebook startup
+
+**Measured** (`npm run build`, then the chunks the notebook route loads). The shell every page
+shares is 831 KB (242 KB gzipped: React, Dexie, the sync client) and didn't change. After it, the
+notebook screen loaded 817 KB (250 KB gzipped). A one-off build with source maps split that up:
+katex 261 KB, highlight.js 161 KB, **zod 110 KB**, marked 49 KB, html-to-image 12 KB, then our own
+code. katex, highlight.js and marked draw the text sections, so they have to be there. zod and
+html-to-image don't: zod is only used to check AI output, and html-to-image only to make an image.
+
+**Changed.** zod reached the notebook through four imports, each of which only needed a small part:
+- `store.ts` → `roundtrip.ts`, for the three-line `applyPatch`. `applyNotebookChanges` now loads
+  `roundtrip` itself when you press Apply (it's already loaded by then, see the next item).
+- `ReturnedFiles.tsx` → `roundtrip.ts`. "Show returned files" now loads the parser in parallel with
+  the files request, and the review appears when both have arrived, as before.
+- `context.ts` → `schema.ts`, for `SCHEMA_VERSION`. The constant moved to `types.ts`; `schema.ts`
+  re-exports it, so other importers didn't change.
+- `pdf.ts` → `pdf-meta.ts`, for `pdfSignature`. The zod `pdfMetadata` check is server-only (the
+  `/api/pdfs` route), so it moved to `src/server/pdf-storage.ts`.
+- `export.ts` now loads html-to-image inside `sectionPng`. "Copy image" still hands the clipboard
+  its promise straight away, so Safari's user-gesture rule is unaffected.
+
+Result: the notebook's own JS is 676 KB (208 KB gzipped), **−141 KB raw / −42 KB gzipped (−17%)**,
+and the iPad parses and runs that much less before the first section draws. zod loads with the AI
+import page (it needs it) or when you open returned files.
+
+**Checked.** New `tests/startup-imports.test.ts` follows the editor's static imports and fails if
+zod or html-to-image come back (I checked that it does fail when the old `store.ts` import is put
+back). `npm run typecheck`, `npm run lint`, `npx vitest run` (806 passed), `npm run test:pencil`
+(33 passed, baselines unchanged). No ink, stroke or drawing code changed.
+
+**Looked at, left alone.** Nothing else from tonight is left unused: all the new exports are used,
+and the Pencil test page's unrounded tile scale (next to `tileScale`) is on purpose. Loading
+katex/highlight.js only when a section needs them would save more (~420 KB) but would make text
+sections appear a moment after the page, which changes behaviour. That's a daytime decision.
+
+**Needs a device check.** On the iPad: open a notebook, then in the side panel "Show returned
+files" on an Ask job and Apply one change; and "Copy image" on a section still puts a PNG on the
+clipboard.
+
+**Next (simplify).** `NotebookEditor.tsx` / `Toolbar.tsx` splits (from 03:00) are still open. The
+chat panel (~45 KB of our code) loads with the notebook before anyone opens it; loading it on first
+open is the next startup win to measure.

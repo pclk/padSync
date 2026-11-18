@@ -2,7 +2,7 @@ import Dexie from "dexie";
 import { nanoid } from "nanoid";
 import { db, deviceId } from "./db";
 import { hlcNow, hlcObserve, hlcWall } from "./hlc";
-import { applyPatch, type SectionChange } from "./roundtrip";
+import type { SectionChange } from "./roundtrip";
 import { requestSync } from "./sync";
 import { debugNow, recordSyncDebug, syncDebugEnabled } from "./sync-debug";
 import {
@@ -170,7 +170,8 @@ export type { TextBoxEntity };
 
 /** Applies reviewed AI changes: patches existing sections, appends new ones. Never deletes. */
 export async function applyNotebookChanges(notebookId: string, changes: SectionChange[]) {
-  const sorted = await liveSections(notebookId);
+  // Loaded here, not at the top: roundtrip pulls in zod, which the notebook doesn't need to start.
+  const [{ applyPatch }, sorted] = await Promise.all([import("./roundtrip"), liveSections(notebookId)]);
   const rows: Entity[] = [];
   for (const c of changes) {
     if (c.kind !== "update") continue;

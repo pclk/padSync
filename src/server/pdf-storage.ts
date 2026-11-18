@@ -2,7 +2,10 @@ import 'server-only';
 import { after } from 'next/server';
 import { createHash } from 'node:crypto';
 import { AbortMultipartUploadCommand, DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { z } from 'zod';
+import { MAX_PDF_BYTES } from '@/lib/pdf-meta';
 import type { Sql } from './db';
+export const pdfMetadata = z.object({ notebookId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/), name: z.string().min(1).max(255).refine(n => !/[\x00-\x1f]/.test(n)), size: z.number().int().min(5).max(MAX_PDF_BYTES), pageCount: z.number().int().min(1).max(2000), sha256: z.string().regex(/^[a-f0-9]{64}$/) });
 export function pdfKey(owner: string, id: string) {
   if (!/^[a-zA-Z0-9_-]{1,100}$/.test(id)) throw new Error('Invalid document id');
   return `pdfs/${createHash('sha256').update(owner.toLowerCase()).digest('hex')}/${id}.pdf`;

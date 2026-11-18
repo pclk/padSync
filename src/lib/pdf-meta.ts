@@ -1,8 +1,6 @@
-import { z } from 'zod';
 import { PAGE_WIDTH, type SectionData } from './types';
 export const MAX_PDF_BYTES = 100 * 1024 * 1024;
 export const PDF_PART_BYTES = 8 * 1024 * 1024;
-export const pdfMetadata = z.object({ notebookId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/), name: z.string().min(1).max(255).refine(n => !/[\x00-\x1f]/.test(n)), size: z.number().int().min(5).max(MAX_PDF_BYTES), pageCount: z.number().int().min(1).max(2000), sha256: z.string().regex(/^[a-f0-9]{64}$/) });
 export interface PdfPage { documentId: string; name: string; page: number; height: number; text: string }
 export function pdfSections(documentId: string, name: string, pages: { width: number; height: number; text: string }[]): Omit<SectionData, 'order' | 'createdAt'>[] {
   if (!pages.length || pages.length > 2000 || pages.some(p => !Number.isFinite(p.width) || !Number.isFinite(p.height) || p.width <= 0 || p.height <= 0 || p.height / p.width > 8)) throw new Error('Unsupported PDF page dimensions or count');
