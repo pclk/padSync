@@ -1,0 +1,317 @@
+{
+ "harnessVersion": 1,
+ "options": {
+  "useCoalesced": true,
+  "usePredicted": true,
+  "pen": null,
+  "toolOverride": false
+ },
+ "strokes": [
+  {
+   "index": 0,
+   "sectionId": "synthetic-section",
+   "afterSeq": 16,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#1e293b",
+   "size": 3,
+   "points": 49,
+   "durationMs": 200,
+   "pressure": {
+    "min": 0.03,
+    "max": 0.48,
+    "mean": 0.394
+   },
+   "altitude": {
+    "min": 0.95,
+    "max": 1.05
+   },
+   "azimuth": {
+    "min": 2,
+    "max": 2.2
+   },
+   "box": {
+    "minX": 120,
+    "minY": 100,
+    "maxX": 120,
+    "maxY": 128
+   },
+   "rawLength": 28,
+   "processed": {
+    "points": 47,
+    "length": 28,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0,
+    "meanDeviation": 0
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 74
+   }
+  },
+  {
+   "index": 1,
+   "sectionId": "synthetic-section",
+   "afterSeq": 33,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#1e293b",
+   "size": 3,
+   "points": 49,
+   "durationMs": 200,
+   "pressure": {
+    "min": 0.03,
+    "max": 0.48,
+    "mean": 0.394
+   },
+   "altitude": {
+    "min": 0.95,
+    "max": 1.05
+   },
+   "azimuth": {
+    "min": 2,
+    "max": 2.2
+   },
+   "box": {
+    "minX": 120,
+    "minY": 112.04,
+    "maxX": 134,
+    "maxY": 128
+   },
+   "rawLength": 29.343,
+   "processed": {
+    "points": 47,
+    "length": 28.568,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.512,
+    "meanDeviation": 0.056
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 72
+   }
+  },
+  {
+   "index": 2,
+   "sectionId": "synthetic-section",
+   "afterSeq": 50,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#1e293b",
+   "size": 3,
+   "points": 49,
+   "durationMs": 200,
+   "pressure": {
+    "min": 0.03,
+    "max": 0.48,
+    "mean": 0.394
+   },
+   "altitude": {
+    "min": 0.95,
+    "max": 1.05
+   },
+   "azimuth": {
+    "min": 2,
+    "max": 2.2
+   },
+   "box": {
+    "minX": 142,
+    "minY": 112,
+    "maxX": 142,
+    "maxY": 128
+   },
+   "rawLength": 16,
+   "processed": {
+    "points": 43,
+    "length": 16,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0,
+    "meanDeviation": 0
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 60
+   }
+  },
+  {
+   "index": 3,
+   "sectionId": "synthetic-section",
+   "afterSeq": 60,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#1e293b",
+   "size": 3,
+   "points": 1,
+   "durationMs": 0,
+   "pressure": {
+    "min": 0.03,
+    "max": 0.03,
+    "mean": 0.03
+   },
+   "altitude": {
+    "min": 0.95,
+    "max": 0.95
+   },
+   "azimuth": {
+    "min": 2.2,
+    "max": 2.2
+   },
+   "box": {
+    "minX": 142,
+    "minY": 104,
+    "maxX": 142,
+    "maxY": 104
+   },
+   "rawLength": 0,
+   "processed": {
+    "points": 1,
+    "length": 0,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0,
+    "meanDeviation": 0
+   },
+   "outline": {
+    "kind": "dot",
+    "points": 0
+   }
+  },
+  {
+   "index": 4,
+   "sectionId": "synthetic-section",
+   "afterSeq": 81,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#1e293b",
+   "size": 3,
+   "points": 63,
+   "durationMs": 258,
+   "pressure": {
+    "min": 0.03,
+    "max": 0.48,
+    "mean": 0.395
+   },
+   "altitude": {
+    "min": 0.95,
+    "max": 1.05
+   },
+   "azimuth": {
+    "min": 2,
+    "max": 2.2
+   },
+   "box": {
+    "minX": 200,
+    "minY": 100,
+    "maxX": 200,
+    "maxY": 128
+   },
+   "rawLength": 28,
+   "processed": {
+    "points": 59,
+    "length": 28,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0,
+    "meanDeviation": 0
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 74
+   }
+  },
+  {
+   "index": 5,
+   "sectionId": "synthetic-section",
+   "afterSeq": 102,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#1e293b",
+   "size": 3,
+   "points": 63,
+   "durationMs": 258,
+   "pressure": {
+    "min": 0.03,
+    "max": 0.48,
+    "mean": 0.395
+   },
+   "altitude": {
+    "min": 0.95,
+    "max": 1.05
+   },
+   "azimuth": {
+    "min": 2,
+    "max": 2.2
+   },
+   "box": {
+    "minX": 224,
+    "minY": 112,
+    "maxX": 236,
+    "maxY": 127.94
+   },
+   "rawLength": 44.415,
+   "processed": {
+    "points": 61,
+    "length": 42.612,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.479,
+    "meanDeviation": 0.094
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 85
+   }
+  }
+ ],
+ "discarded": {
+  "count": 0,
+  "points": []
+ },
+ "totals": {
+  "strokes": 6,
+  "points": 274,
+  "processedPoints": 258,
+  "outlinePoints": 365,
+  "rawLength": 145.758,
+  "processedLength": 143.18
+ },
+ "fingerprint": "f535c3bf",
+ "outlineFingerprint": "4d97b04e",
+ "capture": {
+  "matches": true,
+  "differences": []
+ },
+ "recording": {
+  "id": "synthetic-words-hi-lo",
+  "label": "SYNTHETIC: words: hi lo",
+  "source": "synthetic",
+  "durationMs": 2291.499,
+  "sections": 1,
+  "events": {
+   "total": 103,
+   "byType": {
+    "pointermove": 91,
+    "pointerdown": 6,
+    "pointerup": 6
+   },
+   "byPointerType": {
+    "pen": 103
+   }
+  },
+  "samples": {
+   "dispatched": 103,
+   "coalesced": 285,
+   "predicted": 146
+  },
+  "gestures": {
+   "downs": 6,
+   "ups": 6,
+   "cancels": 0,
+   "lostCaptures": 0
+  },
+  "penIntervalMs": 4.167
+ }
+}

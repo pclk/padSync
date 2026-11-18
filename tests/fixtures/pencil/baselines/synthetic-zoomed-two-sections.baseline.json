@@ -1,0 +1,489 @@
+{
+ "harnessVersion": 1,
+ "options": {
+  "useCoalesced": true,
+  "usePredicted": true,
+  "pen": null,
+  "toolOverride": false
+ },
+ "strokes": [
+  {
+   "index": 0,
+   "sectionId": "sec-a",
+   "afterSeq": 16,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#1e293b",
+   "size": 3,
+   "points": 49,
+   "durationMs": 200,
+   "pressure": {
+    "min": 0.03,
+    "max": 0.48,
+    "mean": 0.394
+   },
+   "altitude": {
+    "min": 0.95,
+    "max": 1.05
+   },
+   "azimuth": {
+    "min": 2,
+    "max": 2.2
+   },
+   "box": {
+    "minX": 300.05,
+    "minY": 212.07,
+    "maxX": 314,
+    "maxY": 227.74
+   },
+   "rawLength": 37.841,
+   "processed": {
+    "points": 49,
+    "length": 36.264,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.487,
+    "meanDeviation": 0.073
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 77
+   }
+  },
+  {
+   "index": 1,
+   "sectionId": "sec-a",
+   "afterSeq": 33,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#1e293b",
+   "size": 3,
+   "points": 49,
+   "durationMs": 200,
+   "pressure": {
+    "min": 0.03,
+    "max": 0.48,
+    "mean": 0.394
+   },
+   "altitude": {
+    "min": 0.95,
+    "max": 1.05
+   },
+   "azimuth": {
+    "min": 2,
+    "max": 2.2
+   },
+   "box": {
+    "minX": 314,
+    "minY": 212,
+    "maxX": 314,
+    "maxY": 228
+   },
+   "rawLength": 16,
+   "processed": {
+    "points": 43,
+    "length": 16,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0,
+    "meanDeviation": 0
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 60
+   }
+  },
+  {
+   "index": 2,
+   "sectionId": "sec-a",
+   "afterSeq": 50,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#1e293b",
+   "size": 3,
+   "points": 49,
+   "durationMs": 200,
+   "pressure": {
+    "min": 0.03,
+    "max": 0.48,
+    "mean": 0.394
+   },
+   "altitude": {
+    "min": 0.95,
+    "max": 1.05
+   },
+   "azimuth": {
+    "min": 2,
+    "max": 2.2
+   },
+   "box": {
+    "minX": 326,
+    "minY": 202,
+    "maxX": 326,
+    "maxY": 228
+   },
+   "rawLength": 26,
+   "processed": {
+    "points": 47,
+    "length": 26,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0,
+    "meanDeviation": 0
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 68
+   }
+  },
+  {
+   "index": 3,
+   "sectionId": "sec-a",
+   "afterSeq": 67,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#1e293b",
+   "size": 3,
+   "points": 49,
+   "durationMs": 200,
+   "pressure": {
+    "min": 0.03,
+    "max": 0.48,
+    "mean": 0.394
+   },
+   "altitude": {
+    "min": 0.95,
+    "max": 1.05
+   },
+   "azimuth": {
+    "min": 2,
+    "max": 2.2
+   },
+   "box": {
+    "minX": 322,
+    "minY": 212,
+    "maxX": 332,
+    "maxY": 212
+   },
+   "rawLength": 10,
+   "processed": {
+    "points": 37,
+    "length": 10,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0,
+    "meanDeviation": 0
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 54
+   }
+  },
+  {
+   "index": 4,
+   "sectionId": "sec-b",
+   "afterSeq": 84,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#1e293b",
+   "size": 3,
+   "points": 49,
+   "durationMs": 200,
+   "pressure": {
+    "min": 0.03,
+    "max": 0.48,
+    "mean": 0.394
+   },
+   "altitude": {
+    "min": 0.95,
+    "max": 1.05
+   },
+   "azimuth": {
+    "min": 2,
+    "max": 2.2
+   },
+   "box": {
+    "minX": 80,
+    "minY": 60,
+    "maxX": 80,
+    "maxY": 88
+   },
+   "rawLength": 28,
+   "processed": {
+    "points": 47,
+    "length": 28,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0,
+    "meanDeviation": 0
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 74
+   }
+  },
+  {
+   "index": 5,
+   "sectionId": "sec-b",
+   "afterSeq": 101,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#1e293b",
+   "size": 3,
+   "points": 49,
+   "durationMs": 200,
+   "pressure": {
+    "min": 0.03,
+    "max": 0.48,
+    "mean": 0.394
+   },
+   "altitude": {
+    "min": 0.95,
+    "max": 1.05
+   },
+   "azimuth": {
+    "min": 2,
+    "max": 2.2
+   },
+   "box": {
+    "minX": 80,
+    "minY": 72.04,
+    "maxX": 94,
+    "maxY": 88
+   },
+   "rawLength": 29.343,
+   "processed": {
+    "points": 47,
+    "length": 28.568,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.512,
+    "meanDeviation": 0.056
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 72
+   }
+  },
+  {
+   "index": 6,
+   "sectionId": "sec-b",
+   "afterSeq": 118,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#1e293b",
+   "size": 3,
+   "points": 49,
+   "durationMs": 200,
+   "pressure": {
+    "min": 0.03,
+    "max": 0.48,
+    "mean": 0.394
+   },
+   "altitude": {
+    "min": 0.95,
+    "max": 1.05
+   },
+   "azimuth": {
+    "min": 2,
+    "max": 2.2
+   },
+   "box": {
+    "minX": 102,
+    "minY": 72,
+    "maxX": 102,
+    "maxY": 88
+   },
+   "rawLength": 16,
+   "processed": {
+    "points": 43,
+    "length": 16,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0,
+    "meanDeviation": 0
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 60
+   }
+  },
+  {
+   "index": 7,
+   "sectionId": "sec-b",
+   "afterSeq": 128,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#1e293b",
+   "size": 3,
+   "points": 1,
+   "durationMs": 0,
+   "pressure": {
+    "min": 0.03,
+    "max": 0.03,
+    "mean": 0.03
+   },
+   "altitude": {
+    "min": 0.95,
+    "max": 0.95
+   },
+   "azimuth": {
+    "min": 2.2,
+    "max": 2.2
+   },
+   "box": {
+    "minX": 102,
+    "minY": 64,
+    "maxX": 102,
+    "maxY": 64
+   },
+   "rawLength": 0,
+   "processed": {
+    "points": 1,
+    "length": 0,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0,
+    "meanDeviation": 0
+   },
+   "outline": {
+    "kind": "dot",
+    "points": 0
+   }
+  },
+  {
+   "index": 8,
+   "sectionId": "sec-b",
+   "afterSeq": 145,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#1e293b",
+   "size": 3,
+   "points": 49,
+   "durationMs": 200,
+   "pressure": {
+    "min": 0.03,
+    "max": 0.48,
+    "mean": 0.394
+   },
+   "altitude": {
+    "min": 0.95,
+    "max": 1.05
+   },
+   "azimuth": {
+    "min": 2,
+    "max": 2.2
+   },
+   "box": {
+    "minX": 128,
+    "minY": 62,
+    "maxX": 128,
+    "maxY": 88
+   },
+   "rawLength": 26,
+   "processed": {
+    "points": 47,
+    "length": 26,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0,
+    "meanDeviation": 0
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 66
+   }
+  },
+  {
+   "index": 9,
+   "sectionId": "sec-b",
+   "afterSeq": 162,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#1e293b",
+   "size": 3,
+   "points": 49,
+   "durationMs": 200,
+   "pressure": {
+    "min": 0.03,
+    "max": 0.48,
+    "mean": 0.394
+   },
+   "altitude": {
+    "min": 0.95,
+    "max": 1.05
+   },
+   "azimuth": {
+    "min": 2,
+    "max": 2.2
+   },
+   "box": {
+    "minX": 124,
+    "minY": 72,
+    "maxX": 134,
+    "maxY": 72
+   },
+   "rawLength": 10,
+   "processed": {
+    "points": 37,
+    "length": 10,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0,
+    "meanDeviation": 0
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 54
+   }
+  }
+ ],
+ "discarded": {
+  "count": 0,
+  "points": []
+ },
+ "totals": {
+  "strokes": 10,
+  "points": 442,
+  "processedPoints": 398,
+  "outlinePoints": 585,
+  "rawLength": 199.184,
+  "processedLength": 196.832
+ },
+ "fingerprint": "05e0a951",
+ "outlineFingerprint": "9c161644",
+ "capture": {
+  "matches": true,
+  "differences": []
+ },
+ "recording": {
+  "id": "synthetic-zoomed-0-75-two-sections",
+  "label": "SYNTHETIC: zoomed 0.75, two sections",
+  "source": "synthetic",
+  "durationMs": 3710.833,
+  "sections": 2,
+  "events": {
+   "total": 163,
+   "byType": {
+    "pointermove": 143,
+    "pointerdown": 10,
+    "pointerup": 10
+   },
+   "byPointerType": {
+    "pen": 163
+   }
+  },
+  "samples": {
+   "dispatched": 163,
+   "coalesced": 449,
+   "predicted": 226
+  },
+  "gestures": {
+   "downs": 10,
+   "ups": 10,
+   "cancels": 0,
+   "lostCaptures": 0
+  },
+  "penIntervalMs": 4.167
+ }
+}

@@ -138,6 +138,13 @@ export default function SettingsView() {
           </span>
           <input type="checkbox" className="switch" checked={showCopy} onChange={(e) => setShowCopy(e.target.checked)} />
         </label>
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <span>
+            <span className="block text-slate-800">Pencil lab</span>
+            <span className="block text-xs text-slate-500">Record Pencil writing to a file and replay it, to test how writing is processed. Nothing written there is saved.</span>
+          </span>
+          <Link href="/pencil-lab" className="btn btn-secondary shrink-0">Open</Link>
+        </div>
       </section>
 
       <section className="card p-5">

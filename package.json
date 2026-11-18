@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "typecheck": "next typegen && tsc --noEmit && tsc --noEmit -p bridge"
+    "typecheck": "next typegen && tsc --noEmit && tsc --noEmit -p bridge",
+    "test:pencil": "vitest run tests/pencil-fixtures.test.ts tests/pencil-regression.test.ts tests/pencil-replay.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1170.0",

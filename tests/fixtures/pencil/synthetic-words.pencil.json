@@ -1,0 +1,8083 @@
+{
+ "format": "padsync.pencil-recording",
+ "version": 1,
+ "id": "synthetic-words-hi-lo",
+ "label": "SYNTHETIC: words: hi lo",
+ "createdAt": "2026-01-01T00:00:00.000Z",
+ "source": "synthetic",
+ "environment": {
+  "userAgent": "synthetic (padSync test generator, no device)",
+  "platform": "synthetic",
+  "maxTouchPoints": 0,
+  "devicePixelRatio": 2,
+  "viewport": {
+   "width": 1376,
+   "height": 1032
+  }
+ },
+ "pageWidth": 1376,
+ "timeOrigin": 1000,
+ "sections": [
+  {
+   "id": "synthetic-section",
+   "width": 1376,
+   "height": 700
+  }
+ ],
+ "events": [
+  {
+   "seq": 0,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1000,
+    "clientX": 160,
+    "clientY": 190,
+    "pressure": 0,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   },
+   "tool": {
+    "kind": "pen",
+    "penColor": "#1e293b",
+    "penSize": 3,
+    "hlColor": "#fde047",
+    "hlSize": 20,
+    "eraserSize": 20
+   }
+  },
+  {
+   "seq": 1,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1045,
+    "clientX": 160,
+    "clientY": 200,
+    "pressure": 0,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 2,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1090,
+    "clientX": 160,
+    "clientY": 210,
+    "pressure": 0,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 3,
+   "kind": "down",
+   "type": "pointerdown",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": 0,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1180,
+    "clientX": 160,
+    "clientY": 220,
+    "pressure": 0.03,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 4,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1196.667,
+    "clientX": 160,
+    "clientY": 222.33333333333331,
+    "pressure": 0.28,
+    "altitudeAngle": 0.9583333333333333,
+    "azimuthAngle": 2.1833333333333336
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1184.167,
+     "clientX": 160,
+     "clientY": 220.58333333333331,
+     "pressure": 0.0925,
+     "altitudeAngle": 0.9520833333333333,
+     "azimuthAngle": 2.1958333333333333
+    },
+    {
+     "timeStamp": 1188.333,
+     "clientX": 160,
+     "clientY": 221.16666666666669,
+     "pressure": 0.155,
+     "altitudeAngle": 0.9541666666666666,
+     "azimuthAngle": 2.191666666666667
+    },
+    {
+     "timeStamp": 1192.5,
+     "clientX": 160,
+     "clientY": 221.75,
+     "pressure": 0.2175,
+     "altitudeAngle": 0.9562499999999999,
+     "azimuthAngle": 2.1875
+    },
+    {
+     "timeStamp": 1196.667,
+     "clientX": 160,
+     "clientY": 222.33333333333331,
+     "pressure": 0.28,
+     "altitudeAngle": 0.9583333333333333,
+     "azimuthAngle": 2.1833333333333336
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1205.0003333333332,
+     "clientX": 160,
+     "clientY": 223.5,
+     "pressure": 0.28,
+     "altitudeAngle": 0.9583333333333333,
+     "azimuthAngle": 2.1833333333333336
+    },
+    {
+     "timeStamp": 1213.3336666666667,
+     "clientX": 160,
+     "clientY": 224.66666666666663,
+     "pressure": 0.28,
+     "altitudeAngle": 0.9583333333333333,
+     "azimuthAngle": 2.1833333333333336
+    }
+   ]
+  },
+  {
+   "seq": 5,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1213.333,
+    "clientX": 160,
+    "clientY": 224.66666666666669,
+    "pressure": 0.48,
+    "altitudeAngle": 0.9666666666666667,
+    "azimuthAngle": 2.166666666666667
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1200.833,
+     "clientX": 160,
+     "clientY": 222.91666666666669,
+     "pressure": 0.3425,
+     "altitudeAngle": 0.9604166666666666,
+     "azimuthAngle": 2.1791666666666667
+    },
+    {
+     "timeStamp": 1205,
+     "clientX": 160,
+     "clientY": 223.5,
+     "pressure": 0.405,
+     "altitudeAngle": 0.9624999999999999,
+     "azimuthAngle": 2.1750000000000003
+    },
+    {
+     "timeStamp": 1209.167,
+     "clientX": 160,
+     "clientY": 224.08333333333331,
+     "pressure": 0.4675,
+     "altitudeAngle": 0.9645833333333332,
+     "azimuthAngle": 2.1708333333333334
+    },
+    {
+     "timeStamp": 1213.333,
+     "clientX": 160,
+     "clientY": 224.66666666666669,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9666666666666667,
+     "azimuthAngle": 2.166666666666667
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1221.6663333333333,
+     "clientX": 160,
+     "clientY": 225.83333333333337,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9666666666666667,
+     "azimuthAngle": 2.166666666666667
+    },
+    {
+     "timeStamp": 1229.9996666666668,
+     "clientX": 160,
+     "clientY": 227.00000000000006,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9666666666666667,
+     "azimuthAngle": 2.166666666666667
+    }
+   ]
+  },
+  {
+   "seq": 6,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1230,
+    "clientX": 160,
+    "clientY": 227,
+    "pressure": 0.48,
+    "altitudeAngle": 0.975,
+    "azimuthAngle": 2.1500000000000004
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1217.5,
+     "clientX": 160,
+     "clientY": 225.25,
+     "pressure": 0.48,
+     "altitudeAngle": 0.96875,
+     "azimuthAngle": 2.1625
+    },
+    {
+     "timeStamp": 1221.667,
+     "clientX": 160,
+     "clientY": 225.83333333333331,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9708333333333333,
+     "azimuthAngle": 2.1583333333333337
+    },
+    {
+     "timeStamp": 1225.833,
+     "clientX": 160,
+     "clientY": 226.41666666666669,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9729166666666667,
+     "azimuthAngle": 2.154166666666667
+    },
+    {
+     "timeStamp": 1230,
+     "clientX": 160,
+     "clientY": 227,
+     "pressure": 0.48,
+     "altitudeAngle": 0.975,
+     "azimuthAngle": 2.1500000000000004
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1238.3333333333333,
+     "clientX": 160,
+     "clientY": 228.16666666666666,
+     "pressure": 0.48,
+     "altitudeAngle": 0.975,
+     "azimuthAngle": 2.1500000000000004
+    },
+    {
+     "timeStamp": 1246.6666666666667,
+     "clientX": 160,
+     "clientY": 229.33333333333331,
+     "pressure": 0.48,
+     "altitudeAngle": 0.975,
+     "azimuthAngle": 2.1500000000000004
+    }
+   ]
+  },
+  {
+   "seq": 7,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1246.667,
+    "clientX": 160,
+    "clientY": 229.33333333333331,
+    "pressure": 0.48,
+    "altitudeAngle": 0.9833333333333333,
+    "azimuthAngle": 2.1333333333333333
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1234.167,
+     "clientX": 160,
+     "clientY": 227.58333333333331,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9770833333333333,
+     "azimuthAngle": 2.1458333333333335
+    },
+    {
+     "timeStamp": 1238.333,
+     "clientX": 160,
+     "clientY": 228.16666666666669,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9791666666666666,
+     "azimuthAngle": 2.141666666666667
+    },
+    {
+     "timeStamp": 1242.5,
+     "clientX": 160,
+     "clientY": 228.75,
+     "pressure": 0.48,
+     "altitudeAngle": 0.98125,
+     "azimuthAngle": 2.1375
+    },
+    {
+     "timeStamp": 1246.667,
+     "clientX": 160,
+     "clientY": 229.33333333333331,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9833333333333333,
+     "azimuthAngle": 2.1333333333333333
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1255.0003333333332,
+     "clientX": 160,
+     "clientY": 230.5,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9833333333333333,
+     "azimuthAngle": 2.1333333333333333
+    },
+    {
+     "timeStamp": 1263.3336666666667,
+     "clientX": 160,
+     "clientY": 231.66666666666663,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9833333333333333,
+     "azimuthAngle": 2.1333333333333333
+    }
+   ]
+  },
+  {
+   "seq": 8,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1263.333,
+    "clientX": 160,
+    "clientY": 231.66666666666669,
+    "pressure": 0.48,
+    "altitudeAngle": 0.9916666666666666,
+    "azimuthAngle": 2.1166666666666667
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1250.833,
+     "clientX": 160,
+     "clientY": 229.91666666666669,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9854166666666666,
+     "azimuthAngle": 2.129166666666667
+    },
+    {
+     "timeStamp": 1255,
+     "clientX": 160,
+     "clientY": 230.5,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9874999999999999,
+     "azimuthAngle": 2.125
+    },
+    {
+     "timeStamp": 1259.167,
+     "clientX": 160,
+     "clientY": 231.08333333333331,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9895833333333333,
+     "azimuthAngle": 2.1208333333333336
+    },
+    {
+     "timeStamp": 1263.333,
+     "clientX": 160,
+     "clientY": 231.66666666666669,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9916666666666666,
+     "azimuthAngle": 2.1166666666666667
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1271.6663333333333,
+     "clientX": 160,
+     "clientY": 232.83333333333337,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9916666666666666,
+     "azimuthAngle": 2.1166666666666667
+    },
+    {
+     "timeStamp": 1279.9996666666668,
+     "clientX": 160,
+     "clientY": 234.00000000000006,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9916666666666666,
+     "azimuthAngle": 2.1166666666666667
+    }
+   ]
+  },
+  {
+   "seq": 9,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1280,
+    "clientX": 160,
+    "clientY": 234,
+    "pressure": 0.48,
+    "altitudeAngle": 1,
+    "azimuthAngle": 2.1
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1267.5,
+     "clientX": 160,
+     "clientY": 232.25,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9937499999999999,
+     "azimuthAngle": 2.1125000000000003
+    },
+    {
+     "timeStamp": 1271.667,
+     "clientX": 160,
+     "clientY": 232.83333333333331,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9958333333333333,
+     "azimuthAngle": 2.1083333333333334
+    },
+    {
+     "timeStamp": 1275.833,
+     "clientX": 160,
+     "clientY": 233.41666666666669,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9979166666666667,
+     "azimuthAngle": 2.104166666666667
+    },
+    {
+     "timeStamp": 1280,
+     "clientX": 160,
+     "clientY": 234,
+     "pressure": 0.48,
+     "altitudeAngle": 1,
+     "azimuthAngle": 2.1
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1288.3333333333333,
+     "clientX": 160,
+     "clientY": 235.16666666666666,
+     "pressure": 0.48,
+     "altitudeAngle": 1,
+     "azimuthAngle": 2.1
+    },
+    {
+     "timeStamp": 1296.6666666666667,
+     "clientX": 160,
+     "clientY": 236.33333333333331,
+     "pressure": 0.48,
+     "altitudeAngle": 1,
+     "azimuthAngle": 2.1
+    }
+   ]
+  },
+  {
+   "seq": 10,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1296.667,
+    "clientX": 160,
+    "clientY": 236.33333333333334,
+    "pressure": 0.48,
+    "altitudeAngle": 1.0083333333333333,
+    "azimuthAngle": 2.0833333333333335
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1284.167,
+     "clientX": 160,
+     "clientY": 234.58333333333331,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0020833333333332,
+     "azimuthAngle": 2.0958333333333337
+    },
+    {
+     "timeStamp": 1288.333,
+     "clientX": 160,
+     "clientY": 235.16666666666669,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0041666666666667,
+     "azimuthAngle": 2.091666666666667
+    },
+    {
+     "timeStamp": 1292.5,
+     "clientX": 160,
+     "clientY": 235.75,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0062499999999999,
+     "azimuthAngle": 2.0875000000000004
+    },
+    {
+     "timeStamp": 1296.667,
+     "clientX": 160,
+     "clientY": 236.33333333333334,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0083333333333333,
+     "azimuthAngle": 2.0833333333333335
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1305.0003333333332,
+     "clientX": 160,
+     "clientY": 237.50000000000003,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0083333333333333,
+     "azimuthAngle": 2.0833333333333335
+    },
+    {
+     "timeStamp": 1313.3336666666667,
+     "clientX": 160,
+     "clientY": 238.6666666666667,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0083333333333333,
+     "azimuthAngle": 2.0833333333333335
+    }
+   ]
+  },
+  {
+   "seq": 11,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1313.333,
+    "clientX": 160,
+    "clientY": 238.66666666666666,
+    "pressure": 0.48,
+    "altitudeAngle": 1.0166666666666666,
+    "azimuthAngle": 2.066666666666667
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1300.833,
+     "clientX": 160,
+     "clientY": 236.91666666666666,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0104166666666665,
+     "azimuthAngle": 2.079166666666667
+    },
+    {
+     "timeStamp": 1305,
+     "clientX": 160,
+     "clientY": 237.5,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0125,
+     "azimuthAngle": 2.075
+    },
+    {
+     "timeStamp": 1309.167,
+     "clientX": 160,
+     "clientY": 238.08333333333334,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0145833333333334,
+     "azimuthAngle": 2.0708333333333333
+    },
+    {
+     "timeStamp": 1313.333,
+     "clientX": 160,
+     "clientY": 238.66666666666666,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0166666666666666,
+     "azimuthAngle": 2.066666666666667
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1321.6663333333333,
+     "clientX": 160,
+     "clientY": 239.8333333333333,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0166666666666666,
+     "azimuthAngle": 2.066666666666667
+    },
+    {
+     "timeStamp": 1329.9996666666668,
+     "clientX": 160,
+     "clientY": 240.99999999999991,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0166666666666666,
+     "azimuthAngle": 2.066666666666667
+    }
+   ]
+  },
+  {
+   "seq": 12,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1330,
+    "clientX": 160,
+    "clientY": 241,
+    "pressure": 0.48,
+    "altitudeAngle": 1.025,
+    "azimuthAngle": 2.0500000000000003
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1317.5,
+     "clientX": 160,
+     "clientY": 239.25,
+     "pressure": 0.48,
+     "altitudeAngle": 1.01875,
+     "azimuthAngle": 2.0625
+    },
+    {
+     "timeStamp": 1321.667,
+     "clientX": 160,
+     "clientY": 239.83333333333334,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0208333333333333,
+     "azimuthAngle": 2.0583333333333336
+    },
+    {
+     "timeStamp": 1325.833,
+     "clientX": 160,
+     "clientY": 240.41666666666666,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0229166666666667,
+     "azimuthAngle": 2.0541666666666667
+    },
+    {
+     "timeStamp": 1330,
+     "clientX": 160,
+     "clientY": 241,
+     "pressure": 0.48,
+     "altitudeAngle": 1.025,
+     "azimuthAngle": 2.0500000000000003
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1338.3333333333333,
+     "clientX": 160,
+     "clientY": 242.16666666666669,
+     "pressure": 0.48,
+     "altitudeAngle": 1.025,
+     "azimuthAngle": 2.0500000000000003
+    },
+    {
+     "timeStamp": 1346.6666666666667,
+     "clientX": 160,
+     "clientY": 243.33333333333337,
+     "pressure": 0.48,
+     "altitudeAngle": 1.025,
+     "azimuthAngle": 2.0500000000000003
+    }
+   ]
+  },
+  {
+   "seq": 13,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1346.667,
+    "clientX": 160,
+    "clientY": 243.33333333333334,
+    "pressure": 0.405,
+    "altitudeAngle": 1.0333333333333332,
+    "azimuthAngle": 2.0333333333333337
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1334.167,
+     "clientX": 160,
+     "clientY": 241.58333333333334,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0270833333333333,
+     "azimuthAngle": 2.0458333333333334
+    },
+    {
+     "timeStamp": 1338.333,
+     "clientX": 160,
+     "clientY": 242.16666666666666,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0291666666666666,
+     "azimuthAngle": 2.041666666666667
+    },
+    {
+     "timeStamp": 1342.5,
+     "clientX": 160,
+     "clientY": 242.75,
+     "pressure": 0.4519,
+     "altitudeAngle": 1.03125,
+     "azimuthAngle": 2.0375
+    },
+    {
+     "timeStamp": 1346.667,
+     "clientX": 160,
+     "clientY": 243.33333333333334,
+     "pressure": 0.405,
+     "altitudeAngle": 1.0333333333333332,
+     "azimuthAngle": 2.0333333333333337
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1355.0003333333332,
+     "clientX": 160,
+     "clientY": 244.50000000000003,
+     "pressure": 0.405,
+     "altitudeAngle": 1.0333333333333332,
+     "azimuthAngle": 2.0333333333333337
+    },
+    {
+     "timeStamp": 1363.3336666666667,
+     "clientX": 160,
+     "clientY": 245.6666666666667,
+     "pressure": 0.405,
+     "altitudeAngle": 1.0333333333333332,
+     "azimuthAngle": 2.0333333333333337
+    }
+   ]
+  },
+  {
+   "seq": 14,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1363.333,
+    "clientX": 160,
+    "clientY": 245.66666666666666,
+    "pressure": 0.2175,
+    "altitudeAngle": 1.0416666666666665,
+    "azimuthAngle": 2.0166666666666666
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1350.833,
+     "clientX": 160,
+     "clientY": 243.91666666666666,
+     "pressure": 0.3581,
+     "altitudeAngle": 1.0354166666666667,
+     "azimuthAngle": 2.029166666666667
+    },
+    {
+     "timeStamp": 1355,
+     "clientX": 160,
+     "clientY": 244.5,
+     "pressure": 0.3113,
+     "altitudeAngle": 1.0374999999999999,
+     "azimuthAngle": 2.0250000000000004
+    },
+    {
+     "timeStamp": 1359.167,
+     "clientX": 160,
+     "clientY": 245.08333333333334,
+     "pressure": 0.2644,
+     "altitudeAngle": 1.0395833333333333,
+     "azimuthAngle": 2.0208333333333335
+    },
+    {
+     "timeStamp": 1363.333,
+     "clientX": 160,
+     "clientY": 245.66666666666666,
+     "pressure": 0.2175,
+     "altitudeAngle": 1.0416666666666665,
+     "azimuthAngle": 2.0166666666666666
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1371.6663333333333,
+     "clientX": 160,
+     "clientY": 246.8333333333333,
+     "pressure": 0.2175,
+     "altitudeAngle": 1.0416666666666665,
+     "azimuthAngle": 2.0166666666666666
+    },
+    {
+     "timeStamp": 1379.9996666666668,
+     "clientX": 160,
+     "clientY": 247.99999999999991,
+     "pressure": 0.2175,
+     "altitudeAngle": 1.0416666666666665,
+     "azimuthAngle": 2.0166666666666666
+    }
+   ]
+  },
+  {
+   "seq": 15,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1380,
+    "clientX": 160,
+    "clientY": 248,
+    "pressure": 0.03,
+    "altitudeAngle": 1.05,
+    "azimuthAngle": 2
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1367.5,
+     "clientX": 160,
+     "clientY": 246.25,
+     "pressure": 0.1706,
+     "altitudeAngle": 1.04375,
+     "azimuthAngle": 2.0125
+    },
+    {
+     "timeStamp": 1371.667,
+     "clientX": 160,
+     "clientY": 246.83333333333334,
+     "pressure": 0.1237,
+     "altitudeAngle": 1.0458333333333334,
+     "azimuthAngle": 2.0083333333333333
+    },
+    {
+     "timeStamp": 1375.833,
+     "clientX": 160,
+     "clientY": 247.41666666666666,
+     "pressure": 0.0769,
+     "altitudeAngle": 1.0479166666666666,
+     "azimuthAngle": 2.004166666666667
+    },
+    {
+     "timeStamp": 1380,
+     "clientX": 160,
+     "clientY": 248,
+     "pressure": 0.03,
+     "altitudeAngle": 1.05,
+     "azimuthAngle": 2
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1388.3333333333333,
+     "clientX": 160,
+     "clientY": 249.16666666666669,
+     "pressure": 0.03,
+     "altitudeAngle": 1.05,
+     "azimuthAngle": 2
+    },
+    {
+     "timeStamp": 1396.6666666666667,
+     "clientX": 160,
+     "clientY": 250.33333333333337,
+     "pressure": 0.03,
+     "altitudeAngle": 1.05,
+     "azimuthAngle": 2
+    }
+   ]
+  },
+  {
+   "seq": 16,
+   "kind": "up",
+   "type": "pointerup",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": 0,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1384,
+    "clientX": 160,
+    "clientY": 248,
+    "pressure": 0,
+    "altitudeAngle": 1.05,
+    "azimuthAngle": 2
+   }
+  },
+  {
+   "seq": 17,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1384,
+    "clientX": 160,
+    "clientY": 206,
+    "pressure": 0,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 18,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1429,
+    "clientX": 160,
+    "clientY": 216,
+    "pressure": 0,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 19,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1474,
+    "clientX": 160,
+    "clientY": 226,
+    "pressure": 0,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 20,
+   "kind": "down",
+   "type": "pointerdown",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": 0,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1564,
+    "clientX": 160,
+    "clientY": 236,
+    "pressure": 0.03,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 21,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1580.667,
+    "clientX": 162.04249721829103,
+    "clientY": 234.63833518780598,
+    "pressure": 0.28,
+    "altitudeAngle": 0.9583333333333333,
+    "azimuthAngle": 2.1833333333333336
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1568.167,
+     "clientX": 160.51062430457276,
+     "clientY": 235.6595837969515,
+     "pressure": 0.0925,
+     "altitudeAngle": 0.9520833333333333,
+     "azimuthAngle": 2.1958333333333333
+    },
+    {
+     "timeStamp": 1572.333,
+     "clientX": 161.02124860914552,
+     "clientY": 235.319167593903,
+     "pressure": 0.155,
+     "altitudeAngle": 0.9541666666666666,
+     "azimuthAngle": 2.191666666666667
+    },
+    {
+     "timeStamp": 1576.5,
+     "clientX": 161.53187291371825,
+     "clientY": 234.97875139085448,
+     "pressure": 0.2175,
+     "altitudeAngle": 0.9562499999999999,
+     "azimuthAngle": 2.1875
+    },
+    {
+     "timeStamp": 1580.667,
+     "clientX": 162.04249721829103,
+     "clientY": 234.63833518780598,
+     "pressure": 0.28,
+     "altitudeAngle": 0.9583333333333333,
+     "azimuthAngle": 2.1833333333333336
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1589.0003333333332,
+     "clientX": 163.06374582743655,
+     "clientY": 233.95750278170897,
+     "pressure": 0.28,
+     "altitudeAngle": 0.9583333333333333,
+     "azimuthAngle": 2.1833333333333336
+    },
+    {
+     "timeStamp": 1597.3336666666667,
+     "clientX": 164.08499443658206,
+     "clientY": 233.27667037561196,
+     "pressure": 0.28,
+     "altitudeAngle": 0.9583333333333333,
+     "azimuthAngle": 2.1833333333333336
+    }
+   ]
+  },
+  {
+   "seq": 22,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1597.333,
+    "clientX": 164.08499443658204,
+    "clientY": 233.27667037561199,
+    "pressure": 0.48,
+    "altitudeAngle": 0.9666666666666667,
+    "azimuthAngle": 2.166666666666667
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1584.833,
+     "clientX": 162.55312152286376,
+     "clientY": 234.29791898475747,
+     "pressure": 0.3425,
+     "altitudeAngle": 0.9604166666666666,
+     "azimuthAngle": 2.1791666666666667
+    },
+    {
+     "timeStamp": 1589,
+     "clientX": 163.06374582743652,
+     "clientY": 233.95750278170897,
+     "pressure": 0.405,
+     "altitudeAngle": 0.9624999999999999,
+     "azimuthAngle": 2.1750000000000003
+    },
+    {
+     "timeStamp": 1593.167,
+     "clientX": 163.57437013200928,
+     "clientY": 233.61708657866046,
+     "pressure": 0.4675,
+     "altitudeAngle": 0.9645833333333332,
+     "azimuthAngle": 2.1708333333333334
+    },
+    {
+     "timeStamp": 1597.333,
+     "clientX": 164.08499443658204,
+     "clientY": 233.27667037561199,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9666666666666667,
+     "azimuthAngle": 2.166666666666667
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1605.6663333333333,
+     "clientX": 165.10624304572755,
+     "clientY": 232.595837969515,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9666666666666667,
+     "azimuthAngle": 2.166666666666667
+    },
+    {
+     "timeStamp": 1613.9996666666668,
+     "clientX": 166.12749165487307,
+     "clientY": 231.91500556341802,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9666666666666667,
+     "azimuthAngle": 2.166666666666667
+    }
+   ]
+  },
+  {
+   "seq": 23,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1614,
+    "clientX": 166.14865095733742,
+    "clientY": 232.03716273933435,
+    "pressure": 0.48,
+    "altitudeAngle": 0.975,
+    "azimuthAngle": 2.1500000000000004
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1601.5,
+     "clientX": 164.5956187411548,
+     "clientY": 232.93625417256348,
+     "pressure": 0.48,
+     "altitudeAngle": 0.96875,
+     "azimuthAngle": 2.1625
+    },
+    {
+     "timeStamp": 1605.667,
+     "clientX": 165.10624304572752,
+     "clientY": 232.59583796951497,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9708333333333333,
+     "azimuthAngle": 2.1583333333333337
+    },
+    {
+     "timeStamp": 1609.833,
+     "clientX": 165.6168673503003,
+     "clientY": 232.25542176646647,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9729166666666667,
+     "azimuthAngle": 2.154166666666667
+    },
+    {
+     "timeStamp": 1614,
+     "clientX": 166.14865095733742,
+     "clientY": 232.03716273933435,
+     "pressure": 0.48,
+     "altitudeAngle": 0.975,
+     "azimuthAngle": 2.1500000000000004
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1622.3333333333333,
+     "clientX": 167.21221817141168,
+     "clientY": 231.60064468507016,
+     "pressure": 0.48,
+     "altitudeAngle": 0.975,
+     "azimuthAngle": 2.1500000000000004
+    },
+    {
+     "timeStamp": 1630.6666666666667,
+     "clientX": 168.27578538548593,
+     "clientY": 231.16412663080592,
+     "pressure": 0.48,
+     "altitudeAngle": 0.975,
+     "azimuthAngle": 2.1500000000000004
+    }
+   ]
+  },
+  {
+   "seq": 24,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1630.667,
+    "clientX": 168.53013362897045,
+    "clientY": 232.63253340724262,
+    "pressure": 0.48,
+    "altitudeAngle": 0.9833333333333333,
+    "azimuthAngle": 2.1333333333333333
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1618.167,
+     "clientX": 166.7440216252457,
+     "clientY": 232.18600540631144,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9770833333333333,
+     "azimuthAngle": 2.1458333333333335
+    },
+    {
+     "timeStamp": 1622.333,
+     "clientX": 167.33939229315394,
+     "clientY": 232.33484807328847,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9791666666666666,
+     "azimuthAngle": 2.141666666666667
+    },
+    {
+     "timeStamp": 1626.5,
+     "clientX": 167.93476296106218,
+     "clientY": 232.48369074026556,
+     "pressure": 0.48,
+     "altitudeAngle": 0.98125,
+     "azimuthAngle": 2.1375
+    },
+    {
+     "timeStamp": 1630.667,
+     "clientX": 168.53013362897045,
+     "clientY": 232.63253340724262,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9833333333333333,
+     "azimuthAngle": 2.1333333333333333
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1639.0003333333332,
+     "clientX": 169.72087496478696,
+     "clientY": 232.93021874119677,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9833333333333333,
+     "azimuthAngle": 2.1333333333333333
+    },
+    {
+     "timeStamp": 1647.3336666666667,
+     "clientX": 170.91161630060347,
+     "clientY": 233.22790407515092,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9833333333333333,
+     "azimuthAngle": 2.1333333333333333
+    }
+   ]
+  },
+  {
+   "seq": 25,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1647.333,
+    "clientX": 170.91161630060347,
+    "clientY": 233.2279040751509,
+    "pressure": 0.48,
+    "altitudeAngle": 0.9916666666666666,
+    "azimuthAngle": 2.1166666666666667
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1634.833,
+     "clientX": 169.12550429687872,
+     "clientY": 232.78137607421968,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9854166666666666,
+     "azimuthAngle": 2.129166666666667
+    },
+    {
+     "timeStamp": 1639,
+     "clientX": 169.72087496478696,
+     "clientY": 232.93021874119674,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9874999999999999,
+     "azimuthAngle": 2.125
+    },
+    {
+     "timeStamp": 1643.167,
+     "clientX": 170.31624563269523,
+     "clientY": 233.0790614081738,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9895833333333333,
+     "azimuthAngle": 2.1208333333333336
+    },
+    {
+     "timeStamp": 1647.333,
+     "clientX": 170.91161630060347,
+     "clientY": 233.2279040751509,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9916666666666666,
+     "azimuthAngle": 2.1166666666666667
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1655.6663333333333,
+     "clientX": 172.10235763641995,
+     "clientY": 233.525589409105,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9916666666666666,
+     "azimuthAngle": 2.1166666666666667
+    },
+    {
+     "timeStamp": 1663.9996666666668,
+     "clientX": 173.29309897223644,
+     "clientY": 233.8232747430592,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9916666666666666,
+     "azimuthAngle": 2.1166666666666667
+    }
+   ]
+  },
+  {
+   "seq": 26,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1664,
+    "clientX": 173.2930989722365,
+    "clientY": 233.82327474305913,
+    "pressure": 0.48,
+    "altitudeAngle": 1,
+    "azimuthAngle": 2.1
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1651.5,
+     "clientX": 171.50698696851174,
+     "clientY": 233.37674674212792,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9937499999999999,
+     "azimuthAngle": 2.1125000000000003
+    },
+    {
+     "timeStamp": 1655.667,
+     "clientX": 172.10235763641998,
+     "clientY": 233.525589409105,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9958333333333333,
+     "azimuthAngle": 2.1083333333333334
+    },
+    {
+     "timeStamp": 1659.833,
+     "clientX": 172.69772830432825,
+     "clientY": 233.67443207608204,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9979166666666667,
+     "azimuthAngle": 2.104166666666667
+    },
+    {
+     "timeStamp": 1664,
+     "clientX": 173.2930989722365,
+     "clientY": 233.82327474305913,
+     "pressure": 0.48,
+     "altitudeAngle": 1,
+     "azimuthAngle": 2.1
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1672.3333333333333,
+     "clientX": 174.48384030805298,
+     "clientY": 234.12096007701328,
+     "pressure": 0.48,
+     "altitudeAngle": 1,
+     "azimuthAngle": 2.1
+    },
+    {
+     "timeStamp": 1680.6666666666667,
+     "clientX": 175.67458164386946,
+     "clientY": 234.41864541096743,
+     "pressure": 0.48,
+     "altitudeAngle": 1,
+     "azimuthAngle": 2.1
+    }
+   ]
+  },
+  {
+   "seq": 27,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1680.667,
+    "clientX": 174,
+    "clientY": 235.72611924909864,
+    "pressure": 0.48,
+    "altitudeAngle": 1.0083333333333333,
+    "azimuthAngle": 2.0833333333333335
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1668.167,
+     "clientX": 173.88846964014476,
+     "clientY": 233.9721174100362,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0020833333333332,
+     "azimuthAngle": 2.0958333333333337
+    },
+    {
+     "timeStamp": 1672.333,
+     "clientX": 174,
+     "clientY": 234.49873117400847,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0041666666666667,
+     "azimuthAngle": 2.091666666666667
+    },
+    {
+     "timeStamp": 1676.5,
+     "clientX": 174,
+     "clientY": 235.11242521155356,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0062499999999999,
+     "azimuthAngle": 2.0875000000000004
+    },
+    {
+     "timeStamp": 1680.667,
+     "clientX": 174,
+     "clientY": 235.72611924909864,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0083333333333333,
+     "azimuthAngle": 2.0833333333333335
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1689.0003333333332,
+     "clientX": 174,
+     "clientY": 236.95350732418876,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0083333333333333,
+     "azimuthAngle": 2.0833333333333335
+    },
+    {
+     "timeStamp": 1697.3336666666667,
+     "clientX": 174,
+     "clientY": 238.18089539927894,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0083333333333333,
+     "azimuthAngle": 2.0833333333333335
+    }
+   ]
+  },
+  {
+   "seq": 28,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1697.333,
+    "clientX": 174,
+    "clientY": 238.18089539927888,
+    "pressure": 0.48,
+    "altitudeAngle": 1.0166666666666666,
+    "azimuthAngle": 2.066666666666667
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1684.833,
+     "clientX": 174,
+     "clientY": 236.33981328664368,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0104166666666665,
+     "azimuthAngle": 2.079166666666667
+    },
+    {
+     "timeStamp": 1689,
+     "clientX": 174,
+     "clientY": 236.95350732418876,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0125,
+     "azimuthAngle": 2.075
+    },
+    {
+     "timeStamp": 1693.167,
+     "clientX": 174,
+     "clientY": 237.56720136173385,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0145833333333334,
+     "azimuthAngle": 2.0708333333333333
+    },
+    {
+     "timeStamp": 1697.333,
+     "clientX": 174,
+     "clientY": 238.18089539927888,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0166666666666666,
+     "azimuthAngle": 2.066666666666667
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1705.6663333333333,
+     "clientX": 174,
+     "clientY": 239.408283474369,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0166666666666666,
+     "azimuthAngle": 2.066666666666667
+    },
+    {
+     "timeStamp": 1713.9996666666668,
+     "clientX": 174,
+     "clientY": 240.63567154945912,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0166666666666666,
+     "azimuthAngle": 2.066666666666667
+    }
+   ]
+  },
+  {
+   "seq": 29,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1714,
+    "clientX": 174,
+    "clientY": 240.63567154945918,
+    "pressure": 0.48,
+    "altitudeAngle": 1.025,
+    "azimuthAngle": 2.0500000000000003
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1701.5,
+     "clientX": 174,
+     "clientY": 238.79458943682397,
+     "pressure": 0.48,
+     "altitudeAngle": 1.01875,
+     "azimuthAngle": 2.0625
+    },
+    {
+     "timeStamp": 1705.667,
+     "clientX": 174,
+     "clientY": 239.40828347436906,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0208333333333333,
+     "azimuthAngle": 2.0583333333333336
+    },
+    {
+     "timeStamp": 1709.833,
+     "clientX": 174,
+     "clientY": 240.0219775119141,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0229166666666667,
+     "azimuthAngle": 2.0541666666666667
+    },
+    {
+     "timeStamp": 1714,
+     "clientX": 174,
+     "clientY": 240.63567154945918,
+     "pressure": 0.48,
+     "altitudeAngle": 1.025,
+     "azimuthAngle": 2.0500000000000003
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1722.3333333333333,
+     "clientX": 174,
+     "clientY": 241.86305962454932,
+     "pressure": 0.48,
+     "altitudeAngle": 1.025,
+     "azimuthAngle": 2.0500000000000003
+    },
+    {
+     "timeStamp": 1730.6666666666667,
+     "clientX": 174,
+     "clientY": 243.09044769963947,
+     "pressure": 0.48,
+     "altitudeAngle": 1.025,
+     "azimuthAngle": 2.0500000000000003
+    }
+   ]
+  },
+  {
+   "seq": 30,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1730.667,
+    "clientX": 174,
+    "clientY": 243.09044769963947,
+    "pressure": 0.405,
+    "altitudeAngle": 1.0333333333333332,
+    "azimuthAngle": 2.0333333333333337
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1718.167,
+     "clientX": 174,
+     "clientY": 241.24936558700426,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0270833333333333,
+     "azimuthAngle": 2.0458333333333334
+    },
+    {
+     "timeStamp": 1722.333,
+     "clientX": 174,
+     "clientY": 241.8630596245493,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0291666666666666,
+     "azimuthAngle": 2.041666666666667
+    },
+    {
+     "timeStamp": 1726.5,
+     "clientX": 174,
+     "clientY": 242.47675366209438,
+     "pressure": 0.4519,
+     "altitudeAngle": 1.03125,
+     "azimuthAngle": 2.0375
+    },
+    {
+     "timeStamp": 1730.667,
+     "clientX": 174,
+     "clientY": 243.09044769963947,
+     "pressure": 0.405,
+     "altitudeAngle": 1.0333333333333332,
+     "azimuthAngle": 2.0333333333333337
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1739.0003333333332,
+     "clientX": 174,
+     "clientY": 244.3178357747296,
+     "pressure": 0.405,
+     "altitudeAngle": 1.0333333333333332,
+     "azimuthAngle": 2.0333333333333337
+    },
+    {
+     "timeStamp": 1747.3336666666667,
+     "clientX": 174,
+     "clientY": 245.54522384981976,
+     "pressure": 0.405,
+     "altitudeAngle": 1.0333333333333332,
+     "azimuthAngle": 2.0333333333333337
+    }
+   ]
+  },
+  {
+   "seq": 31,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1747.333,
+    "clientX": 174,
+    "clientY": 245.5452238498197,
+    "pressure": 0.2175,
+    "altitudeAngle": 1.0416666666666665,
+    "azimuthAngle": 2.0166666666666666
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1734.833,
+     "clientX": 174,
+     "clientY": 243.7041417371845,
+     "pressure": 0.3581,
+     "altitudeAngle": 1.0354166666666667,
+     "azimuthAngle": 2.029166666666667
+    },
+    {
+     "timeStamp": 1739,
+     "clientX": 174,
+     "clientY": 244.3178357747296,
+     "pressure": 0.3113,
+     "altitudeAngle": 1.0374999999999999,
+     "azimuthAngle": 2.0250000000000004
+    },
+    {
+     "timeStamp": 1743.167,
+     "clientX": 174,
+     "clientY": 244.93152981227468,
+     "pressure": 0.2644,
+     "altitudeAngle": 1.0395833333333333,
+     "azimuthAngle": 2.0208333333333335
+    },
+    {
+     "timeStamp": 1747.333,
+     "clientX": 174,
+     "clientY": 245.5452238498197,
+     "pressure": 0.2175,
+     "altitudeAngle": 1.0416666666666665,
+     "azimuthAngle": 2.0166666666666666
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1755.6663333333333,
+     "clientX": 174,
+     "clientY": 246.77261192490982,
+     "pressure": 0.2175,
+     "altitudeAngle": 1.0416666666666665,
+     "azimuthAngle": 2.0166666666666666
+    },
+    {
+     "timeStamp": 1763.9996666666668,
+     "clientX": 174,
+     "clientY": 247.99999999999994,
+     "pressure": 0.2175,
+     "altitudeAngle": 1.0416666666666665,
+     "azimuthAngle": 2.0166666666666666
+    }
+   ]
+  },
+  {
+   "seq": 32,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1764,
+    "clientX": 174,
+    "clientY": 248,
+    "pressure": 0.03,
+    "altitudeAngle": 1.05,
+    "azimuthAngle": 2
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1751.5,
+     "clientX": 174,
+     "clientY": 246.1589178873648,
+     "pressure": 0.1706,
+     "altitudeAngle": 1.04375,
+     "azimuthAngle": 2.0125
+    },
+    {
+     "timeStamp": 1755.667,
+     "clientX": 174,
+     "clientY": 246.77261192490988,
+     "pressure": 0.1237,
+     "altitudeAngle": 1.0458333333333334,
+     "azimuthAngle": 2.0083333333333333
+    },
+    {
+     "timeStamp": 1759.833,
+     "clientX": 174,
+     "clientY": 247.3863059624549,
+     "pressure": 0.0769,
+     "altitudeAngle": 1.0479166666666666,
+     "azimuthAngle": 2.004166666666667
+    },
+    {
+     "timeStamp": 1764,
+     "clientX": 174,
+     "clientY": 248,
+     "pressure": 0.03,
+     "altitudeAngle": 1.05,
+     "azimuthAngle": 2
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1772.3333333333333,
+     "clientX": 174,
+     "clientY": 249.22738807509015,
+     "pressure": 0.03,
+     "altitudeAngle": 1.05,
+     "azimuthAngle": 2
+    },
+    {
+     "timeStamp": 1780.6666666666667,
+     "clientX": 174,
+     "clientY": 250.4547761501803,
+     "pressure": 0.03,
+     "altitudeAngle": 1.05,
+     "azimuthAngle": 2
+    }
+   ]
+  },
+  {
+   "seq": 33,
+   "kind": "up",
+   "type": "pointerup",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": 0,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1768,
+    "clientX": 174,
+    "clientY": 248,
+    "pressure": 0,
+    "altitudeAngle": 1.05,
+    "azimuthAngle": 2
+   }
+  },
+  {
+   "seq": 34,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1768,
+    "clientX": 182,
+    "clientY": 202,
+    "pressure": 0,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 35,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1813,
+    "clientX": 182,
+    "clientY": 212,
+    "pressure": 0,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 36,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1858,
+    "clientX": 182,
+    "clientY": 222,
+    "pressure": 0,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 37,
+   "kind": "down",
+   "type": "pointerdown",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": 0,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1948,
+    "clientX": 182,
+    "clientY": 232,
+    "pressure": 0.03,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 38,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1964.667,
+    "clientX": 182,
+    "clientY": 233.33333333333331,
+    "pressure": 0.28,
+    "altitudeAngle": 0.9583333333333333,
+    "azimuthAngle": 2.1833333333333336
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1952.167,
+     "clientX": 182,
+     "clientY": 232.33333333333331,
+     "pressure": 0.0925,
+     "altitudeAngle": 0.9520833333333333,
+     "azimuthAngle": 2.1958333333333333
+    },
+    {
+     "timeStamp": 1956.333,
+     "clientX": 182,
+     "clientY": 232.66666666666669,
+     "pressure": 0.155,
+     "altitudeAngle": 0.9541666666666666,
+     "azimuthAngle": 2.191666666666667
+    },
+    {
+     "timeStamp": 1960.5,
+     "clientX": 182,
+     "clientY": 233,
+     "pressure": 0.2175,
+     "altitudeAngle": 0.9562499999999999,
+     "azimuthAngle": 2.1875
+    },
+    {
+     "timeStamp": 1964.667,
+     "clientX": 182,
+     "clientY": 233.33333333333331,
+     "pressure": 0.28,
+     "altitudeAngle": 0.9583333333333333,
+     "azimuthAngle": 2.1833333333333336
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1973.0003333333332,
+     "clientX": 182,
+     "clientY": 234,
+     "pressure": 0.28,
+     "altitudeAngle": 0.9583333333333333,
+     "azimuthAngle": 2.1833333333333336
+    },
+    {
+     "timeStamp": 1981.3336666666667,
+     "clientX": 182,
+     "clientY": 234.66666666666663,
+     "pressure": 0.28,
+     "altitudeAngle": 0.9583333333333333,
+     "azimuthAngle": 2.1833333333333336
+    }
+   ]
+  },
+  {
+   "seq": 39,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1981.333,
+    "clientX": 182,
+    "clientY": 234.66666666666669,
+    "pressure": 0.48,
+    "altitudeAngle": 0.9666666666666667,
+    "azimuthAngle": 2.166666666666667
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1968.833,
+     "clientX": 182,
+     "clientY": 233.66666666666669,
+     "pressure": 0.3425,
+     "altitudeAngle": 0.9604166666666666,
+     "azimuthAngle": 2.1791666666666667
+    },
+    {
+     "timeStamp": 1973,
+     "clientX": 182,
+     "clientY": 234,
+     "pressure": 0.405,
+     "altitudeAngle": 0.9624999999999999,
+     "azimuthAngle": 2.1750000000000003
+    },
+    {
+     "timeStamp": 1977.167,
+     "clientX": 182,
+     "clientY": 234.33333333333331,
+     "pressure": 0.4675,
+     "altitudeAngle": 0.9645833333333332,
+     "azimuthAngle": 2.1708333333333334
+    },
+    {
+     "timeStamp": 1981.333,
+     "clientX": 182,
+     "clientY": 234.66666666666669,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9666666666666667,
+     "azimuthAngle": 2.166666666666667
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 1989.6663333333333,
+     "clientX": 182,
+     "clientY": 235.33333333333337,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9666666666666667,
+     "azimuthAngle": 2.166666666666667
+    },
+    {
+     "timeStamp": 1997.9996666666668,
+     "clientX": 182,
+     "clientY": 236.00000000000006,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9666666666666667,
+     "azimuthAngle": 2.166666666666667
+    }
+   ]
+  },
+  {
+   "seq": 40,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 1998,
+    "clientX": 182,
+    "clientY": 236,
+    "pressure": 0.48,
+    "altitudeAngle": 0.975,
+    "azimuthAngle": 2.1500000000000004
+   },
+   "coalesced": [
+    {
+     "timeStamp": 1985.5,
+     "clientX": 182,
+     "clientY": 235,
+     "pressure": 0.48,
+     "altitudeAngle": 0.96875,
+     "azimuthAngle": 2.1625
+    },
+    {
+     "timeStamp": 1989.667,
+     "clientX": 182,
+     "clientY": 235.33333333333331,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9708333333333333,
+     "azimuthAngle": 2.1583333333333337
+    },
+    {
+     "timeStamp": 1993.833,
+     "clientX": 182,
+     "clientY": 235.66666666666669,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9729166666666667,
+     "azimuthAngle": 2.154166666666667
+    },
+    {
+     "timeStamp": 1998,
+     "clientX": 182,
+     "clientY": 236,
+     "pressure": 0.48,
+     "altitudeAngle": 0.975,
+     "azimuthAngle": 2.1500000000000004
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2006.3333333333333,
+     "clientX": 182,
+     "clientY": 236.66666666666666,
+     "pressure": 0.48,
+     "altitudeAngle": 0.975,
+     "azimuthAngle": 2.1500000000000004
+    },
+    {
+     "timeStamp": 2014.6666666666667,
+     "clientX": 182,
+     "clientY": 237.33333333333331,
+     "pressure": 0.48,
+     "altitudeAngle": 0.975,
+     "azimuthAngle": 2.1500000000000004
+    }
+   ]
+  },
+  {
+   "seq": 41,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2014.667,
+    "clientX": 182,
+    "clientY": 237.33333333333331,
+    "pressure": 0.48,
+    "altitudeAngle": 0.9833333333333333,
+    "azimuthAngle": 2.1333333333333333
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2002.167,
+     "clientX": 182,
+     "clientY": 236.33333333333331,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9770833333333333,
+     "azimuthAngle": 2.1458333333333335
+    },
+    {
+     "timeStamp": 2006.333,
+     "clientX": 182,
+     "clientY": 236.66666666666669,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9791666666666666,
+     "azimuthAngle": 2.141666666666667
+    },
+    {
+     "timeStamp": 2010.5,
+     "clientX": 182,
+     "clientY": 237,
+     "pressure": 0.48,
+     "altitudeAngle": 0.98125,
+     "azimuthAngle": 2.1375
+    },
+    {
+     "timeStamp": 2014.667,
+     "clientX": 182,
+     "clientY": 237.33333333333331,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9833333333333333,
+     "azimuthAngle": 2.1333333333333333
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2023.0003333333332,
+     "clientX": 182,
+     "clientY": 238,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9833333333333333,
+     "azimuthAngle": 2.1333333333333333
+    },
+    {
+     "timeStamp": 2031.3336666666667,
+     "clientX": 182,
+     "clientY": 238.66666666666663,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9833333333333333,
+     "azimuthAngle": 2.1333333333333333
+    }
+   ]
+  },
+  {
+   "seq": 42,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2031.333,
+    "clientX": 182,
+    "clientY": 238.66666666666669,
+    "pressure": 0.48,
+    "altitudeAngle": 0.9916666666666666,
+    "azimuthAngle": 2.1166666666666667
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2018.833,
+     "clientX": 182,
+     "clientY": 237.66666666666669,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9854166666666666,
+     "azimuthAngle": 2.129166666666667
+    },
+    {
+     "timeStamp": 2023,
+     "clientX": 182,
+     "clientY": 238,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9874999999999999,
+     "azimuthAngle": 2.125
+    },
+    {
+     "timeStamp": 2027.167,
+     "clientX": 182,
+     "clientY": 238.33333333333331,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9895833333333333,
+     "azimuthAngle": 2.1208333333333336
+    },
+    {
+     "timeStamp": 2031.333,
+     "clientX": 182,
+     "clientY": 238.66666666666669,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9916666666666666,
+     "azimuthAngle": 2.1166666666666667
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2039.6663333333333,
+     "clientX": 182,
+     "clientY": 239.33333333333337,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9916666666666666,
+     "azimuthAngle": 2.1166666666666667
+    },
+    {
+     "timeStamp": 2047.9996666666668,
+     "clientX": 182,
+     "clientY": 240.00000000000006,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9916666666666666,
+     "azimuthAngle": 2.1166666666666667
+    }
+   ]
+  },
+  {
+   "seq": 43,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2048,
+    "clientX": 182,
+    "clientY": 240,
+    "pressure": 0.48,
+    "altitudeAngle": 1,
+    "azimuthAngle": 2.1
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2035.5,
+     "clientX": 182,
+     "clientY": 239,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9937499999999999,
+     "azimuthAngle": 2.1125000000000003
+    },
+    {
+     "timeStamp": 2039.667,
+     "clientX": 182,
+     "clientY": 239.33333333333331,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9958333333333333,
+     "azimuthAngle": 2.1083333333333334
+    },
+    {
+     "timeStamp": 2043.833,
+     "clientX": 182,
+     "clientY": 239.66666666666669,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9979166666666667,
+     "azimuthAngle": 2.104166666666667
+    },
+    {
+     "timeStamp": 2048,
+     "clientX": 182,
+     "clientY": 240,
+     "pressure": 0.48,
+     "altitudeAngle": 1,
+     "azimuthAngle": 2.1
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2056.3333333333335,
+     "clientX": 182,
+     "clientY": 240.66666666666666,
+     "pressure": 0.48,
+     "altitudeAngle": 1,
+     "azimuthAngle": 2.1
+    },
+    {
+     "timeStamp": 2064.6666666666665,
+     "clientX": 182,
+     "clientY": 241.33333333333331,
+     "pressure": 0.48,
+     "altitudeAngle": 1,
+     "azimuthAngle": 2.1
+    }
+   ]
+  },
+  {
+   "seq": 44,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2064.667,
+    "clientX": 182,
+    "clientY": 241.33333333333331,
+    "pressure": 0.48,
+    "altitudeAngle": 1.0083333333333333,
+    "azimuthAngle": 2.0833333333333335
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2052.167,
+     "clientX": 182,
+     "clientY": 240.33333333333331,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0020833333333332,
+     "azimuthAngle": 2.0958333333333337
+    },
+    {
+     "timeStamp": 2056.333,
+     "clientX": 182,
+     "clientY": 240.66666666666669,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0041666666666667,
+     "azimuthAngle": 2.091666666666667
+    },
+    {
+     "timeStamp": 2060.5,
+     "clientX": 182,
+     "clientY": 241,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0062499999999999,
+     "azimuthAngle": 2.0875000000000004
+    },
+    {
+     "timeStamp": 2064.667,
+     "clientX": 182,
+     "clientY": 241.33333333333331,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0083333333333333,
+     "azimuthAngle": 2.0833333333333335
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2073.0003333333334,
+     "clientX": 182,
+     "clientY": 242,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0083333333333333,
+     "azimuthAngle": 2.0833333333333335
+    },
+    {
+     "timeStamp": 2081.3336666666664,
+     "clientX": 182,
+     "clientY": 242.66666666666663,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0083333333333333,
+     "azimuthAngle": 2.0833333333333335
+    }
+   ]
+  },
+  {
+   "seq": 45,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2081.333,
+    "clientX": 182,
+    "clientY": 242.66666666666669,
+    "pressure": 0.48,
+    "altitudeAngle": 1.0166666666666666,
+    "azimuthAngle": 2.066666666666667
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2068.833,
+     "clientX": 182,
+     "clientY": 241.66666666666669,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0104166666666665,
+     "azimuthAngle": 2.079166666666667
+    },
+    {
+     "timeStamp": 2073,
+     "clientX": 182,
+     "clientY": 242,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0125,
+     "azimuthAngle": 2.075
+    },
+    {
+     "timeStamp": 2077.167,
+     "clientX": 182,
+     "clientY": 242.33333333333331,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0145833333333334,
+     "azimuthAngle": 2.0708333333333333
+    },
+    {
+     "timeStamp": 2081.333,
+     "clientX": 182,
+     "clientY": 242.66666666666669,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0166666666666666,
+     "azimuthAngle": 2.066666666666667
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2089.6663333333336,
+     "clientX": 182,
+     "clientY": 243.33333333333337,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0166666666666666,
+     "azimuthAngle": 2.066666666666667
+    },
+    {
+     "timeStamp": 2097.9996666666666,
+     "clientX": 182,
+     "clientY": 244.00000000000006,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0166666666666666,
+     "azimuthAngle": 2.066666666666667
+    }
+   ]
+  },
+  {
+   "seq": 46,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2098,
+    "clientX": 182,
+    "clientY": 244,
+    "pressure": 0.48,
+    "altitudeAngle": 1.025,
+    "azimuthAngle": 2.0500000000000003
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2085.5,
+     "clientX": 182,
+     "clientY": 243,
+     "pressure": 0.48,
+     "altitudeAngle": 1.01875,
+     "azimuthAngle": 2.0625
+    },
+    {
+     "timeStamp": 2089.667,
+     "clientX": 182,
+     "clientY": 243.33333333333331,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0208333333333333,
+     "azimuthAngle": 2.0583333333333336
+    },
+    {
+     "timeStamp": 2093.833,
+     "clientX": 182,
+     "clientY": 243.66666666666669,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0229166666666667,
+     "azimuthAngle": 2.0541666666666667
+    },
+    {
+     "timeStamp": 2098,
+     "clientX": 182,
+     "clientY": 244,
+     "pressure": 0.48,
+     "altitudeAngle": 1.025,
+     "azimuthAngle": 2.0500000000000003
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2106.3333333333335,
+     "clientX": 182,
+     "clientY": 244.66666666666666,
+     "pressure": 0.48,
+     "altitudeAngle": 1.025,
+     "azimuthAngle": 2.0500000000000003
+    },
+    {
+     "timeStamp": 2114.6666666666665,
+     "clientX": 182,
+     "clientY": 245.33333333333331,
+     "pressure": 0.48,
+     "altitudeAngle": 1.025,
+     "azimuthAngle": 2.0500000000000003
+    }
+   ]
+  },
+  {
+   "seq": 47,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2114.667,
+    "clientX": 182,
+    "clientY": 245.33333333333331,
+    "pressure": 0.405,
+    "altitudeAngle": 1.0333333333333332,
+    "azimuthAngle": 2.0333333333333337
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2102.167,
+     "clientX": 182,
+     "clientY": 244.33333333333331,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0270833333333333,
+     "azimuthAngle": 2.0458333333333334
+    },
+    {
+     "timeStamp": 2106.333,
+     "clientX": 182,
+     "clientY": 244.66666666666669,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0291666666666666,
+     "azimuthAngle": 2.041666666666667
+    },
+    {
+     "timeStamp": 2110.5,
+     "clientX": 182,
+     "clientY": 245,
+     "pressure": 0.4519,
+     "altitudeAngle": 1.03125,
+     "azimuthAngle": 2.0375
+    },
+    {
+     "timeStamp": 2114.667,
+     "clientX": 182,
+     "clientY": 245.33333333333331,
+     "pressure": 0.405,
+     "altitudeAngle": 1.0333333333333332,
+     "azimuthAngle": 2.0333333333333337
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2123.0003333333334,
+     "clientX": 182,
+     "clientY": 246,
+     "pressure": 0.405,
+     "altitudeAngle": 1.0333333333333332,
+     "azimuthAngle": 2.0333333333333337
+    },
+    {
+     "timeStamp": 2131.3336666666664,
+     "clientX": 182,
+     "clientY": 246.66666666666663,
+     "pressure": 0.405,
+     "altitudeAngle": 1.0333333333333332,
+     "azimuthAngle": 2.0333333333333337
+    }
+   ]
+  },
+  {
+   "seq": 48,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2131.333,
+    "clientX": 182,
+    "clientY": 246.66666666666669,
+    "pressure": 0.2175,
+    "altitudeAngle": 1.0416666666666665,
+    "azimuthAngle": 2.0166666666666666
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2118.833,
+     "clientX": 182,
+     "clientY": 245.66666666666669,
+     "pressure": 0.3581,
+     "altitudeAngle": 1.0354166666666667,
+     "azimuthAngle": 2.029166666666667
+    },
+    {
+     "timeStamp": 2123,
+     "clientX": 182,
+     "clientY": 246,
+     "pressure": 0.3113,
+     "altitudeAngle": 1.0374999999999999,
+     "azimuthAngle": 2.0250000000000004
+    },
+    {
+     "timeStamp": 2127.167,
+     "clientX": 182,
+     "clientY": 246.33333333333331,
+     "pressure": 0.2644,
+     "altitudeAngle": 1.0395833333333333,
+     "azimuthAngle": 2.0208333333333335
+    },
+    {
+     "timeStamp": 2131.333,
+     "clientX": 182,
+     "clientY": 246.66666666666669,
+     "pressure": 0.2175,
+     "altitudeAngle": 1.0416666666666665,
+     "azimuthAngle": 2.0166666666666666
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2139.6663333333336,
+     "clientX": 182,
+     "clientY": 247.33333333333337,
+     "pressure": 0.2175,
+     "altitudeAngle": 1.0416666666666665,
+     "azimuthAngle": 2.0166666666666666
+    },
+    {
+     "timeStamp": 2147.9996666666666,
+     "clientX": 182,
+     "clientY": 248.00000000000006,
+     "pressure": 0.2175,
+     "altitudeAngle": 1.0416666666666665,
+     "azimuthAngle": 2.0166666666666666
+    }
+   ]
+  },
+  {
+   "seq": 49,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2148,
+    "clientX": 182,
+    "clientY": 248,
+    "pressure": 0.03,
+    "altitudeAngle": 1.05,
+    "azimuthAngle": 2
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2135.5,
+     "clientX": 182,
+     "clientY": 247,
+     "pressure": 0.1706,
+     "altitudeAngle": 1.04375,
+     "azimuthAngle": 2.0125
+    },
+    {
+     "timeStamp": 2139.667,
+     "clientX": 182,
+     "clientY": 247.33333333333331,
+     "pressure": 0.1237,
+     "altitudeAngle": 1.0458333333333334,
+     "azimuthAngle": 2.0083333333333333
+    },
+    {
+     "timeStamp": 2143.833,
+     "clientX": 182,
+     "clientY": 247.66666666666669,
+     "pressure": 0.0769,
+     "altitudeAngle": 1.0479166666666666,
+     "azimuthAngle": 2.004166666666667
+    },
+    {
+     "timeStamp": 2148,
+     "clientX": 182,
+     "clientY": 248,
+     "pressure": 0.03,
+     "altitudeAngle": 1.05,
+     "azimuthAngle": 2
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2156.3333333333335,
+     "clientX": 182,
+     "clientY": 248.66666666666666,
+     "pressure": 0.03,
+     "altitudeAngle": 1.05,
+     "azimuthAngle": 2
+    },
+    {
+     "timeStamp": 2164.6666666666665,
+     "clientX": 182,
+     "clientY": 249.33333333333331,
+     "pressure": 0.03,
+     "altitudeAngle": 1.05,
+     "azimuthAngle": 2
+    }
+   ]
+  },
+  {
+   "seq": 50,
+   "kind": "up",
+   "type": "pointerup",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": 0,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2152,
+    "clientX": 182,
+    "clientY": 248,
+    "pressure": 0,
+    "altitudeAngle": 1.05,
+    "azimuthAngle": 2
+   }
+  },
+  {
+   "seq": 51,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2152,
+    "clientX": 182,
+    "clientY": 194,
+    "pressure": 0,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 52,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2197,
+    "clientX": 182,
+    "clientY": 204,
+    "pressure": 0,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 53,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2242,
+    "clientX": 182,
+    "clientY": 214,
+    "pressure": 0,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 54,
+   "kind": "down",
+   "type": "pointerdown",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": 0,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2332,
+    "clientX": 182,
+    "clientY": 224,
+    "pressure": 0.03,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 55,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2348.667,
+    "clientX": 182,
+    "clientY": 224,
+    "pressure": 0.48,
+    "altitudeAngle": 0.9735294117647059,
+    "azimuthAngle": 2.1529411764705886
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2336.167,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.2065,
+     "altitudeAngle": 0.9558823529411764,
+     "azimuthAngle": 2.1882352941176473
+    },
+    {
+     "timeStamp": 2340.333,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.3829,
+     "altitudeAngle": 0.9617647058823529,
+     "azimuthAngle": 2.1764705882352944
+    },
+    {
+     "timeStamp": 2344.5,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9676470588235294,
+     "azimuthAngle": 2.1647058823529415
+    },
+    {
+     "timeStamp": 2348.667,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9735294117647059,
+     "azimuthAngle": 2.1529411764705886
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2357.0003333333334,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9735294117647059,
+     "azimuthAngle": 2.1529411764705886
+    },
+    {
+     "timeStamp": 2365.3336666666664,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9735294117647059,
+     "azimuthAngle": 2.1529411764705886
+    }
+   ]
+  },
+  {
+   "seq": 56,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2365.333,
+    "clientX": 182,
+    "clientY": 224,
+    "pressure": 0.48,
+    "altitudeAngle": 0.9970588235294118,
+    "azimuthAngle": 2.1058823529411765
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2352.833,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9794117647058823,
+     "azimuthAngle": 2.1411764705882357
+    },
+    {
+     "timeStamp": 2357,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9852941176470588,
+     "azimuthAngle": 2.1294117647058823
+    },
+    {
+     "timeStamp": 2361.167,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9911764705882352,
+     "azimuthAngle": 2.1176470588235294
+    },
+    {
+     "timeStamp": 2365.333,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9970588235294118,
+     "azimuthAngle": 2.1058823529411765
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2373.6663333333336,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9970588235294118,
+     "azimuthAngle": 2.1058823529411765
+    },
+    {
+     "timeStamp": 2381.9996666666666,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9970588235294118,
+     "azimuthAngle": 2.1058823529411765
+    }
+   ]
+  },
+  {
+   "seq": 57,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2382,
+    "clientX": 182,
+    "clientY": 224,
+    "pressure": 0.48,
+    "altitudeAngle": 1.0205882352941176,
+    "azimuthAngle": 2.058823529411765
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2369.5,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0029411764705882,
+     "azimuthAngle": 2.0941176470588236
+    },
+    {
+     "timeStamp": 2373.667,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0088235294117647,
+     "azimuthAngle": 2.0823529411764707
+    },
+    {
+     "timeStamp": 2377.833,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0147058823529411,
+     "azimuthAngle": 2.070588235294118
+    },
+    {
+     "timeStamp": 2382,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0205882352941176,
+     "azimuthAngle": 2.058823529411765
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2390.3333333333335,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0205882352941176,
+     "azimuthAngle": 2.058823529411765
+    },
+    {
+     "timeStamp": 2398.6666666666665,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0205882352941176,
+     "azimuthAngle": 2.058823529411765
+    }
+   ]
+  },
+  {
+   "seq": 58,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2398.667,
+    "clientX": 182,
+    "clientY": 224,
+    "pressure": 0.1624,
+    "altitudeAngle": 1.0441176470588234,
+    "azimuthAngle": 2.011764705882353
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2386.167,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.48,
+     "altitudeAngle": 1.026470588235294,
+     "azimuthAngle": 2.047058823529412
+    },
+    {
+     "timeStamp": 2390.333,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.4271,
+     "altitudeAngle": 1.0323529411764705,
+     "azimuthAngle": 2.035294117647059
+    },
+    {
+     "timeStamp": 2394.5,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.2947,
+     "altitudeAngle": 1.038235294117647,
+     "azimuthAngle": 2.0235294117647062
+    },
+    {
+     "timeStamp": 2398.667,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.1624,
+     "altitudeAngle": 1.0441176470588234,
+     "azimuthAngle": 2.011764705882353
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2407.0003333333334,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.1624,
+     "altitudeAngle": 1.0441176470588234,
+     "azimuthAngle": 2.011764705882353
+    },
+    {
+     "timeStamp": 2415.3336666666664,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.1624,
+     "altitudeAngle": 1.0441176470588234,
+     "azimuthAngle": 2.011764705882353
+    }
+   ]
+  },
+  {
+   "seq": 59,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2402.833,
+    "clientX": 182,
+    "clientY": 224,
+    "pressure": 0.03,
+    "altitudeAngle": 1.05,
+    "azimuthAngle": 2
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2402.833,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.03,
+     "altitudeAngle": 1.05,
+     "azimuthAngle": 2
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2411.1663333333336,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.03,
+     "altitudeAngle": 1.05,
+     "azimuthAngle": 2
+    },
+    {
+     "timeStamp": 2419.4996666666666,
+     "clientX": 182,
+     "clientY": 224,
+     "pressure": 0.03,
+     "altitudeAngle": 1.05,
+     "azimuthAngle": 2
+    }
+   ]
+  },
+  {
+   "seq": 60,
+   "kind": "up",
+   "type": "pointerup",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": 0,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2406.833,
+    "clientX": 182,
+    "clientY": 224,
+    "pressure": 0,
+    "altitudeAngle": 1.05,
+    "azimuthAngle": 2
+   }
+  },
+  {
+   "seq": 61,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2406.833,
+    "clientX": 240,
+    "clientY": 190,
+    "pressure": 0,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 62,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2451.833,
+    "clientX": 240,
+    "clientY": 200,
+    "pressure": 0,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 63,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2496.833,
+    "clientX": 240,
+    "clientY": 210,
+    "pressure": 0,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 64,
+   "kind": "down",
+   "type": "pointerdown",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": 0,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2586.833,
+    "clientX": 240,
+    "clientY": 220,
+    "pressure": 0.03,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 65,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2603.5,
+    "clientX": 240,
+    "clientY": 221.80645161290323,
+    "pressure": 0.2235,
+    "altitudeAngle": 0.9564516129032258,
+    "azimuthAngle": 2.1870967741935488
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2591,
+     "clientX": 240,
+     "clientY": 220.4516129032258,
+     "pressure": 0.0784,
+     "altitudeAngle": 0.9516129032258064,
+     "azimuthAngle": 2.196774193548387
+    },
+    {
+     "timeStamp": 2595.166,
+     "clientX": 240,
+     "clientY": 220.90322580645162,
+     "pressure": 0.1268,
+     "altitudeAngle": 0.9532258064516128,
+     "azimuthAngle": 2.1935483870967745
+    },
+    {
+     "timeStamp": 2599.333,
+     "clientX": 240,
+     "clientY": 221.35483870967744,
+     "pressure": 0.1752,
+     "altitudeAngle": 0.9548387096774194,
+     "azimuthAngle": 2.1903225806451614
+    },
+    {
+     "timeStamp": 2603.5,
+     "clientX": 240,
+     "clientY": 221.80645161290323,
+     "pressure": 0.2235,
+     "altitudeAngle": 0.9564516129032258,
+     "azimuthAngle": 2.1870967741935488
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2611.8333333333335,
+     "clientX": 240,
+     "clientY": 222.70967741935485,
+     "pressure": 0.2235,
+     "altitudeAngle": 0.9564516129032258,
+     "azimuthAngle": 2.1870967741935488
+    },
+    {
+     "timeStamp": 2620.1666666666665,
+     "clientX": 240,
+     "clientY": 223.61290322580646,
+     "pressure": 0.2235,
+     "altitudeAngle": 0.9564516129032258,
+     "azimuthAngle": 2.1870967741935488
+    }
+   ]
+  },
+  {
+   "seq": 66,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2620.166,
+    "clientX": 240,
+    "clientY": 223.61290322580646,
+    "pressure": 0.4171,
+    "altitudeAngle": 0.9629032258064516,
+    "azimuthAngle": 2.174193548387097
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2607.666,
+     "clientX": 240,
+     "clientY": 222.25806451612902,
+     "pressure": 0.2719,
+     "altitudeAngle": 0.9580645161290322,
+     "azimuthAngle": 2.1838709677419357
+    },
+    {
+     "timeStamp": 2611.833,
+     "clientX": 240,
+     "clientY": 222.70967741935482,
+     "pressure": 0.3203,
+     "altitudeAngle": 0.9596774193548386,
+     "azimuthAngle": 2.1806451612903226
+    },
+    {
+     "timeStamp": 2616,
+     "clientX": 240,
+     "clientY": 223.16129032258064,
+     "pressure": 0.3687,
+     "altitudeAngle": 0.9612903225806451,
+     "azimuthAngle": 2.17741935483871
+    },
+    {
+     "timeStamp": 2620.166,
+     "clientX": 240,
+     "clientY": 223.61290322580646,
+     "pressure": 0.4171,
+     "altitudeAngle": 0.9629032258064516,
+     "azimuthAngle": 2.174193548387097
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2628.4993333333337,
+     "clientX": 240,
+     "clientY": 224.51612903225805,
+     "pressure": 0.4171,
+     "altitudeAngle": 0.9629032258064516,
+     "azimuthAngle": 2.174193548387097
+    },
+    {
+     "timeStamp": 2636.8326666666667,
+     "clientX": 240,
+     "clientY": 225.4193548387097,
+     "pressure": 0.4171,
+     "altitudeAngle": 0.9629032258064516,
+     "azimuthAngle": 2.174193548387097
+    }
+   ]
+  },
+  {
+   "seq": 67,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2636.833,
+    "clientX": 240,
+    "clientY": 225.4193548387097,
+    "pressure": 0.48,
+    "altitudeAngle": 0.9693548387096774,
+    "azimuthAngle": 2.1612903225806455
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2624.333,
+     "clientX": 240,
+     "clientY": 224.06451612903226,
+     "pressure": 0.4655,
+     "altitudeAngle": 0.964516129032258,
+     "azimuthAngle": 2.1709677419354843
+    },
+    {
+     "timeStamp": 2628.5,
+     "clientX": 240,
+     "clientY": 224.51612903225805,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9661290322580645,
+     "azimuthAngle": 2.167741935483871
+    },
+    {
+     "timeStamp": 2632.666,
+     "clientX": 240,
+     "clientY": 224.96774193548387,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9677419354838709,
+     "azimuthAngle": 2.164516129032258
+    },
+    {
+     "timeStamp": 2636.833,
+     "clientX": 240,
+     "clientY": 225.4193548387097,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9693548387096774,
+     "azimuthAngle": 2.1612903225806455
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2645.1663333333336,
+     "clientX": 240,
+     "clientY": 226.32258064516128,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9693548387096774,
+     "azimuthAngle": 2.1612903225806455
+    },
+    {
+     "timeStamp": 2653.4996666666666,
+     "clientX": 240,
+     "clientY": 227.22580645161293,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9693548387096774,
+     "azimuthAngle": 2.1612903225806455
+    }
+   ]
+  },
+  {
+   "seq": 68,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2653.5,
+    "clientX": 240,
+    "clientY": 227.2258064516129,
+    "pressure": 0.48,
+    "altitudeAngle": 0.9758064516129031,
+    "azimuthAngle": 2.1483870967741936
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2641,
+     "clientX": 240,
+     "clientY": 225.8709677419355,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9709677419354839,
+     "azimuthAngle": 2.1580645161290324
+    },
+    {
+     "timeStamp": 2645.166,
+     "clientX": 240,
+     "clientY": 226.32258064516128,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9725806451612903,
+     "azimuthAngle": 2.1548387096774198
+    },
+    {
+     "timeStamp": 2649.333,
+     "clientX": 240,
+     "clientY": 226.7741935483871,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9741935483870967,
+     "azimuthAngle": 2.1516129032258067
+    },
+    {
+     "timeStamp": 2653.5,
+     "clientX": 240,
+     "clientY": 227.2258064516129,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9758064516129031,
+     "azimuthAngle": 2.1483870967741936
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2661.8333333333335,
+     "clientX": 240,
+     "clientY": 228.12903225806448,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9758064516129031,
+     "azimuthAngle": 2.1483870967741936
+    },
+    {
+     "timeStamp": 2670.1666666666665,
+     "clientX": 240,
+     "clientY": 229.03225806451607,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9758064516129031,
+     "azimuthAngle": 2.1483870967741936
+    }
+   ]
+  },
+  {
+   "seq": 69,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2670.166,
+    "clientX": 240,
+    "clientY": 229.03225806451613,
+    "pressure": 0.48,
+    "altitudeAngle": 0.982258064516129,
+    "azimuthAngle": 2.135483870967742
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2657.666,
+     "clientX": 240,
+     "clientY": 227.67741935483872,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9774193548387097,
+     "azimuthAngle": 2.145161290322581
+    },
+    {
+     "timeStamp": 2661.833,
+     "clientX": 240,
+     "clientY": 228.1290322580645,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9790322580645161,
+     "azimuthAngle": 2.141935483870968
+    },
+    {
+     "timeStamp": 2666,
+     "clientX": 240,
+     "clientY": 228.5806451612903,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9806451612903225,
+     "azimuthAngle": 2.138709677419355
+    },
+    {
+     "timeStamp": 2670.166,
+     "clientX": 240,
+     "clientY": 229.03225806451613,
+     "pressure": 0.48,
+     "altitudeAngle": 0.982258064516129,
+     "azimuthAngle": 2.135483870967742
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2678.4993333333337,
+     "clientX": 240,
+     "clientY": 229.93548387096774,
+     "pressure": 0.48,
+     "altitudeAngle": 0.982258064516129,
+     "azimuthAngle": 2.135483870967742
+    },
+    {
+     "timeStamp": 2686.8326666666667,
+     "clientX": 240,
+     "clientY": 230.83870967741936,
+     "pressure": 0.48,
+     "altitudeAngle": 0.982258064516129,
+     "azimuthAngle": 2.135483870967742
+    }
+   ]
+  },
+  {
+   "seq": 70,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2686.833,
+    "clientX": 240,
+    "clientY": 230.83870967741936,
+    "pressure": 0.48,
+    "altitudeAngle": 0.9887096774193548,
+    "azimuthAngle": 2.1225806451612903
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2674.333,
+     "clientX": 240,
+     "clientY": 229.48387096774195,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9838709677419354,
+     "azimuthAngle": 2.132258064516129
+    },
+    {
+     "timeStamp": 2678.5,
+     "clientX": 240,
+     "clientY": 229.93548387096774,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9854838709677419,
+     "azimuthAngle": 2.1290322580645165
+    },
+    {
+     "timeStamp": 2682.666,
+     "clientX": 240,
+     "clientY": 230.38709677419354,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9870967741935484,
+     "azimuthAngle": 2.1258064516129034
+    },
+    {
+     "timeStamp": 2686.833,
+     "clientX": 240,
+     "clientY": 230.83870967741936,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9887096774193548,
+     "azimuthAngle": 2.1225806451612903
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2695.1663333333336,
+     "clientX": 240,
+     "clientY": 231.74193548387098,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9887096774193548,
+     "azimuthAngle": 2.1225806451612903
+    },
+    {
+     "timeStamp": 2703.4996666666666,
+     "clientX": 240,
+     "clientY": 232.6451612903226,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9887096774193548,
+     "azimuthAngle": 2.1225806451612903
+    }
+   ]
+  },
+  {
+   "seq": 71,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2703.5,
+    "clientX": 240,
+    "clientY": 232.64516129032256,
+    "pressure": 0.48,
+    "altitudeAngle": 0.9951612903225806,
+    "azimuthAngle": 2.109677419354839
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2691,
+     "clientX": 240,
+     "clientY": 231.29032258064515,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9903225806451612,
+     "azimuthAngle": 2.1193548387096777
+    },
+    {
+     "timeStamp": 2695.166,
+     "clientX": 240,
+     "clientY": 231.74193548387098,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9919354838709677,
+     "azimuthAngle": 2.1161290322580646
+    },
+    {
+     "timeStamp": 2699.333,
+     "clientX": 240,
+     "clientY": 232.19354838709677,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9935483870967742,
+     "azimuthAngle": 2.112903225806452
+    },
+    {
+     "timeStamp": 2703.5,
+     "clientX": 240,
+     "clientY": 232.64516129032256,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9951612903225806,
+     "azimuthAngle": 2.109677419354839
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2711.8333333333335,
+     "clientX": 240,
+     "clientY": 233.5483870967742,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9951612903225806,
+     "azimuthAngle": 2.109677419354839
+    },
+    {
+     "timeStamp": 2720.1666666666665,
+     "clientX": 240,
+     "clientY": 234.4516129032258,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9951612903225806,
+     "azimuthAngle": 2.109677419354839
+    }
+   ]
+  },
+  {
+   "seq": 72,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2720.166,
+    "clientX": 240,
+    "clientY": 234.4516129032258,
+    "pressure": 0.48,
+    "altitudeAngle": 1.0016129032258063,
+    "azimuthAngle": 2.0967741935483875
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2707.666,
+     "clientX": 240,
+     "clientY": 233.09677419354838,
+     "pressure": 0.48,
+     "altitudeAngle": 0.996774193548387,
+     "azimuthAngle": 2.106451612903226
+    },
+    {
+     "timeStamp": 2711.833,
+     "clientX": 240,
+     "clientY": 233.5483870967742,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9983870967741935,
+     "azimuthAngle": 2.103225806451613
+    },
+    {
+     "timeStamp": 2716,
+     "clientX": 240,
+     "clientY": 234,
+     "pressure": 0.48,
+     "altitudeAngle": 1,
+     "azimuthAngle": 2.1
+    },
+    {
+     "timeStamp": 2720.166,
+     "clientX": 240,
+     "clientY": 234.4516129032258,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0016129032258063,
+     "azimuthAngle": 2.0967741935483875
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2728.4993333333337,
+     "clientX": 240,
+     "clientY": 235.35483870967744,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0016129032258063,
+     "azimuthAngle": 2.0967741935483875
+    },
+    {
+     "timeStamp": 2736.8326666666667,
+     "clientX": 240,
+     "clientY": 236.25806451612902,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0016129032258063,
+     "azimuthAngle": 2.0967741935483875
+    }
+   ]
+  },
+  {
+   "seq": 73,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2736.833,
+    "clientX": 240,
+    "clientY": 236.25806451612902,
+    "pressure": 0.48,
+    "altitudeAngle": 1.0080645161290323,
+    "azimuthAngle": 2.0838709677419356
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2724.333,
+     "clientX": 240,
+     "clientY": 234.90322580645162,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0032258064516129,
+     "azimuthAngle": 2.0935483870967744
+    },
+    {
+     "timeStamp": 2728.5,
+     "clientX": 240,
+     "clientY": 235.35483870967744,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0048387096774194,
+     "azimuthAngle": 2.0903225806451613
+    },
+    {
+     "timeStamp": 2732.666,
+     "clientX": 240,
+     "clientY": 235.80645161290323,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0064516129032257,
+     "azimuthAngle": 2.0870967741935487
+    },
+    {
+     "timeStamp": 2736.833,
+     "clientX": 240,
+     "clientY": 236.25806451612902,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0080645161290323,
+     "azimuthAngle": 2.0838709677419356
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2745.1663333333336,
+     "clientX": 240,
+     "clientY": 237.1612903225806,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0080645161290323,
+     "azimuthAngle": 2.0838709677419356
+    },
+    {
+     "timeStamp": 2753.4996666666666,
+     "clientX": 240,
+     "clientY": 238.0645161290322,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0080645161290323,
+     "azimuthAngle": 2.0838709677419356
+    }
+   ]
+  },
+  {
+   "seq": 74,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2753.5,
+    "clientX": 240,
+    "clientY": 238.06451612903226,
+    "pressure": 0.48,
+    "altitudeAngle": 1.014516129032258,
+    "azimuthAngle": 2.070967741935484
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2741,
+     "clientX": 240,
+     "clientY": 236.70967741935485,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0096774193548386,
+     "azimuthAngle": 2.080645161290323
+    },
+    {
+     "timeStamp": 2745.166,
+     "clientX": 240,
+     "clientY": 237.16129032258064,
+     "pressure": 0.48,
+     "altitudeAngle": 1.011290322580645,
+     "azimuthAngle": 2.07741935483871
+    },
+    {
+     "timeStamp": 2749.333,
+     "clientX": 240,
+     "clientY": 237.61290322580646,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0129032258064516,
+     "azimuthAngle": 2.074193548387097
+    },
+    {
+     "timeStamp": 2753.5,
+     "clientX": 240,
+     "clientY": 238.06451612903226,
+     "pressure": 0.48,
+     "altitudeAngle": 1.014516129032258,
+     "azimuthAngle": 2.070967741935484
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2761.8333333333335,
+     "clientX": 240,
+     "clientY": 238.96774193548387,
+     "pressure": 0.48,
+     "altitudeAngle": 1.014516129032258,
+     "azimuthAngle": 2.070967741935484
+    },
+    {
+     "timeStamp": 2770.1666666666665,
+     "clientX": 240,
+     "clientY": 239.8709677419355,
+     "pressure": 0.48,
+     "altitudeAngle": 1.014516129032258,
+     "azimuthAngle": 2.070967741935484
+    }
+   ]
+  },
+  {
+   "seq": 75,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2770.166,
+    "clientX": 240,
+    "clientY": 239.8709677419355,
+    "pressure": 0.48,
+    "altitudeAngle": 1.020967741935484,
+    "azimuthAngle": 2.0580645161290323
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2757.666,
+     "clientX": 240,
+     "clientY": 238.51612903225805,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0161290322580645,
+     "azimuthAngle": 2.067741935483871
+    },
+    {
+     "timeStamp": 2761.833,
+     "clientX": 240,
+     "clientY": 238.96774193548387,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0177419354838708,
+     "azimuthAngle": 2.0645161290322585
+    },
+    {
+     "timeStamp": 2766,
+     "clientX": 240,
+     "clientY": 239.4193548387097,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0193548387096774,
+     "azimuthAngle": 2.0612903225806454
+    },
+    {
+     "timeStamp": 2770.166,
+     "clientX": 240,
+     "clientY": 239.8709677419355,
+     "pressure": 0.48,
+     "altitudeAngle": 1.020967741935484,
+     "azimuthAngle": 2.0580645161290323
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2778.4993333333337,
+     "clientX": 240,
+     "clientY": 240.7741935483871,
+     "pressure": 0.48,
+     "altitudeAngle": 1.020967741935484,
+     "azimuthAngle": 2.0580645161290323
+    },
+    {
+     "timeStamp": 2786.8326666666667,
+     "clientX": 240,
+     "clientY": 241.67741935483872,
+     "pressure": 0.48,
+     "altitudeAngle": 1.020967741935484,
+     "azimuthAngle": 2.0580645161290323
+    }
+   ]
+  },
+  {
+   "seq": 76,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2786.833,
+    "clientX": 240,
+    "clientY": 241.67741935483872,
+    "pressure": 0.48,
+    "altitudeAngle": 1.0274193548387096,
+    "azimuthAngle": 2.045161290322581
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2774.333,
+     "clientX": 240,
+     "clientY": 240.32258064516128,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0225806451612902,
+     "azimuthAngle": 2.0548387096774197
+    },
+    {
+     "timeStamp": 2778.5,
+     "clientX": 240,
+     "clientY": 240.7741935483871,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0241935483870968,
+     "azimuthAngle": 2.0516129032258066
+    },
+    {
+     "timeStamp": 2782.666,
+     "clientX": 240,
+     "clientY": 241.2258064516129,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0258064516129033,
+     "azimuthAngle": 2.048387096774194
+    },
+    {
+     "timeStamp": 2786.833,
+     "clientX": 240,
+     "clientY": 241.67741935483872,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0274193548387096,
+     "azimuthAngle": 2.045161290322581
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2795.1663333333336,
+     "clientX": 240,
+     "clientY": 242.5806451612903,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0274193548387096,
+     "azimuthAngle": 2.045161290322581
+    },
+    {
+     "timeStamp": 2803.4996666666666,
+     "clientX": 240,
+     "clientY": 243.48387096774195,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0274193548387096,
+     "azimuthAngle": 2.045161290322581
+    }
+   ]
+  },
+  {
+   "seq": 77,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2803.5,
+    "clientX": 240,
+    "clientY": 243.48387096774195,
+    "pressure": 0.3929,
+    "altitudeAngle": 1.0338709677419355,
+    "azimuthAngle": 2.032258064516129
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2791,
+     "clientX": 240,
+     "clientY": 242.1290322580645,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0290322580645161,
+     "azimuthAngle": 2.041935483870968
+    },
+    {
+     "timeStamp": 2795.166,
+     "clientX": 240,
+     "clientY": 242.5806451612903,
+     "pressure": 0.4655,
+     "altitudeAngle": 1.0306451612903225,
+     "azimuthAngle": 2.038709677419355
+    },
+    {
+     "timeStamp": 2799.333,
+     "clientX": 240,
+     "clientY": 243.03225806451613,
+     "pressure": 0.4292,
+     "altitudeAngle": 1.032258064516129,
+     "azimuthAngle": 2.035483870967742
+    },
+    {
+     "timeStamp": 2803.5,
+     "clientX": 240,
+     "clientY": 243.48387096774195,
+     "pressure": 0.3929,
+     "altitudeAngle": 1.0338709677419355,
+     "azimuthAngle": 2.032258064516129
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2811.8333333333335,
+     "clientX": 240,
+     "clientY": 244.38709677419354,
+     "pressure": 0.3929,
+     "altitudeAngle": 1.0338709677419355,
+     "azimuthAngle": 2.032258064516129
+    },
+    {
+     "timeStamp": 2820.1666666666665,
+     "clientX": 240,
+     "clientY": 245.29032258064518,
+     "pressure": 0.3929,
+     "altitudeAngle": 1.0338709677419355,
+     "azimuthAngle": 2.032258064516129
+    }
+   ]
+  },
+  {
+   "seq": 78,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2820.166,
+    "clientX": 240,
+    "clientY": 245.29032258064515,
+    "pressure": 0.2477,
+    "altitudeAngle": 1.0403225806451613,
+    "azimuthAngle": 2.0193548387096776
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2807.666,
+     "clientX": 240,
+     "clientY": 243.93548387096774,
+     "pressure": 0.3566,
+     "altitudeAngle": 1.0354838709677419,
+     "azimuthAngle": 2.0290322580645164
+    },
+    {
+     "timeStamp": 2811.833,
+     "clientX": 240,
+     "clientY": 244.38709677419354,
+     "pressure": 0.3203,
+     "altitudeAngle": 1.0370967741935484,
+     "azimuthAngle": 2.0258064516129033
+    },
+    {
+     "timeStamp": 2816,
+     "clientX": 240,
+     "clientY": 244.83870967741936,
+     "pressure": 0.284,
+     "altitudeAngle": 1.0387096774193547,
+     "azimuthAngle": 2.0225806451612907
+    },
+    {
+     "timeStamp": 2820.166,
+     "clientX": 240,
+     "clientY": 245.29032258064515,
+     "pressure": 0.2477,
+     "altitudeAngle": 1.0403225806451613,
+     "azimuthAngle": 2.0193548387096776
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2828.4993333333337,
+     "clientX": 240,
+     "clientY": 246.19354838709674,
+     "pressure": 0.2477,
+     "altitudeAngle": 1.0403225806451613,
+     "azimuthAngle": 2.0193548387096776
+    },
+    {
+     "timeStamp": 2836.8326666666667,
+     "clientX": 240,
+     "clientY": 247.09677419354833,
+     "pressure": 0.2477,
+     "altitudeAngle": 1.0403225806451613,
+     "azimuthAngle": 2.0193548387096776
+    }
+   ]
+  },
+  {
+   "seq": 79,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2836.833,
+    "clientX": 240,
+    "clientY": 247.09677419354838,
+    "pressure": 0.1026,
+    "altitudeAngle": 1.046774193548387,
+    "azimuthAngle": 2.006451612903226
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2824.333,
+     "clientX": 240,
+     "clientY": 245.74193548387098,
+     "pressure": 0.2115,
+     "altitudeAngle": 1.0419354838709678,
+     "azimuthAngle": 2.0161290322580645
+    },
+    {
+     "timeStamp": 2828.5,
+     "clientX": 240,
+     "clientY": 246.19354838709677,
+     "pressure": 0.1752,
+     "altitudeAngle": 1.043548387096774,
+     "azimuthAngle": 2.012903225806452
+    },
+    {
+     "timeStamp": 2832.666,
+     "clientX": 240,
+     "clientY": 246.6451612903226,
+     "pressure": 0.1389,
+     "altitudeAngle": 1.0451612903225806,
+     "azimuthAngle": 2.009677419354839
+    },
+    {
+     "timeStamp": 2836.833,
+     "clientX": 240,
+     "clientY": 247.09677419354838,
+     "pressure": 0.1026,
+     "altitudeAngle": 1.046774193548387,
+     "azimuthAngle": 2.006451612903226
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2845.1663333333336,
+     "clientX": 240,
+     "clientY": 247.99999999999997,
+     "pressure": 0.1026,
+     "altitudeAngle": 1.046774193548387,
+     "azimuthAngle": 2.006451612903226
+    },
+    {
+     "timeStamp": 2853.4996666666666,
+     "clientX": 240,
+     "clientY": 248.90322580645156,
+     "pressure": 0.1026,
+     "altitudeAngle": 1.046774193548387,
+     "azimuthAngle": 2.006451612903226
+    }
+   ]
+  },
+  {
+   "seq": 80,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2845.166,
+    "clientX": 240,
+    "clientY": 248,
+    "pressure": 0.03,
+    "altitudeAngle": 1.05,
+    "azimuthAngle": 2
+   },
+   "coalesced": [
+    {
+     "timeStamp": 2841,
+     "clientX": 240,
+     "clientY": 247.5483870967742,
+     "pressure": 0.0663,
+     "altitudeAngle": 1.0483870967741935,
+     "azimuthAngle": 2.003225806451613
+    },
+    {
+     "timeStamp": 2845.166,
+     "clientX": 240,
+     "clientY": 248,
+     "pressure": 0.03,
+     "altitudeAngle": 1.05,
+     "azimuthAngle": 2
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 2853.4993333333337,
+     "clientX": 240,
+     "clientY": 248.90322580645162,
+     "pressure": 0.03,
+     "altitudeAngle": 1.05,
+     "azimuthAngle": 2
+    },
+    {
+     "timeStamp": 2861.8326666666667,
+     "clientX": 240,
+     "clientY": 249.80645161290323,
+     "pressure": 0.03,
+     "altitudeAngle": 1.05,
+     "azimuthAngle": 2
+    }
+   ]
+  },
+  {
+   "seq": 81,
+   "kind": "up",
+   "type": "pointerup",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": 0,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2849.166,
+    "clientX": 240,
+    "clientY": 248,
+    "pressure": 0,
+    "altitudeAngle": 1.05,
+    "azimuthAngle": 2
+   }
+  },
+  {
+   "seq": 82,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2849.166,
+    "clientX": 270,
+    "clientY": 202,
+    "pressure": 0,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 83,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2894.166,
+    "clientX": 270,
+    "clientY": 212,
+    "pressure": 0,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 84,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 2939.166,
+    "clientX": 270,
+    "clientY": 222,
+    "pressure": 0,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 85,
+   "kind": "down",
+   "type": "pointerdown",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": 0,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 3029.166,
+    "clientX": 270,
+    "clientY": 232,
+    "pressure": 0.03,
+    "altitudeAngle": 0.95,
+    "azimuthAngle": 2.2
+   }
+  },
+  {
+   "seq": 86,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 3045.833,
+    "clientX": 267.6042078065899,
+    "clientY": 233.59719479560673,
+    "pressure": 0.2235,
+    "altitudeAngle": 0.9564516129032258,
+    "azimuthAngle": 2.1870967741935488
+   },
+   "coalesced": [
+    {
+     "timeStamp": 3033.333,
+     "clientX": 269.40105195164745,
+     "clientY": 232.3992986989017,
+     "pressure": 0.0784,
+     "altitudeAngle": 0.9516129032258064,
+     "azimuthAngle": 2.196774193548387
+    },
+    {
+     "timeStamp": 3037.499,
+     "clientX": 268.80210390329495,
+     "clientY": 232.79859739780335,
+     "pressure": 0.1268,
+     "altitudeAngle": 0.9532258064516128,
+     "azimuthAngle": 2.1935483870967745
+    },
+    {
+     "timeStamp": 3041.666,
+     "clientX": 268.20315585494245,
+     "clientY": 233.19789609670505,
+     "pressure": 0.1752,
+     "altitudeAngle": 0.9548387096774194,
+     "azimuthAngle": 2.1903225806451614
+    },
+    {
+     "timeStamp": 3045.833,
+     "clientX": 267.6042078065899,
+     "clientY": 233.59719479560673,
+     "pressure": 0.2235,
+     "altitudeAngle": 0.9564516129032258,
+     "azimuthAngle": 2.1870967741935488
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 3054.1663333333336,
+     "clientX": 266.40631170988485,
+     "clientY": 234.39579219341007,
+     "pressure": 0.2235,
+     "altitudeAngle": 0.9564516129032258,
+     "azimuthAngle": 2.1870967741935488
+    },
+    {
+     "timeStamp": 3062.4996666666666,
+     "clientX": 265.2084156131798,
+     "clientY": 235.19438959121342,
+     "pressure": 0.2235,
+     "altitudeAngle": 0.9564516129032258,
+     "azimuthAngle": 2.1870967741935488
+    }
+   ]
+  },
+  {
+   "seq": 87,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 3062.499,
+    "clientX": 265.2084156131798,
+    "clientY": 235.19438959121345,
+    "pressure": 0.4171,
+    "altitudeAngle": 0.9629032258064516,
+    "azimuthAngle": 2.174193548387097
+   },
+   "coalesced": [
+    {
+     "timeStamp": 3049.999,
+     "clientX": 267.00525975823734,
+     "clientY": 233.9964934945084,
+     "pressure": 0.2719,
+     "altitudeAngle": 0.9580645161290322,
+     "azimuthAngle": 2.1838709677419357
+    },
+    {
+     "timeStamp": 3054.166,
+     "clientX": 266.40631170988485,
+     "clientY": 234.3957921934101,
+     "pressure": 0.3203,
+     "altitudeAngle": 0.9596774193548386,
+     "azimuthAngle": 2.1806451612903226
+    },
+    {
+     "timeStamp": 3058.333,
+     "clientX": 265.80736366153235,
+     "clientY": 234.79509089231178,
+     "pressure": 0.3687,
+     "altitudeAngle": 0.9612903225806451,
+     "azimuthAngle": 2.17741935483871
+    },
+    {
+     "timeStamp": 3062.499,
+     "clientX": 265.2084156131798,
+     "clientY": 235.19438959121345,
+     "pressure": 0.4171,
+     "altitudeAngle": 0.9629032258064516,
+     "azimuthAngle": 2.174193548387097
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 3070.8323333333333,
+     "clientX": 264.01051951647474,
+     "clientY": 235.99298698901686,
+     "pressure": 0.4171,
+     "altitudeAngle": 0.9629032258064516,
+     "azimuthAngle": 2.174193548387097
+    },
+    {
+     "timeStamp": 3079.1656666666663,
+     "clientX": 262.8126234197697,
+     "clientY": 236.7915843868202,
+     "pressure": 0.4171,
+     "altitudeAngle": 0.9629032258064516,
+     "azimuthAngle": 2.174193548387097
+    }
+   ]
+  },
+  {
+   "seq": 88,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 3079.166,
+    "clientX": 264,
+    "clientY": 237.42704904776846,
+    "pressure": 0.48,
+    "altitudeAngle": 0.9693548387096774,
+    "azimuthAngle": 2.1612903225806455
+   },
+   "coalesced": [
+    {
+     "timeStamp": 3066.666,
+     "clientX": 264.60946756482724,
+     "clientY": 235.59368829011515,
+     "pressure": 0.4655,
+     "altitudeAngle": 0.964516129032258,
+     "azimuthAngle": 2.1709677419354843
+    },
+    {
+     "timeStamp": 3070.833,
+     "clientX": 264.01051951647474,
+     "clientY": 235.99298698901683,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9661290322580645,
+     "azimuthAngle": 2.167741935483871
+    },
+    {
+     "timeStamp": 3074.999,
+     "clientX": 264,
+     "clientY": 236.70720308121042,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9677419354838709,
+     "azimuthAngle": 2.164516129032258
+    },
+    {
+     "timeStamp": 3079.166,
+     "clientX": 264,
+     "clientY": 237.42704904776846,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9693548387096774,
+     "azimuthAngle": 2.1612903225806455
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 3087.4993333333337,
+     "clientX": 264,
+     "clientY": 238.86674098088454,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9693548387096774,
+     "azimuthAngle": 2.1612903225806455
+    },
+    {
+     "timeStamp": 3095.8326666666667,
+     "clientX": 264,
+     "clientY": 240.30643291400062,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9693548387096774,
+     "azimuthAngle": 2.1612903225806455
+    }
+   ]
+  },
+  {
+   "seq": 89,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 3095.833,
+    "clientX": 264,
+    "clientY": 240.3064329140006,
+    "pressure": 0.48,
+    "altitudeAngle": 0.9758064516129031,
+    "azimuthAngle": 2.1483870967741936
+   },
+   "coalesced": [
+    {
+     "timeStamp": 3083.333,
+     "clientX": 264,
+     "clientY": 238.1468950143265,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9709677419354839,
+     "azimuthAngle": 2.1580645161290324
+    },
+    {
+     "timeStamp": 3087.499,
+     "clientX": 264,
+     "clientY": 238.86674098088454,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9725806451612903,
+     "azimuthAngle": 2.1548387096774198
+    },
+    {
+     "timeStamp": 3091.666,
+     "clientX": 264,
+     "clientY": 239.58658694744258,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9741935483870967,
+     "azimuthAngle": 2.1516129032258067
+    },
+    {
+     "timeStamp": 3095.833,
+     "clientX": 264,
+     "clientY": 240.3064329140006,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9758064516129031,
+     "azimuthAngle": 2.1483870967741936
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 3104.1663333333336,
+     "clientX": 264,
+     "clientY": 241.74612484711668,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9758064516129031,
+     "azimuthAngle": 2.1483870967741936
+    },
+    {
+     "timeStamp": 3112.4996666666666,
+     "clientX": 264,
+     "clientY": 243.1858167802327,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9758064516129031,
+     "azimuthAngle": 2.1483870967741936
+    }
+   ]
+  },
+  {
+   "seq": 90,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 3112.499,
+    "clientX": 264,
+    "clientY": 243.18581678023276,
+    "pressure": 0.48,
+    "altitudeAngle": 0.982258064516129,
+    "azimuthAngle": 2.135483870967742
+   },
+   "coalesced": [
+    {
+     "timeStamp": 3099.999,
+     "clientX": 264,
+     "clientY": 241.02627888055866,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9774193548387097,
+     "azimuthAngle": 2.145161290322581
+    },
+    {
+     "timeStamp": 3104.166,
+     "clientX": 264,
+     "clientY": 241.74612484711668,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9790322580645161,
+     "azimuthAngle": 2.141935483870968
+    },
+    {
+     "timeStamp": 3108.333,
+     "clientX": 264,
+     "clientY": 242.46597081367474,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9806451612903225,
+     "azimuthAngle": 2.138709677419355
+    },
+    {
+     "timeStamp": 3112.499,
+     "clientX": 264,
+     "clientY": 243.18581678023276,
+     "pressure": 0.48,
+     "altitudeAngle": 0.982258064516129,
+     "azimuthAngle": 2.135483870967742
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 3120.8323333333333,
+     "clientX": 264,
+     "clientY": 244.6255087133488,
+     "pressure": 0.48,
+     "altitudeAngle": 0.982258064516129,
+     "azimuthAngle": 2.135483870967742
+    },
+    {
+     "timeStamp": 3129.1656666666663,
+     "clientX": 264,
+     "clientY": 246.06520064646486,
+     "pressure": 0.48,
+     "altitudeAngle": 0.982258064516129,
+     "azimuthAngle": 2.135483870967742
+    }
+   ]
+  },
+  {
+   "seq": 91,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 3129.166,
+    "clientX": 265.71835080575784,
+    "clientY": 245.14556720383854,
+    "pressure": 0.48,
+    "altitudeAngle": 0.9887096774193548,
+    "azimuthAngle": 2.1225806451612903
+   },
+   "coalesced": [
+    {
+     "timeStamp": 3116.666,
+     "clientX": 264,
+     "clientY": 243.9056627467908,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9838709677419354,
+     "azimuthAngle": 2.132258064516129
+    },
+    {
+     "timeStamp": 3120.833,
+     "clientX": 264.5204547090528,
+     "clientY": 244.3469698060352,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9854838709677419,
+     "azimuthAngle": 2.1290322580645165
+    },
+    {
+     "timeStamp": 3124.999,
+     "clientX": 265.1194027574053,
+     "clientY": 244.7462685049369,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9870967741935484,
+     "azimuthAngle": 2.1258064516129034
+    },
+    {
+     "timeStamp": 3129.166,
+     "clientX": 265.71835080575784,
+     "clientY": 245.14556720383854,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9887096774193548,
+     "azimuthAngle": 2.1225806451612903
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 3137.4993333333337,
+     "clientX": 266.9162469024629,
+     "clientY": 245.9441646016419,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9887096774193548,
+     "azimuthAngle": 2.1225806451612903
+    },
+    {
+     "timeStamp": 3145.8326666666667,
+     "clientX": 268.11414299916794,
+     "clientY": 246.74276199944524,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9887096774193548,
+     "azimuthAngle": 2.1225806451612903
+    }
+   ]
+  },
+  {
+   "seq": 92,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 3145.833,
+    "clientX": 268.11414299916794,
+    "clientY": 246.7427619994453,
+    "pressure": 0.48,
+    "altitudeAngle": 0.9951612903225806,
+    "azimuthAngle": 2.109677419354839
+   },
+   "coalesced": [
+    {
+     "timeStamp": 3133.333,
+     "clientX": 266.3172988541104,
+     "clientY": 245.54486590274024,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9903225806451612,
+     "azimuthAngle": 2.1193548387096777
+    },
+    {
+     "timeStamp": 3137.499,
+     "clientX": 266.9162469024629,
+     "clientY": 245.94416460164192,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9919354838709677,
+     "azimuthAngle": 2.1161290322580646
+    },
+    {
+     "timeStamp": 3141.666,
+     "clientX": 267.5151949508154,
+     "clientY": 246.3434633005436,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9935483870967742,
+     "azimuthAngle": 2.112903225806452
+    },
+    {
+     "timeStamp": 3145.833,
+     "clientX": 268.11414299916794,
+     "clientY": 246.7427619994453,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9951612903225806,
+     "azimuthAngle": 2.109677419354839
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 3154.1663333333336,
+     "clientX": 269.312039095873,
+     "clientY": 247.54135939724867,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9951612903225806,
+     "azimuthAngle": 2.109677419354839
+    },
+    {
+     "timeStamp": 3162.4996666666666,
+     "clientX": 270.50993519257804,
+     "clientY": 248.33995679505205,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9951612903225806,
+     "azimuthAngle": 2.109677419354839
+    }
+   ]
+  },
+  {
+   "seq": 93,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 3162.499,
+    "clientX": 270.50993519257804,
+    "clientY": 247.66004320494798,
+    "pressure": 0.48,
+    "altitudeAngle": 1.0016129032258063,
+    "azimuthAngle": 2.0967741935483875
+   },
+   "coalesced": [
+    {
+     "timeStamp": 3149.999,
+     "clientX": 268.7130910475205,
+     "clientY": 247.14206069834697,
+     "pressure": 0.48,
+     "altitudeAngle": 0.996774193548387,
+     "azimuthAngle": 2.106451612903226
+    },
+    {
+     "timeStamp": 3154.166,
+     "clientX": 269.312039095873,
+     "clientY": 247.54135939724864,
+     "pressure": 0.48,
+     "altitudeAngle": 0.9983870967741935,
+     "azimuthAngle": 2.103225806451613
+    },
+    {
+     "timeStamp": 3158.333,
+     "clientX": 269.9109871442255,
+     "clientY": 247.94065809615034,
+     "pressure": 0.48,
+     "altitudeAngle": 1,
+     "azimuthAngle": 2.1
+    },
+    {
+     "timeStamp": 3162.499,
+     "clientX": 270.50993519257804,
+     "clientY": 247.66004320494798,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0016129032258063,
+     "azimuthAngle": 2.0967741935483875
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 3170.8323333333333,
+     "clientX": 271.7078312892831,
+     "clientY": 247.09881342254326,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0016129032258063,
+     "azimuthAngle": 2.0967741935483875
+    },
+    {
+     "timeStamp": 3179.1656666666663,
+     "clientX": 272.90572738598814,
+     "clientY": 246.53758364013854,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0016129032258063,
+     "azimuthAngle": 2.0967741935483875
+    }
+   ]
+  },
+  {
+   "seq": 94,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 3179.166,
+    "clientX": 272.90572738598814,
+    "clientY": 246.06284840934126,
+    "pressure": 0.48,
+    "altitudeAngle": 1.0080645161290323,
+    "azimuthAngle": 2.0838709677419356
+   },
+   "coalesced": [
+    {
+     "timeStamp": 3166.666,
+     "clientX": 271.1088832409306,
+     "clientY": 247.2607445060463,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0032258064516129,
+     "azimuthAngle": 2.0935483870967744
+    },
+    {
+     "timeStamp": 3170.833,
+     "clientX": 271.70783128928304,
+     "clientY": 246.8614458071446,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0048387096774194,
+     "azimuthAngle": 2.0903225806451613
+    },
+    {
+     "timeStamp": 3174.999,
+     "clientX": 272.3067793376356,
+     "clientY": 246.46214710824293,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0064516129032257,
+     "azimuthAngle": 2.0870967741935487
+    },
+    {
+     "timeStamp": 3179.166,
+     "clientX": 272.90572738598814,
+     "clientY": 246.06284840934126,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0080645161290323,
+     "azimuthAngle": 2.0838709677419356
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 3187.4993333333337,
+     "clientX": 274.10362348269314,
+     "clientY": 245.26425101153785,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0080645161290323,
+     "azimuthAngle": 2.0838709677419356
+    },
+    {
+     "timeStamp": 3195.8326666666667,
+     "clientX": 275.30151957939813,
+     "clientY": 244.4656536137345,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0080645161290323,
+     "azimuthAngle": 2.0838709677419356
+    }
+   ]
+  },
+  {
+   "seq": 95,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 3195.833,
+    "clientX": 275.30151957939825,
+    "clientY": 244.4656536137345,
+    "pressure": 0.48,
+    "altitudeAngle": 1.014516129032258,
+    "azimuthAngle": 2.070967741935484
+   },
+   "coalesced": [
+    {
+     "timeStamp": 3183.333,
+     "clientX": 273.50467543434064,
+     "clientY": 245.66354971043955,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0096774193548386,
+     "azimuthAngle": 2.080645161290323
+    },
+    {
+     "timeStamp": 3187.499,
+     "clientX": 274.10362348269314,
+     "clientY": 245.26425101153788,
+     "pressure": 0.48,
+     "altitudeAngle": 1.011290322580645,
+     "azimuthAngle": 2.07741935483871
+    },
+    {
+     "timeStamp": 3191.666,
+     "clientX": 274.7025715310457,
+     "clientY": 244.8649523126362,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0129032258064516,
+     "azimuthAngle": 2.074193548387097
+    },
+    {
+     "timeStamp": 3195.833,
+     "clientX": 275.30151957939825,
+     "clientY": 244.4656536137345,
+     "pressure": 0.48,
+     "altitudeAngle": 1.014516129032258,
+     "azimuthAngle": 2.070967741935484
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 3204.1663333333336,
+     "clientX": 276.49941567610324,
+     "clientY": 243.66705621593115,
+     "pressure": 0.48,
+     "altitudeAngle": 1.014516129032258,
+     "azimuthAngle": 2.070967741935484
+    },
+    {
+     "timeStamp": 3212.4996666666666,
+     "clientX": 277.69731177280835,
+     "clientY": 242.86845881812775,
+     "pressure": 0.48,
+     "altitudeAngle": 1.014516129032258,
+     "azimuthAngle": 2.070967741935484
+    }
+   ]
+  },
+  {
+   "seq": 96,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 3212.499,
+    "clientX": 276,
+    "clientY": 241.96008512423032,
+    "pressure": 0.48,
+    "altitudeAngle": 1.020967741935484,
+    "azimuthAngle": 2.0580645161290323
+   },
+   "coalesced": [
+    {
+     "timeStamp": 3199.999,
+     "clientX": 275.90046762775074,
+     "clientY": 244.06635491483283,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0161290322580645,
+     "azimuthAngle": 2.067741935483871
+    },
+    {
+     "timeStamp": 3204.166,
+     "clientX": 276,
+     "clientY": 243.3997770573464,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0177419354838708,
+     "azimuthAngle": 2.0645161290322585
+    },
+    {
+     "timeStamp": 3208.333,
+     "clientX": 276,
+     "clientY": 242.67993109078833,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0193548387096774,
+     "azimuthAngle": 2.0612903225806454
+    },
+    {
+     "timeStamp": 3212.499,
+     "clientX": 276,
+     "clientY": 241.96008512423032,
+     "pressure": 0.48,
+     "altitudeAngle": 1.020967741935484,
+     "azimuthAngle": 2.0580645161290323
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 3220.8323333333333,
+     "clientX": 276,
+     "clientY": 240.52039319111424,
+     "pressure": 0.48,
+     "altitudeAngle": 1.020967741935484,
+     "azimuthAngle": 2.0580645161290323
+    },
+    {
+     "timeStamp": 3229.1656666666663,
+     "clientX": 276,
+     "clientY": 239.08070125799821,
+     "pressure": 0.48,
+     "altitudeAngle": 1.020967741935484,
+     "azimuthAngle": 2.0580645161290323
+    }
+   ]
+  },
+  {
+   "seq": 97,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 3229.166,
+    "clientX": 276,
+    "clientY": 239.08070125799816,
+    "pressure": 0.48,
+    "altitudeAngle": 1.0274193548387096,
+    "azimuthAngle": 2.045161290322581
+   },
+   "coalesced": [
+    {
+     "timeStamp": 3216.666,
+     "clientX": 276,
+     "clientY": 241.24023915767225,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0225806451612902,
+     "azimuthAngle": 2.0548387096774197
+    },
+    {
+     "timeStamp": 3220.833,
+     "clientX": 276,
+     "clientY": 240.52039319111424,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0241935483870968,
+     "azimuthAngle": 2.0516129032258066
+    },
+    {
+     "timeStamp": 3224.999,
+     "clientX": 276,
+     "clientY": 239.8005472245562,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0258064516129033,
+     "azimuthAngle": 2.048387096774194
+    },
+    {
+     "timeStamp": 3229.166,
+     "clientX": 276,
+     "clientY": 239.08070125799816,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0274193548387096,
+     "azimuthAngle": 2.045161290322581
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 3237.4993333333337,
+     "clientX": 276,
+     "clientY": 237.64100932488208,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0274193548387096,
+     "azimuthAngle": 2.045161290322581
+    },
+    {
+     "timeStamp": 3245.8326666666667,
+     "clientX": 276,
+     "clientY": 236.201317391766,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0274193548387096,
+     "azimuthAngle": 2.045161290322581
+    }
+   ]
+  },
+  {
+   "seq": 98,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 3245.833,
+    "clientX": 276,
+    "clientY": 236.201317391766,
+    "pressure": 0.3929,
+    "altitudeAngle": 1.0338709677419355,
+    "azimuthAngle": 2.032258064516129
+   },
+   "coalesced": [
+    {
+     "timeStamp": 3233.333,
+     "clientX": 276,
+     "clientY": 238.36085529144012,
+     "pressure": 0.48,
+     "altitudeAngle": 1.0290322580645161,
+     "azimuthAngle": 2.041935483870968
+    },
+    {
+     "timeStamp": 3237.499,
+     "clientX": 276,
+     "clientY": 237.64100932488208,
+     "pressure": 0.4655,
+     "altitudeAngle": 1.0306451612903225,
+     "azimuthAngle": 2.038709677419355
+    },
+    {
+     "timeStamp": 3241.666,
+     "clientX": 276,
+     "clientY": 236.92116335832404,
+     "pressure": 0.4292,
+     "altitudeAngle": 1.032258064516129,
+     "azimuthAngle": 2.035483870967742
+    },
+    {
+     "timeStamp": 3245.833,
+     "clientX": 276,
+     "clientY": 236.201317391766,
+     "pressure": 0.3929,
+     "altitudeAngle": 1.0338709677419355,
+     "azimuthAngle": 2.032258064516129
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 3254.1663333333336,
+     "clientX": 276,
+     "clientY": 234.76162545864997,
+     "pressure": 0.3929,
+     "altitudeAngle": 1.0338709677419355,
+     "azimuthAngle": 2.032258064516129
+    },
+    {
+     "timeStamp": 3262.4996666666666,
+     "clientX": 276,
+     "clientY": 233.3219335255339,
+     "pressure": 0.3929,
+     "altitudeAngle": 1.0338709677419355,
+     "azimuthAngle": 2.032258064516129
+    }
+   ]
+  },
+  {
+   "seq": 99,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 3262.499,
+    "clientX": 273.7035769435573,
+    "clientY": 234.62214616613443,
+    "pressure": 0.2477,
+    "altitudeAngle": 1.0403225806451613,
+    "azimuthAngle": 2.0193548387096776
+   },
+   "coalesced": [
+    {
+     "timeStamp": 3249.999,
+     "clientX": 275.55536541533604,
+     "clientY": 235.73321924920162,
+     "pressure": 0.3566,
+     "altitudeAngle": 1.0354838709677419,
+     "azimuthAngle": 2.0290322580645164
+    },
+    {
+     "timeStamp": 3254.166,
+     "clientX": 274.9381025914098,
+     "clientY": 235.3628615548459,
+     "pressure": 0.3203,
+     "altitudeAngle": 1.0370967741935484,
+     "azimuthAngle": 2.0258064516129033
+    },
+    {
+     "timeStamp": 3258.333,
+     "clientX": 274.32083976748356,
+     "clientY": 234.99250386049016,
+     "pressure": 0.284,
+     "altitudeAngle": 1.0387096774193547,
+     "azimuthAngle": 2.0225806451612907
+    },
+    {
+     "timeStamp": 3262.499,
+     "clientX": 273.7035769435573,
+     "clientY": 234.62214616613443,
+     "pressure": 0.2477,
+     "altitudeAngle": 1.0403225806451613,
+     "azimuthAngle": 2.0193548387096776
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 3270.8323333333333,
+     "clientX": 272.46905129570496,
+     "clientY": 233.88143077742296,
+     "pressure": 0.2477,
+     "altitudeAngle": 1.0403225806451613,
+     "azimuthAngle": 2.0193548387096776
+    },
+    {
+     "timeStamp": 3279.1656666666663,
+     "clientX": 271.2345256478525,
+     "clientY": 233.1407153887115,
+     "pressure": 0.2477,
+     "altitudeAngle": 1.0403225806451613,
+     "azimuthAngle": 2.0193548387096776
+    }
+   ]
+  },
+  {
+   "seq": 100,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 3279.166,
+    "clientX": 271.2345256478525,
+    "clientY": 233.14071538871147,
+    "pressure": 0.1026,
+    "altitudeAngle": 1.046774193548387,
+    "azimuthAngle": 2.006451612903226
+   },
+   "coalesced": [
+    {
+     "timeStamp": 3266.666,
+     "clientX": 273.0863141196311,
+     "clientY": 234.2517884717787,
+     "pressure": 0.2115,
+     "altitudeAngle": 1.0419354838709678,
+     "azimuthAngle": 2.0161290322580645
+    },
+    {
+     "timeStamp": 3270.833,
+     "clientX": 272.4690512957049,
+     "clientY": 233.88143077742296,
+     "pressure": 0.1752,
+     "altitudeAngle": 1.043548387096774,
+     "azimuthAngle": 2.012903225806452
+    },
+    {
+     "timeStamp": 3274.999,
+     "clientX": 271.85178847177866,
+     "clientY": 233.5110730830672,
+     "pressure": 0.1389,
+     "altitudeAngle": 1.0451612903225806,
+     "azimuthAngle": 2.009677419354839
+    },
+    {
+     "timeStamp": 3279.166,
+     "clientX": 271.2345256478525,
+     "clientY": 233.14071538871147,
+     "pressure": 0.1026,
+     "altitudeAngle": 1.046774193548387,
+     "azimuthAngle": 2.006451612903226
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 3287.4993333333337,
+     "clientX": 270,
+     "clientY": 232.4,
+     "pressure": 0.1026,
+     "altitudeAngle": 1.046774193548387,
+     "azimuthAngle": 2.006451612903226
+    },
+    {
+     "timeStamp": 3295.8326666666667,
+     "clientX": 268.76547435214763,
+     "clientY": 231.65928461128854,
+     "pressure": 0.1026,
+     "altitudeAngle": 1.046774193548387,
+     "azimuthAngle": 2.006451612903226
+    }
+   ]
+  },
+  {
+   "seq": 101,
+   "kind": "move",
+   "type": "pointermove",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": -1,
+   "buttons": 1,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 3287.499,
+    "clientX": 270,
+    "clientY": 232.4,
+    "pressure": 0.03,
+    "altitudeAngle": 1.05,
+    "azimuthAngle": 2
+   },
+   "coalesced": [
+    {
+     "timeStamp": 3283.333,
+     "clientX": 270.61726282392624,
+     "clientY": 232.77035769435574,
+     "pressure": 0.0663,
+     "altitudeAngle": 1.0483870967741935,
+     "azimuthAngle": 2.003225806451613
+    },
+    {
+     "timeStamp": 3287.499,
+     "clientX": 270,
+     "clientY": 232.4,
+     "pressure": 0.03,
+     "altitudeAngle": 1.05,
+     "azimuthAngle": 2
+    }
+   ],
+   "predicted": [
+    {
+     "timeStamp": 3295.8323333333333,
+     "clientX": 268.7654743521476,
+     "clientY": 231.65928461128854,
+     "pressure": 0.03,
+     "altitudeAngle": 1.05,
+     "azimuthAngle": 2
+    },
+    {
+     "timeStamp": 3304.1656666666663,
+     "clientX": 267.53094870429516,
+     "clientY": 230.91856922257708,
+     "pressure": 0.03,
+     "altitudeAngle": 1.05,
+     "azimuthAngle": 2
+    }
+   ]
+  },
+  {
+   "seq": 102,
+   "kind": "up",
+   "type": "pointerup",
+   "section": "synthetic-section",
+   "pointerId": 2,
+   "pointerType": "pen",
+   "button": 0,
+   "buttons": 0,
+   "rect": {
+    "left": 40,
+    "top": 120,
+    "width": 1376,
+    "height": 700
+   },
+   "zoom": 1,
+   "sample": {
+    "timeStamp": 3291.499,
+    "clientX": 270,
+    "clientY": 232.4,
+    "pressure": 0,
+    "altitudeAngle": 1.05,
+    "azimuthAngle": 2
+   }
+  }
+ ],
+ "committed": [
+  {
+   "afterSeq": 16,
+   "sectionId": "synthetic-section",
+   "data": {
+    "tool": "pen",
+    "color": "#1e293b",
+    "size": 3,
+    "pts": [
+     120,
+     100,
+     0.03,
+     0.95,
+     2.2,
+     0,
+     120,
+     100.58,
+     0.093,
+     0.952,
+     2.196,
+     4,
+     120,
+     101.17,
+     0.155,
+     0.954,
+     2.192,
+     8,
+     120,
+     101.75,
+     0.218,
+     0.956,
+     2.188,
+     13,
+     120,
+     102.33,
+     0.28,
+     0.958,
+     2.183,
+     17,
+     120,
+     102.92,
+     0.343,
+     0.96,
+     2.179,
+     21,
+     120,
+     103.5,
+     0.405,
+     0.962,
+     2.175,
+     25,
+     120,
+     104.08,
+     0.468,
+     0.965,
+     2.171,
+     29,
+     120,
+     104.67,
+     0.48,
+     0.967,
+     2.167,
+     33,
+     120,
+     105.25,
+     0.48,
+     0.969,
+     2.163,
+     38,
+     120,
+     105.83,
+     0.48,
+     0.971,
+     2.158,
+     42,
+     120,
+     106.42,
+     0.48,
+     0.973,
+     2.154,
+     46,
+     120,
+     107,
+     0.48,
+     0.975,
+     2.15,
+     50,
+     120,
+     107.58,
+     0.48,
+     0.977,
+     2.146,
+     54,
+     120,
+     108.17,
+     0.48,
+     0.979,
+     2.142,
+     58,
+     120,
+     108.75,
+     0.48,
+     0.981,
+     2.138,
+     63,
+     120,
+     109.33,
+     0.48,
+     0.983,
+     2.133,
+     67,
+     120,
+     109.92,
+     0.48,
+     0.985,
+     2.129,
+     71,
+     120,
+     110.5,
+     0.48,
+     0.987,
+     2.125,
+     75,
+     120,
+     111.08,
+     0.48,
+     0.99,
+     2.121,
+     79,
+     120,
+     111.67,
+     0.48,
+     0.992,
+     2.117,
+     83,
+     120,
+     112.25,
+     0.48,
+     0.994,
+     2.113,
+     88,
+     120,
+     112.83,
+     0.48,
+     0.996,
+     2.108,
+     92,
+     120,
+     113.42,
+     0.48,
+     0.998,
+     2.104,
+     96,
+     120,
+     114,
+     0.48,
+     1,
+     2.1,
+     100,
+     120,
+     114.58,
+     0.48,
+     1.002,
+     2.096,
+     104,
+     120,
+     115.17,
+     0.48,
+     1.004,
+     2.092,
+     108,
+     120,
+     115.75,
+     0.48,
+     1.006,
+     2.088,
+     113,
+     120,
+     116.33,
+     0.48,
+     1.008,
+     2.083,
+     117,
+     120,
+     116.92,
+     0.48,
+     1.01,
+     2.079,
+     121,
+     120,
+     117.5,
+     0.48,
+     1.013,
+     2.075,
+     125,
+     120,
+     118.08,
+     0.48,
+     1.015,
+     2.071,
+     129,
+     120,
+     118.67,
+     0.48,
+     1.017,
+     2.067,
+     133,
+     120,
+     119.25,
+     0.48,
+     1.019,
+     2.063,
+     138,
+     120,
+     119.83,
+     0.48,
+     1.021,
+     2.058,
+     142,
+     120,
+     120.42,
+     0.48,
+     1.023,
+     2.054,
+     146,
+     120,
+     121,
+     0.48,
+     1.025,
+     2.05,
+     150,
+     120,
+     121.58,
+     0.48,
+     1.027,
+     2.046,
+     154,
+     120,
+     122.17,
+     0.48,
+     1.029,
+     2.042,
+     158,
+     120,
+     122.75,
+     0.452,
+     1.031,
+     2.038,
+     163,
+     120,
+     123.33,
+     0.405,
+     1.033,
+     2.033,
+     167,
+     120,
+     123.92,
+     0.358,
+     1.035,
+     2.029,
+     171,
+     120,
+     124.5,
+     0.311,
+     1.037,
+     2.025,
+     175,
+     120,
+     125.08,
+     0.264,
+     1.04,
+     2.021,
+     179,
+     120,
+     125.67,
+     0.218,
+     1.042,
+     2.017,
+     183,
+     120,
+     126.25,
+     0.171,
+     1.044,
+     2.013,
+     188,
+     120,
+     126.83,
+     0.124,
+     1.046,
+     2.008,
+     192,
+     120,
+     127.42,
+     0.077,
+     1.048,
+     2.004,
+     196,
+     120,
+     128,
+     0.03,
+     1.05,
+     2,
+     200
+    ],
+    "t0": 0,
+    "input": "pen",
+    "device": "synthetic"
+   }
+  },
+  {
+   "afterSeq": 33,
+   "sectionId": "synthetic-section",
+   "data": {
+    "tool": "pen",
+    "color": "#1e293b",
+    "size": 3,
+    "pts": [
+     120,
+     116,
+     0.03,
+     0.95,
+     2.2,
+     0,
+     120.51,
+     115.66,
+     0.093,
+     0.952,
+     2.196,
+     4,
+     121.02,
+     115.32,
+     0.155,
+     0.954,
+     2.192,
+     8,
+     121.53,
+     114.98,
+     0.218,
+     0.956,
+     2.188,
+     13,
+     122.04,
+     114.64,
+     0.28,
+     0.958,
+     2.183,
+     17,
+     122.55,
+     114.3,
+     0.343,
+     0.96,
+     2.179,
+     21,
+     123.06,
+     113.96,
+     0.405,
+     0.962,
+     2.175,
+     25,
+     123.57,
+     113.62,
+     0.468,
+     0.965,
+     2.171,
+     29,
+     124.08,
+     113.28,
+     0.48,
+     0.967,
+     2.167,
+     33,
+     124.6,
+     112.94,
+     0.48,
+     0.969,
+     2.163,
+     38,
+     125.11,
+     112.6,
+     0.48,
+     0.971,
+     2.158,
+     42,
+     125.62,
+     112.26,
+     0.48,
+     0.973,
+     2.154,
+     46,
+     126.15,
+     112.04,
+     0.48,
+     0.975,
+     2.15,
+     50,
+     126.74,
+     112.19,
+     0.48,
+     0.977,
+     2.146,
+     54,
+     127.34,
+     112.33,
+     0.48,
+     0.979,
+     2.142,
+     58,
+     127.93,
+     112.48,
+     0.48,
+     0.981,
+     2.138,
+     63,
+     128.53,
+     112.63,
+     0.48,
+     0.983,
+     2.133,
+     67,
+     129.13,
+     112.78,
+     0.48,
+     0.985,
+     2.129,
+     71,
+     129.72,
+     112.93,
+     0.48,
+     0.987,
+     2.125,
+     75,
+     130.32,
+     113.08,
+     0.48,
+     0.99,
+     2.121,
+     79,
+     130.91,
+     113.23,
+     0.48,
+     0.992,
+     2.117,
+     83,
+     131.51,
+     113.38,
+     0.48,
+     0.994,
+     2.113,
+     88,
+     132.1,
+     113.53,
+     0.48,
+     0.996,
+     2.108,
+     92,
+     132.7,
+     113.67,
+     0.48,
+     0.998,
+     2.104,
+     96,
+     133.29,
+     113.82,
+     0.48,
+     1,
+     2.1,
+     100,
+     133.89,
+     113.97,
+     0.48,
+     1.002,
+     2.096,
+     104,
+     134,
+     114.5,
+     0.48,
+     1.004,
+     2.092,
+     108,
+     134,
+     115.11,
+     0.48,
+     1.006,
+     2.088,
+     113,
+     134,
+     115.73,
+     0.48,
+     1.008,
+     2.083,
+     117,
+     134,
+     116.34,
+     0.48,
+     1.01,
+     2.079,
+     121,
+     134,
+     116.95,
+     0.48,
+     1.013,
+     2.075,
+     125,
+     134,
+     117.57,
+     0.48,
+     1.015,
+     2.071,
+     129,
+     134,
+     118.18,
+     0.48,
+     1.017,
+     2.067,
+     133,
+     134,
+     118.79,
+     0.48,
+     1.019,
+     2.063,
+     138,
+     134,
+     119.41,
+     0.48,
+     1.021,
+     2.058,
+     142,
+     134,
+     120.02,
+     0.48,
+     1.023,
+     2.054,
+     146,
+     134,
+     120.64,
+     0.48,
+     1.025,
+     2.05,
+     150,
+     134,
+     121.25,
+     0.48,
+     1.027,
+     2.046,
+     154,
+     134,
+     121.86,
+     0.48,
+     1.029,
+     2.042,
+     158,
+     134,
+     122.48,
+     0.452,
+     1.031,
+     2.038,
+     163,
+     134,
+     123.09,
+     0.405,
+     1.033,
+     2.033,
+     167,
+     134,
+     123.7,
+     0.358,
+     1.035,
+     2.029,
+     171,
+     134,
+     124.32,
+     0.311,
+     1.037,
+     2.025,
+     175,
+     134,
+     124.93,
+     0.264,
+     1.04,
+     2.021,
+     179,
+     134,
+     125.55,
+     0.218,
+     1.042,
+     2.017,
+     183,
+     134,
+     126.16,
+     0.171,
+     1.044,
+     2.013,
+     188,
+     134,
+     126.77,
+     0.124,
+     1.046,
+     2.008,
+     192,
+     134,
+     127.39,
+     0.077,
+     1.048,
+     2.004,
+     196,
+     134,
+     128,
+     0.03,
+     1.05,
+     2,
+     200
+    ],
+    "t0": 0,
+    "input": "pen",
+    "device": "synthetic"
+   }
+  },
+  {
+   "afterSeq": 50,
+   "sectionId": "synthetic-section",
+   "data": {
+    "tool": "pen",
+    "color": "#1e293b",
+    "size": 3,
+    "pts": [
+     142,
+     112,
+     0.03,
+     0.95,
+     2.2,
+     0,
+     142,
+     112.33,
+     0.093,
+     0.952,
+     2.196,
+     4,
+     142,
+     112.67,
+     0.155,
+     0.954,
+     2.192,
+     8,
+     142,
+     113,
+     0.218,
+     0.956,
+     2.188,
+     13,
+     142,
+     113.33,
+     0.28,
+     0.958,
+     2.183,
+     17,
+     142,
+     113.67,
+     0.343,
+     0.96,
+     2.179,
+     21,
+     142,
+     114,
+     0.405,
+     0.962,
+     2.175,
+     25,
+     142,
+     114.33,
+     0.468,
+     0.965,
+     2.171,
+     29,
+     142,
+     114.67,
+     0.48,
+     0.967,
+     2.167,
+     33,
+     142,
+     115,
+     0.48,
+     0.969,
+     2.163,
+     38,
+     142,
+     115.33,
+     0.48,
+     0.971,
+     2.158,
+     42,
+     142,
+     115.67,
+     0.48,
+     0.973,
+     2.154,
+     46,
+     142,
+     116,
+     0.48,
+     0.975,
+     2.15,
+     50,
+     142,
+     116.33,
+     0.48,
+     0.977,
+     2.146,
+     54,
+     142,
+     116.67,
+     0.48,
+     0.979,
+     2.142,
+     58,
+     142,
+     117,
+     0.48,
+     0.981,
+     2.138,
+     63,
+     142,
+     117.33,
+     0.48,
+     0.983,
+     2.133,
+     67,
+     142,
+     117.67,
+     0.48,
+     0.985,
+     2.129,
+     71,
+     142,
+     118,
+     0.48,
+     0.987,
+     2.125,
+     75,
+     142,
+     118.33,
+     0.48,
+     0.99,
+     2.121,
+     79,
+     142,
+     118.67,
+     0.48,
+     0.992,
+     2.117,
+     83,
+     142,
+     119,
+     0.48,
+     0.994,
+     2.113,
+     88,
+     142,
+     119.33,
+     0.48,
+     0.996,
+     2.108,
+     92,
+     142,
+     119.67,
+     0.48,
+     0.998,
+     2.104,
+     96,
+     142,
+     120,
+     0.48,
+     1,
+     2.1,
+     100,
+     142,
+     120.33,
+     0.48,
+     1.002,
+     2.096,
+     104,
+     142,
+     120.67,
+     0.48,
+     1.004,
+     2.092,
+     108,
+     142,
+     121,
+     0.48,
+     1.006,
+     2.088,
+     113,
+     142,
+     121.33,
+     0.48,
+     1.008,
+     2.083,
+     117,
+     142,
+     121.67,
+     0.48,
+     1.01,
+     2.079,
+     121,
+     142,
+     122,
+     0.48,
+     1.013,
+     2.075,
+     125,
+     142,
+     122.33,
+     0.48,
+     1.015,
+     2.071,
+     129,
+     142,
+     122.67,
+     0.48,
+     1.017,
+     2.067,
+     133,
+     142,
+     123,
+     0.48,
+     1.019,
+     2.063,
+     138,
+     142,
+     123.33,
+     0.48,
+     1.021,
+     2.058,
+     142,
+     142,
+     123.67,
+     0.48,
+     1.023,
+     2.054,
+     146,
+     142,
+     124,
+     0.48,
+     1.025,
+     2.05,
+     150,
+     142,
+     124.33,
+     0.48,
+     1.027,
+     2.046,
+     154,
+     142,
+     124.67,
+     0.48,
+     1.029,
+     2.042,
+     158,
+     142,
+     125,
+     0.452,
+     1.031,
+     2.038,
+     163,
+     142,
+     125.33,
+     0.405,
+     1.033,
+     2.033,
+     167,
+     142,
+     125.67,
+     0.358,
+     1.035,
+     2.029,
+     171,
+     142,
+     126,
+     0.311,
+     1.037,
+     2.025,
+     175,
+     142,
+     126.33,
+     0.264,
+     1.04,
+     2.021,
+     179,
+     142,
+     126.67,
+     0.218,
+     1.042,
+     2.017,
+     183,
+     142,
+     127,
+     0.171,
+     1.044,
+     2.013,
+     188,
+     142,
+     127.33,
+     0.124,
+     1.046,
+     2.008,
+     192,
+     142,
+     127.67,
+     0.077,
+     1.048,
+     2.004,
+     196,
+     142,
+     128,
+     0.03,
+     1.05,
+     2,
+     200
+    ],
+    "t0": 0,
+    "input": "pen",
+    "device": "synthetic"
+   }
+  },
+  {
+   "afterSeq": 60,
+   "sectionId": "synthetic-section",
+   "data": {
+    "tool": "pen",
+    "color": "#1e293b",
+    "size": 3,
+    "pts": [
+     142,
+     104,
+     0.03,
+     0.95,
+     2.2,
+     0
+    ],
+    "t0": 0,
+    "input": "pen",
+    "device": "synthetic"
+   }
+  },
+  {
+   "afterSeq": 81,
+   "sectionId": "synthetic-section",
+   "data": {
+    "tool": "pen",
+    "color": "#1e293b",
+    "size": 3,
+    "pts": [
+     200,
+     100,
+     0.03,
+     0.95,
+     2.2,
+     0,
+     200,
+     100.45,
+     0.078,
+     0.952,
+     2.197,
+     4,
+     200,
+     100.9,
+     0.127,
+     0.953,
+     2.194,
+     8,
+     200,
+     101.35,
+     0.175,
+     0.955,
+     2.19,
+     13,
+     200,
+     101.81,
+     0.224,
+     0.956,
+     2.187,
+     17,
+     200,
+     102.26,
+     0.272,
+     0.958,
+     2.184,
+     21,
+     200,
+     102.71,
+     0.32,
+     0.96,
+     2.181,
+     25,
+     200,
+     103.16,
+     0.369,
+     0.961,
+     2.177,
+     29,
+     200,
+     103.61,
+     0.417,
+     0.963,
+     2.174,
+     33,
+     200,
+     104.06,
+     0.466,
+     0.965,
+     2.171,
+     38,
+     200,
+     104.52,
+     0.48,
+     0.966,
+     2.168,
+     42,
+     200,
+     104.97,
+     0.48,
+     0.968,
+     2.165,
+     46,
+     200,
+     105.42,
+     0.48,
+     0.969,
+     2.161,
+     50,
+     200,
+     105.87,
+     0.48,
+     0.971,
+     2.158,
+     54,
+     200,
+     106.32,
+     0.48,
+     0.973,
+     2.155,
+     58,
+     200,
+     106.77,
+     0.48,
+     0.974,
+     2.152,
+     63,
+     200,
+     107.23,
+     0.48,
+     0.976,
+     2.148,
+     67,
+     200,
+     107.68,
+     0.48,
+     0.977,
+     2.145,
+     71,
+     200,
+     108.13,
+     0.48,
+     0.979,
+     2.142,
+     75,
+     200,
+     108.58,
+     0.48,
+     0.981,
+     2.139,
+     79,
+     200,
+     109.03,
+     0.48,
+     0.982,
+     2.135,
+     83,
+     200,
+     109.48,
+     0.48,
+     0.984,
+     2.132,
+     88,
+     200,
+     109.94,
+     0.48,
+     0.985,
+     2.129,
+     92,
+     200,
+     110.39,
+     0.48,
+     0.987,
+     2.126,
+     96,
+     200,
+     110.84,
+     0.48,
+     0.989,
+     2.123,
+     100,
+     200,
+     111.29,
+     0.48,
+     0.99,
+     2.119,
+     104,
+     200,
+     111.74,
+     0.48,
+     0.992,
+     2.116,
+     108,
+     200,
+     112.19,
+     0.48,
+     0.994,
+     2.113,
+     113,
+     200,
+     112.65,
+     0.48,
+     0.995,
+     2.11,
+     117,
+     200,
+     113.1,
+     0.48,
+     0.997,
+     2.106,
+     121,
+     200,
+     113.55,
+     0.48,
+     0.998,
+     2.103,
+     125,
+     200,
+     114,
+     0.48,
+     1,
+     2.1,
+     129,
+     200,
+     114.45,
+     0.48,
+     1.002,
+     2.097,
+     133,
+     200,
+     114.9,
+     0.48,
+     1.003,
+     2.094,
+     138,
+     200,
+     115.35,
+     0.48,
+     1.005,
+     2.09,
+     142,
+     200,
+     115.81,
+     0.48,
+     1.006,
+     2.087,
+     146,
+     200,
+     116.26,
+     0.48,
+     1.008,
+     2.084,
+     150,
+     200,
+     116.71,
+     0.48,
+     1.01,
+     2.081,
+     154,
+     200,
+     117.16,
+     0.48,
+     1.011,
+     2.077,
+     158,
+     200,
+     117.61,
+     0.48,
+     1.013,
+     2.074,
+     163,
+     200,
+     118.06,
+     0.48,
+     1.015,
+     2.071,
+     167,
+     200,
+     118.52,
+     0.48,
+     1.016,
+     2.068,
+     171,
+     200,
+     118.97,
+     0.48,
+     1.018,
+     2.065,
+     175,
+     200,
+     119.42,
+     0.48,
+     1.019,
+     2.061,
+     179,
+     200,
+     119.87,
+     0.48,
+     1.021,
+     2.058,
+     183,
+     200,
+     120.32,
+     0.48,
+     1.023,
+     2.055,
+     188,
+     200,
+     120.77,
+     0.48,
+     1.024,
+     2.052,
+     192,
+     200,
+     121.23,
+     0.48,
+     1.026,
+     2.048,
+     196,
+     200,
+     121.68,
+     0.48,
+     1.027,
+     2.045,
+     200,
+     200,
+     122.13,
+     0.48,
+     1.029,
+     2.042,
+     204,
+     200,
+     122.58,
+     0.466,
+     1.031,
+     2.039,
+     208,
+     200,
+     123.03,
+     0.429,
+     1.032,
+     2.035,
+     213,
+     200,
+     123.48,
+     0.393,
+     1.034,
+     2.032,
+     217,
+     200,
+     123.94,
+     0.357,
+     1.035,
+     2.029,
+     221,
+     200,
+     124.39,
+     0.32,
+     1.037,
+     2.026,
+     225,
+     200,
+     124.84,
+     0.284,
+     1.039,
+     2.023,
+     229,
+     200,
+     125.29,
+     0.248,
+     1.04,
+     2.019,
+     233,
+     200,
+     125.74,
+     0.212,
+     1.042,
+     2.016,
+     238,
+     200,
+     126.19,
+     0.175,
+     1.044,
+     2.013,
+     242,
+     200,
+     126.65,
+     0.139,
+     1.045,
+     2.01,
+     246,
+     200,
+     127.1,
+     0.103,
+     1.047,
+     2.006,
+     250,
+     200,
+     127.55,
+     0.066,
+     1.048,
+     2.003,
+     254,
+     200,
+     128,
+     0.03,
+     1.05,
+     2,
+     258
+    ],
+    "t0": 0,
+    "input": "pen",
+    "device": "synthetic"
+   }
+  },
+  {
+   "afterSeq": 102,
+   "sectionId": "synthetic-section",
+   "data": {
+    "tool": "pen",
+    "color": "#1e293b",
+    "size": 3,
+    "pts": [
+     230,
+     112,
+     0.03,
+     0.95,
+     2.2,
+     0,
+     229.4,
+     112.4,
+     0.078,
+     0.952,
+     2.197,
+     4,
+     228.8,
+     112.8,
+     0.127,
+     0.953,
+     2.194,
+     8,
+     228.2,
+     113.2,
+     0.175,
+     0.955,
+     2.19,
+     13,
+     227.6,
+     113.6,
+     0.224,
+     0.956,
+     2.187,
+     17,
+     227.01,
+     114,
+     0.272,
+     0.958,
+     2.184,
+     21,
+     226.41,
+     114.4,
+     0.32,
+     0.96,
+     2.181,
+     25,
+     225.81,
+     114.8,
+     0.369,
+     0.961,
+     2.177,
+     29,
+     225.21,
+     115.19,
+     0.417,
+     0.963,
+     2.174,
+     33,
+     224.61,
+     115.59,
+     0.466,
+     0.965,
+     2.171,
+     38,
+     224.01,
+     115.99,
+     0.48,
+     0.966,
+     2.168,
+     42,
+     224,
+     116.71,
+     0.48,
+     0.968,
+     2.165,
+     46,
+     224,
+     117.43,
+     0.48,
+     0.969,
+     2.161,
+     50,
+     224,
+     118.15,
+     0.48,
+     0.971,
+     2.158,
+     54,
+     224,
+     118.87,
+     0.48,
+     0.973,
+     2.155,
+     58,
+     224,
+     119.59,
+     0.48,
+     0.974,
+     2.152,
+     63,
+     224,
+     120.31,
+     0.48,
+     0.976,
+     2.148,
+     67,
+     224,
+     121.03,
+     0.48,
+     0.977,
+     2.145,
+     71,
+     224,
+     121.75,
+     0.48,
+     0.979,
+     2.142,
+     75,
+     224,
+     122.47,
+     0.48,
+     0.981,
+     2.139,
+     79,
+     224,
+     123.19,
+     0.48,
+     0.982,
+     2.135,
+     83,
+     224,
+     123.91,
+     0.48,
+     0.984,
+     2.132,
+     88,
+     224.52,
+     124.35,
+     0.48,
+     0.985,
+     2.129,
+     92,
+     225.12,
+     124.75,
+     0.48,
+     0.987,
+     2.126,
+     96,
+     225.72,
+     125.15,
+     0.48,
+     0.989,
+     2.123,
+     100,
+     226.32,
+     125.54,
+     0.48,
+     0.99,
+     2.119,
+     104,
+     226.92,
+     125.94,
+     0.48,
+     0.992,
+     2.116,
+     108,
+     227.52,
+     126.34,
+     0.48,
+     0.994,
+     2.113,
+     113,
+     228.11,
+     126.74,
+     0.48,
+     0.995,
+     2.11,
+     117,
+     228.71,
+     127.14,
+     0.48,
+     0.997,
+     2.106,
+     121,
+     229.31,
+     127.54,
+     0.48,
+     0.998,
+     2.103,
+     125,
+     229.91,
+     127.94,
+     0.48,
+     1,
+     2.1,
+     129,
+     230.51,
+     127.66,
+     0.48,
+     1.002,
+     2.097,
+     133,
+     231.11,
+     127.26,
+     0.48,
+     1.003,
+     2.094,
+     138,
+     231.71,
+     126.86,
+     0.48,
+     1.005,
+     2.09,
+     142,
+     232.31,
+     126.46,
+     0.48,
+     1.006,
+     2.087,
+     146,
+     232.91,
+     126.06,
+     0.48,
+     1.008,
+     2.084,
+     150,
+     233.5,
+     125.66,
+     0.48,
+     1.01,
+     2.081,
+     154,
+     234.1,
+     125.26,
+     0.48,
+     1.011,
+     2.077,
+     158,
+     234.7,
+     124.86,
+     0.48,
+     1.013,
+     2.074,
+     163,
+     235.3,
+     124.47,
+     0.48,
+     1.015,
+     2.071,
+     167,
+     235.9,
+     124.07,
+     0.48,
+     1.016,
+     2.068,
+     171,
+     236,
+     123.4,
+     0.48,
+     1.018,
+     2.065,
+     175,
+     236,
+     122.68,
+     0.48,
+     1.019,
+     2.061,
+     179,
+     236,
+     121.96,
+     0.48,
+     1.021,
+     2.058,
+     183,
+     236,
+     121.24,
+     0.48,
+     1.023,
+     2.055,
+     188,
+     236,
+     120.52,
+     0.48,
+     1.024,
+     2.052,
+     192,
+     236,
+     119.8,
+     0.48,
+     1.026,
+     2.048,
+     196,
+     236,
+     119.08,
+     0.48,
+     1.027,
+     2.045,
+     200,
+     236,
+     118.36,
+     0.48,
+     1.029,
+     2.042,
+     204,
+     236,
+     117.64,
+     0.466,
+     1.031,
+     2.039,
+     208,
+     236,
+     116.92,
+     0.429,
+     1.032,
+     2.035,
+     213,
+     236,
+     116.2,
+     0.393,
+     1.034,
+     2.032,
+     217,
+     235.56,
+     115.73,
+     0.357,
+     1.035,
+     2.029,
+     221,
+     234.94,
+     115.36,
+     0.32,
+     1.037,
+     2.026,
+     225,
+     234.32,
+     114.99,
+     0.284,
+     1.039,
+     2.023,
+     229,
+     233.7,
+     114.62,
+     0.248,
+     1.04,
+     2.019,
+     233,
+     233.09,
+     114.25,
+     0.212,
+     1.042,
+     2.016,
+     238,
+     232.47,
+     113.88,
+     0.175,
+     1.044,
+     2.013,
+     242,
+     231.85,
+     113.51,
+     0.139,
+     1.045,
+     2.01,
+     246,
+     231.23,
+     113.14,
+     0.103,
+     1.047,
+     2.006,
+     250,
+     230.62,
+     112.77,
+     0.066,
+     1.048,
+     2.003,
+     254,
+     230,
+     112.4,
+     0.03,
+     1.05,
+     2,
+     258
+    ],
+    "t0": 0,
+    "input": "pen",
+    "device": "synthetic"
+   }
+  }
+ ],
+ "notes": "SYNTHETIC fixture generated by tests/helpers/synthetic-pencil.ts. Not recorded on a device."
+}
