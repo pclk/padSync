@@ -11,6 +11,7 @@ import { parseRecording, recordingFileName, serializeRecording, type Capabilitie
 import { paintStroke, strokePath } from "@/ink/render";
 import { appendPoint, toLocal } from "@/ink/samples";
 import { deviceId } from "@/lib/db";
+import { usePencilNoScroll } from "@/lib/hooks";
 import { PAGE_WIDTH, type StrokeData } from "@/lib/types";
 import { Icon } from "./Icons";
 
@@ -61,6 +62,7 @@ export default function PencilTestView() {
   const rootRef = useRef<HTMLElement>(null);
   const holderRef = useRef<HTMLDivElement>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
+  usePencilNoScroll(surfaceRef);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [zoom, setZoom] = useState(1);

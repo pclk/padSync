@@ -9,6 +9,7 @@ import { parseRecording, recordingFileName, serializeRecording, type PencilRecor
 import { strokeSvgPath } from "@/ink/render";
 import { PencilReplayer, type ReplayState } from "@/ink/replay";
 import { runReplay, type ReplayReport } from "@/ink/replay-harness";
+import { usePencilNoScroll } from "@/lib/hooks";
 import { PAGE_WIDTH, type StrokeData } from "@/lib/types";
 import { Icon } from "./Icons";
 
@@ -52,6 +53,7 @@ export default function PencilLab() {
   const [speed, setSpeed] = useState(1);
 
   const surfaceRef = useRef<HTMLDivElement>(null);
+  usePencilNoScroll(surfaceRef);
   const [lab] = useState(() => new LabSession({ onEvents: setEvents, onStroke: (s) => setStrokes((all) => [...all, s]) }));
   const controller = lab.controller;
 

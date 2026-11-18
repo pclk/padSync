@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useReducer, useState, useSyncExternalStore } from "react";
+import { useEffect, useReducer, useState, useSyncExternalStore, type RefObject } from "react";
 import { getSyncState, subscribeSync } from "./sync";
 
 import { onActivity } from "@/lib/activity";
@@ -37,6 +37,24 @@ export function useStoredState<T>(key: string, initial: T): [T, (v: T) => void] 
     } catch {}
   }, [key, value]);
   return [value, setValue];
+}
+
+// Pencil touches on a drawing surface never scroll (as in NotebookEditor's touch handler); fingers
+// still do. iPadOS only honours this from a non-passive touchstart/touchmove listener.
+export function usePencilNoScroll(ref: RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const claim = (e: TouchEvent) => {
+      if ([...e.touches].some((t) => t.touchType === "stylus")) e.preventDefault();
+    };
+    el.addEventListener("touchstart", claim, { passive: false });
+    el.addEventListener("touchmove", claim, { passive: false });
+    return () => {
+      el.removeEventListener("touchstart", claim);
+      el.removeEventListener("touchmove", claim);
+    };
+  }, [ref]);
 }
 
 export function useLayoutMode(notebookId: string, controller: InkController, leftInset = 0) {
