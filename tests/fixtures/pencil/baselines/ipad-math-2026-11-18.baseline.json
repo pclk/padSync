@@ -1,0 +1,9393 @@
+{
+ "harnessVersion": 1,
+ "recording": {
+  "id": "rec-20261118103424-j7b0nj",
+  "label": "Pencil recording",
+  "source": "device",
+  "durationMs": 97062,
+  "sections": 1,
+  "events": {
+   "total": 10109,
+   "byType": {
+    "pointermove": 9456,
+    "pointerdown": 218,
+    "pointerup": 217,
+    "lostpointercapture": 217,
+    "pointercancel": 1
+   },
+   "byPointerType": {
+    "pen": 10107,
+    "touch": 2
+   }
+  },
+  "samples": {
+   "dispatched": 10109,
+   "coalesced": 16658,
+   "predicted": 3621
+  },
+  "gestures": {
+   "downs": 218,
+   "ups": 217,
+   "cancels": 1,
+   "lostCaptures": 217
+  },
+  "penIntervalMs": 4
+ },
+ "options": {
+  "useCoalesced": true,
+  "usePredicted": true,
+  "pen": null,
+  "toolOverride": false
+ },
+ "strokes": [
+  {
+   "index": 0,
+   "sectionId": "lab",
+   "afterSeq": 50,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 26,
+   "durationMs": 150,
+   "pressure": {
+    "min": 0,
+    "max": 0.173,
+    "mean": 0.12
+   },
+   "altitude": {
+    "min": 0.984,
+    "max": 1.009
+   },
+   "azimuth": {
+    "min": 0.21,
+    "max": 0.262
+   },
+   "box": {
+    "minX": 111.6,
+    "minY": 69.62,
+    "maxX": 113.13,
+    "maxY": 83.44
+   },
+   "rawLength": 22.275,
+   "processed": {
+    "points": 27,
+    "length": 18.461,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.443,
+    "meanDeviation": 0.106
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 90
+   }
+  },
+  {
+   "index": 1,
+   "sectionId": "lab",
+   "afterSeq": 77,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 19,
+   "durationMs": 100,
+   "pressure": {
+    "min": 0,
+    "max": 0.22,
+    "mean": 0.125
+   },
+   "altitude": {
+    "min": 0.984,
+    "max": 0.984
+   },
+   "azimuth": {
+    "min": 0.21,
+    "max": 0.23
+   },
+   "box": {
+    "minX": 115.69,
+    "minY": 57.33,
+    "maxX": 120.3,
+    "maxY": 65.01
+   },
+   "rawLength": 13.288,
+   "processed": {
+    "points": 19,
+    "length": 11.023,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.275,
+    "meanDeviation": 0.11
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 55
+   }
+  },
+  {
+   "index": 2,
+   "sectionId": "lab",
+   "afterSeq": 128,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 45,
+   "durationMs": 233,
+   "pressure": {
+    "min": 0,
+    "max": 0.174,
+    "mean": 0.102
+   },
+   "altitude": {
+    "min": 0.984,
+    "max": 0.984
+   },
+   "azimuth": {
+    "min": 0.217,
+    "max": 0.217
+   },
+   "box": {
+    "minX": 120.81,
+    "minY": 66.04,
+    "maxX": 132.58,
+    "maxY": 78.32
+   },
+   "rawLength": 36.778,
+   "processed": {
+    "points": 48,
+    "length": 33.135,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.369,
+    "meanDeviation": 0.122
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 81
+   }
+  },
+  {
+   "index": 3,
+   "sectionId": "lab",
+   "afterSeq": 161,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 28,
+   "durationMs": 133,
+   "pressure": {
+    "min": 0,
+    "max": 0.216,
+    "mean": 0.145
+   },
+   "altitude": {
+    "min": 0.984,
+    "max": 0.984
+   },
+   "azimuth": {
+    "min": 0.194,
+    "max": 0.194
+   },
+   "box": {
+    "minX": 138.73,
+    "minY": 57.33,
+    "maxX": 143.85,
+    "maxY": 84.46
+   },
+   "rawLength": 36.181,
+   "processed": {
+    "points": 41,
+    "length": 32.774,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.256,
+    "meanDeviation": 0.058
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 106
+   }
+  },
+  {
+   "index": 4,
+   "sectionId": "lab",
+   "afterSeq": 185,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 19,
+   "durationMs": 100,
+   "pressure": {
+    "min": 0,
+    "max": 0.21,
+    "mean": 0.117
+   },
+   "altitude": {
+    "min": 0.984,
+    "max": 1.006
+   },
+   "azimuth": {
+    "min": 0.194,
+    "max": 0.197
+   },
+   "box": {
+    "minX": 141.8,
+    "minY": 70.64,
+    "maxX": 151.01,
+    "maxY": 73.71
+   },
+   "rawLength": 12.322,
+   "processed": {
+    "points": 20,
+    "length": 11.443,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.372,
+    "meanDeviation": 0.076
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 55
+   }
+  },
+  {
+   "index": 5,
+   "sectionId": "lab",
+   "afterSeq": 226,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 33,
+   "durationMs": 183,
+   "pressure": {
+    "min": 0,
+    "max": 0.253,
+    "mean": 0.189
+   },
+   "altitude": {
+    "min": 1.011,
+    "max": 1.029
+   },
+   "azimuth": {
+    "min": 0.194,
+    "max": 0.244
+   },
+   "box": {
+    "minX": 150.5,
+    "minY": 69.62,
+    "maxX": 157.15,
+    "maxY": 81.39
+   },
+   "rawLength": 33.943,
+   "processed": {
+    "points": 38,
+    "length": 29.743,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.406,
+    "meanDeviation": 0.129
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 102
+   }
+  },
+  {
+   "index": 6,
+   "sectionId": "lab",
+   "afterSeq": 267,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 26,
+   "durationMs": 134,
+   "pressure": {
+    "min": 0,
+    "max": 0.325,
+    "mean": 0.191
+   },
+   "altitude": {
+    "min": 0.963,
+    "max": 1.002
+   },
+   "azimuth": {
+    "min": 0.203,
+    "max": 0.203
+   },
+   "box": {
+    "minX": 119.79,
+    "minY": 82.93,
+    "maxX": 151.01,
+    "maxY": 92.65
+   },
+   "rawLength": 35.847,
+   "processed": {
+    "points": 39,
+    "length": 34.103,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.237,
+    "meanDeviation": 0.057
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 107
+   }
+  },
+  {
+   "index": 7,
+   "sectionId": "lab",
+   "afterSeq": 290,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 7,
+   "durationMs": 83,
+   "pressure": {
+    "min": 0,
+    "max": 0.164,
+    "mean": 0.092
+   },
+   "altitude": {
+    "min": 1.066,
+    "max": 1.066
+   },
+   "azimuth": {
+    "min": 0.306,
+    "max": 0.306
+   },
+   "box": {
+    "minX": 180.7,
+    "minY": 65.01,
+    "maxX": 181.21,
+    "maxY": 68.6
+   },
+   "rawLength": 4.672,
+   "processed": {
+    "points": 5,
+    "length": 3.217,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.163,
+    "meanDeviation": 0.066
+   },
+   "outline": {
+    "kind": "dot",
+    "points": 0
+   }
+  },
+  {
+   "index": 8,
+   "sectionId": "lab",
+   "afterSeq": 306,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 5,
+   "durationMs": 75,
+   "pressure": {
+    "min": 0,
+    "max": 0.224,
+    "mean": 0.095
+   },
+   "altitude": {
+    "min": 1.066,
+    "max": 1.066
+   },
+   "azimuth": {
+    "min": 0.281,
+    "max": 0.281
+   },
+   "box": {
+    "minX": 181.21,
+    "minY": 75.25,
+    "maxX": 182.75,
+    "maxY": 76.79
+   },
+   "rawLength": 3.397,
+   "processed": {
+    "points": 4,
+    "length": 2.225,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.268,
+    "meanDeviation": 0.073
+   },
+   "outline": {
+    "kind": "dot",
+    "points": 0
+   }
+  },
+  {
+   "index": 9,
+   "sectionId": "lab",
+   "afterSeq": 364,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 42,
+   "durationMs": 208,
+   "pressure": {
+    "min": 0,
+    "max": 0.248,
+    "mean": 0.137
+   },
+   "altitude": {
+    "min": 1.148,
+    "max": 1.148
+   },
+   "azimuth": {
+    "min": 0.286,
+    "max": 0.286
+   },
+   "box": {
+    "minX": 202.71,
+    "minY": 57.85,
+    "maxX": 220.12,
+    "maxY": 84.46
+   },
+   "rawLength": 60.74,
+   "processed": {
+    "points": 63,
+    "length": 55.885,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.39,
+    "meanDeviation": 0.087
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 158
+   }
+  },
+  {
+   "index": 10,
+   "sectionId": "lab",
+   "afterSeq": 393,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 18,
+   "durationMs": 108,
+   "pressure": {
+    "min": 0,
+    "max": 0.217,
+    "mean": 0.14
+   },
+   "altitude": {
+    "min": 1.148,
+    "max": 1.148
+   },
+   "azimuth": {
+    "min": 0.286,
+    "max": 0.286
+   },
+   "box": {
+    "minX": 226.26,
+    "minY": 62.96,
+    "maxX": 233.94,
+    "maxY": 67.57
+   },
+   "rawLength": 13.178,
+   "processed": {
+    "points": 18,
+    "length": 11.705,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.43,
+    "meanDeviation": 0.136
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 56
+   }
+  },
+  {
+   "index": 11,
+   "sectionId": "lab",
+   "afterSeq": 415,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 18,
+   "durationMs": 87,
+   "pressure": {
+    "min": 0,
+    "max": 0.214,
+    "mean": 0.135
+   },
+   "altitude": {
+    "min": 1.148,
+    "max": 1.148
+   },
+   "azimuth": {
+    "min": 0.286,
+    "max": 0.286
+   },
+   "box": {
+    "minX": 225.75,
+    "minY": 69.62,
+    "maxX": 236.5,
+    "maxY": 76.79
+   },
+   "rawLength": 18.046,
+   "processed": {
+    "points": 20,
+    "length": 16.973,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.476,
+    "meanDeviation": 0.147
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 61
+   }
+  },
+  {
+   "index": 12,
+   "sectionId": "lab",
+   "afterSeq": 488,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 49,
+   "durationMs": 232,
+   "pressure": {
+    "min": 0,
+    "max": 0.182,
+    "mean": 0.125
+   },
+   "altitude": {
+    "min": 1.19,
+    "max": 1.19
+   },
+   "azimuth": {
+    "min": 0.286,
+    "max": 0.286
+   },
+   "box": {
+    "minX": 254.93,
+    "minY": 59.89,
+    "maxX": 268.75,
+    "maxY": 87.02
+   },
+   "rawLength": 47.835,
+   "processed": {
+    "points": 55,
+    "length": 44.617,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.387,
+    "meanDeviation": 0.111
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 120
+   }
+  },
+  {
+   "index": 13,
+   "sectionId": "lab",
+   "afterSeq": 550,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 47,
+   "durationMs": 242,
+   "pressure": {
+    "min": 0,
+    "max": 0.22,
+    "mean": 0.128
+   },
+   "altitude": {
+    "min": 1.124,
+    "max": 1.124
+   },
+   "azimuth": {
+    "min": 0.286,
+    "max": 0.286
+   },
+   "box": {
+    "minX": 275.4,
+    "minY": 60.92,
+    "maxX": 289.74,
+    "maxY": 82.42
+   },
+   "rawLength": 51.275,
+   "processed": {
+    "points": 59,
+    "length": 46.944,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.4,
+    "meanDeviation": 0.077
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 122
+   }
+  },
+  {
+   "index": 14,
+   "sectionId": "lab",
+   "afterSeq": 611,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 53,
+   "durationMs": 254,
+   "pressure": {
+    "min": 0,
+    "max": 0.241,
+    "mean": 0.132
+   },
+   "altitude": {
+    "min": 1.124,
+    "max": 1.124
+   },
+   "azimuth": {
+    "min": 0.286,
+    "max": 0.286
+   },
+   "box": {
+    "minX": 290.25,
+    "minY": 56.31,
+    "maxX": 296.39,
+    "maxY": 82.42
+   },
+   "rawLength": 52.974,
+   "processed": {
+    "points": 64,
+    "length": 47.831,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.461,
+    "meanDeviation": 0.123
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 96
+   }
+  },
+  {
+   "index": 15,
+   "sectionId": "lab",
+   "afterSeq": 645,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 22,
+   "durationMs": 137,
+   "pressure": {
+    "min": 0,
+    "max": 0.21,
+    "mean": 0.12
+   },
+   "altitude": {
+    "min": 1.149,
+    "max": 1.149
+   },
+   "azimuth": {
+    "min": 0.287,
+    "max": 0.287
+   },
+   "box": {
+    "minX": 298.95,
+    "minY": 72.69,
+    "maxX": 311.24,
+    "maxY": 73.71
+   },
+   "rawLength": 16.546,
+   "processed": {
+    "points": 22,
+    "length": 13.761,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.202,
+    "meanDeviation": 0.069
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 84
+   }
+  },
+  {
+   "index": 16,
+   "sectionId": "lab",
+   "afterSeq": 674,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 26,
+   "durationMs": 121,
+   "pressure": {
+    "min": 0,
+    "max": 0.192,
+    "mean": 0.112
+   },
+   "altitude": {
+    "min": 1.149,
+    "max": 1.149
+   },
+   "azimuth": {
+    "min": 0.287,
+    "max": 0.287
+   },
+   "box": {
+    "minX": 298.44,
+    "minY": 73.71,
+    "maxX": 306.12,
+    "maxY": 89.58
+   },
+   "rawLength": 26.688,
+   "processed": {
+    "points": 30,
+    "length": 24.89,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.403,
+    "meanDeviation": 0.106
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 69
+   }
+  },
+  {
+   "index": 17,
+   "sectionId": "lab",
+   "afterSeq": 704,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 25,
+   "durationMs": 129,
+   "pressure": {
+    "min": 0,
+    "max": 0.251,
+    "mean": 0.164
+   },
+   "altitude": {
+    "min": 1.149,
+    "max": 1.149
+   },
+   "azimuth": {
+    "min": 0.287,
+    "max": 0.287
+   },
+   "box": {
+    "minX": 305.1,
+    "minY": 71.67,
+    "maxX": 316.36,
+    "maxY": 83.95
+   },
+   "rawLength": 24.701,
+   "processed": {
+    "points": 27,
+    "length": 22.345,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.363,
+    "meanDeviation": 0.102
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 94
+   }
+  },
+  {
+   "index": 18,
+   "sectionId": "lab",
+   "afterSeq": 794,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 61,
+   "durationMs": 309,
+   "pressure": {
+    "min": 0,
+    "max": 0.125,
+    "mean": 0.088
+   },
+   "altitude": {
+    "min": 1.153,
+    "max": 1.153
+   },
+   "azimuth": {
+    "min": 0.289,
+    "max": 0.289
+   },
+   "box": {
+    "minX": 379.32,
+    "minY": 78.32,
+    "maxX": 392.12,
+    "maxY": 99.82
+   },
+   "rawLength": 56.984,
+   "processed": {
+    "points": 69,
+    "length": 50.311,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.501,
+    "meanDeviation": 0.11
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 153
+   }
+  },
+  {
+   "index": 19,
+   "sectionId": "lab",
+   "afterSeq": 848,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 38,
+   "durationMs": 200,
+   "pressure": {
+    "min": 0,
+    "max": 0.241,
+    "mean": 0.164
+   },
+   "altitude": {
+    "min": 1.153,
+    "max": 1.153
+   },
+   "azimuth": {
+    "min": 0.289,
+    "max": 0.289
+   },
+   "box": {
+    "minX": 400.31,
+    "minY": 74.23,
+    "maxX": 405.94,
+    "maxY": 84.46
+   },
+   "rawLength": 29.502,
+   "processed": {
+    "points": 40,
+    "length": 25.221,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.46,
+    "meanDeviation": 0.134
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 99
+   }
+  },
+  {
+   "index": 20,
+   "sectionId": "lab",
+   "afterSeq": 927,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 58,
+   "durationMs": 350,
+   "pressure": {
+    "min": 0,
+    "max": 0.231,
+    "mean": 0.162
+   },
+   "altitude": {
+    "min": 1.153,
+    "max": 1.153
+   },
+   "azimuth": {
+    "min": 0.289,
+    "max": 0.289
+   },
+   "box": {
+    "minX": 410.04,
+    "minY": 70.13,
+    "maxX": 418.23,
+    "maxY": 81.9
+   },
+   "rawLength": 41.414,
+   "processed": {
+    "points": 58,
+    "length": 34.278,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.616,
+    "meanDeviation": 0.116
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 111
+   }
+  },
+  {
+   "index": 21,
+   "sectionId": "lab",
+   "afterSeq": 953,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 17,
+   "durationMs": 100,
+   "pressure": {
+    "min": 0,
+    "max": 0.215,
+    "mean": 0.147
+   },
+   "altitude": {
+    "min": 1.153,
+    "max": 1.153
+   },
+   "azimuth": {
+    "min": 0.289,
+    "max": 0.289
+   },
+   "box": {
+    "minX": 427.44,
+    "minY": 61.94,
+    "maxX": 429.49,
+    "maxY": 81.9
+   },
+   "rawLength": 20.69,
+   "processed": {
+    "points": 25,
+    "length": 20.483,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.182,
+    "meanDeviation": 0.026
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 66
+   }
+  },
+  {
+   "index": 22,
+   "sectionId": "lab",
+   "afterSeq": 1006,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 38,
+   "durationMs": 188,
+   "pressure": {
+    "min": 0,
+    "max": 0.362,
+    "mean": 0.211
+   },
+   "altitude": {
+    "min": 1.104,
+    "max": 1.153
+   },
+   "azimuth": {
+    "min": 0.242,
+    "max": 0.289
+   },
+   "box": {
+    "minX": 376.76,
+    "minY": 88.56,
+    "maxX": 433.07,
+    "maxY": 102.38
+   },
+   "rawLength": 62.808,
+   "processed": {
+    "points": 63,
+    "length": 60.31,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.211,
+    "meanDeviation": 0.044
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 111
+   }
+  },
+  {
+   "index": 23,
+   "sectionId": "lab",
+   "afterSeq": 1035,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 9,
+   "durationMs": 96,
+   "pressure": {
+    "min": 0,
+    "max": 0.223,
+    "mean": 0.133
+   },
+   "altitude": {
+    "min": 1.227,
+    "max": 1.227
+   },
+   "azimuth": {
+    "min": 0.306,
+    "max": 0.306
+   },
+   "box": {
+    "minX": 452.52,
+    "minY": 79.35,
+    "maxX": 455.08,
+    "maxY": 84.46
+   },
+   "rawLength": 8.218,
+   "processed": {
+    "points": 9,
+    "length": 6.197,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.343,
+    "meanDeviation": 0.122
+   },
+   "outline": {
+    "kind": "dot",
+    "points": 0
+   }
+  },
+  {
+   "index": 24,
+   "sectionId": "lab",
+   "afterSeq": 1052,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 6,
+   "durationMs": 83,
+   "pressure": {
+    "min": 0,
+    "max": 0.166,
+    "mean": 0.09
+   },
+   "altitude": {
+    "min": 1.227,
+    "max": 1.227
+   },
+   "azimuth": {
+    "min": 0.306,
+    "max": 0.318
+   },
+   "box": {
+    "minX": 455.08,
+    "minY": 86.51,
+    "maxX": 458.15,
+    "maxY": 89.07
+   },
+   "rawLength": 5.333,
+   "processed": {
+    "points": 5,
+    "length": 3.654,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.24,
+    "meanDeviation": 0.072
+   },
+   "outline": {
+    "kind": "dot",
+    "points": 0
+   }
+  },
+  {
+   "index": 25,
+   "sectionId": "lab",
+   "afterSeq": 1153,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 74,
+   "durationMs": 375,
+   "pressure": {
+    "min": 0,
+    "max": 0.236,
+    "mean": 0.135
+   },
+   "altitude": {
+    "min": 1.186,
+    "max": 1.186
+   },
+   "azimuth": {
+    "min": 0.304,
+    "max": 0.319
+   },
+   "box": {
+    "minX": 470.44,
+    "minY": 75.76,
+    "maxX": 491.43,
+    "maxY": 92.65
+   },
+   "rawLength": 66.723,
+   "processed": {
+    "points": 79,
+    "length": 58.718,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.451,
+    "meanDeviation": 0.107
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 164
+   }
+  },
+  {
+   "index": 26,
+   "sectionId": "lab",
+   "afterSeq": 1185,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 17,
+   "durationMs": 129,
+   "pressure": {
+    "min": 0,
+    "max": 0.197,
+    "mean": 0.143
+   },
+   "altitude": {
+    "min": 1.18,
+    "max": 1.18
+   },
+   "azimuth": {
+    "min": 0.338,
+    "max": 0.338
+   },
+   "box": {
+    "minX": 495.01,
+    "minY": 77.81,
+    "maxX": 497.57,
+    "maxY": 91.12
+   },
+   "rawLength": 19.203,
+   "processed": {
+    "points": 21,
+    "length": 15.988,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.192,
+    "meanDeviation": 0.066
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 88
+   }
+  },
+  {
+   "index": 27,
+   "sectionId": "lab",
+   "afterSeq": 1209,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 17,
+   "durationMs": 100,
+   "pressure": {
+    "min": 0,
+    "max": 0.202,
+    "mean": 0.121
+   },
+   "altitude": {
+    "min": 1.18,
+    "max": 1.18
+   },
+   "azimuth": {
+    "min": 0.338,
+    "max": 0.338
+   },
+   "box": {
+    "minX": 499.62,
+    "minY": 67.57,
+    "maxX": 501.15,
+    "maxY": 76.27
+   },
+   "rawLength": 12.998,
+   "processed": {
+    "points": 19,
+    "length": 11.282,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.476,
+    "meanDeviation": 0.119
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 55
+   }
+  },
+  {
+   "index": 28,
+   "sectionId": "lab",
+   "afterSeq": 1264,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 43,
+   "durationMs": 233,
+   "pressure": {
+    "min": 0,
+    "max": 0.214,
+    "mean": 0.127
+   },
+   "altitude": {
+    "min": 1.18,
+    "max": 1.18
+   },
+   "azimuth": {
+    "min": 0.338,
+    "max": 0.338
+   },
+   "box": {
+    "minX": 501.15,
+    "minY": 78.83,
+    "maxX": 510.37,
+    "maxY": 90.1
+   },
+   "rawLength": 34.339,
+   "processed": {
+    "points": 42,
+    "length": 29.279,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.42,
+    "meanDeviation": 0.113
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 101
+   }
+  },
+  {
+   "index": 29,
+   "sectionId": "lab",
+   "afterSeq": 1291,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 16,
+   "durationMs": 113,
+   "pressure": {
+    "min": 0,
+    "max": 0.189,
+    "mean": 0.13
+   },
+   "altitude": {
+    "min": 1.18,
+    "max": 1.18
+   },
+   "azimuth": {
+    "min": 0.337,
+    "max": 0.338
+   },
+   "box": {
+    "minX": 513.95,
+    "minY": 79.35,
+    "maxX": 514.98,
+    "maxY": 90.1
+   },
+   "rawLength": 13.617,
+   "processed": {
+    "points": 16,
+    "length": 10.677,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.252,
+    "meanDeviation": 0.071
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 79
+   }
+  },
+  {
+   "index": 30,
+   "sectionId": "lab",
+   "afterSeq": 1307,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 8,
+   "durationMs": 66,
+   "pressure": {
+    "min": 0,
+    "max": 0.134,
+    "mean": 0.082
+   },
+   "altitude": {
+    "min": 1.18,
+    "max": 1.18
+   },
+   "azimuth": {
+    "min": 0.337,
+    "max": 0.337
+   },
+   "box": {
+    "minX": 516.51,
+    "minY": 69.62,
+    "maxX": 518.05,
+    "maxY": 75.25
+   },
+   "rawLength": 7.32,
+   "processed": {
+    "points": 6,
+    "length": 5.096,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.248,
+    "meanDeviation": 0.075
+   },
+   "outline": {
+    "kind": "dot",
+    "points": 0
+   }
+  },
+  {
+   "index": 31,
+   "sectionId": "lab",
+   "afterSeq": 1388,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 51,
+   "durationMs": 337,
+   "pressure": {
+    "min": 0,
+    "max": 0.321,
+    "mean": 0.164
+   },
+   "altitude": {
+    "min": 1.204,
+    "max": 1.204
+   },
+   "azimuth": {
+    "min": 0.337,
+    "max": 0.337
+   },
+   "box": {
+    "minX": 520.1,
+    "minY": 79.35,
+    "maxX": 532.89,
+    "maxY": 93.68
+   },
+   "rawLength": 39.027,
+   "processed": {
+    "points": 47,
+    "length": 32.981,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.493,
+    "meanDeviation": 0.154
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 79
+   }
+  },
+  {
+   "index": 32,
+   "sectionId": "lab",
+   "afterSeq": 1409,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 14,
+   "durationMs": 96,
+   "pressure": {
+    "min": 0,
+    "max": 0.222,
+    "mean": 0.12
+   },
+   "altitude": {
+    "min": 1.204,
+    "max": 1.204
+   },
+   "azimuth": {
+    "min": 0.337,
+    "max": 0.337
+   },
+   "box": {
+    "minX": 534.94,
+    "minY": 78.83,
+    "maxX": 536.48,
+    "maxY": 88.56
+   },
+   "rawLength": 12.48,
+   "processed": {
+    "points": 15,
+    "length": 10.362,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.212,
+    "meanDeviation": 0.08
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 78
+   }
+  },
+  {
+   "index": 33,
+   "sectionId": "lab",
+   "afterSeq": 1426,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 10,
+   "durationMs": 79,
+   "pressure": {
+    "min": 0,
+    "max": 0.177,
+    "mean": 0.115
+   },
+   "altitude": {
+    "min": 1.204,
+    "max": 1.204
+   },
+   "azimuth": {
+    "min": 0.334,
+    "max": 0.334
+   },
+   "box": {
+    "minX": 538.01,
+    "minY": 73.71,
+    "maxX": 542.11,
+    "maxY": 77.3
+   },
+   "rawLength": 7.545,
+   "processed": {
+    "points": 9,
+    "length": 6.266,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.364,
+    "meanDeviation": 0.13
+   },
+   "outline": {
+    "kind": "dot",
+    "points": 0
+   }
+  },
+  {
+   "index": 34,
+   "sectionId": "lab",
+   "afterSeq": 1483,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 42,
+   "durationMs": 246,
+   "pressure": {
+    "min": 0,
+    "max": 0.157,
+    "mean": 0.107
+   },
+   "altitude": {
+    "min": 1.204,
+    "max": 1.224
+   },
+   "azimuth": {
+    "min": 0.334,
+    "max": 0.334
+   },
+   "box": {
+    "minX": 544.67,
+    "minY": 78.83,
+    "maxX": 551.83,
+    "maxY": 91.12
+   },
+   "rawLength": 27.555,
+   "processed": {
+    "points": 43,
+    "length": 23.25,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.475,
+    "meanDeviation": 0.129
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 69
+   }
+  },
+  {
+   "index": 35,
+   "sectionId": "lab",
+   "afterSeq": 1533,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 44,
+   "durationMs": 208,
+   "pressure": {
+    "min": 0,
+    "max": 0.256,
+    "mean": 0.144
+   },
+   "altitude": {
+    "min": 1.239,
+    "max": 1.239
+   },
+   "azimuth": {
+    "min": 0.321,
+    "max": 0.321
+   },
+   "box": {
+    "minX": 556.95,
+    "minY": 76.79,
+    "maxX": 564.12,
+    "maxY": 92.65
+   },
+   "rawLength": 38.198,
+   "processed": {
+    "points": 51,
+    "length": 34.01,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.5,
+    "meanDeviation": 0.145
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 81
+   }
+  },
+  {
+   "index": 36,
+   "sectionId": "lab",
+   "afterSeq": 1630,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 80,
+   "durationMs": 350,
+   "pressure": {
+    "min": 0,
+    "max": 0.239,
+    "mean": 0.108
+   },
+   "altitude": {
+    "min": 1.214,
+    "max": 1.22
+   },
+   "azimuth": {
+    "min": 0.33,
+    "max": 0.33
+   },
+   "box": {
+    "minX": 585.62,
+    "minY": 61.43,
+    "maxX": 596.37,
+    "maxY": 90.1
+   },
+   "rawLength": 100.091,
+   "processed": {
+    "points": 117,
+    "length": 94.008,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.342,
+    "meanDeviation": 0.065
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 180
+   }
+  },
+  {
+   "index": 37,
+   "sectionId": "lab",
+   "afterSeq": 1649,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 13,
+   "durationMs": 91,
+   "pressure": {
+    "min": 0,
+    "max": 0.19,
+    "mean": 0.126
+   },
+   "altitude": {
+    "min": 1.199,
+    "max": 1.199
+   },
+   "azimuth": {
+    "min": 0.33,
+    "max": 0.33
+   },
+   "box": {
+    "minX": 589.2,
+    "minY": 77.81,
+    "maxX": 600.46,
+    "maxY": 79.86
+   },
+   "rawLength": 11.744,
+   "processed": {
+    "points": 13,
+    "length": 11.511,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.19,
+    "meanDeviation": 0.068
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 53
+   }
+  },
+  {
+   "index": 38,
+   "sectionId": "lab",
+   "afterSeq": 1688,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 15,
+   "durationMs": 116,
+   "pressure": {
+    "min": 0,
+    "max": 0.229,
+    "mean": 0.17
+   },
+   "altitude": {
+    "min": 1.21,
+    "max": 1.21
+   },
+   "azimuth": {
+    "min": 0.352,
+    "max": 0.352
+   },
+   "box": {
+    "minX": 614.29,
+    "minY": 78.83,
+    "maxX": 623.5,
+    "maxY": 81.39
+   },
+   "rawLength": 12.751,
+   "processed": {
+    "points": 15,
+    "length": 11.364,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.313,
+    "meanDeviation": 0.106
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 81
+   }
+  },
+  {
+   "index": 39,
+   "sectionId": "lab",
+   "afterSeq": 1708,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 16,
+   "durationMs": 83,
+   "pressure": {
+    "min": 0,
+    "max": 0.197,
+    "mean": 0.127
+   },
+   "altitude": {
+    "min": 1.21,
+    "max": 1.21
+   },
+   "azimuth": {
+    "min": 0.352,
+    "max": 0.352
+   },
+   "box": {
+    "minX": 616.33,
+    "minY": 82.42,
+    "maxX": 629.13,
+    "maxY": 87.54
+   },
+   "rawLength": 16.595,
+   "processed": {
+    "points": 17,
+    "length": 15.595,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.388,
+    "meanDeviation": 0.122
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 60
+   }
+  },
+  {
+   "index": 40,
+   "sectionId": "lab",
+   "afterSeq": 1755,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 26,
+   "durationMs": 133,
+   "pressure": {
+    "min": 0,
+    "max": 0.268,
+    "mean": 0.163
+   },
+   "altitude": {
+    "min": 1.321,
+    "max": 1.321
+   },
+   "azimuth": {
+    "min": 0.284,
+    "max": 0.291
+   },
+   "box": {
+    "minX": 647.05,
+    "minY": 68.6,
+    "maxX": 659.33,
+    "maxY": 74.23
+   },
+   "rawLength": 21.875,
+   "processed": {
+    "points": 28,
+    "length": 19.275,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.459,
+    "meanDeviation": 0.131
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 64
+   }
+  },
+  {
+   "index": 41,
+   "sectionId": "lab",
+   "afterSeq": 1786,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 22,
+   "durationMs": 150,
+   "pressure": {
+    "min": 0,
+    "max": 0.233,
+    "mean": 0.137
+   },
+   "altitude": {
+    "min": 1.284,
+    "max": 1.295
+   },
+   "azimuth": {
+    "min": 0.296,
+    "max": 0.296
+   },
+   "box": {
+    "minX": 645.51,
+    "minY": 70.64,
+    "maxX": 653.7,
+    "maxY": 84.98
+   },
+   "rawLength": 28.333,
+   "processed": {
+    "points": 28,
+    "length": 25.56,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.236,
+    "meanDeviation": 0.064
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 98
+   }
+  },
+  {
+   "index": 42,
+   "sectionId": "lab",
+   "afterSeq": 1820,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 29,
+   "durationMs": 142,
+   "pressure": {
+    "min": 0,
+    "max": 0.251,
+    "mean": 0.16
+   },
+   "altitude": {
+    "min": 1.284,
+    "max": 1.284
+   },
+   "azimuth": {
+    "min": 0.296,
+    "max": 0.296
+   },
+   "box": {
+    "minX": 655.24,
+    "minY": 70.64,
+    "maxX": 663.94,
+    "maxY": 87.02
+   },
+   "rawLength": 30.866,
+   "processed": {
+    "points": 34,
+    "length": 27.907,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.387,
+    "meanDeviation": 0.087
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 99
+   }
+  },
+  {
+   "index": 43,
+   "sectionId": "lab",
+   "afterSeq": 1873,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 38,
+   "durationMs": 196,
+   "pressure": {
+    "min": 0,
+    "max": 0.212,
+    "mean": 0.119
+   },
+   "altitude": {
+    "min": 1.284,
+    "max": 1.284
+   },
+   "azimuth": {
+    "min": 0.355,
+    "max": 0.355
+   },
+   "box": {
+    "minX": 668.04,
+    "minY": 74.23,
+    "maxX": 681.35,
+    "maxY": 93.68
+   },
+   "rawLength": 43.908,
+   "processed": {
+    "points": 45,
+    "length": 40.73,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.302,
+    "meanDeviation": 0.059
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 116
+   }
+  },
+  {
+   "index": 44,
+   "sectionId": "lab",
+   "afterSeq": 1921,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 33,
+   "durationMs": 204,
+   "pressure": {
+    "min": 0,
+    "max": 0.255,
+    "mean": 0.13
+   },
+   "altitude": {
+    "min": 1.284,
+    "max": 1.284
+   },
+   "azimuth": {
+    "min": 0.355,
+    "max": 0.355
+   },
+   "box": {
+    "minX": 684.42,
+    "minY": 61.94,
+    "maxX": 691.58,
+    "maxY": 75.76
+   },
+   "rawLength": 27.512,
+   "processed": {
+    "points": 34,
+    "length": 24.667,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.458,
+    "meanDeviation": 0.147
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 69
+   }
+  },
+  {
+   "index": 45,
+   "sectionId": "lab",
+   "afterSeq": 1959,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 22,
+   "durationMs": 120,
+   "pressure": {
+    "min": 0,
+    "max": 0.253,
+    "mean": 0.161
+   },
+   "altitude": {
+    "min": 1.332,
+    "max": 1.332
+   },
+   "azimuth": {
+    "min": 0.271,
+    "max": 0.281
+   },
+   "box": {
+    "minX": 711.55,
+    "minY": 73.2,
+    "maxX": 725.37,
+    "maxY": 80.88
+   },
+   "rawLength": 21.541,
+   "processed": {
+    "points": 22,
+    "length": 17.925,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.463,
+    "meanDeviation": 0.131
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 89
+   }
+  },
+  {
+   "index": 46,
+   "sectionId": "lab",
+   "afterSeq": 1981,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 18,
+   "durationMs": 92,
+   "pressure": {
+    "min": 0,
+    "max": 0.237,
+    "mean": 0.157
+   },
+   "altitude": {
+    "min": 1.329,
+    "max": 1.332
+   },
+   "azimuth": {
+    "min": 0.338,
+    "max": 0.338
+   },
+   "box": {
+    "minX": 718.2,
+    "minY": 68.6,
+    "maxX": 721.79,
+    "maxY": 86.51
+   },
+   "rawLength": 22.356,
+   "processed": {
+    "points": 26,
+    "length": 20.593,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.252,
+    "meanDeviation": 0.071
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 91
+   }
+  },
+  {
+   "index": 47,
+   "sectionId": "lab",
+   "afterSeq": 2052,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 54,
+   "durationMs": 238,
+   "pressure": {
+    "min": 0,
+    "max": 0.308,
+    "mean": 0.175
+   },
+   "altitude": {
+    "min": 1.329,
+    "max": 1.329
+   },
+   "azimuth": {
+    "min": 0.215,
+    "max": 0.267
+   },
+   "box": {
+    "minX": 739.19,
+    "minY": 66.04,
+    "maxX": 754.04,
+    "maxY": 86
+   },
+   "rawLength": 52.167,
+   "processed": {
+    "points": 58,
+    "length": 49.065,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.508,
+    "meanDeviation": 0.117
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 98
+   }
+  },
+  {
+   "index": 48,
+   "sectionId": "lab",
+   "afterSeq": 2120,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 53,
+   "durationMs": 304,
+   "pressure": {
+    "min": 0,
+    "max": 0.296,
+    "mean": 0.166
+   },
+   "altitude": {
+    "min": 1.329,
+    "max": 1.329
+   },
+   "azimuth": {
+    "min": 0.336,
+    "max": 0.336
+   },
+   "box": {
+    "minX": 756.6,
+    "minY": 70.13,
+    "maxX": 770.93,
+    "maxY": 89.07
+   },
+   "rawLength": 44.335,
+   "processed": {
+    "points": 58,
+    "length": 38.735,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.477,
+    "meanDeviation": 0.105
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 142
+   }
+  },
+  {
+   "index": 49,
+   "sectionId": "lab",
+   "afterSeq": 2153,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 26,
+   "durationMs": 129,
+   "pressure": {
+    "min": 0,
+    "max": 0.269,
+    "mean": 0.148
+   },
+   "altitude": {
+    "min": 1.329,
+    "max": 1.329
+   },
+   "azimuth": {
+    "min": 0.336,
+    "max": 0.336
+   },
+   "box": {
+    "minX": 766.32,
+    "minY": 72.69,
+    "maxX": 773.49,
+    "maxY": 83.44
+   },
+   "rawLength": 21.138,
+   "processed": {
+    "points": 27,
+    "length": 18.683,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.503,
+    "meanDeviation": 0.116
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 65
+   }
+  },
+  {
+   "index": 50,
+   "sectionId": "lab",
+   "afterSeq": 2202,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 39,
+   "durationMs": 195,
+   "pressure": {
+    "min": 0,
+    "max": 0.26,
+    "mean": 0.17
+   },
+   "altitude": {
+    "min": 1.329,
+    "max": 1.329
+   },
+   "azimuth": {
+    "min": 0.312,
+    "max": 0.312
+   },
+   "box": {
+    "minX": 774.51,
+    "minY": 75.25,
+    "maxX": 789.36,
+    "maxY": 89.07
+   },
+   "rawLength": 36.73,
+   "processed": {
+    "points": 43,
+    "length": 34.119,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.44,
+    "meanDeviation": 0.091
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 81
+   }
+  },
+  {
+   "index": 51,
+   "sectionId": "lab",
+   "afterSeq": 2258,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 43,
+   "durationMs": 233,
+   "pressure": {
+    "min": 0,
+    "max": 0.316,
+    "mean": 0.194
+   },
+   "altitude": {
+    "min": 1.341,
+    "max": 1.341
+   },
+   "azimuth": {
+    "min": 0.238,
+    "max": 0.267
+   },
+   "box": {
+    "minX": 791.4,
+    "minY": 66.55,
+    "maxX": 802.15,
+    "maxY": 85.49
+   },
+   "rawLength": 40.901,
+   "processed": {
+    "points": 48,
+    "length": 36.585,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.391,
+    "meanDeviation": 0.107
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 85
+   }
+  },
+  {
+   "index": 52,
+   "sectionId": "lab",
+   "afterSeq": 2309,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 19,
+   "durationMs": 134,
+   "pressure": {
+    "min": 0,
+    "max": 0.266,
+    "mean": 0.182
+   },
+   "altitude": {
+    "min": 1.342,
+    "max": 1.349
+   },
+   "azimuth": {
+    "min": 0.201,
+    "max": 0.304
+   },
+   "box": {
+    "minX": 821.1,
+    "minY": 73.71,
+    "maxX": 830.82,
+    "maxY": 75.25
+   },
+   "rawLength": 13.546,
+   "processed": {
+    "points": 16,
+    "length": 10.389,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.219,
+    "meanDeviation": 0.066
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 80
+   }
+  },
+  {
+   "index": 53,
+   "sectionId": "lab",
+   "afterSeq": 2327,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 16,
+   "durationMs": 112,
+   "pressure": {
+    "min": 0,
+    "max": 0.263,
+    "mean": 0.125
+   },
+   "altitude": {
+    "min": 1.269,
+    "max": 1.279
+   },
+   "azimuth": {
+    "min": 0.201,
+    "max": 0.307
+   },
+   "box": {
+    "minX": 826.73,
+    "minY": 63.48,
+    "maxX": 830.82,
+    "maxY": 82.42
+   },
+   "rawLength": 25.171,
+   "processed": {
+    "points": 26,
+    "length": 23.821,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.356,
+    "meanDeviation": 0.057
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 67
+   }
+  },
+  {
+   "index": 54,
+   "sectionId": "lab",
+   "afterSeq": 2362,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 20,
+   "durationMs": 120,
+   "pressure": {
+    "min": 0,
+    "max": 0.143,
+    "mean": 0.083
+   },
+   "altitude": {
+    "min": 1.269,
+    "max": 1.269
+   },
+   "azimuth": {
+    "min": 0.379,
+    "max": 0.379
+   },
+   "box": {
+    "minX": 854.37,
+    "minY": 58.87,
+    "maxX": 863.07,
+    "maxY": 80.88
+   },
+   "rawLength": 25.729,
+   "processed": {
+    "points": 30,
+    "length": 24.476,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.485,
+    "meanDeviation": 0.055
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 96
+   }
+  },
+  {
+   "index": 55,
+   "sectionId": "lab",
+   "afterSeq": 2390,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 24,
+   "durationMs": 129,
+   "pressure": {
+    "min": 0,
+    "max": 0.223,
+    "mean": 0.128
+   },
+   "altitude": {
+    "min": 1.269,
+    "max": 1.269
+   },
+   "azimuth": {
+    "min": 0.379,
+    "max": 0.379
+   },
+   "box": {
+    "minX": 849.25,
+    "minY": 73.71,
+    "maxX": 867.17,
+    "maxY": 80.88
+   },
+   "rawLength": 27.239,
+   "processed": {
+    "points": 30,
+    "length": 25.054,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.37,
+    "meanDeviation": 0.106
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 98
+   }
+  },
+  {
+   "index": 56,
+   "sectionId": "lab",
+   "afterSeq": 2439,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 39,
+   "durationMs": 212,
+   "pressure": {
+    "min": 0,
+    "max": 0.204,
+    "mean": 0.068
+   },
+   "altitude": {
+    "min": 1.269,
+    "max": 1.269
+   },
+   "azimuth": {
+    "min": 0.379,
+    "max": 0.379
+   },
+   "box": {
+    "minX": 852.83,
+    "minY": 87.02,
+    "maxX": 867.68,
+    "maxY": 98.8
+   },
+   "rawLength": 38.47,
+   "processed": {
+    "points": 41,
+    "length": 33.918,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.44,
+    "meanDeviation": 0.106
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 80
+   }
+  },
+  {
+   "index": 57,
+   "sectionId": "lab",
+   "afterSeq": 2485,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 30,
+   "durationMs": 150,
+   "pressure": {
+    "min": 0,
+    "max": 0.138,
+    "mean": 0.091
+   },
+   "altitude": {
+    "min": 1.411,
+    "max": 1.411
+   },
+   "azimuth": {
+    "min": 0.207,
+    "max": 0.238
+   },
+   "box": {
+    "minX": 886.62,
+    "minY": 70.13,
+    "maxX": 897.88,
+    "maxY": 93.17
+   },
+   "rawLength": 42.084,
+   "processed": {
+    "points": 43,
+    "length": 40.272,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.41,
+    "meanDeviation": 0.098
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 83
+   }
+  },
+  {
+   "index": 58,
+   "sectionId": "lab",
+   "afterSeq": 2546,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 41,
+   "durationMs": 183,
+   "pressure": {
+    "min": 0,
+    "max": 0.236,
+    "mean": 0.16
+   },
+   "altitude": {
+    "min": 1.346,
+    "max": 1.359
+   },
+   "azimuth": {
+    "min": 0.297,
+    "max": 0.309
+   },
+   "box": {
+    "minX": 911.19,
+    "minY": 73.2,
+    "maxX": 919.89,
+    "maxY": 86.51
+   },
+   "rawLength": 28.225,
+   "processed": {
+    "points": 39,
+    "length": 24.694,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.499,
+    "meanDeviation": 0.169
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 71
+   }
+  },
+  {
+   "index": 59,
+   "sectionId": "lab",
+   "afterSeq": 2573,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 20,
+   "durationMs": 112,
+   "pressure": {
+    "min": 0,
+    "max": 0.203,
+    "mean": 0.141
+   },
+   "altitude": {
+    "min": 1.306,
+    "max": 1.309
+   },
+   "azimuth": {
+    "min": 0.297,
+    "max": 0.304
+   },
+   "box": {
+    "minX": 912.73,
+    "minY": 75.25,
+    "maxX": 921.94,
+    "maxY": 95.21
+   },
+   "rawLength": 28.552,
+   "processed": {
+    "points": 29,
+    "length": 26.928,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.352,
+    "meanDeviation": 0.1
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 73
+   }
+  },
+  {
+   "index": 60,
+   "sectionId": "lab",
+   "afterSeq": 2639,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 48,
+   "durationMs": 316,
+   "pressure": {
+    "min": 0,
+    "max": 0.289,
+    "mean": 0.171
+   },
+   "altitude": {
+    "min": 1.306,
+    "max": 1.306
+   },
+   "azimuth": {
+    "min": 0.344,
+    "max": 0.344
+   },
+   "box": {
+    "minX": 923.48,
+    "minY": 78.32,
+    "maxX": 938.32,
+    "maxY": 97.26
+   },
+   "rawLength": 44.536,
+   "processed": {
+    "points": 53,
+    "length": 38.573,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.392,
+    "meanDeviation": 0.109
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 91
+   }
+  },
+  {
+   "index": 61,
+   "sectionId": "lab",
+   "afterSeq": 2670,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 21,
+   "durationMs": 125,
+   "pressure": {
+    "min": 0,
+    "max": 0.235,
+    "mean": 0.159
+   },
+   "altitude": {
+    "min": 1.306,
+    "max": 1.306
+   },
+   "azimuth": {
+    "min": 0.344,
+    "max": 0.344
+   },
+   "box": {
+    "minX": 935.25,
+    "minY": 80.37,
+    "maxX": 941.9,
+    "maxY": 88.56
+   },
+   "rawLength": 15.238,
+   "processed": {
+    "points": 21,
+    "length": 13.115,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.345,
+    "meanDeviation": 0.141
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 59
+   }
+  },
+  {
+   "index": 62,
+   "sectionId": "lab",
+   "afterSeq": 2726,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 41,
+   "durationMs": 208,
+   "pressure": {
+    "min": 0,
+    "max": 0.242,
+    "mean": 0.159
+   },
+   "altitude": {
+    "min": 1.306,
+    "max": 1.306
+   },
+   "azimuth": {
+    "min": 0.313,
+    "max": 0.327
+   },
+   "box": {
+    "minX": 946,
+    "minY": 82.42,
+    "maxX": 957.26,
+    "maxY": 94.7
+   },
+   "rawLength": 31.244,
+   "processed": {
+    "points": 41,
+    "length": 28.101,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.203,
+    "meanDeviation": 0.076
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 104
+   }
+  },
+  {
+   "index": 63,
+   "sectionId": "lab",
+   "afterSeq": 2785,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 39,
+   "durationMs": 250,
+   "pressure": {
+    "min": 0,
+    "max": 0.289,
+    "mean": 0.176
+   },
+   "altitude": {
+    "min": 1.306,
+    "max": 1.306
+   },
+   "azimuth": {
+    "min": 0.327,
+    "max": 0.327
+   },
+   "box": {
+    "minX": 962.38,
+    "minY": 72.69,
+    "maxX": 973.64,
+    "maxY": 80.88
+   },
+   "rawLength": 27.119,
+   "processed": {
+    "points": 40,
+    "length": 23.016,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.415,
+    "meanDeviation": 0.141
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 70
+   }
+  },
+  {
+   "index": 64,
+   "sectionId": "lab",
+   "afterSeq": 2832,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 33,
+   "durationMs": 154,
+   "pressure": {
+    "min": 0,
+    "max": 0.285,
+    "mean": 0.185
+   },
+   "altitude": {
+    "min": 1.306,
+    "max": 1.306
+   },
+   "azimuth": {
+    "min": 0.249,
+    "max": 0.249
+   },
+   "box": {
+    "minX": 971.6,
+    "minY": 62.45,
+    "maxX": 987.46,
+    "maxY": 101.36
+   },
+   "rawLength": 48.027,
+   "processed": {
+    "points": 49,
+    "length": 46.843,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.245,
+    "meanDeviation": 0.059
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 92
+   }
+  },
+  {
+   "index": 65,
+   "sectionId": "lab",
+   "afterSeq": 2916,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 64,
+   "durationMs": 308,
+   "pressure": {
+    "min": 0,
+    "max": 0.259,
+    "mean": 0.146
+   },
+   "altitude": {
+    "min": 0.948,
+    "max": 0.948
+   },
+   "azimuth": {
+    "min": 0.158,
+    "max": 0.382
+   },
+   "box": {
+    "minX": 117.23,
+    "minY": 161.25,
+    "maxX": 141.29,
+    "maxY": 181.73
+   },
+   "rawLength": 66.931,
+   "processed": {
+    "points": 81,
+    "length": 61.523,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.545,
+    "meanDeviation": 0.113
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 140
+   }
+  },
+  {
+   "index": 66,
+   "sectionId": "lab",
+   "afterSeq": 2960,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 38,
+   "durationMs": 187,
+   "pressure": {
+    "min": 0,
+    "max": 0.203,
+    "mean": 0.136
+   },
+   "altitude": {
+    "min": 0.948,
+    "max": 0.949
+   },
+   "azimuth": {
+    "min": 0.174,
+    "max": 0.183
+   },
+   "box": {
+    "minX": 145.38,
+    "minY": 161.25,
+    "maxX": 153.57,
+    "maxY": 177.63
+   },
+   "rawLength": 41.505,
+   "processed": {
+    "points": 48,
+    "length": 38.805,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.529,
+    "meanDeviation": 0.142
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 86
+   }
+  },
+  {
+   "index": 67,
+   "sectionId": "lab",
+   "afterSeq": 3012,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 29,
+   "durationMs": 150,
+   "pressure": {
+    "min": 0,
+    "max": 0.19,
+    "mean": 0.126
+   },
+   "altitude": {
+    "min": 1.097,
+    "max": 1.097
+   },
+   "azimuth": {
+    "min": 0.135,
+    "max": 0.196
+   },
+   "box": {
+    "minX": 185.31,
+    "minY": 147.43,
+    "maxX": 189.92,
+    "maxY": 176.61
+   },
+   "rawLength": 39.878,
+   "processed": {
+    "points": 45,
+    "length": 36.787,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.426,
+    "meanDeviation": 0.077
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 112
+   }
+  },
+  {
+   "index": 68,
+   "sectionId": "lab",
+   "afterSeq": 3045,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 31,
+   "durationMs": 138,
+   "pressure": {
+    "min": 0,
+    "max": 0.193,
+    "mean": 0.12
+   },
+   "altitude": {
+    "min": 1.097,
+    "max": 1.097
+   },
+   "azimuth": {
+    "min": 0.135,
+    "max": 0.135
+   },
+   "box": {
+    "minX": 188.89,
+    "minY": 161.25,
+    "maxX": 198.62,
+    "maxY": 173.02
+   },
+   "rawLength": 26.337,
+   "processed": {
+    "points": 31,
+    "length": 24.478,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.373,
+    "meanDeviation": 0.136
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 70
+   }
+  },
+  {
+   "index": 69,
+   "sectionId": "lab",
+   "afterSeq": 3102,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 42,
+   "durationMs": 225,
+   "pressure": {
+    "min": 0,
+    "max": 0.166,
+    "mean": 0.105
+   },
+   "altitude": {
+    "min": 1.097,
+    "max": 1.097
+   },
+   "azimuth": {
+    "min": 0.17,
+    "max": 0.17
+   },
+   "box": {
+    "minX": 203.23,
+    "minY": 160.23,
+    "maxX": 213.46,
+    "maxY": 173.54
+   },
+   "rawLength": 33.999,
+   "processed": {
+    "points": 41,
+    "length": 27.67,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.527,
+    "meanDeviation": 0.139
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 102
+   }
+  },
+  {
+   "index": 70,
+   "sectionId": "lab",
+   "afterSeq": 3142,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 36,
+   "durationMs": 163,
+   "pressure": {
+    "min": 0,
+    "max": 0.198,
+    "mean": 0.141
+   },
+   "altitude": {
+    "min": 1.097,
+    "max": 1.097
+   },
+   "azimuth": {
+    "min": 0.17,
+    "max": 0.17
+   },
+   "box": {
+    "minX": 212.95,
+    "minY": 157.67,
+    "maxX": 219.61,
+    "maxY": 171.49
+   },
+   "rawLength": 34.165,
+   "processed": {
+    "points": 41,
+    "length": 30.293,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.44,
+    "meanDeviation": 0.114
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 77
+   }
+  },
+  {
+   "index": 71,
+   "sectionId": "lab",
+   "afterSeq": 3200,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 47,
+   "durationMs": 242,
+   "pressure": {
+    "min": 0,
+    "max": 0.185,
+    "mean": 0.137
+   },
+   "altitude": {
+    "min": 1.097,
+    "max": 1.109
+   },
+   "azimuth": {
+    "min": 0.184,
+    "max": 0.184
+   },
+   "box": {
+    "minX": 222.17,
+    "minY": 157.15,
+    "maxX": 234.45,
+    "maxY": 169.44
+   },
+   "rawLength": 32.284,
+   "processed": {
+    "points": 47,
+    "length": 27.485,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.557,
+    "meanDeviation": 0.124
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 101
+   }
+  },
+  {
+   "index": 72,
+   "sectionId": "lab",
+   "afterSeq": 3274,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 50,
+   "durationMs": 225,
+   "pressure": {
+    "min": 0,
+    "max": 0.292,
+    "mean": 0.176
+   },
+   "altitude": {
+    "min": 1.024,
+    "max": 1.12
+   },
+   "azimuth": {
+    "min": 0.169,
+    "max": 0.259
+   },
+   "box": {
+    "minX": 111.08,
+    "minY": 181.21,
+    "maxX": 246.23,
+    "maxY": 203.74
+   },
+   "rawLength": 140.766,
+   "processed": {
+    "points": 117,
+    "length": 139.701,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.266,
+    "meanDeviation": 0.021
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 206
+   }
+  },
+  {
+   "index": 73,
+   "sectionId": "lab",
+   "afterSeq": 3298,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 6,
+   "durationMs": 75,
+   "pressure": {
+    "min": 0,
+    "max": 0.08,
+    "mean": 0.04
+   },
+   "altitude": {
+    "min": 1.263,
+    "max": 1.263
+   },
+   "azimuth": {
+    "min": 0.326,
+    "max": 0.326
+   },
+   "box": {
+    "minX": 274.89,
+    "minY": 160.74,
+    "maxX": 275.92,
+    "maxY": 164.83
+   },
+   "rawLength": 5.658,
+   "processed": {
+    "points": 5,
+    "length": 3.822,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.27,
+    "meanDeviation": 0.073
+   },
+   "outline": {
+    "kind": "dot",
+    "points": 0
+   }
+  },
+  {
+   "index": 74,
+   "sectionId": "lab",
+   "afterSeq": 3317,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 9,
+   "durationMs": 66,
+   "pressure": {
+    "min": 0,
+    "max": 0.08,
+    "mean": 0.035
+   },
+   "altitude": {
+    "min": 1.263,
+    "max": 1.263
+   },
+   "azimuth": {
+    "min": 0.285,
+    "max": 0.326
+   },
+   "box": {
+    "minX": 274.38,
+    "minY": 175.58,
+    "maxX": 277.96,
+    "maxY": 178.14
+   },
+   "rawLength": 7.065,
+   "processed": {
+    "points": 10,
+    "length": 5.919,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.372,
+    "meanDeviation": 0.179
+   },
+   "outline": {
+    "kind": "dot",
+    "points": 0
+   }
+  },
+  {
+   "index": 75,
+   "sectionId": "lab",
+   "afterSeq": 3442,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 56,
+   "durationMs": 270,
+   "pressure": {
+    "min": 0,
+    "max": 0.215,
+    "mean": 0.139
+   },
+   "altitude": {
+    "min": 1.049,
+    "max": 1.049
+   },
+   "azimuth": {
+    "min": 0.233,
+    "max": 0.317
+   },
+   "box": {
+    "minX": 308.17,
+    "minY": 143.33,
+    "maxX": 325.06,
+    "maxY": 176.1
+   },
+   "rawLength": 83.28,
+   "processed": {
+    "points": 86,
+    "length": 77.78,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.496,
+    "meanDeviation": 0.082
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 134
+   }
+  },
+  {
+   "index": 76,
+   "sectionId": "lab",
+   "afterSeq": 3488,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 24,
+   "durationMs": 132,
+   "pressure": {
+    "min": 0,
+    "max": 0.189,
+    "mean": 0.127
+   },
+   "altitude": {
+    "min": 1.091,
+    "max": 1.091
+   },
+   "azimuth": {
+    "min": 0.319,
+    "max": 0.319
+   },
+   "box": {
+    "minX": 332.23,
+    "minY": 158.69,
+    "maxX": 342.46,
+    "maxY": 163.81
+   },
+   "rawLength": 18.395,
+   "processed": {
+    "points": 26,
+    "length": 16.423,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.452,
+    "meanDeviation": 0.113
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 62
+   }
+  },
+  {
+   "index": 77,
+   "sectionId": "lab",
+   "afterSeq": 3511,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 20,
+   "durationMs": 104,
+   "pressure": {
+    "min": 0,
+    "max": 0.206,
+    "mean": 0.134
+   },
+   "altitude": {
+    "min": 1.091,
+    "max": 1.091
+   },
+   "azimuth": {
+    "min": 0.319,
+    "max": 0.319
+   },
+   "box": {
+    "minX": 333.25,
+    "minY": 165.86,
+    "maxX": 346.56,
+    "maxY": 171.49
+   },
+   "rawLength": 18.541,
+   "processed": {
+    "points": 21,
+    "length": 17.238,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.351,
+    "meanDeviation": 0.092
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 60
+   }
+  },
+  {
+   "index": 78,
+   "sectionId": "lab",
+   "afterSeq": 3544,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 23,
+   "durationMs": 125,
+   "pressure": {
+    "min": 0,
+    "max": 0.22,
+    "mean": 0.139
+   },
+   "altitude": {
+    "min": 1.16,
+    "max": 1.16
+   },
+   "azimuth": {
+    "min": 0.319,
+    "max": 0.319
+   },
+   "box": {
+    "minX": 358.85,
+    "minY": 156.13,
+    "maxX": 371.13,
+    "maxY": 159.71
+   },
+   "rawLength": 18.18,
+   "processed": {
+    "points": 23,
+    "length": 16.13,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.474,
+    "meanDeviation": 0.144
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 60
+   }
+  },
+  {
+   "index": 79,
+   "sectionId": "lab",
+   "afterSeq": 3573,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 22,
+   "durationMs": 121,
+   "pressure": {
+    "min": 0,
+    "max": 0.151,
+    "mean": 0.097
+   },
+   "altitude": {
+    "min": 1.16,
+    "max": 1.16
+   },
+   "azimuth": {
+    "min": 0.319,
+    "max": 0.319
+   },
+   "box": {
+    "minX": 360.38,
+    "minY": 160.23,
+    "maxX": 366.52,
+    "maxY": 171.49
+   },
+   "rawLength": 17.844,
+   "processed": {
+    "points": 23,
+    "length": 15.322,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.257,
+    "meanDeviation": 0.057
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 90
+   }
+  },
+  {
+   "index": 80,
+   "sectionId": "lab",
+   "afterSeq": 3601,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 21,
+   "durationMs": 121,
+   "pressure": {
+    "min": 0,
+    "max": 0.148,
+    "mean": 0.106
+   },
+   "altitude": {
+    "min": 1.16,
+    "max": 1.16
+   },
+   "azimuth": {
+    "min": 0.319,
+    "max": 0.319
+   },
+   "box": {
+    "minX": 366.52,
+    "minY": 160.74,
+    "maxX": 376.25,
+    "maxY": 169.44
+   },
+   "rawLength": 16.604,
+   "processed": {
+    "points": 20,
+    "length": 15.14,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.384,
+    "meanDeviation": 0.124
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 60
+   }
+  },
+  {
+   "index": 81,
+   "sectionId": "lab",
+   "afterSeq": 3657,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 36,
+   "durationMs": 208,
+   "pressure": {
+    "min": 0,
+    "max": 0.228,
+    "mean": 0.137
+   },
+   "altitude": {
+    "min": 1.22,
+    "max": 1.22
+   },
+   "azimuth": {
+    "min": 0.344,
+    "max": 0.344
+   },
+   "box": {
+    "minX": 380.86,
+    "minY": 162.27,
+    "maxX": 391.61,
+    "maxY": 171.49
+   },
+   "rawLength": 25.778,
+   "processed": {
+    "points": 34,
+    "length": 21.408,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.25,
+    "meanDeviation": 0.084
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 96
+   }
+  },
+  {
+   "index": 82,
+   "sectionId": "lab",
+   "afterSeq": 3709,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 39,
+   "durationMs": 221,
+   "pressure": {
+    "min": 0,
+    "max": 0.224,
+    "mean": 0.134
+   },
+   "altitude": {
+    "min": 1.22,
+    "max": 1.22
+   },
+   "azimuth": {
+    "min": 0.344,
+    "max": 0.344
+   },
+   "box": {
+    "minX": 394.68,
+    "minY": 149.48,
+    "maxX": 400.82,
+    "maxY": 159.2
+   },
+   "rawLength": 24.04,
+   "processed": {
+    "points": 39,
+    "length": 19.951,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.459,
+    "meanDeviation": 0.158
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 67
+   }
+  },
+  {
+   "index": 83,
+   "sectionId": "lab",
+   "afterSeq": 3768,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 45,
+   "durationMs": 246,
+   "pressure": {
+    "min": 0,
+    "max": 0.237,
+    "mean": 0.146
+   },
+   "altitude": {
+    "min": 1.22,
+    "max": 1.22
+   },
+   "azimuth": {
+    "min": 0.336,
+    "max": 0.336
+   },
+   "box": {
+    "minX": 403.89,
+    "minY": 142.31,
+    "maxX": 413.62,
+    "maxY": 168.93
+   },
+   "rawLength": 49.19,
+   "processed": {
+    "points": 54,
+    "length": 46.007,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.488,
+    "meanDeviation": 0.083
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 96
+   }
+  },
+  {
+   "index": 84,
+   "sectionId": "lab",
+   "afterSeq": 3806,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 19,
+   "durationMs": 121,
+   "pressure": {
+    "min": 0,
+    "max": 0.211,
+    "mean": 0.147
+   },
+   "altitude": {
+    "min": 1.322,
+    "max": 1.342
+   },
+   "azimuth": {
+    "min": 0.278,
+    "max": 0.287
+   },
+   "box": {
+    "minX": 438.19,
+    "minY": 155.62,
+    "maxX": 452.52,
+    "maxY": 164.83
+   },
+   "rawLength": 19.287,
+   "processed": {
+    "points": 20,
+    "length": 18.088,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.447,
+    "meanDeviation": 0.117
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 62
+   }
+  },
+  {
+   "index": 85,
+   "sectionId": "lab",
+   "afterSeq": 3829,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 21,
+   "durationMs": 95,
+   "pressure": {
+    "min": 0,
+    "max": 0.231,
+    "mean": 0.147
+   },
+   "altitude": {
+    "min": 1.284,
+    "max": 1.291
+   },
+   "azimuth": {
+    "min": 0.309,
+    "max": 0.309
+   },
+   "box": {
+    "minX": 444.85,
+    "minY": 150.5,
+    "maxX": 449.96,
+    "maxY": 174.05
+   },
+   "rawLength": 28.245,
+   "processed": {
+    "points": 30,
+    "length": 26.6,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.27,
+    "meanDeviation": 0.068
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 98
+   }
+  },
+  {
+   "index": 86,
+   "sectionId": "lab",
+   "afterSeq": 3882,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 31,
+   "durationMs": 133,
+   "pressure": {
+    "min": 0,
+    "max": 0.219,
+    "mean": 0.122
+   },
+   "altitude": {
+    "min": 1.182,
+    "max": 1.223
+   },
+   "azimuth": {
+    "min": 0.391,
+    "max": 0.391
+   },
+   "box": {
+    "minX": 482.73,
+    "minY": 136.68,
+    "maxX": 489.89,
+    "maxY": 163.81
+   },
+   "rawLength": 34.714,
+   "processed": {
+    "points": 42,
+    "length": 31.994,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.42,
+    "meanDeviation": 0.076
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 78
+   }
+  },
+  {
+   "index": 87,
+   "sectionId": "lab",
+   "afterSeq": 3913,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 28,
+   "durationMs": 117,
+   "pressure": {
+    "min": 0,
+    "max": 0.236,
+    "mean": 0.169
+   },
+   "altitude": {
+    "min": 1.166,
+    "max": 1.166
+   },
+   "azimuth": {
+    "min": 0.391,
+    "max": 0.391
+   },
+   "box": {
+    "minX": 475.05,
+    "minY": 159.71,
+    "maxX": 492.45,
+    "maxY": 163.81
+   },
+   "rawLength": 26.685,
+   "processed": {
+    "points": 33,
+    "length": 24.194,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.446,
+    "meanDeviation": 0.14
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 97
+   }
+  },
+  {
+   "index": 88,
+   "sectionId": "lab",
+   "afterSeq": 3977,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 54,
+   "durationMs": 266,
+   "pressure": {
+    "min": 0,
+    "max": 0.231,
+    "mean": 0.16
+   },
+   "altitude": {
+    "min": 1.166,
+    "max": 1.166
+   },
+   "azimuth": {
+    "min": 0.391,
+    "max": 0.391
+   },
+   "box": {
+    "minX": 483.75,
+    "minY": 173.54,
+    "maxX": 499.62,
+    "maxY": 187.87
+   },
+   "rawLength": 49.215,
+   "processed": {
+    "points": 55,
+    "length": 43.893,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.49,
+    "meanDeviation": 0.135
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 92
+   }
+  },
+  {
+   "index": 89,
+   "sectionId": "lab",
+   "afterSeq": 4036,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 36,
+   "durationMs": 180,
+   "pressure": {
+    "min": 0,
+    "max": 0.242,
+    "mean": 0.153
+   },
+   "altitude": {
+    "min": 1.188,
+    "max": 1.188
+   },
+   "azimuth": {
+    "min": 0.352,
+    "max": 0.352
+   },
+   "box": {
+    "minX": 518.56,
+    "minY": 147.43,
+    "maxX": 531.87,
+    "maxY": 188.89
+   },
+   "rawLength": 66.189,
+   "processed": {
+    "points": 61,
+    "length": 64.361,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.43,
+    "meanDeviation": 0.069
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 114
+   }
+  },
+  {
+   "index": 90,
+   "sectionId": "lab",
+   "afterSeq": 4083,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 38,
+   "durationMs": 183,
+   "pressure": {
+    "min": 0,
+    "max": 0.192,
+    "mean": 0.141
+   },
+   "altitude": {
+    "min": 1.188,
+    "max": 1.188
+   },
+   "azimuth": {
+    "min": 0.352,
+    "max": 0.352
+   },
+   "box": {
+    "minX": 537.5,
+    "minY": 146.4,
+    "maxX": 545.18,
+    "maxY": 160.74
+   },
+   "rawLength": 33.67,
+   "processed": {
+    "points": 40,
+    "length": 30.246,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.43,
+    "meanDeviation": 0.151
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 76
+   }
+  },
+  {
+   "index": 91,
+   "sectionId": "lab",
+   "afterSeq": 4113,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 25,
+   "durationMs": 121,
+   "pressure": {
+    "min": 0,
+    "max": 0.222,
+    "mean": 0.143
+   },
+   "altitude": {
+    "min": 1.188,
+    "max": 1.188
+   },
+   "azimuth": {
+    "min": 0.352,
+    "max": 0.352
+   },
+   "box": {
+    "minX": 537.5,
+    "minY": 146.4,
+    "maxX": 546.71,
+    "maxY": 165.86
+   },
+   "rawLength": 23.612,
+   "processed": {
+    "points": 27,
+    "length": 22.479,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.267,
+    "meanDeviation": 0.081
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 66
+   }
+  },
+  {
+   "index": 92,
+   "sectionId": "lab",
+   "afterSeq": 4146,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 26,
+   "durationMs": 133,
+   "pressure": {
+    "min": 0,
+    "max": 0.265,
+    "mean": 0.168
+   },
+   "altitude": {
+    "min": 1.188,
+    "max": 1.188
+   },
+   "azimuth": {
+    "min": 0.352,
+    "max": 0.352
+   },
+   "box": {
+    "minX": 531.36,
+    "minY": 166.88,
+    "maxX": 547.74,
+    "maxY": 172
+   },
+   "rawLength": 22.041,
+   "processed": {
+    "points": 26,
+    "length": 19.96,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.359,
+    "meanDeviation": 0.103
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 65
+   }
+  },
+  {
+   "index": 93,
+   "sectionId": "lab",
+   "afterSeq": 4225,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 59,
+   "durationMs": 333,
+   "pressure": {
+    "min": 0,
+    "max": 0.283,
+    "mean": 0.149
+   },
+   "altitude": {
+    "min": 1.188,
+    "max": 1.188
+   },
+   "azimuth": {
+    "min": 0.352,
+    "max": 0.352
+   },
+   "box": {
+    "minX": 538.01,
+    "minY": 178.14,
+    "maxX": 548.25,
+    "maxY": 197.08
+   },
+   "rawLength": 44.003,
+   "processed": {
+    "points": 62,
+    "length": 36.859,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.523,
+    "meanDeviation": 0.17
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 86
+   }
+  },
+  {
+   "index": 94,
+   "sectionId": "lab",
+   "afterSeq": 4265,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 23,
+   "durationMs": 117,
+   "pressure": {
+    "min": 0,
+    "max": 0.23,
+    "mean": 0.157
+   },
+   "altitude": {
+    "min": 1.243,
+    "max": 1.243
+   },
+   "azimuth": {
+    "min": 0.3,
+    "max": 0.3
+   },
+   "box": {
+    "minX": 560.02,
+    "minY": 160.74,
+    "maxX": 575.89,
+    "maxY": 163.81
+   },
+   "rawLength": 22.861,
+   "processed": {
+    "points": 23,
+    "length": 18.682,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.451,
+    "meanDeviation": 0.125
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 89
+   }
+  },
+  {
+   "index": 95,
+   "sectionId": "lab",
+   "afterSeq": 4295,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 26,
+   "durationMs": 134,
+   "pressure": {
+    "min": 0,
+    "max": 0.18,
+    "mean": 0.115
+   },
+   "altitude": {
+    "min": 1.243,
+    "max": 1.243
+   },
+   "azimuth": {
+    "min": 0.3,
+    "max": 0.3
+   },
+   "box": {
+    "minX": 563.1,
+    "minY": 162.27,
+    "maxX": 569.24,
+    "maxY": 179.17
+   },
+   "rawLength": 27.334,
+   "processed": {
+    "points": 30,
+    "length": 24.935,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.312,
+    "meanDeviation": 0.082
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 70
+   }
+  },
+  {
+   "index": 96,
+   "sectionId": "lab",
+   "afterSeq": 4327,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 28,
+   "durationMs": 141,
+   "pressure": {
+    "min": 0,
+    "max": 0.164,
+    "mean": 0.125
+   },
+   "altitude": {
+    "min": 1.243,
+    "max": 1.243
+   },
+   "azimuth": {
+    "min": 0.3,
+    "max": 0.3
+   },
+   "box": {
+    "minX": 570.77,
+    "minY": 164.83,
+    "maxX": 578.96,
+    "maxY": 178.65
+   },
+   "rawLength": 24.344,
+   "processed": {
+    "points": 30,
+    "length": 21.567,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.296,
+    "meanDeviation": 0.067
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 93
+   }
+  },
+  {
+   "index": 97,
+   "sectionId": "lab",
+   "afterSeq": 4384,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 43,
+   "durationMs": 196,
+   "pressure": {
+    "min": 0,
+    "max": 0.175,
+    "mean": 0.117
+   },
+   "altitude": {
+    "min": 1.256,
+    "max": 1.256
+   },
+   "azimuth": {
+    "min": 0.344,
+    "max": 0.344
+   },
+   "box": {
+    "minX": 586.64,
+    "minY": 168.93,
+    "maxX": 600.46,
+    "maxY": 184.29
+   },
+   "rawLength": 38.887,
+   "processed": {
+    "points": 42,
+    "length": 35.737,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.247,
+    "meanDeviation": 0.096
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 83
+   }
+  },
+  {
+   "index": 98,
+   "sectionId": "lab",
+   "afterSeq": 4461,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 50,
+   "durationMs": 312,
+   "pressure": {
+    "min": 0,
+    "max": 0.299,
+    "mean": 0.159
+   },
+   "altitude": {
+    "min": 1.303,
+    "max": 1.303
+   },
+   "azimuth": {
+    "min": 0.344,
+    "max": 0.344
+   },
+   "box": {
+    "minX": 606.61,
+    "minY": 152.55,
+    "maxX": 616.33,
+    "maxY": 165.35
+   },
+   "rawLength": 31.798,
+   "processed": {
+    "points": 51,
+    "length": 26.546,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.392,
+    "meanDeviation": 0.172
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 104
+   }
+  },
+  {
+   "index": 99,
+   "sectionId": "lab",
+   "afterSeq": 4502,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 32,
+   "durationMs": 154,
+   "pressure": {
+    "min": 0,
+    "max": 0.257,
+    "mean": 0.156
+   },
+   "altitude": {
+    "min": 1.303,
+    "max": 1.303
+   },
+   "azimuth": {
+    "min": 0.248,
+    "max": 0.271
+   },
+   "box": {
+    "minX": 619.4,
+    "minY": 149.99,
+    "maxX": 632.2,
+    "maxY": 188.89
+   },
+   "rawLength": 50.151,
+   "processed": {
+    "points": 49,
+    "length": 47.766,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.333,
+    "meanDeviation": 0.064
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 127
+   }
+  },
+  {
+   "index": 100,
+   "sectionId": "lab",
+   "afterSeq": 4547,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 16,
+   "durationMs": 92,
+   "pressure": {
+    "min": 0,
+    "max": 0.195,
+    "mean": 0.134
+   },
+   "altitude": {
+    "min": 1.287,
+    "max": 1.287
+   },
+   "azimuth": {
+    "min": 0.372,
+    "max": 0.372
+   },
+   "box": {
+    "minX": 658.31,
+    "minY": 164.32,
+    "maxX": 667.01,
+    "maxY": 169.95
+   },
+   "rawLength": 16.326,
+   "processed": {
+    "points": 17,
+    "length": 13.911,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.386,
+    "meanDeviation": 0.117
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 57
+   }
+  },
+  {
+   "index": 101,
+   "sectionId": "lab",
+   "afterSeq": 4571,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 18,
+   "durationMs": 100,
+   "pressure": {
+    "min": 0,
+    "max": 0.246,
+    "mean": 0.171
+   },
+   "altitude": {
+    "min": 1.241,
+    "max": 1.241
+   },
+   "azimuth": {
+    "min": 0.372,
+    "max": 0.372
+   },
+   "box": {
+    "minX": 657.29,
+    "minY": 166.88,
+    "maxX": 676.23,
+    "maxY": 174.56
+   },
+   "rawLength": 22.321,
+   "processed": {
+    "points": 24,
+    "length": 21.21,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.146,
+    "meanDeviation": 0.027
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 66
+   }
+  },
+  {
+   "index": 102,
+   "sectionId": "lab",
+   "afterSeq": 4628,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 42,
+   "durationMs": 204,
+   "pressure": {
+    "min": 0,
+    "max": 0.157,
+    "mean": 0.091
+   },
+   "altitude": {
+    "min": 1.241,
+    "max": 1.241
+   },
+   "azimuth": {
+    "min": 0.451,
+    "max": 0.451
+   },
+   "box": {
+    "minX": 682.37,
+    "minY": 153.06,
+    "maxX": 692.61,
+    "maxY": 181.73
+   },
+   "rawLength": 38.88,
+   "processed": {
+    "points": 44,
+    "length": 36.111,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.27,
+    "meanDeviation": 0.109
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 110
+   }
+  },
+  {
+   "index": 103,
+   "sectionId": "lab",
+   "afterSeq": 4690,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 48,
+   "durationMs": 246,
+   "pressure": {
+    "min": 0,
+    "max": 0.24,
+    "mean": 0.172
+   },
+   "altitude": {
+    "min": 1.241,
+    "max": 1.241
+   },
+   "azimuth": {
+    "min": 0.162,
+    "max": 0.279
+   },
+   "box": {
+    "minX": 699.77,
+    "minY": 157.67,
+    "maxX": 713.6,
+    "maxY": 183.26
+   },
+   "rawLength": 52.438,
+   "processed": {
+    "points": 56,
+    "length": 48.009,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.3,
+    "meanDeviation": 0.069
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 98
+   }
+  },
+  {
+   "index": 104,
+   "sectionId": "lab",
+   "afterSeq": 4779,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 60,
+   "durationMs": 296,
+   "pressure": {
+    "min": 0,
+    "max": 0.254,
+    "mean": 0.162
+   },
+   "altitude": {
+    "min": 1.345,
+    "max": 1.345
+   },
+   "azimuth": {
+    "min": 0.297,
+    "max": 0.297
+   },
+   "box": {
+    "minX": 719.74,
+    "minY": 156.64,
+    "maxX": 732.54,
+    "maxY": 178.65
+   },
+   "rawLength": 56.484,
+   "processed": {
+    "points": 71,
+    "length": 51.156,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.467,
+    "meanDeviation": 0.124
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 104
+   }
+  },
+  {
+   "index": 105,
+   "sectionId": "lab",
+   "afterSeq": 4852,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 57,
+   "durationMs": 312,
+   "pressure": {
+    "min": 0,
+    "max": 0.245,
+    "mean": 0.154
+   },
+   "altitude": {
+    "min": 1.345,
+    "max": 1.345
+   },
+   "azimuth": {
+    "min": 0.311,
+    "max": 0.311
+   },
+   "box": {
+    "minX": 733.05,
+    "minY": 160.74,
+    "maxX": 746.87,
+    "maxY": 184.29
+   },
+   "rawLength": 50.244,
+   "processed": {
+    "points": 63,
+    "length": 42.913,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.484,
+    "meanDeviation": 0.11
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 121
+   }
+  },
+  {
+   "index": 106,
+   "sectionId": "lab",
+   "afterSeq": 4883,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 27,
+   "durationMs": 121,
+   "pressure": {
+    "min": 0,
+    "max": 0.252,
+    "mean": 0.168
+   },
+   "altitude": {
+    "min": 1.345,
+    "max": 1.345
+   },
+   "azimuth": {
+    "min": 0.307,
+    "max": 0.311
+   },
+   "box": {
+    "minX": 740.21,
+    "minY": 166.88,
+    "maxX": 748.92,
+    "maxY": 180.19
+   },
+   "rawLength": 22.204,
+   "processed": {
+    "points": 26,
+    "length": 21.123,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.26,
+    "meanDeviation": 0.093
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 66
+   }
+  },
+  {
+   "index": 107,
+   "sectionId": "lab",
+   "afterSeq": 4959,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 56,
+   "durationMs": 262,
+   "pressure": {
+    "min": 0,
+    "max": 0.24,
+    "mean": 0.099
+   },
+   "altitude": {
+    "min": 1.078,
+    "max": 1.092
+   },
+   "azimuth": {
+    "min": 0.147,
+    "max": 0.231
+   },
+   "box": {
+    "minX": 256.98,
+    "minY": 241.11,
+    "maxX": 268.75,
+    "maxY": 275.92
+   },
+   "rawLength": 71.576,
+   "processed": {
+    "points": 75,
+    "length": 67.08,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.563,
+    "meanDeviation": 0.085
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 124
+   }
+  },
+  {
+   "index": 108,
+   "sectionId": "lab",
+   "afterSeq": 4989,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 20,
+   "durationMs": 100,
+   "pressure": {
+    "min": 0,
+    "max": 0.191,
+    "mean": 0.122
+   },
+   "altitude": {
+    "min": 1.128,
+    "max": 1.128
+   },
+   "azimuth": {
+    "min": 0.106,
+    "max": 0.114
+   },
+   "box": {
+    "minX": 290.76,
+    "minY": 260.05,
+    "maxX": 302.54,
+    "maxY": 263.63
+   },
+   "rawLength": 18.302,
+   "processed": {
+    "points": 21,
+    "length": 15.909,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.386,
+    "meanDeviation": 0.121
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 86
+   }
+  },
+  {
+   "index": 109,
+   "sectionId": "lab",
+   "afterSeq": 5012,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 19,
+   "durationMs": 88,
+   "pressure": {
+    "min": 0,
+    "max": 0.201,
+    "mean": 0.134
+   },
+   "altitude": {
+    "min": 1.128,
+    "max": 1.128
+   },
+   "azimuth": {
+    "min": 0.106,
+    "max": 0.106
+   },
+   "box": {
+    "minX": 293.32,
+    "minY": 266.7,
+    "maxX": 306.63,
+    "maxY": 275.4
+   },
+   "rawLength": 20.234,
+   "processed": {
+    "points": 22,
+    "length": 19.401,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.475,
+    "meanDeviation": 0.12
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 64
+   }
+  },
+  {
+   "index": 110,
+   "sectionId": "lab",
+   "afterSeq": 5089,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 47,
+   "durationMs": 237,
+   "pressure": {
+    "min": 0,
+    "max": 0.168,
+    "mean": 0.107
+   },
+   "altitude": {
+    "min": 1.198,
+    "max": 1.198
+   },
+   "azimuth": {
+    "min": 0.249,
+    "max": 0.249
+   },
+   "box": {
+    "minX": 338.37,
+    "minY": 237.52,
+    "maxX": 347.58,
+    "maxY": 255.95
+   },
+   "rawLength": 34.876,
+   "processed": {
+    "points": 48,
+    "length": 30.591,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.295,
+    "meanDeviation": 0.128
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 79
+   }
+  },
+  {
+   "index": 111,
+   "sectionId": "lab",
+   "afterSeq": 5141,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 39,
+   "durationMs": 212,
+   "pressure": {
+    "min": 0,
+    "max": 0.156,
+    "mean": 0.114
+   },
+   "altitude": {
+    "min": 1.198,
+    "max": 1.198
+   },
+   "azimuth": {
+    "min": 0.249,
+    "max": 0.249
+   },
+   "box": {
+    "minX": 350.14,
+    "minY": 239.06,
+    "maxX": 359.36,
+    "maxY": 253.9
+   },
+   "rawLength": 32.532,
+   "processed": {
+    "points": 39,
+    "length": 27.883,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.42,
+    "meanDeviation": 0.123
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 105
+   }
+  },
+  {
+   "index": 112,
+   "sectionId": "lab",
+   "afterSeq": 5194,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 40,
+   "durationMs": 234,
+   "pressure": {
+    "min": 0,
+    "max": 0.198,
+    "mean": 0.134
+   },
+   "altitude": {
+    "min": 1.198,
+    "max": 1.198
+   },
+   "azimuth": {
+    "min": 0.249,
+    "max": 0.249
+   },
+   "box": {
+    "minX": 360.38,
+    "minY": 240.08,
+    "maxX": 365.5,
+    "maxY": 259.54
+   },
+   "rawLength": 36.295,
+   "processed": {
+    "points": 44,
+    "length": 30.643,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.551,
+    "meanDeviation": 0.147
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 76
+   }
+  },
+  {
+   "index": 113,
+   "sectionId": "lab",
+   "afterSeq": 5236,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 26,
+   "durationMs": 142,
+   "pressure": {
+    "min": 0,
+    "max": 0.257,
+    "mean": 0.169
+   },
+   "altitude": {
+    "min": 1.151,
+    "max": 1.177
+   },
+   "azimuth": {
+    "min": 0.093,
+    "max": 0.093
+   },
+   "box": {
+    "minX": 334.27,
+    "minY": 264.65,
+    "maxX": 363.96,
+    "maxY": 272.85
+   },
+   "rawLength": 37.762,
+   "processed": {
+    "points": 40,
+    "length": 36.64,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.411,
+    "meanDeviation": 0.074
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 83
+   }
+  },
+  {
+   "index": 114,
+   "sectionId": "lab",
+   "afterSeq": 5289,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 32,
+   "durationMs": 208,
+   "pressure": {
+    "min": 0,
+    "max": 0.163,
+    "mean": 0.117
+   },
+   "altitude": {
+    "min": 1.185,
+    "max": 1.185
+   },
+   "azimuth": {
+    "min": 0.093,
+    "max": 0.093
+   },
+   "box": {
+    "minX": 345.54,
+    "minY": 278.99,
+    "maxX": 358.33,
+    "maxY": 290.25
+   },
+   "rawLength": 25.485,
+   "processed": {
+    "points": 31,
+    "length": 22.343,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.222,
+    "meanDeviation": 0.072
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 66
+   }
+  },
+  {
+   "index": 115,
+   "sectionId": "lab",
+   "afterSeq": 5340,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 35,
+   "durationMs": 217,
+   "pressure": {
+    "min": 0,
+    "max": 0.16,
+    "mean": 0.119
+   },
+   "altitude": {
+    "min": 1.185,
+    "max": 1.185
+   },
+   "azimuth": {
+    "min": 0.093,
+    "max": 0.093
+   },
+   "box": {
+    "minX": 360.38,
+    "minY": 269.77,
+    "maxX": 368.57,
+    "maxY": 278.99
+   },
+   "rawLength": 24.32,
+   "processed": {
+    "points": 34,
+    "length": 20.544,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.488,
+    "meanDeviation": 0.168
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 67
+   }
+  },
+  {
+   "index": 116,
+   "sectionId": "lab",
+   "afterSeq": 5375,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 20,
+   "durationMs": 96,
+   "pressure": {
+    "min": 0,
+    "max": 0.201,
+    "mean": 0.121
+   },
+   "altitude": {
+    "min": 1.285,
+    "max": 1.285
+   },
+   "azimuth": {
+    "min": 0.153,
+    "max": 0.17
+   },
+   "box": {
+    "minX": 391.1,
+    "minY": 258,
+    "maxX": 410.04,
+    "maxY": 268.75
+   },
+   "rawLength": 24.887,
+   "processed": {
+    "points": 28,
+    "length": 24.281,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.286,
+    "meanDeviation": 0.066
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 70
+   }
+  },
+  {
+   "index": 117,
+   "sectionId": "lab",
+   "afterSeq": 5450,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 54,
+   "durationMs": 304,
+   "pressure": {
+    "min": 0,
+    "max": 0.239,
+    "mean": 0.155
+   },
+   "altitude": {
+    "min": 1.285,
+    "max": 1.285
+   },
+   "azimuth": {
+    "min": 0.197,
+    "max": 0.197
+   },
+   "box": {
+    "minX": 425.39,
+    "minY": 240.08,
+    "maxX": 437.68,
+    "maxY": 252.37
+   },
+   "rawLength": 36.909,
+   "processed": {
+    "points": 51,
+    "length": 32.363,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.478,
+    "meanDeviation": 0.141
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 82
+   }
+  },
+  {
+   "index": 118,
+   "sectionId": "lab",
+   "afterSeq": 5485,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 23,
+   "durationMs": 124,
+   "pressure": {
+    "min": 0,
+    "max": 0.191,
+    "mean": 0.131
+   },
+   "altitude": {
+    "min": 1.285,
+    "max": 1.285
+   },
+   "azimuth": {
+    "min": 0.25,
+    "max": 0.25
+   },
+   "box": {
+    "minX": 424.37,
+    "minY": 261.58,
+    "maxX": 437.68,
+    "maxY": 264.65
+   },
+   "rawLength": 17.916,
+   "processed": {
+    "points": 22,
+    "length": 15.773,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.341,
+    "meanDeviation": 0.111
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 86
+   }
+  },
+  {
+   "index": 119,
+   "sectionId": "lab",
+   "afterSeq": 5559,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 58,
+   "durationMs": 300,
+   "pressure": {
+    "min": 0,
+    "max": 0.242,
+    "mean": 0.146
+   },
+   "altitude": {
+    "min": 1.285,
+    "max": 1.285
+   },
+   "azimuth": {
+    "min": 0.231,
+    "max": 0.25
+   },
+   "box": {
+    "minX": 430,
+    "minY": 271.82,
+    "maxX": 438.19,
+    "maxY": 289.74
+   },
+   "rawLength": 44.887,
+   "processed": {
+    "points": 59,
+    "length": 38.191,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.54,
+    "meanDeviation": 0.169
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 87
+   }
+  },
+  {
+   "index": 120,
+   "sectionId": "lab",
+   "afterSeq": 5622,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 46,
+   "durationMs": 242,
+   "pressure": {
+    "min": 0,
+    "max": 0.237,
+    "mean": 0.139
+   },
+   "altitude": {
+    "min": 1.285,
+    "max": 1.285
+   },
+   "azimuth": {
+    "min": 0.229,
+    "max": 0.231
+   },
+   "box": {
+    "minX": 449.96,
+    "minY": 254.93,
+    "maxX": 464.3,
+    "maxY": 269.26
+   },
+   "rawLength": 40.778,
+   "processed": {
+    "points": 49,
+    "length": 35.899,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.321,
+    "meanDeviation": 0.101
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 85
+   }
+  },
+  {
+   "index": 121,
+   "sectionId": "lab",
+   "afterSeq": 5742,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 79,
+   "durationMs": 404,
+   "pressure": {
+    "min": 0,
+    "max": 0.16,
+    "mean": 0.092
+   },
+   "altitude": {
+    "min": 0.976,
+    "max": 0.993
+   },
+   "azimuth": {
+    "min": 0.183,
+    "max": 0.203
+   },
+   "box": {
+    "minX": 145.89,
+    "minY": 321.99,
+    "maxX": 165.35,
+    "maxY": 338.37
+   },
+   "rawLength": 59.727,
+   "processed": {
+    "points": 82,
+    "length": 52.841,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.504,
+    "meanDeviation": 0.127
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 132
+   }
+  },
+  {
+   "index": 122,
+   "sectionId": "lab",
+   "afterSeq": 5768,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 17,
+   "durationMs": 92,
+   "pressure": {
+    "min": 0,
+    "max": 0.178,
+    "mean": 0.132
+   },
+   "altitude": {
+    "min": 1.024,
+    "max": 1.024
+   },
+   "azimuth": {
+    "min": 0.122,
+    "max": 0.183
+   },
+   "box": {
+    "minX": 174.05,
+    "minY": 325.57,
+    "maxX": 176.1,
+    "maxY": 340.93
+   },
+   "rawLength": 18.57,
+   "processed": {
+    "points": 22,
+    "length": 15.691,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.2,
+    "meanDeviation": 0.071
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 86
+   }
+  },
+  {
+   "index": 123,
+   "sectionId": "lab",
+   "afterSeq": 5790,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 15,
+   "durationMs": 87,
+   "pressure": {
+    "min": 0,
+    "max": 0.216,
+    "mean": 0.135
+   },
+   "altitude": {
+    "min": 1.034,
+    "max": 1.034
+   },
+   "azimuth": {
+    "min": 0.122,
+    "max": 0.122
+   },
+   "box": {
+    "minX": 180.7,
+    "minY": 314.82,
+    "maxX": 183.26,
+    "maxY": 326.08
+   },
+   "rawLength": 13.36,
+   "processed": {
+    "points": 15,
+    "length": 12.771,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.375,
+    "meanDeviation": 0.04
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 55
+   }
+  },
+  {
+   "index": 124,
+   "sectionId": "lab",
+   "afterSeq": 5830,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 35,
+   "durationMs": 175,
+   "pressure": {
+    "min": 0,
+    "max": 0.173,
+    "mean": 0.116
+   },
+   "altitude": {
+    "min": 1.034,
+    "max": 1.034
+   },
+   "azimuth": {
+    "min": 0.122,
+    "max": 0.122
+   },
+   "box": {
+    "minX": 181.21,
+    "minY": 326.08,
+    "maxX": 189.4,
+    "maxY": 338.88
+   },
+   "rawLength": 37.971,
+   "processed": {
+    "points": 42,
+    "length": 34.425,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.438,
+    "meanDeviation": 0.087
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 107
+   }
+  },
+  {
+   "index": 125,
+   "sectionId": "lab",
+   "afterSeq": 5893,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 32,
+   "durationMs": 158,
+   "pressure": {
+    "min": 0,
+    "max": 0.191,
+    "mean": 0.113
+   },
+   "altitude": {
+    "min": 1.123,
+    "max": 1.123
+   },
+   "azimuth": {
+    "min": 0.135,
+    "max": 0.135
+   },
+   "box": {
+    "minX": 223.7,
+    "minY": 312.77,
+    "maxX": 230.87,
+    "maxY": 338.88
+   },
+   "rawLength": 42.123,
+   "processed": {
+    "points": 46,
+    "length": 38.532,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.242,
+    "meanDeviation": 0.054
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 114
+   }
+  },
+  {
+   "index": 126,
+   "sectionId": "lab",
+   "afterSeq": 5920,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 25,
+   "durationMs": 108,
+   "pressure": {
+    "min": 0,
+    "max": 0.136,
+    "mean": 0.091
+   },
+   "altitude": {
+    "min": 1.123,
+    "max": 1.123
+   },
+   "azimuth": {
+    "min": 0.135,
+    "max": 0.135
+   },
+   "box": {
+    "minX": 228.82,
+    "minY": 318.4,
+    "maxX": 233.43,
+    "maxY": 342.46
+   },
+   "rawLength": 31.767,
+   "processed": {
+    "points": 38,
+    "length": 29.96,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.516,
+    "meanDeviation": 0.107
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 76
+   }
+  },
+  {
+   "index": 127,
+   "sectionId": "lab",
+   "afterSeq": 5945,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 19,
+   "durationMs": 104,
+   "pressure": {
+    "min": 0,
+    "max": 0.199,
+    "mean": 0.124
+   },
+   "altitude": {
+    "min": 1.123,
+    "max": 1.123
+   },
+   "azimuth": {
+    "min": 0.135,
+    "max": 0.135
+   },
+   "box": {
+    "minX": 224.73,
+    "minY": 328.13,
+    "maxX": 240.6,
+    "maxY": 333.76
+   },
+   "rawLength": 18.89,
+   "processed": {
+    "points": 18,
+    "length": 16.592,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.184,
+    "meanDeviation": 0.07
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 61
+   }
+  },
+  {
+   "index": 128,
+   "sectionId": "lab",
+   "afterSeq": 5990,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 32,
+   "durationMs": 166,
+   "pressure": {
+    "min": 0,
+    "max": 0.244,
+    "mean": 0.172
+   },
+   "altitude": {
+    "min": 1.143,
+    "max": 1.143
+   },
+   "azimuth": {
+    "min": 0.198,
+    "max": 0.198
+   },
+   "box": {
+    "minX": 247.25,
+    "minY": 320.45,
+    "maxX": 255.44,
+    "maxY": 347.07
+   },
+   "rawLength": 40.434,
+   "processed": {
+    "points": 42,
+    "length": 38.504,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.36,
+    "meanDeviation": 0.097
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 82
+   }
+  },
+  {
+   "index": 129,
+   "sectionId": "lab",
+   "afterSeq": 6043,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 42,
+   "durationMs": 208,
+   "pressure": {
+    "min": 0,
+    "max": 0.2,
+    "mean": 0.14
+   },
+   "altitude": {
+    "min": 1.185,
+    "max": 1.185
+   },
+   "azimuth": {
+    "min": 0.057,
+    "max": 0.09
+   },
+   "box": {
+    "minX": 259.54,
+    "minY": 332.23,
+    "maxX": 272.85,
+    "maxY": 344.51
+   },
+   "rawLength": 32.615,
+   "processed": {
+    "points": 40,
+    "length": 28.919,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.444,
+    "meanDeviation": 0.117
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 74
+   }
+  },
+  {
+   "index": 130,
+   "sectionId": "lab",
+   "afterSeq": 6085,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 27,
+   "durationMs": 171,
+   "pressure": {
+    "min": 0,
+    "max": 0.229,
+    "mean": 0.175
+   },
+   "altitude": {
+    "min": 1.239,
+    "max": 1.239
+   },
+   "azimuth": {
+    "min": 0.156,
+    "max": 0.156
+   },
+   "box": {
+    "minX": 277.45,
+    "minY": 325.06,
+    "maxX": 286.67,
+    "maxY": 357.31
+   },
+   "rawLength": 46.435,
+   "processed": {
+    "points": 43,
+    "length": 44.834,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.457,
+    "meanDeviation": 0.074
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 94
+   }
+  },
+  {
+   "index": 131,
+   "sectionId": "lab",
+   "afterSeq": 6123,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 6,
+   "durationMs": 50,
+   "pressure": {
+    "min": 0,
+    "max": 0.08,
+    "mean": 0.048
+   },
+   "altitude": {
+    "min": 1.164,
+    "max": 1.213
+   },
+   "azimuth": {
+    "min": 0.116,
+    "max": 0.116
+   },
+   "box": {
+    "minX": 302.02,
+    "minY": 333.76,
+    "maxX": 302.54,
+    "maxY": 335.81
+   },
+   "rawLength": 2.775,
+   "processed": {
+    "points": 4,
+    "length": 1.675,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.12,
+    "meanDeviation": 0.03
+   },
+   "outline": {
+    "kind": "dot",
+    "points": 0
+   }
+  },
+  {
+   "index": 132,
+   "sectionId": "lab",
+   "afterSeq": 6158,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 25,
+   "durationMs": 137,
+   "pressure": {
+    "min": 0,
+    "max": 0.16,
+    "mean": 0.103
+   },
+   "altitude": {
+    "min": 1.207,
+    "max": 1.213
+   },
+   "azimuth": {
+    "min": 0.116,
+    "max": 0.149
+   },
+   "box": {
+    "minX": 301,
+    "minY": 333.25,
+    "maxX": 308.68,
+    "maxY": 336.83
+   },
+   "rawLength": 17.663,
+   "processed": {
+    "points": 25,
+    "length": 13.933,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.356,
+    "meanDeviation": 0.135
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 87
+   }
+  },
+  {
+   "index": 133,
+   "sectionId": "lab",
+   "afterSeq": 6189,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 11,
+   "durationMs": 104,
+   "pressure": {
+    "min": 0,
+    "max": 0.218,
+    "mean": 0.125
+   },
+   "altitude": {
+    "min": 1.17,
+    "max": 1.17
+   },
+   "azimuth": {
+    "min": 0.201,
+    "max": 0.201
+   },
+   "box": {
+    "minX": 300.49,
+    "minY": 345.54,
+    "maxX": 306.63,
+    "maxY": 349.63
+   },
+   "rawLength": 9.736,
+   "processed": {
+    "points": 13,
+    "length": 8.175,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.251,
+    "meanDeviation": 0.112
+   },
+   "outline": {
+    "kind": "dot",
+    "points": 0
+   }
+  },
+  {
+   "index": 134,
+   "sectionId": "lab",
+   "afterSeq": 6233,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 25,
+   "durationMs": 125,
+   "pressure": {
+    "min": 0,
+    "max": 0.216,
+    "mean": 0.143
+   },
+   "altitude": {
+    "min": 1.158,
+    "max": 1.179
+   },
+   "azimuth": {
+    "min": 0.157,
+    "max": 0.181
+   },
+   "box": {
+    "minX": 332.23,
+    "minY": 330.69,
+    "maxX": 348.1,
+    "maxY": 333.76
+   },
+   "rawLength": 23.011,
+   "processed": {
+    "points": 27,
+    "length": 19.914,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.432,
+    "meanDeviation": 0.106
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 65
+   }
+  },
+  {
+   "index": 135,
+   "sectionId": "lab",
+   "afterSeq": 6262,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 24,
+   "durationMs": 116,
+   "pressure": {
+    "min": 0,
+    "max": 0.202,
+    "mean": 0.147
+   },
+   "altitude": {
+    "min": 1.158,
+    "max": 1.158
+   },
+   "azimuth": {
+    "min": 0.16,
+    "max": 0.201
+   },
+   "box": {
+    "minX": 334.79,
+    "minY": 329.67,
+    "maxX": 344,
+    "maxY": 347.58
+   },
+   "rawLength": 23.621,
+   "processed": {
+    "points": 27,
+    "length": 21.467,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.175,
+    "meanDeviation": 0.071
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 90
+   }
+  },
+  {
+   "index": 136,
+   "sectionId": "lab",
+   "afterSeq": 6295,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 28,
+   "durationMs": 125,
+   "pressure": {
+    "min": 0,
+    "max": 0.164,
+    "mean": 0.108
+   },
+   "altitude": {
+    "min": 1.158,
+    "max": 1.158
+   },
+   "azimuth": {
+    "min": 0.099,
+    "max": 0.164
+   },
+   "box": {
+    "minX": 342.46,
+    "minY": 332.23,
+    "maxX": 354.24,
+    "maxY": 346.56
+   },
+   "rawLength": 28.623,
+   "processed": {
+    "points": 34,
+    "length": 26.359,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.543,
+    "meanDeviation": 0.153
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 72
+   }
+  },
+  {
+   "index": 137,
+   "sectionId": "lab",
+   "afterSeq": 6341,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 36,
+   "durationMs": 192,
+   "pressure": {
+    "min": 0,
+    "max": 0.193,
+    "mean": 0.124
+   },
+   "altitude": {
+    "min": 1.203,
+    "max": 1.203
+   },
+   "azimuth": {
+    "min": 0.168,
+    "max": 0.168
+   },
+   "box": {
+    "minX": 360.38,
+    "minY": 334.79,
+    "maxX": 372.67,
+    "maxY": 348.1
+   },
+   "rawLength": 33.096,
+   "processed": {
+    "points": 35,
+    "length": 29.75,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.231,
+    "meanDeviation": 0.09
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 100
+   }
+  },
+  {
+   "index": 138,
+   "sectionId": "lab",
+   "afterSeq": 6396,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 40,
+   "durationMs": 229,
+   "pressure": {
+    "min": 0,
+    "max": 0.211,
+    "mean": 0.139
+   },
+   "altitude": {
+    "min": 1.221,
+    "max": 1.221
+   },
+   "azimuth": {
+    "min": 0.165,
+    "max": 0.165
+   },
+   "box": {
+    "minX": 379.32,
+    "minY": 320.96,
+    "maxX": 392.12,
+    "maxY": 330.18
+   },
+   "rawLength": 29.499,
+   "processed": {
+    "points": 42,
+    "length": 25.278,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.519,
+    "meanDeviation": 0.133
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 72
+   }
+  },
+  {
+   "index": 139,
+   "sectionId": "lab",
+   "afterSeq": 6468,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 28,
+   "durationMs": 234,
+   "pressure": {
+    "min": 0,
+    "max": 0.225,
+    "mean": 0.156
+   },
+   "altitude": {
+    "min": 1.231,
+    "max": 1.235
+   },
+   "azimuth": {
+    "min": -0.021,
+    "max": 0.022
+   },
+   "box": {
+    "minX": 404.4,
+    "minY": 331.2,
+    "maxX": 422.83,
+    "maxY": 334.27
+   },
+   "rawLength": 24.766,
+   "processed": {
+    "points": 31,
+    "length": 19.114,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.23,
+    "meanDeviation": 0.046
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 91
+   }
+  },
+  {
+   "index": 140,
+   "sectionId": "lab",
+   "afterSeq": 6491,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 22,
+   "durationMs": 96,
+   "pressure": {
+    "min": 0,
+    "max": 0.219,
+    "mean": 0.124
+   },
+   "altitude": {
+    "min": 1.235,
+    "max": 1.235
+   },
+   "azimuth": {
+    "min": -0.021,
+    "max": 0.062
+   },
+   "box": {
+    "minX": 413.62,
+    "minY": 321.48,
+    "maxX": 416.69,
+    "maxY": 348.1
+   },
+   "rawLength": 30.924,
+   "processed": {
+    "points": 32,
+    "length": 29.441,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.344,
+    "meanDeviation": 0.083
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 101
+   }
+  },
+  {
+   "index": 141,
+   "sectionId": "lab",
+   "afterSeq": 6573,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 52,
+   "durationMs": 271,
+   "pressure": {
+    "min": 0,
+    "max": 0.205,
+    "mean": 0.117
+   },
+   "altitude": {
+    "min": 1.274,
+    "max": 1.298
+   },
+   "azimuth": {
+    "min": 0.049,
+    "max": 0.049
+   },
+   "box": {
+    "minX": 445.36,
+    "minY": 315.85,
+    "maxX": 460.2,
+    "maxY": 342.46
+   },
+   "rawLength": 59.784,
+   "processed": {
+    "points": 63,
+    "length": 55.478,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.273,
+    "meanDeviation": 0.082
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 131
+   }
+  },
+  {
+   "index": 142,
+   "sectionId": "lab",
+   "afterSeq": 6607,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 24,
+   "durationMs": 121,
+   "pressure": {
+    "min": 0,
+    "max": 0.207,
+    "mean": 0.132
+   },
+   "altitude": {
+    "min": 1.213,
+    "max": 1.214
+   },
+   "azimuth": {
+    "min": 0.118,
+    "max": 0.158
+   },
+   "box": {
+    "minX": 466.86,
+    "minY": 319.94,
+    "maxX": 480.68,
+    "maxY": 323.01
+   },
+   "rawLength": 16.538,
+   "processed": {
+    "points": 24,
+    "length": 15.532,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.287,
+    "meanDeviation": 0.085
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 60
+   }
+  },
+  {
+   "index": 143,
+   "sectionId": "lab",
+   "afterSeq": 6637,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 24,
+   "durationMs": 138,
+   "pressure": {
+    "min": 0,
+    "max": 0.184,
+    "mean": 0.124
+   },
+   "altitude": {
+    "min": 1.213,
+    "max": 1.213
+   },
+   "azimuth": {
+    "min": 0.14,
+    "max": 0.188
+   },
+   "box": {
+    "minX": 469.93,
+    "minY": 319.43,
+    "maxX": 478.12,
+    "maxY": 341.44
+   },
+   "rawLength": 34.428,
+   "processed": {
+    "points": 35,
+    "length": 32.229,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.185,
+    "meanDeviation": 0.056
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 81
+   }
+  },
+  {
+   "index": 144,
+   "sectionId": "lab",
+   "afterSeq": 6670,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 24,
+   "durationMs": 145,
+   "pressure": {
+    "min": 0,
+    "max": 0.185,
+    "mean": 0.128
+   },
+   "altitude": {
+    "min": 1.213,
+    "max": 1.213
+   },
+   "azimuth": {
+    "min": 0.14,
+    "max": 0.21
+   },
+   "box": {
+    "minX": 478.12,
+    "minY": 322.5,
+    "maxX": 486.31,
+    "maxY": 336.83
+   },
+   "rawLength": 24.772,
+   "processed": {
+    "points": 28,
+    "length": 21.816,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.359,
+    "meanDeviation": 0.089
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 67
+   }
+  },
+  {
+   "index": 145,
+   "sectionId": "lab",
+   "afterSeq": 6713,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 35,
+   "durationMs": 166,
+   "pressure": {
+    "min": 0,
+    "max": 0.174,
+    "mean": 0.115
+   },
+   "altitude": {
+    "min": 1.215,
+    "max": 1.215
+   },
+   "azimuth": {
+    "min": 0.244,
+    "max": 0.244
+   },
+   "box": {
+    "minX": 490.92,
+    "minY": 328.64,
+    "maxX": 500.64,
+    "maxY": 341.95
+   },
+   "rawLength": 32.023,
+   "processed": {
+    "points": 38,
+    "length": 29.402,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.269,
+    "meanDeviation": 0.072
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 103
+   }
+  },
+  {
+   "index": 146,
+   "sectionId": "lab",
+   "afterSeq": 6756,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 32,
+   "durationMs": 133,
+   "pressure": {
+    "min": 0,
+    "max": 0.221,
+    "mean": 0.149
+   },
+   "altitude": {
+    "min": 1.319,
+    "max": 1.319
+   },
+   "azimuth": {
+    "min": -0.039,
+    "max": 0.086
+   },
+   "box": {
+    "minX": 516,
+    "minY": 310.73,
+    "maxX": 528.29,
+    "maxY": 348.61
+   },
+   "rawLength": 55.54,
+   "processed": {
+    "points": 54,
+    "length": 54.074,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.323,
+    "meanDeviation": 0.068
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 101
+   }
+  },
+  {
+   "index": 147,
+   "sectionId": "lab",
+   "afterSeq": 6839,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 45,
+   "durationMs": 245,
+   "pressure": {
+    "min": 0,
+    "max": 0.176,
+    "mean": 0.103
+   },
+   "altitude": {
+    "min": 1.214,
+    "max": 1.214
+   },
+   "azimuth": {
+    "min": 0.26,
+    "max": 0.26
+   },
+   "box": {
+    "minX": 550.3,
+    "minY": 306.63,
+    "maxX": 556.95,
+    "maxY": 325.06
+   },
+   "rawLength": 36.638,
+   "processed": {
+    "points": 47,
+    "length": 32.526,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.479,
+    "meanDeviation": 0.133
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 81
+   }
+  },
+  {
+   "index": 148,
+   "sectionId": "lab",
+   "afterSeq": 6900,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 43,
+   "durationMs": 241,
+   "pressure": {
+    "min": 0,
+    "max": 0.254,
+    "mean": 0.133
+   },
+   "altitude": {
+    "min": 1.214,
+    "max": 1.214
+   },
+   "azimuth": {
+    "min": 0.274,
+    "max": 0.274
+   },
+   "box": {
+    "minX": 563.1,
+    "minY": 304.07,
+    "maxX": 576.4,
+    "maxY": 317.38
+   },
+   "rawLength": 32.012,
+   "processed": {
+    "points": 43,
+    "length": 27.636,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.496,
+    "meanDeviation": 0.14
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 102
+   }
+  },
+  {
+   "index": 149,
+   "sectionId": "lab",
+   "afterSeq": 6952,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 40,
+   "durationMs": 220,
+   "pressure": {
+    "min": 0,
+    "max": 0.226,
+    "mean": 0.144
+   },
+   "altitude": {
+    "min": 1.214,
+    "max": 1.214
+   },
+   "azimuth": {
+    "min": 0.274,
+    "max": 0.274
+   },
+   "box": {
+    "minX": 574.36,
+    "minY": 301.51,
+    "maxX": 586.64,
+    "maxY": 317.89
+   },
+   "rawLength": 36.465,
+   "processed": {
+    "points": 47,
+    "length": 32.299,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.492,
+    "meanDeviation": 0.173
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 82
+   }
+  },
+  {
+   "index": 150,
+   "sectionId": "lab",
+   "afterSeq": 6993,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 31,
+   "durationMs": 154,
+   "pressure": {
+    "min": 0,
+    "max": 0.297,
+    "mean": 0.173
+   },
+   "altitude": {
+    "min": 1.124,
+    "max": 1.174
+   },
+   "azimuth": {
+    "min": 0.169,
+    "max": 0.217
+   },
+   "box": {
+    "minX": 548.25,
+    "minY": 326.08,
+    "maxX": 582.04,
+    "maxY": 332.23
+   },
+   "rawLength": 42.567,
+   "processed": {
+    "points": 47,
+    "length": 40.327,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.462,
+    "meanDeviation": 0.075
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 112
+   }
+  },
+  {
+   "index": 151,
+   "sectionId": "lab",
+   "afterSeq": 7042,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 40,
+   "durationMs": 204,
+   "pressure": {
+    "min": 0,
+    "max": 0.211,
+    "mean": 0.143
+   },
+   "altitude": {
+    "min": 1.157,
+    "max": 1.157
+   },
+   "azimuth": {
+    "min": 0.037,
+    "max": 0.13
+   },
+   "box": {
+    "minX": 563.1,
+    "minY": 340.42,
+    "maxX": 575.89,
+    "maxY": 353.21
+   },
+   "rawLength": 33.667,
+   "processed": {
+    "points": 38,
+    "length": 29.925,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.242,
+    "meanDeviation": 0.09
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 103
+   }
+  },
+  {
+   "index": 152,
+   "sectionId": "lab",
+   "afterSeq": 7095,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 43,
+   "durationMs": 208,
+   "pressure": {
+    "min": 0,
+    "max": 0.236,
+    "mean": 0.15
+   },
+   "altitude": {
+    "min": 1.171,
+    "max": 1.171
+   },
+   "azimuth": {
+    "min": 0.037,
+    "max": 0.145
+   },
+   "box": {
+    "minX": 579.99,
+    "minY": 329.15,
+    "maxX": 588.69,
+    "maxY": 341.44
+   },
+   "rawLength": 34.065,
+   "processed": {
+    "points": 44,
+    "length": 29.973,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.472,
+    "meanDeviation": 0.15
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 79
+   }
+  },
+  {
+   "index": 153,
+   "sectionId": "lab",
+   "afterSeq": 7127,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 17,
+   "durationMs": 92,
+   "pressure": {
+    "min": 0,
+    "max": 0.244,
+    "mean": 0.178
+   },
+   "altitude": {
+    "min": 1.28,
+    "max": 1.28
+   },
+   "azimuth": {
+    "min": 0.148,
+    "max": 0.148
+   },
+   "box": {
+    "minX": 605.58,
+    "minY": 317.89,
+    "maxX": 621.96,
+    "maxY": 323.52
+   },
+   "rawLength": 19.017,
+   "processed": {
+    "points": 20,
+    "length": 17.538,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.284,
+    "meanDeviation": 0.073
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 61
+   }
+  },
+  {
+   "index": 154,
+   "sectionId": "lab",
+   "afterSeq": 7207,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 46,
+   "durationMs": 246,
+   "pressure": {
+    "min": 0,
+    "max": 0.195,
+    "mean": 0.123
+   },
+   "altitude": {
+    "min": 1.248,
+    "max": 1.248
+   },
+   "azimuth": {
+    "min": 0.271,
+    "max": 0.271
+   },
+   "box": {
+    "minX": 633.74,
+    "minY": 297.93,
+    "maxX": 643.46,
+    "maxY": 316.87
+   },
+   "rawLength": 44.593,
+   "processed": {
+    "points": 53,
+    "length": 40.8,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.413,
+    "meanDeviation": 0.109
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 114
+   }
+  },
+  {
+   "index": 155,
+   "sectionId": "lab",
+   "afterSeq": 7239,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 25,
+   "durationMs": 125,
+   "pressure": {
+    "min": 0,
+    "max": 0.24,
+    "mean": 0.149
+   },
+   "altitude": {
+    "min": 1.248,
+    "max": 1.248
+   },
+   "azimuth": {
+    "min": 0.283,
+    "max": 0.283
+   },
+   "box": {
+    "minX": 628.62,
+    "minY": 319.94,
+    "maxX": 647.56,
+    "maxY": 323.52
+   },
+   "rawLength": 23.165,
+   "processed": {
+    "points": 29,
+    "length": 21.695,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.455,
+    "meanDeviation": 0.12
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 67
+   }
+  },
+  {
+   "index": 156,
+   "sectionId": "lab",
+   "afterSeq": 7379,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 51,
+   "durationMs": 308,
+   "pressure": {
+    "min": 0,
+    "max": 0.215,
+    "mean": 0.124
+   },
+   "altitude": {
+    "min": 1.059,
+    "max": 1.059
+   },
+   "azimuth": {
+    "min": 0.357,
+    "max": 0.357
+   },
+   "box": {
+    "minX": 632.71,
+    "minY": 334.27,
+    "maxX": 645,
+    "maxY": 348.61
+   },
+   "rawLength": 37.071,
+   "processed": {
+    "points": 54,
+    "length": 31.393,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.372,
+    "meanDeviation": 0.105
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 108
+   }
+  },
+  {
+   "index": 157,
+   "sectionId": "lab",
+   "afterSeq": 7435,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 39,
+   "durationMs": 204,
+   "pressure": {
+    "min": 0,
+    "max": 0.179,
+    "mean": 0.119
+   },
+   "altitude": {
+    "min": 1.097,
+    "max": 1.097
+   },
+   "azimuth": {
+    "min": 0.317,
+    "max": 0.326
+   },
+   "box": {
+    "minX": 665.48,
+    "minY": 319.43,
+    "maxX": 681.86,
+    "maxY": 333.76
+   },
+   "rawLength": 38.569,
+   "processed": {
+    "points": 42,
+    "length": 35.955,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.201,
+    "meanDeviation": 0.07
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 84
+   }
+  },
+  {
+   "index": 158,
+   "sectionId": "lab",
+   "afterSeq": 7480,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 38,
+   "durationMs": 167,
+   "pressure": {
+    "min": 0,
+    "max": 0.214,
+    "mean": 0.14
+   },
+   "altitude": {
+    "min": 1.1,
+    "max": 1.1
+   },
+   "azimuth": {
+    "min": 0.317,
+    "max": 0.317
+   },
+   "box": {
+    "minX": 685.95,
+    "minY": 301.51,
+    "maxX": 696.7,
+    "maxY": 339.9
+   },
+   "rawLength": 52.306,
+   "processed": {
+    "points": 52,
+    "length": 49.257,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.345,
+    "meanDeviation": 0.066
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 128
+   }
+  },
+  {
+   "index": 159,
+   "sectionId": "lab",
+   "afterSeq": 7520,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 23,
+   "durationMs": 104,
+   "pressure": {
+    "min": 0,
+    "max": 0.145,
+    "mean": 0.084
+   },
+   "altitude": {
+    "min": 1.167,
+    "max": 1.167
+   },
+   "azimuth": {
+    "min": 0.245,
+    "max": 0.245
+   },
+   "box": {
+    "minX": 712.06,
+    "minY": 315.85,
+    "maxX": 725.88,
+    "maxY": 320.45
+   },
+   "rawLength": 19.434,
+   "processed": {
+    "points": 24,
+    "length": 17.079,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.414,
+    "meanDeviation": 0.106
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 88
+   }
+  },
+  {
+   "index": 160,
+   "sectionId": "lab",
+   "afterSeq": 7541,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 18,
+   "durationMs": 96,
+   "pressure": {
+    "min": 0,
+    "max": 0.169,
+    "mean": 0.095
+   },
+   "altitude": {
+    "min": 1.167,
+    "max": 1.167
+   },
+   "azimuth": {
+    "min": 0.245,
+    "max": 0.245
+   },
+   "box": {
+    "minX": 714.62,
+    "minY": 311.24,
+    "maxX": 721.79,
+    "maxY": 332.23
+   },
+   "rawLength": 31.256,
+   "processed": {
+    "points": 32,
+    "length": 29.89,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.343,
+    "meanDeviation": 0.065
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 73
+   }
+  },
+  {
+   "index": 161,
+   "sectionId": "lab",
+   "afterSeq": 7602,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 50,
+   "durationMs": 246,
+   "pressure": {
+    "min": 0,
+    "max": 0.172,
+    "mean": 0.106
+   },
+   "altitude": {
+    "min": 1.167,
+    "max": 1.167
+   },
+   "azimuth": {
+    "min": 0.245,
+    "max": 0.245
+   },
+   "box": {
+    "minX": 731,
+    "minY": 308.17,
+    "maxX": 739.7,
+    "maxY": 331.71
+   },
+   "rawLength": 43.157,
+   "processed": {
+    "points": 53,
+    "length": 40.945,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.506,
+    "meanDeviation": 0.114
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 90
+   }
+  },
+  {
+   "index": 162,
+   "sectionId": "lab",
+   "afterSeq": 7642,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 28,
+   "durationMs": 150,
+   "pressure": {
+    "min": 0,
+    "max": 0.219,
+    "mean": 0.134
+   },
+   "altitude": {
+    "min": 1.195,
+    "max": 1.195
+   },
+   "azimuth": {
+    "min": 0.224,
+    "max": 0.224
+   },
+   "box": {
+    "minX": 744.82,
+    "minY": 314.82,
+    "maxX": 758.64,
+    "maxY": 317.38
+   },
+   "rawLength": 19.496,
+   "processed": {
+    "points": 28,
+    "length": 16.794,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.402,
+    "meanDeviation": 0.118
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 89
+   }
+  },
+  {
+   "index": 163,
+   "sectionId": "lab",
+   "afterSeq": 7669,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 24,
+   "durationMs": 129,
+   "pressure": {
+    "min": 0,
+    "max": 0.176,
+    "mean": 0.123
+   },
+   "altitude": {
+    "min": 1.195,
+    "max": 1.195
+   },
+   "azimuth": {
+    "min": 0.224,
+    "max": 0.224
+   },
+   "box": {
+    "minX": 746.87,
+    "minY": 313.8,
+    "maxX": 756.08,
+    "maxY": 330.18
+   },
+   "rawLength": 28.338,
+   "processed": {
+    "points": 30,
+    "length": 26.002,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.181,
+    "meanDeviation": 0.068
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 100
+   }
+  },
+  {
+   "index": 164,
+   "sectionId": "lab",
+   "afterSeq": 7699,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 26,
+   "durationMs": 121,
+   "pressure": {
+    "min": 0,
+    "max": 0.249,
+    "mean": 0.163
+   },
+   "altitude": {
+    "min": 1.195,
+    "max": 1.195
+   },
+   "azimuth": {
+    "min": 0.223,
+    "max": 0.224
+   },
+   "box": {
+    "minX": 755.57,
+    "minY": 314.31,
+    "maxX": 764.79,
+    "maxY": 326.6
+   },
+   "rawLength": 23.596,
+   "processed": {
+    "points": 27,
+    "length": 22.055,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.315,
+    "meanDeviation": 0.109
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 67
+   }
+  },
+  {
+   "index": 165,
+   "sectionId": "lab",
+   "afterSeq": 7750,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 39,
+   "durationMs": 200,
+   "pressure": {
+    "min": 0,
+    "max": 0.209,
+    "mean": 0.148
+   },
+   "altitude": {
+    "min": 1.266,
+    "max": 1.266
+   },
+   "azimuth": {
+    "min": 0.173,
+    "max": 0.173
+   },
+   "box": {
+    "minX": 769.9,
+    "minY": 316.36,
+    "maxX": 786.29,
+    "maxY": 331.71
+   },
+   "rawLength": 39.264,
+   "processed": {
+    "points": 40,
+    "length": 36.39,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.256,
+    "meanDeviation": 0.071
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 110
+   }
+  },
+  {
+   "index": 166,
+   "sectionId": "lab",
+   "afterSeq": 7823,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 48,
+   "durationMs": 295,
+   "pressure": {
+    "min": 0,
+    "max": 0.202,
+    "mean": 0.133
+   },
+   "altitude": {
+    "min": 1.313,
+    "max": 1.313
+   },
+   "azimuth": {
+    "min": 0.154,
+    "max": 0.154
+   },
+   "box": {
+    "minX": 796.01,
+    "minY": 299.98,
+    "maxX": 803.18,
+    "maxY": 318.4
+   },
+   "rawLength": 33.132,
+   "processed": {
+    "points": 50,
+    "length": 28.634,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.488,
+    "meanDeviation": 0.175
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 77
+   }
+  },
+  {
+   "index": 167,
+   "sectionId": "lab",
+   "afterSeq": 7874,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 25,
+   "durationMs": 108,
+   "pressure": {
+    "min": 0,
+    "max": 0.21,
+    "mean": 0.131
+   },
+   "altitude": {
+    "min": 1.036,
+    "max": 1.036
+   },
+   "azimuth": {
+    "min": 0.411,
+    "max": 0.411
+   },
+   "box": {
+    "minX": 320.45,
+    "minY": 381.37,
+    "maxX": 339.9,
+    "maxY": 383.42
+   },
+   "rawLength": 23.111,
+   "processed": {
+    "points": 26,
+    "length": 20.843,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.252,
+    "meanDeviation": 0.093
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 90
+   }
+  },
+  {
+   "index": 168,
+   "sectionId": "lab",
+   "afterSeq": 7894,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 17,
+   "durationMs": 88,
+   "pressure": {
+    "min": 0,
+    "max": 0.141,
+    "mean": 0.09
+   },
+   "altitude": {
+    "min": 1.036,
+    "max": 1.036
+   },
+   "azimuth": {
+    "min": 0.39,
+    "max": 0.39
+   },
+   "box": {
+    "minX": 326.08,
+    "minY": 391.61,
+    "maxX": 345.02,
+    "maxY": 398.26
+   },
+   "rawLength": 23.316,
+   "processed": {
+    "points": 25,
+    "length": 22.203,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.345,
+    "meanDeviation": 0.069
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 67
+   }
+  },
+  {
+   "index": 169,
+   "sectionId": "lab",
+   "afterSeq": 7989,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 54,
+   "durationMs": 271,
+   "pressure": {
+    "min": 0,
+    "max": 0.143,
+    "mean": 0.089
+   },
+   "altitude": {
+    "min": 1.035,
+    "max": 1.053
+   },
+   "azimuth": {
+    "min": 0.287,
+    "max": 0.287
+   },
+   "box": {
+    "minX": 378.3,
+    "minY": 379.32,
+    "maxX": 388.54,
+    "maxY": 399.29
+   },
+   "rawLength": 40.88,
+   "processed": {
+    "points": 55,
+    "length": 36.796,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.453,
+    "meanDeviation": 0.168
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 85
+   }
+  },
+  {
+   "index": 170,
+   "sectionId": "lab",
+   "afterSeq": 8022,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 24,
+   "durationMs": 121,
+   "pressure": {
+    "min": 0,
+    "max": 0.227,
+    "mean": 0.118
+   },
+   "altitude": {
+    "min": 1.035,
+    "max": 1.035
+   },
+   "azimuth": {
+    "min": 0.287,
+    "max": 0.287
+   },
+   "box": {
+    "minX": 393.14,
+    "minY": 383.42,
+    "maxX": 410.55,
+    "maxY": 385.46
+   },
+   "rawLength": 22.704,
+   "processed": {
+    "points": 27,
+    "length": 20.528,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.413,
+    "meanDeviation": 0.083
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 92
+   }
+  },
+  {
+   "index": 171,
+   "sectionId": "lab",
+   "afterSeq": 8054,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 26,
+   "durationMs": 142,
+   "pressure": {
+    "min": 0,
+    "max": 0.203,
+    "mean": 0.123
+   },
+   "altitude": {
+    "min": 1.035,
+    "max": 1.035
+   },
+   "azimuth": {
+    "min": 0.287,
+    "max": 0.287
+   },
+   "box": {
+    "minX": 395.19,
+    "minY": 381.37,
+    "maxX": 404.4,
+    "maxY": 399.8
+   },
+   "rawLength": 26.509,
+   "processed": {
+    "points": 31,
+    "length": 23.853,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.298,
+    "meanDeviation": 0.08
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 95
+   }
+  },
+  {
+   "index": 172,
+   "sectionId": "lab",
+   "afterSeq": 8086,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 24,
+   "durationMs": 129,
+   "pressure": {
+    "min": 0,
+    "max": 0.19,
+    "mean": 0.138
+   },
+   "altitude": {
+    "min": 1.035,
+    "max": 1.035
+   },
+   "azimuth": {
+    "min": 0.287,
+    "max": 0.287
+   },
+   "box": {
+    "minX": 402.87,
+    "minY": 384.95,
+    "maxX": 414.13,
+    "maxY": 399.29
+   },
+   "rawLength": 28.183,
+   "processed": {
+    "points": 31,
+    "length": 26.231,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.375,
+    "meanDeviation": 0.098
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 96
+   }
+  },
+  {
+   "index": 173,
+   "sectionId": "lab",
+   "afterSeq": 8137,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 39,
+   "durationMs": 200,
+   "pressure": {
+    "min": 0,
+    "max": 0.203,
+    "mean": 0.135
+   },
+   "altitude": {
+    "min": 1.081,
+    "max": 1.081
+   },
+   "azimuth": {
+    "min": 0.278,
+    "max": 0.287
+   },
+   "box": {
+    "minX": 414.64,
+    "minY": 386.49,
+    "maxX": 425.9,
+    "maxY": 403.38
+   },
+   "rawLength": 38.677,
+   "processed": {
+    "points": 45,
+    "length": 35.614,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.209,
+    "meanDeviation": 0.077
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 111
+   }
+  },
+  {
+   "index": 174,
+   "sectionId": "lab",
+   "afterSeq": 8190,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 37,
+   "durationMs": 229,
+   "pressure": {
+    "min": 0,
+    "max": 0.239,
+    "mean": 0.131
+   },
+   "altitude": {
+    "min": 1.081,
+    "max": 1.112
+   },
+   "azimuth": {
+    "min": 0.278,
+    "max": 0.278
+   },
+   "box": {
+    "minX": 430,
+    "minY": 379.83,
+    "maxX": 437.68,
+    "maxY": 389.05
+   },
+   "rawLength": 26.244,
+   "processed": {
+    "points": 39,
+    "length": 23.265,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.513,
+    "meanDeviation": 0.174
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 71
+   }
+  },
+  {
+   "index": 175,
+   "sectionId": "lab",
+   "afterSeq": 8226,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 23,
+   "durationMs": 117,
+   "pressure": {
+    "min": 0,
+    "max": 0.08,
+    "mean": 0.034
+   },
+   "altitude": {
+    "min": 1.177,
+    "max": 1.177
+   },
+   "azimuth": {
+    "min": 0.21,
+    "max": 0.21
+   },
+   "box": {
+    "minX": 448.43,
+    "minY": 387.51,
+    "maxX": 462.25,
+    "maxY": 398.26
+   },
+   "rawLength": 22.875,
+   "processed": {
+    "points": 25,
+    "length": 21.759,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.448,
+    "meanDeviation": 0.118
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 65
+   }
+  },
+  {
+   "index": 176,
+   "sectionId": "lab",
+   "afterSeq": 8248,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 19,
+   "durationMs": 75,
+   "pressure": {
+    "min": 0,
+    "max": 0.135,
+    "mean": 0.072
+   },
+   "altitude": {
+    "min": 1.177,
+    "max": 1.177
+   },
+   "azimuth": {
+    "min": 0.21,
+    "max": 0.21
+   },
+   "box": {
+    "minX": 455.6,
+    "minY": 381.88,
+    "maxX": 459.69,
+    "maxY": 404.4
+   },
+   "rawLength": 25.547,
+   "processed": {
+    "points": 30,
+    "length": 24.119,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.33,
+    "meanDeviation": 0.071
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 94
+   }
+  },
+  {
+   "index": 177,
+   "sectionId": "lab",
+   "afterSeq": 8306,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 20,
+   "durationMs": 129,
+   "pressure": {
+    "min": 0,
+    "max": 0.187,
+    "mean": 0.13
+   },
+   "altitude": {
+    "min": 1.1,
+    "max": 1.1
+   },
+   "azimuth": {
+    "min": 0.312,
+    "max": 0.312
+   },
+   "box": {
+    "minX": 488.87,
+    "minY": 373.18,
+    "maxX": 490.92,
+    "maxY": 385.98
+   },
+   "rawLength": 17.23,
+   "processed": {
+    "points": 19,
+    "length": 13.379,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.175,
+    "meanDeviation": 0.033
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 84
+   }
+  },
+  {
+   "index": 178,
+   "sectionId": "lab",
+   "afterSeq": 8333,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 21,
+   "durationMs": 108,
+   "pressure": {
+    "min": 0,
+    "max": 0.148,
+    "mean": 0.098
+   },
+   "altitude": {
+    "min": 1.1,
+    "max": 1.1
+   },
+   "azimuth": {
+    "min": 0.312,
+    "max": 0.312
+   },
+   "box": {
+    "minX": 496.55,
+    "minY": 371.13,
+    "maxX": 498.6,
+    "maxY": 386.49
+   },
+   "rawLength": 18.858,
+   "processed": {
+    "points": 24,
+    "length": 17.402,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.337,
+    "meanDeviation": 0.033
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 88
+   }
+  },
+  {
+   "index": 179,
+   "sectionId": "lab",
+   "afterSeq": 8392,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 40,
+   "durationMs": 216,
+   "pressure": {
+    "min": 0,
+    "max": 0.152,
+    "mean": 0.101
+   },
+   "altitude": {
+    "min": 1.1,
+    "max": 1.1
+   },
+   "azimuth": {
+    "min": 0.312,
+    "max": 0.312
+   },
+   "box": {
+    "minX": 503.71,
+    "minY": 372.67,
+    "maxX": 510.37,
+    "maxY": 385.98
+   },
+   "rawLength": 25.662,
+   "processed": {
+    "points": 41,
+    "length": 21.626,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.445,
+    "meanDeviation": 0.169
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 70
+   }
+  },
+  {
+   "index": 180,
+   "sectionId": "lab",
+   "afterSeq": 8474,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 53,
+   "durationMs": 329,
+   "pressure": {
+    "min": 0,
+    "max": 0.154,
+    "mean": 0.112
+   },
+   "altitude": {
+    "min": 1.1,
+    "max": 1.1
+   },
+   "azimuth": {
+    "min": 0.311,
+    "max": 0.312
+   },
+   "box": {
+    "minX": 514.46,
+    "minY": 373.18,
+    "maxX": 523.17,
+    "maxY": 382.9
+   },
+   "rawLength": 32.696,
+   "processed": {
+    "points": 51,
+    "length": 28.142,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.526,
+    "meanDeviation": 0.151
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 78
+   }
+  },
+  {
+   "index": 181,
+   "sectionId": "lab",
+   "afterSeq": 8504,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 20,
+   "durationMs": 121,
+   "pressure": {
+    "min": 0,
+    "max": 0.207,
+    "mean": 0.143
+   },
+   "altitude": {
+    "min": 1.1,
+    "max": 1.1
+   },
+   "azimuth": {
+    "min": 0.311,
+    "max": 0.311
+   },
+   "box": {
+    "minX": 529.82,
+    "minY": 371.64,
+    "maxX": 537.5,
+    "maxY": 374.2
+   },
+   "rawLength": 10.15,
+   "processed": {
+    "points": 15,
+    "length": 8.154,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.247,
+    "meanDeviation": 0.07
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 52
+   }
+  },
+  {
+   "index": 182,
+   "sectionId": "lab",
+   "afterSeq": 8531,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 23,
+   "durationMs": 125,
+   "pressure": {
+    "min": 0,
+    "max": 0.176,
+    "mean": 0.114
+   },
+   "altitude": {
+    "min": 1.1,
+    "max": 1.1
+   },
+   "azimuth": {
+    "min": 0.31,
+    "max": 0.311
+   },
+   "box": {
+    "minX": 529.82,
+    "minY": 370.62,
+    "maxX": 535.96,
+    "maxY": 382.39
+   },
+   "rawLength": 19.725,
+   "processed": {
+    "points": 24,
+    "length": 16.629,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.199,
+    "meanDeviation": 0.071
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 89
+   }
+  },
+  {
+   "index": 183,
+   "sectionId": "lab",
+   "afterSeq": 8560,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 24,
+   "durationMs": 117,
+   "pressure": {
+    "min": 0,
+    "max": 0.188,
+    "mean": 0.133
+   },
+   "altitude": {
+    "min": 1.1,
+    "max": 1.1
+   },
+   "azimuth": {
+    "min": 0.291,
+    "max": 0.31
+   },
+   "box": {
+    "minX": 532.89,
+    "minY": 373.18,
+    "maxX": 540.06,
+    "maxY": 379.83
+   },
+   "rawLength": 14.286,
+   "processed": {
+    "points": 22,
+    "length": 13.054,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.393,
+    "meanDeviation": 0.132
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 58
+   }
+  },
+  {
+   "index": 184,
+   "sectionId": "lab",
+   "afterSeq": 8627,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 39,
+   "durationMs": 196,
+   "pressure": {
+    "min": 0,
+    "max": 0.303,
+    "mean": 0.164
+   },
+   "altitude": {
+    "min": 1.123,
+    "max": 1.123
+   },
+   "azimuth": {
+    "min": 0.321,
+    "max": 0.321
+   },
+   "box": {
+    "minX": 481.19,
+    "minY": 392.12,
+    "maxX": 531.36,
+    "maxY": 397.24
+   },
+   "rawLength": 55.981,
+   "processed": {
+    "points": 58,
+    "length": 52.939,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.482,
+    "meanDeviation": 0.069
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 107
+   }
+  },
+  {
+   "index": 185,
+   "sectionId": "lab",
+   "afterSeq": 8762,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 45,
+   "durationMs": 254,
+   "pressure": {
+    "min": 0,
+    "max": 0.235,
+    "mean": 0.136
+   },
+   "altitude": {
+    "min": 1.046,
+    "max": 1.06
+   },
+   "azimuth": {
+    "min": 0.226,
+    "max": 0.226
+   },
+   "box": {
+    "minX": 504.74,
+    "minY": 405.43,
+    "maxX": 522.65,
+    "maxY": 418.74
+   },
+   "rawLength": 42.183,
+   "processed": {
+    "points": 45,
+    "length": 37.937,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.412,
+    "meanDeviation": 0.111
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 111
+   }
+  },
+  {
+   "index": 186,
+   "sectionId": "lab",
+   "afterSeq": 8804,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 19,
+   "durationMs": 112,
+   "pressure": {
+    "min": 0,
+    "max": 0.147,
+    "mean": 0.098
+   },
+   "altitude": {
+    "min": 1.209,
+    "max": 1.209
+   },
+   "azimuth": {
+    "min": 0.115,
+    "max": 0.135
+   },
+   "box": {
+    "minX": 556.44,
+    "minY": 392.63,
+    "maxX": 572.82,
+    "maxY": 398.26
+   },
+   "rawLength": 18.846,
+   "processed": {
+    "points": 20,
+    "length": 17.535,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.157,
+    "meanDeviation": 0.062
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 61
+   }
+  },
+  {
+   "index": 187,
+   "sectionId": "lab",
+   "afterSeq": 8846,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 34,
+   "durationMs": 179,
+   "pressure": {
+    "min": 0,
+    "max": 0.156,
+    "mean": 0.106
+   },
+   "altitude": {
+    "min": 1.154,
+    "max": 1.154
+   },
+   "azimuth": {
+    "min": 0.135,
+    "max": 0.135
+   },
+   "box": {
+    "minX": 582.04,
+    "minY": 383.42,
+    "maxX": 588.69,
+    "maxY": 395.19
+   },
+   "rawLength": 23.801,
+   "processed": {
+    "points": 35,
+    "length": 21.871,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.353,
+    "meanDeviation": 0.124
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 68
+   }
+  },
+  {
+   "index": 188,
+   "sectionId": "lab",
+   "afterSeq": 8871,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 24,
+   "durationMs": 104,
+   "pressure": {
+    "min": 0,
+    "max": 0.204,
+    "mean": 0.123
+   },
+   "altitude": {
+    "min": 1.154,
+    "max": 1.154
+   },
+   "azimuth": {
+    "min": 0.135,
+    "max": 0.135
+   },
+   "box": {
+    "minX": 582.04,
+    "minY": 386.49,
+    "maxX": 589.2,
+    "maxY": 403.38
+   },
+   "rawLength": 20.13,
+   "processed": {
+    "points": 24,
+    "length": 18.867,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.271,
+    "meanDeviation": 0.082
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 62
+   }
+  },
+  {
+   "index": 189,
+   "sectionId": "lab",
+   "afterSeq": 8899,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 24,
+   "durationMs": 109,
+   "pressure": {
+    "min": 0,
+    "max": 0.214,
+    "mean": 0.139
+   },
+   "altitude": {
+    "min": 1.154,
+    "max": 1.154
+   },
+   "azimuth": {
+    "min": 0.135,
+    "max": 0.135
+   },
+   "box": {
+    "minX": 574.87,
+    "minY": 402.36,
+    "maxX": 587.67,
+    "maxY": 405.43
+   },
+   "rawLength": 20.098,
+   "processed": {
+    "points": 24,
+    "length": 17.649,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.579,
+    "meanDeviation": 0.15
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 87
+   }
+  },
+  {
+   "index": 190,
+   "sectionId": "lab",
+   "afterSeq": 8974,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 55,
+   "durationMs": 316,
+   "pressure": {
+    "min": 0,
+    "max": 0.255,
+    "mean": 0.12
+   },
+   "altitude": {
+    "min": 1.154,
+    "max": 1.154
+   },
+   "azimuth": {
+    "min": 0.135,
+    "max": 0.135
+   },
+   "box": {
+    "minX": 583.06,
+    "minY": 409.01,
+    "maxX": 590.74,
+    "maxY": 431.54
+   },
+   "rawLength": 41.291,
+   "processed": {
+    "points": 57,
+    "length": 35.085,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.5,
+    "meanDeviation": 0.17
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 85
+   }
+  },
+  {
+   "index": 191,
+   "sectionId": "lab",
+   "afterSeq": 9017,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 25,
+   "durationMs": 134,
+   "pressure": {
+    "min": 0,
+    "max": 0.185,
+    "mean": 0.122
+   },
+   "altitude": {
+    "min": 1.239,
+    "max": 1.239
+   },
+   "azimuth": {
+    "min": 0.106,
+    "max": 0.106
+   },
+   "box": {
+    "minX": 603.54,
+    "minY": 398.77,
+    "maxX": 618.38,
+    "maxY": 401.85
+   },
+   "rawLength": 23.675,
+   "processed": {
+    "points": 28,
+    "length": 20.806,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.376,
+    "meanDeviation": 0.096
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 69
+   }
+  },
+  {
+   "index": 192,
+   "sectionId": "lab",
+   "afterSeq": 9046,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 23,
+   "durationMs": 121,
+   "pressure": {
+    "min": 0,
+    "max": 0.185,
+    "mean": 0.106
+   },
+   "altitude": {
+    "min": 1.228,
+    "max": 1.233
+   },
+   "azimuth": {
+    "min": 0.106,
+    "max": 0.108
+   },
+   "box": {
+    "minX": 607.63,
+    "minY": 396.73,
+    "maxX": 614.29,
+    "maxY": 409.52
+   },
+   "rawLength": 23.091,
+   "processed": {
+    "points": 27,
+    "length": 20.554,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.188,
+    "meanDeviation": 0.058
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 90
+   }
+  },
+  {
+   "index": 193,
+   "sectionId": "lab",
+   "afterSeq": 9073,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 21,
+   "durationMs": 117,
+   "pressure": {
+    "min": 0,
+    "max": 0.213,
+    "mean": 0.137
+   },
+   "altitude": {
+    "min": 1.228,
+    "max": 1.228
+   },
+   "azimuth": {
+    "min": 0.106,
+    "max": 0.106
+   },
+   "box": {
+    "minX": 614.8,
+    "minY": 398.26,
+    "maxX": 625.04,
+    "maxY": 407.99
+   },
+   "rawLength": 21.033,
+   "processed": {
+    "points": 21,
+    "length": 19.661,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.347,
+    "meanDeviation": 0.112
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 64
+   }
+  },
+  {
+   "index": 194,
+   "sectionId": "lab",
+   "afterSeq": 9122,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 33,
+   "durationMs": 213,
+   "pressure": {
+    "min": 0,
+    "max": 0.183,
+    "mean": 0.131
+   },
+   "altitude": {
+    "min": 1.228,
+    "max": 1.228
+   },
+   "azimuth": {
+    "min": 0.101,
+    "max": 0.101
+   },
+   "box": {
+    "minX": 627.6,
+    "minY": 397.24,
+    "maxX": 637.32,
+    "maxY": 410.55
+   },
+   "rawLength": 30.699,
+   "processed": {
+    "points": 35,
+    "length": 26.992,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.207,
+    "meanDeviation": 0.08
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 100
+   }
+  },
+  {
+   "index": 195,
+   "sectionId": "lab",
+   "afterSeq": 9175,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 36,
+   "durationMs": 238,
+   "pressure": {
+    "min": 0,
+    "max": 0.249,
+    "mean": 0.155
+   },
+   "altitude": {
+    "min": 1.228,
+    "max": 1.228
+   },
+   "azimuth": {
+    "min": 0.101,
+    "max": 0.101
+   },
+   "box": {
+    "minX": 638.35,
+    "minY": 391.1,
+    "maxX": 647.56,
+    "maxY": 400.31
+   },
+   "rawLength": 24.602,
+   "processed": {
+    "points": 36,
+    "length": 21.13,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.33,
+    "meanDeviation": 0.129
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 67
+   }
+  },
+  {
+   "index": 196,
+   "sectionId": "lab",
+   "afterSeq": 9208,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 19,
+   "durationMs": 96,
+   "pressure": {
+    "min": 0,
+    "max": 0.214,
+    "mean": 0.141
+   },
+   "altitude": {
+    "min": 1.271,
+    "max": 1.271
+   },
+   "azimuth": {
+    "min": 0.047,
+    "max": 0.047
+   },
+   "box": {
+    "minX": 658.31,
+    "minY": 402.36,
+    "maxX": 665.99,
+    "maxY": 404.92
+   },
+   "rawLength": 11.177,
+   "processed": {
+    "points": 15,
+    "length": 8.937,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.266,
+    "meanDeviation": 0.099
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 52
+   }
+  },
+  {
+   "index": 197,
+   "sectionId": "lab",
+   "afterSeq": 9230,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 14,
+   "durationMs": 88,
+   "pressure": {
+    "min": 0,
+    "max": 0.258,
+    "mean": 0.164
+   },
+   "altitude": {
+    "min": 1.271,
+    "max": 1.271
+   },
+   "azimuth": {
+    "min": 0.047,
+    "max": 0.047
+   },
+   "box": {
+    "minX": 658.31,
+    "minY": 403.89,
+    "maxX": 674.18,
+    "maxY": 409.52
+   },
+   "rawLength": 18.961,
+   "processed": {
+    "points": 19,
+    "length": 18.115,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.34,
+    "meanDeviation": 0.06
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 62
+   }
+  },
+  {
+   "index": 198,
+   "sectionId": "lab",
+   "afterSeq": 9302,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 42,
+   "durationMs": 196,
+   "pressure": {
+    "min": 0,
+    "max": 0.17,
+    "mean": 0.091
+   },
+   "altitude": {
+    "min": 1.217,
+    "max": 1.223
+   },
+   "azimuth": {
+    "min": 0.207,
+    "max": 0.207
+   },
+   "box": {
+    "minX": 697.73,
+    "minY": 381.37,
+    "maxX": 706.94,
+    "maxY": 398.26
+   },
+   "rawLength": 30.975,
+   "processed": {
+    "points": 42,
+    "length": 28.027,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.474,
+    "meanDeviation": 0.175
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 75
+   }
+  },
+  {
+   "index": 199,
+   "sectionId": "lab",
+   "afterSeq": 9334,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 24,
+   "durationMs": 116,
+   "pressure": {
+    "min": 0,
+    "max": 0.242,
+    "mean": 0.146
+   },
+   "altitude": {
+    "min": 1.19,
+    "max": 1.19
+   },
+   "azimuth": {
+    "min": 0.207,
+    "max": 0.207
+   },
+   "box": {
+    "minX": 689.02,
+    "minY": 395.7,
+    "maxX": 714.11,
+    "maxY": 401.33
+   },
+   "rawLength": 33.138,
+   "processed": {
+    "points": 35,
+    "length": 31.184,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.409,
+    "meanDeviation": 0.082
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 74
+   }
+  },
+  {
+   "index": 200,
+   "sectionId": "lab",
+   "afterSeq": 9407,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 47,
+   "durationMs": 292,
+   "pressure": {
+    "min": 0,
+    "max": 0.199,
+    "mean": 0.129
+   },
+   "altitude": {
+    "min": 1.19,
+    "max": 1.19
+   },
+   "azimuth": {
+    "min": 0.207,
+    "max": 0.207
+   },
+   "box": {
+    "minX": 698.24,
+    "minY": 407.99,
+    "maxX": 707.96,
+    "maxY": 419.76
+   },
+   "rawLength": 30.608,
+   "processed": {
+    "points": 47,
+    "length": 22.84,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.486,
+    "meanDeviation": 0.153
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 71
+   }
+  },
+  {
+   "index": 201,
+   "sectionId": "lab",
+   "afterSeq": 9438,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 19,
+   "durationMs": 125,
+   "pressure": {
+    "min": 0,
+    "max": 0.227,
+    "mean": 0.157
+   },
+   "altitude": {
+    "min": 1.19,
+    "max": 1.19
+   },
+   "azimuth": {
+    "min": 0.207,
+    "max": 0.207
+   },
+   "box": {
+    "minX": 725.88,
+    "minY": 392.12,
+    "maxX": 735.61,
+    "maxY": 395.19
+   },
+   "rawLength": 13.734,
+   "processed": {
+    "points": 17,
+    "length": 10.412,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.502,
+    "meanDeviation": 0.077
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 79
+   }
+  },
+  {
+   "index": 202,
+   "sectionId": "lab",
+   "afterSeq": 9468,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 25,
+   "durationMs": 137,
+   "pressure": {
+    "min": 0,
+    "max": 0.226,
+    "mean": 0.13
+   },
+   "altitude": {
+    "min": 1.19,
+    "max": 1.19
+   },
+   "azimuth": {
+    "min": 0.151,
+    "max": 0.193
+   },
+   "box": {
+    "minX": 726.39,
+    "minY": 393.14,
+    "maxX": 732.02,
+    "maxY": 403.89
+   },
+   "rawLength": 23.043,
+   "processed": {
+    "points": 29,
+    "length": 20.331,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.352,
+    "meanDeviation": 0.089
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 68
+   }
+  },
+  {
+   "index": 203,
+   "sectionId": "lab",
+   "afterSeq": 9496,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 22,
+   "durationMs": 129,
+   "pressure": {
+    "min": 0,
+    "max": 0.245,
+    "mean": 0.165
+   },
+   "altitude": {
+    "min": 1.19,
+    "max": 1.19
+   },
+   "azimuth": {
+    "min": 0.143,
+    "max": 0.151
+   },
+   "box": {
+    "minX": 732.02,
+    "minY": 393.14,
+    "maxX": 738.68,
+    "maxY": 401.33
+   },
+   "rawLength": 15.827,
+   "processed": {
+    "points": 21,
+    "length": 13.407,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.305,
+    "meanDeviation": 0.103
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 57
+   }
+  },
+  {
+   "index": 204,
+   "sectionId": "lab",
+   "afterSeq": 9546,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 38,
+   "durationMs": 191,
+   "pressure": {
+    "min": 0,
+    "max": 0.216,
+    "mean": 0.16
+   },
+   "altitude": {
+    "min": 1.19,
+    "max": 1.193
+   },
+   "azimuth": {
+    "min": 0.057,
+    "max": 0.057
+   },
+   "box": {
+    "minX": 742.26,
+    "minY": 391.61,
+    "maxX": 751.99,
+    "maxY": 406.96
+   },
+   "rawLength": 32.998,
+   "processed": {
+    "points": 37,
+    "length": 29.718,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.25,
+    "meanDeviation": 0.097
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 105
+   }
+  },
+  {
+   "index": 205,
+   "sectionId": "lab",
+   "afterSeq": 9601,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 40,
+   "durationMs": 229,
+   "pressure": {
+    "min": 0,
+    "max": 0.241,
+    "mean": 0.144
+   },
+   "altitude": {
+    "min": 1.216,
+    "max": 1.216
+   },
+   "azimuth": {
+    "min": 0.057,
+    "max": 0.057
+   },
+   "box": {
+    "minX": 753.01,
+    "minY": 386.49,
+    "maxX": 763.76,
+    "maxY": 396.21
+   },
+   "rawLength": 26.374,
+   "processed": {
+    "points": 40,
+    "length": 21.982,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.295,
+    "meanDeviation": 0.114
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 96
+   }
+  },
+  {
+   "index": 206,
+   "sectionId": "lab",
+   "afterSeq": 9634,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 23,
+   "durationMs": 121,
+   "pressure": {
+    "min": 0,
+    "max": 0.233,
+    "mean": 0.126
+   },
+   "altitude": {
+    "min": 1.289,
+    "max": 1.289
+   },
+   "azimuth": {
+    "min": -0.034,
+    "max": -0.034
+   },
+   "box": {
+    "minX": 769.39,
+    "minY": 395.7,
+    "maxX": 780.65,
+    "maxY": 399.8
+   },
+   "rawLength": 16.048,
+   "processed": {
+    "points": 21,
+    "length": 14.081,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.225,
+    "meanDeviation": 0.085
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 59
+   }
+  },
+  {
+   "index": 207,
+   "sectionId": "lab",
+   "afterSeq": 9656,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 19,
+   "durationMs": 83,
+   "pressure": {
+    "min": 0,
+    "max": 0.27,
+    "mean": 0.171
+   },
+   "altitude": {
+    "min": 1.289,
+    "max": 1.289
+   },
+   "azimuth": {
+    "min": -0.034,
+    "max": -0.034
+   },
+   "box": {
+    "minX": 775.02,
+    "minY": 389.56,
+    "maxX": 777.58,
+    "maxY": 407.48
+   },
+   "rawLength": 20.934,
+   "processed": {
+    "points": 25,
+    "length": 19.139,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.325,
+    "meanDeviation": 0.062
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 90
+   }
+  },
+  {
+   "index": 208,
+   "sectionId": "lab",
+   "afterSeq": 9710,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 23,
+   "durationMs": 125,
+   "pressure": {
+    "min": 0,
+    "max": 0.203,
+    "mean": 0.125
+   },
+   "altitude": {
+    "min": 1.266,
+    "max": 1.279
+   },
+   "azimuth": {
+    "min": 0.17,
+    "max": 0.17
+   },
+   "box": {
+    "minX": 811.37,
+    "minY": 374.71,
+    "maxX": 813.93,
+    "maxY": 391.1
+   },
+   "rawLength": 21.824,
+   "processed": {
+    "points": 27,
+    "length": 18.757,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.537,
+    "meanDeviation": 0.122
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 89
+   }
+  },
+  {
+   "index": 209,
+   "sectionId": "lab",
+   "afterSeq": 9736,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 16,
+   "durationMs": 117,
+   "pressure": {
+    "min": 0,
+    "max": 0.216,
+    "mean": 0.149
+   },
+   "altitude": {
+    "min": 1.266,
+    "max": 1.266
+   },
+   "azimuth": {
+    "min": 0.17,
+    "max": 0.17
+   },
+   "box": {
+    "minX": 819.56,
+    "minY": 377.27,
+    "maxX": 821.1,
+    "maxY": 388.54
+   },
+   "rawLength": 12.929,
+   "processed": {
+    "points": 16,
+    "length": 12.238,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.343,
+    "meanDeviation": 0.068
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 56
+   }
+  },
+  {
+   "index": 210,
+   "sectionId": "lab",
+   "afterSeq": 9786,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 34,
+   "durationMs": 208,
+   "pressure": {
+    "min": 0,
+    "max": 0.161,
+    "mean": 0.091
+   },
+   "altitude": {
+    "min": 1.266,
+    "max": 1.266
+   },
+   "azimuth": {
+    "min": 0.17,
+    "max": 0.17
+   },
+   "box": {
+    "minX": 829.29,
+    "minY": 377.27,
+    "maxX": 835.43,
+    "maxY": 390.07
+   },
+   "rawLength": 21.771,
+   "processed": {
+    "points": 33,
+    "length": 17.693,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.3,
+    "meanDeviation": 0.131
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 89
+   }
+  },
+  {
+   "index": 211,
+   "sectionId": "lab",
+   "afterSeq": 9885,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 55,
+   "durationMs": 479,
+   "pressure": {
+    "min": 0,
+    "max": 0.274,
+    "mean": 0.16
+   },
+   "altitude": {
+    "min": 1.266,
+    "max": 1.266
+   },
+   "azimuth": {
+    "min": 0.152,
+    "max": 0.156
+   },
+   "box": {
+    "minX": 837.99,
+    "minY": 376.25,
+    "maxX": 849.76,
+    "maxY": 387
+   },
+   "rawLength": 32.953,
+   "processed": {
+    "points": 52,
+    "length": 25.713,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.477,
+    "meanDeviation": 0.141
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 77
+   }
+  },
+  {
+   "index": 212,
+   "sectionId": "lab",
+   "afterSeq": 9929,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 22,
+   "durationMs": 158,
+   "pressure": {
+    "min": 0,
+    "max": 0.25,
+    "mean": 0.171
+   },
+   "altitude": {
+    "min": 1.272,
+    "max": 1.272
+   },
+   "azimuth": {
+    "min": 0.028,
+    "max": 0.028
+   },
+   "box": {
+    "minX": 853.35,
+    "minY": 376.25,
+    "maxX": 862.05,
+    "maxY": 377.79
+   },
+   "rawLength": 12.093,
+   "processed": {
+    "points": 19,
+    "length": 8.719,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.294,
+    "meanDeviation": 0.051
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 78
+   }
+  },
+  {
+   "index": 213,
+   "sectionId": "lab",
+   "afterSeq": 9959,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 25,
+   "durationMs": 129,
+   "pressure": {
+    "min": 0,
+    "max": 0.213,
+    "mean": 0.132
+   },
+   "altitude": {
+    "min": 1.272,
+    "max": 1.272
+   },
+   "azimuth": {
+    "min": 0.028,
+    "max": 0.028
+   },
+   "box": {
+    "minX": 852.83,
+    "minY": 375.74,
+    "maxX": 860.51,
+    "maxY": 388.02
+   },
+   "rawLength": 20.12,
+   "processed": {
+    "points": 25,
+    "length": 17.205,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.206,
+    "meanDeviation": 0.052
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 90
+   }
+  },
+  {
+   "index": 214,
+   "sectionId": "lab",
+   "afterSeq": 9986,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 25,
+   "durationMs": 113,
+   "pressure": {
+    "min": 0,
+    "max": 0.242,
+    "mean": 0.157
+   },
+   "altitude": {
+    "min": 1.272,
+    "max": 1.272
+   },
+   "azimuth": {
+    "min": 0.005,
+    "max": 0.028
+   },
+   "box": {
+    "minX": 856.42,
+    "minY": 379.32,
+    "maxX": 864.1,
+    "maxY": 385.98
+   },
+   "rawLength": 15.435,
+   "processed": {
+    "points": 24,
+    "length": 13.761,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.301,
+    "meanDeviation": 0.121
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 60
+   }
+  },
+  {
+   "index": 215,
+   "sectionId": "lab",
+   "afterSeq": 10037,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 37,
+   "durationMs": 179,
+   "pressure": {
+    "min": 0,
+    "max": 0.291,
+    "mean": 0.145
+   },
+   "altitude": {
+    "min": 1.281,
+    "max": 1.281
+   },
+   "azimuth": {
+    "min": -0.027,
+    "max": -0.027
+   },
+   "box": {
+    "minX": 814.95,
+    "minY": 399.29,
+    "maxX": 855.9,
+    "maxY": 406.96
+   },
+   "rawLength": 50.876,
+   "processed": {
+    "points": 54,
+    "length": 48.629,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.346,
+    "meanDeviation": 0.062
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 100
+   }
+  },
+  {
+   "index": 216,
+   "sectionId": "lab",
+   "afterSeq": 10104,
+   "tool": "pen",
+   "input": "pen",
+   "color": "#111827",
+   "size": 2.2,
+   "points": 37,
+   "durationMs": 204,
+   "pressure": {
+    "min": 0,
+    "max": 0.255,
+    "mean": 0.141
+   },
+   "altitude": {
+    "min": 1.281,
+    "max": 1.281
+   },
+   "azimuth": {
+    "min": 0.036,
+    "max": 0.036
+   },
+   "box": {
+    "minX": 827.24,
+    "minY": 414.13,
+    "maxX": 848.23,
+    "maxY": 423.86
+   },
+   "rawLength": 35.314,
+   "processed": {
+    "points": 42,
+    "length": 32.583,
+    "startGap": 0,
+    "endGap": 0,
+    "maxDeviation": 0.181,
+    "meanDeviation": 0.073
+   },
+   "outline": {
+    "kind": "outline",
+    "points": 108
+   }
+  }
+ ],
+ "discarded": {
+  "count": 0,
+  "points": []
+ },
+ "totals": {
+  "strokes": 217,
+  "points": 6895,
+  "processedPoints": 7844,
+  "outlinePoints": 18034,
+  "rawLength": 6627.509,
+  "processedLength": 5974.636
+ },
+ "fingerprint": "9a33fdcd",
+ "outlineFingerprint": "f8798962",
+ "capture": {
+  "matches": true,
+  "differences": []
+ }
+}

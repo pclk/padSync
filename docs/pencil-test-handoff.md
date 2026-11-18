@@ -14,7 +14,7 @@ been tested on an iPad or with an Apple Pencil.** Every recording checked in is 
 | Harness | `src/ink/replay-harness.ts` | `runReplay(rec, opts)` → `ReplayReport` (below). `replayStrokes`, `baselineOf`, `compareBaselines`. Options: `tool`, `pen` (pen parameter overrides to try a writing change), `useCoalesced`, `usePredicted`, `includeSvg`. |
 | Pencil lab | `/pencil-lab` (`src/components/PencilLab.tsx`), linked from Settings → Notebook | Record, Save file, Load file, Replay (0.25×/1×/4×, pause/resume), Replay at once, Clear, and the headless report with Copy JSON. Uses the notebook's saved pen settings (read only). Nothing is written to a notebook. |
 | Synthetic generator | `tests/helpers/synthetic-pencil.ts`, specs in `tests/helpers/pencil-fixtures.ts` | Generates Pencil-like input (240 Hz samples coalesced into 60 Hz moves, 2 predicted samples per move, pressure ramps, tilt drift) and captures it through the real controller and `PencilRecorder`. Output is marked `source: "synthetic"` and labelled `SYNTHETIC: …`. |
-| Fixtures | `tests/fixtures/pencil/*.pencil.json` and `baselines/*.baseline.json` | `synthetic-words`, `synthetic-zoomed-two-sections`, `synthetic-edge-cases` (cancel, lost capture with a late up, a finger, a bounce, a slow stroke with tilt changes, a mouse stroke, a stroke still open at stop). Real: `ipad-handwriting-2026-11-18`, 66 pen strokes on the iPad lab at 98% zoom, the sentence "Both pages now ignore scrolling for Pencil touches on the writing area" (light pressure, peak 0.19–0.35). |
+| Fixtures | `tests/fixtures/pencil/*.pencil.json` and `baselines/*.baseline.json` | `synthetic-words`, `synthetic-zoomed-two-sections`, `synthetic-edge-cases` (cancel, lost capture with a late up, a finger, a bounce, a slow stroke with tilt changes, a mouse stroke, a stroke still open at stop). Real: `ipad-handwriting-2026-11-18`, 66 pen strokes on the iPad lab at 98% zoom, the sentence "Both pages now ignore scrolling for Pencil touches on the writing area" (light pressure, peak 0.19–0.35); `ipad-math-2026-11-18`, 217 strokes of maths working (colons, exponents, fractions). |
 | Tests | `tests/pencil-replay.test.ts`, `tests/pencil-regression.test.ts`, `tests/pencil-fixtures.test.ts` | `npm run test:pencil` (31 tests; they also run in `npm test`). |
 
 ## The report (what you can measure)
@@ -84,6 +84,12 @@ baselines in the same commit and say why. To compare options without editing cod
 - Replay matches capture exactly; no stroke was discarded; drawn centre lines stay within ~1 unit
   of the pen (mean 0.19) and no stroke end is cut (`startGap`/`endGap` 0).
 - Coalesced samples arrive at ~4 ms (240 Hz); about 1.7 coalesced samples per dispatched move.
+- Maths recording: all colon dots become round dots, with their lift-off slides hidden. Two
+  i-dots ("info", the second in "minimize") draw as 9-unit ticks: a landing drag at pressure
+  0.08, a 4-unit firm tick and a 4.6-unit fading lift-off slide. At thinning 0.3 a light writer's
+  whole pressure range (0.08–0.2) gives almost the same width (0.37–0.41 × size), so the drags
+  draw at full weight. Pressure relative to each stroke's own level thins them only a little,
+  because smoothPressure's 20 ms average and 0.03 step limit hold the pressure up through a quick fade.
 
 ## Limitations and open questions
 
