@@ -9,10 +9,11 @@ describe("pdfDensity", () => {
     expect(pdfDensity(0.4, 2)).toBe(1);
     expect(pdfDensity(0.5, 2)).toBe(1);
   });
-  it("uses three quarters between 50% and 75%", () => {
-    expect(pdfDensity(0.6, 2)).toBe(1.5);
+  it("follows the zoom in quarter steps between 50% and 100%", () => {
+    expect(pdfDensity(0.6, 2)).toBe(1.25);
+    expect(pdfDensity(0.8, 2)).toBe(1.75);
   });
-  it("is the full screen density from 75% up", () => {
+  it("is the full screen density from 100% up", () => {
     expect(pdfDensity(1, 2)).toBe(2);
     expect(pdfDensity(3, 2)).toBe(2);
   });

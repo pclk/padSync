@@ -3,12 +3,13 @@ import { useEffect, useRef, useState } from 'react';
 import { pdfRaster } from '@/lib/pdf';
 import type { PdfPage } from '@/lib/pdf-meta';
 /**
- * Device pixels per page pixel for the raster: zoomed out, a page shows at a fraction of its size,
- * and a full-density decode (~39 MB a page on an iPad) for each of the many pages in view runs
- * Safari out of memory. Three tiers, so a pinch re-renders a page at most when it crosses one.
+ * Device pixels per page pixel for the raster: what the zoom shows on screen, rounded up to a
+ * quarter step (rasterScale's steps), between half and full screen density. Zoomed out, a
+ * full-density decode (~30-39 MB a page on an iPad) for each of the pages in view runs Safari out
+ * of memory; at 80% a page needs 1.75x, not 2x.
  */
 export function pdfDensity(zoom: number, dpr: number) {
-  return dpr * (zoom <= 0.5 ? 0.5 : zoom <= 0.75 ? 0.75 : 1);
+  return Math.min(dpr, Math.max(dpr / 2, Math.ceil(dpr * zoom * 4) / 4));
 }
 export function PdfBackground({ page, zoom }: { page: PdfPage; zoom: number }) {
   const ref = useRef<HTMLDivElement>(null);

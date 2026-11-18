@@ -307,8 +307,9 @@ const InkTile = memo(function InkTile({ top, height, strokes, zoom, hidden, cont
       painted.current = null;
       return;
     }
-    // In half steps, so most zoom changes keep the bitmaps instead of reallocating every tile.
-    const scale = Math.min(Math.ceil((window.devicePixelRatio || 1) * zoom * 2) / 2, MAX_SCALE);
+    // In quarter steps: close to what the zoom shows (half steps drew 80% zoom at 2.0x for 1.6x,
+    // 56% more pixels), while small zoom changes still keep the bitmaps.
+    const scale = Math.min(Math.ceil((window.devicePixelRatio || 1) * zoom * 4) / 4, MAX_SCALE);
     const paint = () => {
       const paintStarted = debugNow();
       const w = Math.round(PAGE_WIDTH * scale);

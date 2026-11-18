@@ -78,6 +78,9 @@ export class InkController {
   private hover: { sec: SectionHandle; x: number; y: number } | null = null;
   private pending = new Map<string, Pending>();
   private frame = 0;
+  // The overlay is a full-window bitmap (22-29 MB); it only has one while something is on it.
+  private liveSized = false;
+  private liveRelease: ReturnType<typeof setTimeout> | null = null;
   private cb: ControllerCallbacks;
 
   constructor(notebookId: string, tool: ToolState, cb: ControllerCallbacks) {
@@ -98,6 +101,9 @@ export class InkController {
       this.live.width = 0;
       this.live.height = 0;
     }
+    if (this.liveRelease) clearTimeout(this.liveRelease);
+    this.liveRelease = null;
+    this.liveSized = false;
     if (!canvas) {
       // The editor is going away mid-stroke: keep what was drawn (sections end it too, but their
       // cleanup runs after this ref is detached and would find the gesture already cleared).
@@ -124,9 +130,32 @@ export class InkController {
     // jumps when the tile paints it.
     this.live.style.width = `${w}px`;
     this.live.style.height = `${h}px`;
-    this.live.width = Math.round(w * dpr);
-    this.live.height = Math.round(h * dpr);
+    if (this.liveSized) {
+      this.live.width = Math.round(w * dpr);
+      this.live.height = Math.round(h * dpr);
+    }
     this.requestFrame();
+  }
+
+  /** Gives the overlay its bitmap: first Pencil hover, press or pending stroke after a quiet spell. */
+  private wakeLive() {
+    if (this.liveRelease) clearTimeout(this.liveRelease);
+    this.liveRelease = null;
+    if (this.liveSized || !this.live) return;
+    this.liveSized = true;
+    this.resizeLive();
+  }
+
+  /** Frees the overlay's bitmap once nothing has been on it for a while. */
+  private releaseLiveLater() {
+    if (!this.liveSized || this.liveRelease) return;
+    this.liveRelease = setTimeout(() => {
+      this.liveRelease = null;
+      if (this.gesture || this.pending.size || this.hover || !this.live) return;
+      this.liveSized = false;
+      this.live.width = 0;
+      this.live.height = 0;
+    }, 20_000);
   }
 
   setSelection(s: Selection | null) {
@@ -448,6 +477,8 @@ export class InkController {
     const ctx = this.ctx;
     const canvas = this.live;
     if (!ctx || !canvas) return;
+    if (this.gesture || this.pending.size || this.hover) this.wakeLive();
+    else this.releaseLiveLater();
     const dpr = window.devicePixelRatio || 1;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);

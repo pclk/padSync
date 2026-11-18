@@ -48,6 +48,7 @@ let started = false;
 let dueAt = Infinity;
 let scheduledReason = "none";
 let failures = 0;
+let localFailures = 0;
 let retryAt = 0;
 let configCheckedAt = -Infinity;
 let configLoading = false;
@@ -169,6 +170,14 @@ export function startSync() {
   });
   requestSync(0);
 }
+// Safari's IndexedDB throws these now and then (UnknownError when its storage process hiccups) and
+// they clear on the next try. Backing off as for a network outage cost 30 s of not syncing.
+const LOCAL_ERRORS = new Set(["UnknownError", "AbortError", "InvalidStateError", "DatabaseClosedError", "TransactionInactiveError", "OpenFailedError"]);
+const LOCAL_RETRIES = 3;
+export function isLocalStorageError(error: unknown) {
+  const e = error as { name?: string; inner?: { name?: string } } | null;
+  return !!e && (LOCAL_ERRORS.has(e.name ?? "") || LOCAL_ERRORS.has(e.inner?.name ?? ""));
+}
 async function runSync(context = { trigger: "manual", queueMs: 0, timerLateMs: 0 }) {
   if (Date.now() < retryAt) { schedule(retryAt - Date.now()); return; }
   // Encoding a push and applying a pull compete with Pencil input; wait for the stroke to end
@@ -189,18 +198,28 @@ async function runSync(context = { trigger: "manual", queueMs: 0, timerLateMs: 0
   running = true;
   const current = generation;
   void refreshConfig();
+  let localError: unknown = null;
   try {
     let more = true;
     while (more && current === generation) {
       more = await syncOnce(context);
       context = { trigger: "pagination / backlog", queueMs: 0, timerLateMs: 0 };
     }
-  } catch {
-    setStatus('error');
+  } catch (error) {
+    if (isLocalStorageError(error)) localError = error;
+    // A quick local retry is still syncing as far as the badge is concerned.
+    setStatus(localError && localFailures < LOCAL_RETRIES ? 'syncing' : 'error');
   } finally {
     running = false;
-    if (status === 'synced') { failures = 0; retryAt = 0; }
-    else {
+    if (status === 'synced') { failures = 0; localFailures = 0; retryAt = 0; }
+    else if (localError && localFailures < LOCAL_RETRIES) {
+      // A failed apply rolls back whole (the cursor did not move), so retrying soon is safe.
+      localFailures++;
+      retryAt = Date.now() + 250 * localFailures;
+      recordSyncDebug("schedule", "Local database error, retrying soon", { error: (localError as { name?: string }).name ?? "unknown", attempt: localFailures, retryInMs: 250 * localFailures });
+      if (!db.isOpen()) void db.open().catch(() => {});
+      listeners.forEach((l) => l());
+    } else {
       failures++;
       retryAt = Date.now() + Math.min(60000, config.retryBaseMs * 2 ** Math.min(failures - 1, 16));
       // The status was set before the backoff was known; let the badge show the new countdown.
