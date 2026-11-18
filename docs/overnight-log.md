@@ -365,3 +365,37 @@ dark palette remaps to the card surface).
 
 **Next (UI).** The chat panel's controls (model picker, context picker, thread switcher) and the
 library's empty state haven't been looked at yet. The notebook toolbar idea from 01:30 is still open.
+
+## 2026-11-19 04:30 — bugs: duplicated ink painted under newer ink
+
+**Fixed.** Lasso Duplicate (02:30) copied each stroke's `t0` along with its data. Strokes paint in
+`t0` order (`paintStrokes`, and `paintDelta` for the tiles), so a copy sat at its original's
+place in that order and was drawn **under** every stroke written after the original — including
+the ink you duplicate it onto (visible where colours differ). The copies now take times just up
+to now (`now - (n-1) … now`), in their originals' order, so they paint on top and keep their own
+stacking. Point times are relative to `t0`, so durations and the stroke shapes don't change.
+Side effect: the tile now adds the copy as a delta instead of repainting from scratch.
+
+**Checked.** Failing test first in `tests/lasso-move.test.ts` (a copy must get a `t0` above a
+stroke drawn after its original, and two copies keep their order), then the fix.
+`npm run typecheck`, `npm run lint`, `npx vitest run` (804 passed), `npm run test:pencil`
+(33 passed, baselines unchanged).
+
+**Reviewed, no bug shown.** The zoom commit (`measureZoom`/`commitZoom`: `configure` runs in a
+layout effect, so `controller.zoom` is current for the next wheel event after `flushSync`),
+Ctrl+wheel at the limits, reset, `smoothPressure` placeholder edge cases (all-placeholder taps,
+floor above 0.08), `withoutLiftOff` with `tapDot`/`dotRadius`, pen overrides with the new toggle
+(`valid` accepts booleans), Pen settings Fine-tune state, and the shared `downloadFile`.
+
+**Possible, not demonstrated (left alone).**
+- Duplicate, then drag the copy before the live query has delivered it to `sec.strokes()`: the
+  drag would move the box but not the ink. Needs a drag within ~tens of ms of the tap.
+- Pinch: adding a third finger then lifting a different one continues the pinch with `d0` from
+  the first pair, so the zoom could jump once.
+- Section stats (`sectionStats`) count duplicated strokes as ink time.
+
+**Needs a device check.** Duplicate some black working onto a line of blue writing: the copy
+should be on top.
+
+**Next (bugs).** The third-finger pinch case above is the most likely real one; it needs a test
+harness for the touch handler (it lives in a `NotebookEditor` effect, not a pure function).

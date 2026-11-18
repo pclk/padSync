@@ -126,6 +126,22 @@ describe("duplicating a lasso selection", () => {
     expect(store.setDeleted).toHaveBeenLastCalledWith([id], false);
   });
 
+  it("gives the copies new times, so they paint above ink written since, in the originals' order", async () => {
+    // Strokes paint in t0 order (paintStrokes): a copy that kept its original's t0 went under
+    // anything drawn after the original, such as the line it was duplicated onto.
+    const { InkController } = await import("@/ink/controller");
+    const at = (id: string, t0: number, x: number) => ({ id, kind: "stroke", data: { tool: "pen", t0, pts: [x, 100, 0.5, 1, 0, 0, x + 10, 120, 0.5, 1, 0, 8] } }) as unknown as StrokeEntity;
+    const strokes = [at("b", 2000, 120), at("a", 1000, 100), at("later", 5000, 300)];
+    const c = new InkController("nb", { kind: "lasso", penColor: "#000", penSize: 3, hlColor: "#ff0", hlSize: 20, eraserSize: 20 }, { onSelection() {}, onDragging() {}, onTextCreate() {} }, { now: () => 9000 });
+    c.setSelection({ sectionId: "sec", ids: new Set(["a", "b"]), box });
+    await c.duplicateSelection({ ...sec, strokes: () => strokes });
+    const [copies] = store.putEntities.mock.calls[0] as unknown as [StrokeEntity[]];
+    const t0 = (x: number) => copies.find((s) => s.data.pts[0] === x)!.data.t0;
+    expect(t0(124)).toBeGreaterThan(5000);
+    expect(t0(144)).toBeGreaterThan(t0(124));
+    expect(Math.max(t0(124), t0(144))).toBeLessThanOrEqual(9000);
+  });
+
   it("does nothing for another section's handle", async () => {
     const { c } = await setup();
     await c.duplicateSelection({ ...sec, id: "other" });

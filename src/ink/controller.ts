@@ -440,7 +440,12 @@ export class InkController {
     if (!originals.length) return;
     const height = sec.el.getBoundingClientRect().height / this.zoom;
     const [dx, dy] = clampMove(sel.box, DUPLICATE_OFFSET, DUPLICATE_OFFSET, height);
-    const copies = originals.map((s) => newEntity<"stroke", StrokeData>("stroke", this.notebookId, sec.id, { ...s.data, pts: shiftPts(s.data.pts, dx, dy) }));
+    // Strokes paint in t0 order, so the copies take times just up to now, in their originals'
+    // order: kept as they were, they would paint under everything drawn since.
+    const now = this.now();
+    const copies = originals
+      .sort((a, b) => a.data.t0 - b.data.t0)
+      .map((s, i, all) => newEntity<"stroke", StrokeData>("stroke", this.notebookId, sec.id, { ...s.data, t0: now - (all.length - 1 - i), pts: shiftPts(s.data.pts, dx, dy) }));
     await putEntities(copies);
     const ids = copies.map((s) => s.id);
     const copySel = { sectionId: sec.id, ids: new Set(ids), box: shift(sel.box, dx, dy) };
