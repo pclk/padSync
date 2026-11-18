@@ -23,6 +23,18 @@ const MIN_ZOOM = 0.4;
 const MAX_ZOOM = 3;
 const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 
+// Where this device last was in each notebook: a section and the logical offset into it.
+type Position = { sectionId: string; offsetY: number };
+const positionKey = (notebookId: string) => `padsync.position.${notebookId}`;
+function readPosition(notebookId: string): Position | null {
+  try {
+    const p = JSON.parse(localStorage.getItem(positionKey(notebookId)) ?? "null");
+    return p && typeof p.sectionId === "string" && typeof p.offsetY === "number" ? p : null;
+  } catch {
+    return null;
+  }
+}
+
 const DEFAULT_TOOL: ToolState = { kind: "pen", penColor: "#111827", penSize: 3.4, hlColor: "#facc15", hlSize: 22, eraserSize: 24 };
 
 export default function NotebookEditor() {
@@ -317,6 +329,32 @@ function Editor({ notebookId }: { notebookId: string }) {
   const currentRef = useRef<string | null>(null);
   const followingScroll = useRef(0);
 
+  // Reopen where this device left the notebook. Saving waits until the restore is over, so the
+  // scroll-to-top of a fresh mount never overwrites the saved place.
+  const [savedPosition] = useState(() => readPosition(notebookId));
+  const restored = useRef(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savePosition = useCallback(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = null;
+    const sid = currentRef.current;
+    const el = sid ? els.current.get(sid) : undefined;
+    if (!restored.current || !sid || !el) return;
+    const offsetY = Math.round((TOOLBAR_H - el.getBoundingClientRect().top) / controller.zoom);
+    try {
+      localStorage.setItem(positionKey(notebookId), JSON.stringify({ sectionId: sid, offsetY } satisfies Position));
+    } catch {}
+  }, [controller, notebookId]);
+
+  useEffect(() => {
+    const flush = () => saveTimer.current && savePosition();
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, [savePosition]);
+
   const publishPresence = useCallback(() => {
     const sid = currentRef.current;
     const el = sid ? els.current.get(sid) : undefined;
@@ -343,6 +381,10 @@ function Editor({ notebookId }: { notebookId: string }) {
           setCurrentId(found);
           void logEvent(notebookId, found, "focus", {});
         }
+        if (restored.current) {
+          if (saveTimer.current) clearTimeout(saveTimer.current);
+          saveTimer.current = setTimeout(savePosition, 300);
+        }
         // Only the device being written on reports where it is; a following Mac stays quiet.
         if (performance.now() - followingScroll.current < 1500) return;
         if (presenceTimer.current) clearTimeout(presenceTimer.current);
@@ -357,7 +399,7 @@ function Editor({ notebookId }: { notebookId: string }) {
       cancelAnimationFrame(frame);
       if (presenceTimer.current) clearTimeout(presenceTimer.current);
     };
-  }, [notebookId, publishPresence, sections?.length]);
+  }, [notebookId, publishPresence, savePosition, sections?.length]);
 
   const presences = useLiveQuery(() => db.entities.where("kind").equals("presence").toArray(), []) as PresenceEntity[] | undefined;
   const ipad = useMemo(() => {
@@ -403,6 +445,34 @@ function Editor({ notebookId }: { notebookId: string }) {
     ro.observe(el);
     return () => ro.disconnect();
   }, [loaded]);
+
+  useLayoutEffect(() => {
+    if (!loaded || restored.current) return;
+    const target = savedPosition ? els.current.get(savedPosition.sectionId) : undefined;
+    if (!savedPosition || !target || !pinchRef.current) {
+      restored.current = true;
+      return;
+    }
+    const align = () => window.scrollBy(0, target.getBoundingClientRect().top + savedPosition.offsetY * controller.zoom - TOOLBAR_H);
+    // Sections above grow as their text and ink measure in, and the Mac refits its zoom; keep the
+    // place pinned until the reader moves the page or things settle.
+    const ro = new ResizeObserver(align);
+    ro.observe(pinchRef.current);
+    align();
+    const stop = () => {
+      restored.current = true;
+      cleanup();
+    };
+    const inputs = ["wheel", "touchstart", "pointerdown", "keydown"] as const;
+    const timer = setTimeout(stop, 1500);
+    inputs.forEach((t) => window.addEventListener(t, stop, { passive: true, capture: true }));
+    function cleanup() {
+      ro.disconnect();
+      clearTimeout(timer);
+      inputs.forEach((t) => window.removeEventListener(t, stop, { capture: true }));
+    }
+    return cleanup;
+  }, [loaded, savedPosition, controller]);
 
   const registerEl = useCallback((sid: string, el: HTMLElement | null) => {
     if (el) els.current.set(sid, el);
