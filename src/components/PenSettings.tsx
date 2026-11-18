@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ToolState } from "@/ink/controller";
 import {
   DEFAULT_PEN,
@@ -56,13 +56,16 @@ interface Props {
 
 /**
  * Pen settings, opened by tapping the pen tool again while it is selected: two quick sliders and
- * every pen parameter below them, each adjustable and resettable on its own.
+ * every pen parameter in tabs, each adjustable and resettable on its own.
  */
 export function PenSettings({ tool, setTool, anchorY, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const params = useMemo(() => withOverrides(tool.pen), [tool.pen]);
-  const changed = Object.keys(penOverrides(params)).length;
+  const overrides = penOverrides(params);
+  const changed = Object.keys(overrides).length;
   const update = (next: PenParams) => setTool({ ...tool, pen: penOverrides(next) });
+  const [tab, setTab] = useState("Quick");
+  const box = usePopoverBox(anchorY);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -85,15 +88,19 @@ export function PenSettings({ tool, setTool, anchorY, onClose }: Props) {
     return strokeSvgPath(data);
   }, [tool.penColor, tool.penSize, params]);
 
+  const tabs = ["Quick", ...PEN_GROUPS.map((g) => g.tab)];
+
+  // A fixed header (title, preview, tabs) over a body that scrolls on its own, sized to the
+  // visible screen, so every setting is reachable however short the screen is.
   return (
     <div
       ref={ref}
       role="dialog"
       aria-label="Pen settings"
-      className="card fixed left-[4.75rem] z-50 max-h-[calc(100dvh-5rem)] w-80 max-w-[calc(100vw-6rem)] overflow-y-auto overscroll-contain p-3 shadow-lift"
-      style={{ top: `max(4.25rem, min(${Math.round(anchorY - 28)}px, calc(100dvh - 22rem)))` }}
+      className="card fixed left-[4.75rem] z-50 flex w-80 max-w-[calc(100vw-6rem)] flex-col overflow-hidden shadow-lift"
+      style={{ top: box.top, maxHeight: box.maxHeight }}
     >
-      <div className="sticky -top-3 z-10 -mx-3 -mt-3 mb-2 bg-[var(--surface,white)] px-3 pb-2 pt-3">
+      <div className="shrink-0 border-b border-slate-100 px-3 pt-3">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-slate-900">Pen</h2>
           <button className="btn btn-ghost btn-sm" onClick={() => update(DEFAULT_PEN)} disabled={!changed}>
@@ -101,32 +108,83 @@ export function PenSettings({ tool, setTool, anchorY, onClose }: Props) {
           </button>
         </div>
         <div className="paper overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <svg viewBox={`0 0 ${PREVIEW_W} ${PREVIEW_H}`} width="100%" aria-label="Preview" role="img">
+          <svg viewBox={`0 0 ${PREVIEW_W} ${PREVIEW_H}`} width="100%" aria-label="Preview" role="img" className="max-h-20">
             <path d={preview} fill={tool.penColor} />
           </svg>
         </div>
+        <div role="tablist" aria-label="Pen setting groups" className="-mx-3 mt-2 flex overflow-x-auto px-2">
+          {tabs.map((t) => {
+            const group = PEN_GROUPS.find((g) => g.tab === t);
+            const dirty = group?.params.some((p) => p.key in overrides);
+            return (
+              <button
+                key={t}
+                role="tab"
+                aria-selected={tab === t}
+                onClick={() => setTab(t)}
+                className={`relative shrink-0 border-b-2 px-2 py-2 text-xs font-medium ${tab === t ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+              >
+                {t}
+                {dirty && <span className="absolute right-0.5 top-1.5 h-1.5 w-1.5 rounded-full bg-brand-500" aria-label="changed" />}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <Slider label="Smoothness" low="Precise" high="Smooth" value={smoothnessOf(params)} onChange={(v) => update(setSmoothness(params, v))} />
-      <Slider label="Pressure" low="Even" high="Expressive" value={pressureOf(params)} onChange={(v) => update(setPressure(params, v))} />
-      <p className="mb-3 text-xs text-slate-500">
-        Quick controls set several of the settings below. Settings apply to new strokes; pressure only affects the Apple Pencil.
-      </p>
-
-      {PEN_GROUPS.map((g) => (
-        <details key={g.title} className="group border-t border-slate-100 py-1">
-          <summary className="flex cursor-pointer list-none items-center justify-between py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600">
-            {g.title}
-            <span className="text-slate-400 transition-transform group-open:rotate-90" aria-hidden="true">›</span>
-          </summary>
-          {g.note && <p className="mb-2 text-[11px] text-slate-500">{g.note}</p>}
-          {g.params.map((spec) => (
-            <Param key={spec.key} spec={spec} value={params[spec.key]} onChange={(v) => update({ ...params, [spec.key]: v })} />
-          ))}
-        </details>
-      ))}
+      <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-3 py-3">
+        <div role="tabpanel" hidden={tab !== "Quick"}>
+          <Slider label="Smoothness" low="Precise" high="Smooth" value={smoothnessOf(params)} onChange={(v) => update(setSmoothness(params, v))} />
+          <Slider label="Pressure" low="Even" high="Expressive" value={pressureOf(params)} onChange={(v) => update(setPressure(params, v))} />
+          <p className="text-xs text-slate-500">
+            These set several settings in the other tabs at once. Settings apply to new strokes; pressure only affects the Apple Pencil.
+          </p>
+        </div>
+        {PEN_GROUPS.map((g) => (
+          <div key={g.tab} role="tabpanel" aria-label={g.title} hidden={tab !== g.tab}>
+            {g.note && <p className="mb-3 text-[11px] text-slate-500">{g.note}</p>}
+            {g.params.map((spec) => (
+              <Param key={spec.key} spec={spec} value={params[spec.key]} onChange={(v) => update({ ...params, [spec.key]: v })} />
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
+}
+
+/**
+ * Top and height for the popover from the visible screen (visualViewport where there is one, so
+ * Safari's bars and the keyboard are accounted for), kept up to date as it changes.
+ */
+function usePopoverBox(anchorY: number) {
+  const measure = () => {
+    if (typeof window === "undefined") return { top: 68, maxHeight: 600 };
+    const vv = window.visualViewport;
+    const height = vv?.height ?? window.innerHeight;
+    const offset = vv?.offsetTop ?? 0;
+    const margin = 12;
+    // Line the header up with the pen button, but never so low that less than 320 px fit.
+    const top = Math.max(offset + 68, Math.min(anchorY - 28, offset + height - 320 - margin));
+    return { top, maxHeight: Math.max(200, offset + height - top - margin) };
+  };
+  const [box, setBox] = useState(measure);
+  useEffect(() => {
+    const update = () => setBox(measure());
+    const vv = window.visualViewport;
+    window.addEventListener("resize", update);
+    vv?.addEventListener("resize", update);
+    vv?.addEventListener("scroll", update);
+    update();
+    return () => {
+      window.removeEventListener("resize", update);
+      vv?.removeEventListener("resize", update);
+      vv?.removeEventListener("scroll", update);
+    };
+    // measure reads anchorY; re-measure when it changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anchorY]);
+  return box;
 }
 
 function Param({ spec, value, onChange }: { spec: PenParamSpec; value: PenParams[keyof PenParams]; onChange: (v: PenParams[keyof PenParams]) => void }) {

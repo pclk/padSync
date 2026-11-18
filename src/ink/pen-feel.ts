@@ -85,9 +85,10 @@ export type PenParamSpec =
   | { key: Key; label: string; help: string; kind: "select"; options: readonly string[] };
 
 /** Every pen parameter, grouped as the settings show them. Ranges also bound synced values. */
-export const PEN_GROUPS: { title: string; note?: string; params: PenParamSpec[] }[] = [
+export const PEN_GROUPS: { title: string; tab: string; note?: string; params: PenParamSpec[] }[] = [
   {
     title: "Line",
+    tab: "Line",
     params: [
       { key: "streamline", label: "Streamline", kind: "range", min: 0, max: 0.95, step: 0.01, help: "How far the line trails behind the tip to calm wobble. High values round off corners." },
       { key: "smoothing", label: "Outline smoothing", kind: "range", min: 0, max: 1, step: 0.01, help: "Softens the edges of the line's outline." },
@@ -99,6 +100,7 @@ export const PEN_GROUPS: { title: string; note?: string; params: PenParamSpec[] 
   },
   {
     title: "Ends",
+    tab: "Ends",
     params: [
       { key: "taperStart", label: "Taper start", kind: "range", min: 0, max: 60, step: 1, unit: "px", help: "Thins the first part of each stroke to a point." },
       { key: "taperEnd", label: "Taper end", kind: "range", min: 0, max: 60, step: 1, unit: "px", help: "Thins the last part of each stroke to a point." },
@@ -108,6 +110,7 @@ export const PEN_GROUPS: { title: string; note?: string; params: PenParamSpec[] 
   },
   {
     title: "Path clean-up",
+    tab: "Clean-up",
     note: "Applied when drawing, so they also change how strokes drawn earlier with the same values look.",
     params: [
       { key: "maxPointGap", label: "Curve between samples", kind: "range", min: 0.5, max: 20, step: 0.5, unit: "px", help: "Samples further apart than this are joined by a curve. Large values draw straight pieces." },
@@ -118,6 +121,7 @@ export const PEN_GROUPS: { title: string; note?: string; params: PenParamSpec[] 
   },
   {
     title: "Pressure filter",
+    tab: "Pressure",
     params: [
       { key: "pressureAlpha", label: "Response", kind: "range", min: 0.01, max: 1, step: 0.01, help: "How quickly width follows pressure. 1 uses raw pressure; low values are calmer." },
       { key: "pressureMaxStep", label: "Max change per sample", kind: "range", min: 0.001, max: 1, step: 0.001, help: "Caps how fast width can change, so one spiky sample can't swell the line." },
@@ -127,6 +131,7 @@ export const PEN_GROUPS: { title: string; note?: string; params: PenParamSpec[] 
   },
   {
     title: "Taps and prediction",
+    tab: "Taps",
     note: "Applied while you write; changing them doesn't affect existing strokes.",
     params: [
       { key: "dotMinMs", label: "Stray dot: shorter than", kind: "range", min: 0, max: 200, step: 5, unit: "ms", help: "A tap shorter than this, and lighter than below, is dropped as a bounce. 0 keeps every tap." },
