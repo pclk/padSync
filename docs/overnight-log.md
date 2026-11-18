@@ -208,3 +208,34 @@ a one-line change (`dropLiftOff: true` in `DEFAULT_PEN`) plus `PENCIL_UPDATE_BAS
    pressure). `tapDot`'s spread check counts the landing drag too. Next step is to measure whether
    leaving placeholder samples out of `extent(-Infinity)` turns these into dots without turning short
    dashes (superscript minus) into dots.
+
+## 2026-11-19 02:30 — feature: duplicate a lasso selection
+
+**Checked first.** Lasso select, drag-to-move and delete already exist, and so does the page jump in
+the side panel. What was missing was a way to copy ink, which you need for maths working (rewrite
+the line above and change one term) and for repeated diagrams.
+
+**Changed.**
+- `InkController.duplicateSelection(sec)` (`src/ink/controller.ts`) copies the selected strokes as
+  new strokes, 24 units down and to the right. `clampMove` keeps the copy on the page, so near an
+  edge it is shifted less. The copy becomes the selection, so you can drag it straight into place.
+  The originals are left alone. It's a single undo step, and undoing it also clears the copy's
+  selection box. The event log gets `lasso_duplicate` (`from`, `ids`, `dx`, `dy`).
+- The selection menu above the box (`src/components/SectionView.tsx`) is now Delete · Duplicate ·
+  Done.
+- Copies keep the stroke data exactly, pen overrides included, so the ink looks the same. Nothing
+  is ever removed.
+
+**Checked.** New tests in `tests/lasso-move.test.ts`: the copy is offset with new ids and the
+originals are unchanged; the copy stays on the page at the bottom-right corner; undo, then redo;
+a handle from another section is ignored. `npm run typecheck`, `npm run lint`, `npx vitest run`
+(796 passed), `npm run test:pencil` (baselines unchanged; no rendering code touched).
+
+**Needs a device check.** On the iPad: lasso some working, tap Duplicate, then drag the copy with
+a finger. Check the three-button menu fits above a small selection near the page's left edge, and
+that the copy appears straight away (it reaches the tiles through the live query, not the
+pending-paint path).
+
+**Next (features).** A keyboard shortcut (⌘D on the Mac) would need the editor to find the
+selected section's handle, which is a small follow-up. Resizing the selection with a corner handle
+is the other common lasso action that's still missing.

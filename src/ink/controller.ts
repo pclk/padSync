@@ -429,6 +429,35 @@ export class InkController {
     void logEvent(this.notebookId, sel.sectionId, "lasso_delete", { ids });
   }
 
+  /**
+   * Copies the selected strokes a little down and to the right (kept on the page) and selects the
+   * copy, so it can be dragged straight into place: rewriting a line of working, a repeated diagram.
+   */
+  async duplicateSelection(sec: SectionHandle) {
+    const sel = this.selection;
+    if (!sel || sel.sectionId !== sec.id || !this.persist) return;
+    const originals = sec.strokes().filter((s) => sel.ids.has(s.id));
+    if (!originals.length) return;
+    const height = sec.el.getBoundingClientRect().height / this.zoom;
+    const [dx, dy] = clampMove(sel.box, DUPLICATE_OFFSET, DUPLICATE_OFFSET, height);
+    const copies = originals.map((s) => newEntity<"stroke", StrokeData>("stroke", this.notebookId, sec.id, { ...s.data, pts: shiftPts(s.data.pts, dx, dy) }));
+    await putEntities(copies);
+    const ids = copies.map((s) => s.id);
+    const copySel = { sectionId: sec.id, ids: new Set(ids), box: shift(sel.box, dx, dy) };
+    this.setSelection(copySel);
+    emitActivity({ notebookId: this.notebookId, source: "local", kinds: ["stroke"], at: Date.now() });
+    this.undo.push({
+      label: "duplicate",
+      undo: async () => {
+        // The copy's box would be left framing nothing.
+        if (this.selection?.ids === copySel.ids) this.setSelection(null);
+        await setDeleted(ids, true);
+      },
+      redo: () => setDeleted(ids, false),
+    });
+    void logEvent(this.notebookId, sec.id, "lasso_duplicate", { from: [...sel.ids], ids, dx, dy });
+  }
+
   private addPoints(g: Extract<Gesture, { type: "ink" }>, evs: InkPointer[]) {
     const pts = g.data.pts;
     for (const ev of evs) {
@@ -622,6 +651,18 @@ export function clampMove(b: Box, dx: number, dy: number, height: number): [numb
 
 function inBox(b: Box, x: number, y: number, pad: number) {
   return x >= b.minX - pad && x <= b.maxX + pad && y >= b.minY - pad && y <= b.maxY + pad;
+}
+
+/** How far a duplicate lands from its original, down and to the right (page units). */
+const DUPLICATE_OFFSET = 24;
+
+function shiftPts(src: number[], dx: number, dy: number) {
+  const pts = src.slice();
+  for (let i = 0; i < pts.length; i += STROKE_STRIDE) {
+    pts[i] += dx;
+    pts[i + 1] += dy;
+  }
+  return pts;
 }
 
 function shift(b: Box, dx: number, dy: number): Box {

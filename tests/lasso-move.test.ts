@@ -86,3 +86,49 @@ describe("clampMove", () => {
     expect(clampMove(out, 10, 0, 600)).toEqual([10, 0]);
   });
 });
+
+describe("duplicating a lasso selection", () => {
+  beforeEach(() => {
+    store.putEntities.mockClear();
+    store.setDeleted.mockClear();
+    store.logEvent.mockClear();
+  });
+
+  it("copies the strokes a little down and right, leaves the originals, and selects the copy", async () => {
+    const { c } = await setup();
+    await c.duplicateSelection(sec);
+    const [copies] = store.putEntities.mock.calls[0] as unknown as [StrokeEntity[]];
+    expect(copies).toHaveLength(1);
+    expect(copies[0].id).not.toBe("a");
+    expect(copies[0].parentId).toBe("sec");
+    expect(copies[0].data.pts).toEqual([124, 124, 0.5, 1, 0, 0, 164, 144, 0.5, 1, 0, 8]);
+    expect(stroke.data.pts[0]).toBe(100);
+    expect(c.selection?.ids).toEqual(new Set([copies[0].id]));
+    expect(c.selection?.box).toEqual({ minX: 124, minY: 124, maxX: 164, maxY: 144 });
+  });
+
+  it("keeps the copy on the page at the bottom-right edge", async () => {
+    const { c } = await setup();
+    const corner = { minX: PAGE_WIDTH - 40, minY: 560, maxX: PAGE_WIDTH, maxY: 590 };
+    c.setSelection({ sectionId: "sec", ids: new Set(["a"]), box: corner });
+    await c.duplicateSelection(sec);
+    expect(c.selection?.box).toEqual({ ...corner, minY: 570, maxY: 600 });
+  });
+
+  it("undo removes the copy and clears its selection; redo brings it back", async () => {
+    const { c } = await setup();
+    await c.duplicateSelection(sec);
+    const id = [...c.selection!.ids][0];
+    await c.undo.undo();
+    expect(store.setDeleted).toHaveBeenLastCalledWith([id], true);
+    expect(c.selection).toBeNull();
+    await c.undo.redo();
+    expect(store.setDeleted).toHaveBeenLastCalledWith([id], false);
+  });
+
+  it("does nothing for another section's handle", async () => {
+    const { c } = await setup();
+    await c.duplicateSelection({ ...sec, id: "other" });
+    expect(store.putEntities).not.toHaveBeenCalled();
+  });
+});
