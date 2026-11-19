@@ -19,5 +19,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return Response.json({ error: "agents: non-empty list of claude|codex" }, { status: 400 });
   const features = (parsed.data.features ?? []).filter((f): f is (typeof BRIDGE_FEATURES)[number] => (BRIDGE_FEATURES as readonly string[]).includes(f));
   const job = await claimJob(auth.sql, auth.device.id, parsed.data.agents, features);
-  return Response.json({ job: job ? { ...job, ...(job.kind === 'chat' ? await chatJobContext(auth.sql, job.id) : {}) } : null }, { headers: { "cache-control": "no-store" } });
+  const body = { job: job ? { ...job, ...(job.kind === 'chat' ? await chatJobContext(auth.sql, job.id) : {}) } : null };
+  // serverTime lets the bridge line its clock up with ours for latency traces.
+  return Response.json({ ...body, serverTime: Date.now() }, { headers: { "cache-control": "no-store" } });
 }

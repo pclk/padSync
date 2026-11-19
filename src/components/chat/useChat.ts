@@ -25,6 +25,10 @@ import {
   writeStored,
   type ThreadFilter,
 } from "@/lib/chat-ui";
+import { priceFor, type Price } from "@/lib/chat-cost";
+import { MAX_BUNDLE_BYTES } from "@/lib/context";
+import { clientClock, localMarks, markLocal, noteServerTime } from "@/lib/chat-trace";
+import { voiceFile } from "./useVoice";
 import type { ThreadListProps } from "./ThreadList";
 import type { ContextHandle } from "./ContextPicker";
 
@@ -49,6 +53,7 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
   );
   const [catalog, setCatalog] = useState<CatalogAccount[] | null>(null);
   const catalogAt = useRef(0);
+  const [prices, setPrices] = useState<Record<string, Price> | null>(null);
   const [loadedId, setLoadedId] = useState("");
   const [error, setError] = useState("");
   const [draft, setDraft] = useState(() => readDraft(""));
@@ -114,6 +119,13 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
       });
   }, [p.visible, tabVisible]);
   useEffect(() => {
+    if (!p.visible || prices) return;
+    api
+      .getPricing()
+      .then((data) => setPrices(data.prices))
+      .catch(() => {});
+  }, [p.visible, prices]);
+  useEffect(() => {
     const scheduler = createPollScheduler(
       async () => {
         try {
@@ -144,10 +156,19 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
         if (requests.current.has(id)) return;
         requests.current.add(id);
         try {
+          const sentAt = Date.now();
           const data = await api.getThread(id, {
             since: since.current,
             from: api.pollCursor(turnsRef.current),
           });
+          const seenAt = Date.now();
+          if (data.serverTime) noteServerTime(data.serverTime, sentAt, seenAt);
+          // Latency trace: when this device first showed words, and the finished reply, of turns it sent.
+          for (const t of data.turns) {
+            if (localMarks(t.jobId)["client.response"] === undefined) continue;
+            if (t.output) markLocal(t.jobId, "client.first_output_seen", seenAt);
+            if (["done", "error", "cancelled"].includes(t.status)) markLocal(t.jobId, "client.done_seen", seenAt);
+          }
           if (!live || selected.current !== id) return;
           setThread(data.thread);
           setTurns((old) => api.mergeTurns(old, data.turns));
@@ -244,6 +265,9 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
   const accounts = catalog?.length ? catalog : fallbackCatalog();
   const modelLabel = (s: { agent: ChatAgent; options: ChatOptions }) =>
     describeModel(accounts, s).label;
+  /** API list price of the model a turn ran on; null until loaded or when unknown. */
+  const priceOf = (s: { agent: ChatAgent; options: ChatOptions }) =>
+    prices ? priceFor(prices, s, describeModel(accounts, s).account?.defaultModel) : null;
   const download = (t: ThreadSummary, messages: Turn[]) =>
     downloadFile("conversation.md", exportMarkdown(t, messages), "text/markdown");
   const rowAction = (kind: string, t: ThreadSummary, title?: string) =>
@@ -279,9 +303,20 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
     context: ContextHandle | null,
     files: File[],
     onProgress: Parameters<typeof api.uploadTurnInputs>[2],
+    /** A recorded voice message: the Mac transcribes it into (the rest of) the question. */
+    voice?: Blob,
+    /** When the user pressed send (or let go of the mic), and other "client.*" stamps. */
+    marks: Record<string, number> = { "client.pressed": Date.now() },
   ) => {
     setBusy(true);
     try {
+      const readBase64 = (blob: Blob, name: string) =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+          reader.onerror = () => reject(new Error(`Could not read ${name}`));
+          reader.readAsDataURL(blob);
+        });
       const inputs = await Promise.all(
         files.map(async (file, index) => ({
           path: `attachment-${index + 1}.${
@@ -291,21 +326,24 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
               ?.replace(/[^a-zA-Z0-9]/g, "") || "bin"
           }`,
           mime: file.type,
-          base64: await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(String(reader.result).split(",")[1]);
-            reader.onerror = () =>
-              reject(new Error(`Could not read ${file.name}`));
-            reader.readAsDataURL(file);
-          }),
+          base64: await readBase64(file, file.name),
         })),
       );
+      const audio = voice && { ...voiceFile(voice.type), base64: await readBase64(voice, "the recording") };
       const bundle = await context?.prepare();
+      // A voice message rides in the turn itself when it fits (one request fewer before the Mac
+      // can start); a long one goes up in parts like any other attachment.
+      const bundleSize = (bundle?.files ?? []).reduce((n, f) => n + (f.text ?? f.base64 ?? "").length, 0);
+      const inline = !!audio && audio.base64.length <= 1_500_000 && bundleSize + audio.base64.length <= MAX_BUNDLE_BYTES;
+      if (audio && !inline) inputs.push(audio);
       const target = thread ?? (await create());
       const tools = toolsOf(target.options);
+      const clock = clientClock();
+      const trace = { ...marks, "client.sent": Date.now(), ...(clock ? { "client.clock_offset": clock.offset, "client.clock_rtt": clock.rtt } : {}) };
       const sent = await api.sendTurn(target.id, {
+        trace,
         question: text,
-        files: bundle?.files ?? [],
+        files: [...(bundle?.files ?? []), ...(audio && inline ? [audio] : [])],
         uploads: api.uploadSpecs(inputs),
         context: bundle?.context,
         // Running code needs the writable job folder, so it brings edits with it.
@@ -315,6 +353,7 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
           allowEdits: (bundle?.options.allowEdits ?? true) || tools.allowCode,
         },
       });
+      markLocal(sent.turn.jobId, "client.response");
       await api.uploadTurnInputs(sent.turn.jobId, inputs, onProgress);
       if (selected.current === target.id) setDraft("");
       writeDraft(target.id, "");
@@ -405,6 +444,7 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
     accounts,
     fallbackModels: !catalog?.length,
     modelLabel,
+    priceOf,
     loading: !!id && loadedId !== id,
     focusComposer,
     draft,

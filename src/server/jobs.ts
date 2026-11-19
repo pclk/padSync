@@ -114,8 +114,21 @@ export const jobInputSchema = z
   })
   .strict();
 
+/** Epoch ms on the database's clock, for latency traces (src/lib/chat-trace.ts). */
+export const NOW_MS = `(extract(epoch from clock_timestamp()) * 1000)::bigint`;
+
+/** Latency stamps a device or bridge reports: "<who>.<event>" → epoch ms (or a duration). */
+export const traceSchema = (who: "client" | "bridge") =>
+  z
+    .record(z.string().regex(new RegExp(`^${who}\\.[a-z_]{1,40}$`)), z.number().finite())
+    .refine((t) => Object.keys(t).length <= 40, "at most 40 trace entries");
+
 export const jobUpdateSchema = z
   .object({
+    /** The bridge's latency stamps so far; merged into the job's trace. */
+    trace: traceSchema("bridge").optional(),
+    /** The question with a voice message's transcript; only for a turn that has one. */
+    question: z.string().trim().min(1).max(4000).optional(),
     sessionId: z.string().min(1).max(200).optional(),
     append: z.string().max(MAX_OUTPUT).optional(),
     output: z.string().max(MAX_OUTPUT).optional(),
@@ -258,18 +271,23 @@ export async function cancelJob(sql: Sql, id: string): Promise<Job | null> {
   return rows[0] ? toJob(rows[0]) : null;
 }
 
+/** A chat turn with a voice message the bridge still has to transcribe (src/lib/context.ts VOICE_PATH_RE). */
+const NEEDS_TRANSCRIPT = `(not transcribed and exists (select 1 from jsonb_array_elements(coalesce(attachments, '[]'::jsonb)) a where a->>'path' ~ '^voice-message\\.'))`;
+
 /** What a bridge can run beyond plain questions; an older bridge sends none and never gets imports. */
-export const BRIDGE_FEATURES = ["import", "chat"] as const;
+export const BRIDGE_FEATURES = ["import", "chat", "voice"] as const;
 
 /** Atomically hands the oldest runnable job to this device (or reclaims a stale one). */
 export async function claimJob(sql: Sql, deviceId: string, agents: readonly Agent[], features: readonly string[] = []): Promise<ClaimedJob | null> {
   if (!agents.length) return null;
   const rows = await sql.query<Row>(
-    `update jobs set status = 'running', claimed_by = $1, claimed_at = now(), updated_at = now(), output = '', error = null
+    `update jobs set status = 'running', claimed_by = $1, claimed_at = now(), updated_at = now(), output = '', error = null,
+       trace = trace || jsonb_build_object('server.claimed', ${NOW_MS})
      where id = (
        select j.id from jobs j
        where agent = any($2::text[])
          and (kind = 'ask' or kind = any($4::text[]))
+         and ('voice' = any($4::text[]) or not ${NEEDS_TRANSCRIPT})
          and (j.thread_id is null or not exists (select 1 from jobs earlier where earlier.thread_id = j.thread_id and earlier.turn < j.turn and earlier.status in ('uploading','queued','running')))
          and (status = 'queued' or (status = 'running' and updated_at < now() - make_interval(secs => $3)))
        order by created_at
@@ -293,6 +311,12 @@ export async function updateJob(sql: Sql, id: string, deviceId: string, u: z.inf
   // Finishing also deletes the job's uploaded parts, in the same statement.
   const rows = await sql.query<{ status: JobStatus }>(
     `with u as (update jobs set
+       question = case when $10::text is not null and ${NEEDS_TRANSCRIPT} then $10::text else question end,
+       transcribed = transcribed or ($10::text is not null and ${NEEDS_TRANSCRIPT}),
+       trace = trace || coalesce($11::jsonb, '{}'::jsonb)
+         || case when output = '' and coalesce($3::text, $4::text, '') <> '' and trace->>'server.first_output' is null
+              then jsonb_build_object('server.first_output', ${NOW_MS}) else '{}'::jsonb end
+         || case when $5::text is not null then jsonb_build_object('server.finished', ${NOW_MS}) else '{}'::jsonb end,
        output = left(case when $3::text is not null then $3::text else output || coalesce($4::text, '') end, $7),
        status = coalesce($5::text, status),
        error = coalesce($6::text, error),
@@ -304,6 +328,9 @@ export async function updateJob(sql: Sql, id: string, deviceId: string, u: z.inf
        result_files = coalesce($8::jsonb, result_files)
      where id = $1 and claimed_by = $2 and status = 'running'
      returning id, status, thread_id, agent, turn, options
+     ), title_update as (
+       update chat_threads set title = left(split_part($10::text, E'\n', 1), 60), updated_at = now()
+       from u where chat_threads.id = u.thread_id and $10::text is not null and chat_threads.title = ''
      ), session_update as (
        update chat_threads set agent_session = jsonb_strip_nulls(jsonb_build_object('agent', u.agent, 'sessionId', $9::text, 'account', u.options->>'account')), updated_at = now()
        from u where chat_threads.id = u.thread_id and $9::text is not null and u.status = 'done'
@@ -316,7 +343,7 @@ export async function updateJob(sql: Sql, id: string, deviceId: string, u: z.inf
        on conflict do nothing
      ), d as (delete from job_inputs where job_id in (select id from u) and $5::text is not null)
      select status from u`,
-    [id, deviceId, u.output ?? null, u.append ?? null, u.status ?? null, u.error ?? null, MAX_OUTPUT, u.files ? JSON.stringify(u.files) : null, u.sessionId ?? null],
+    [id, deviceId, u.output ?? null, u.append ?? null, u.status ?? null, u.error ?? null, MAX_OUTPUT, u.files ? JSON.stringify(u.files) : null, u.sessionId ?? null, u.question ?? null, u.trace ? JSON.stringify(u.trace) : null],
   );
   if (rows[0]) return { ok: true, status: rows[0].status };
   const cur = await sql.query<{ status: JobStatus }>(`select status from jobs where id = $1 and claimed_by = $2`, [id, deviceId]);
@@ -354,7 +381,8 @@ export async function putJobInput(sql: Sql, id: string, input: z.infer<typeof jo
   const expected = (job.uploads ?? []).reduce((n, u) => n + u.parts, 0);
   // Separate statement, so it sees this insert and any made in parallel.
   const done = await sql.query<{ status: JobStatus; received: number }>(
-    `update jobs set status = case when (select count(*) from job_inputs where job_id = $1) >= $2 then 'queued' else status end, updated_at = now()
+    `update jobs set status = case when (select count(*) from job_inputs where job_id = $1) >= $2 then 'queued' else status end, updated_at = now(),
+       trace = case when (select count(*) from job_inputs where job_id = $1) >= $2 then trace || jsonb_build_object('server.queued', ${NOW_MS}) else trace end
      where id = $1 and status = 'uploading'
      returning status, (select count(*)::int from job_inputs where job_id = $1) as received`,
     [id, expected],

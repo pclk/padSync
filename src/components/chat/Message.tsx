@@ -3,8 +3,11 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Turn } from "@/lib/chat-types";
 import type { SectionEntity } from "@/lib/types";
 import { editNeedsFork } from "@/lib/chat-ui";
+import { formatUsd, type turnCost } from "@/lib/chat-cost";
+import { VOICE_PATH_RE } from "@/lib/context";
 import { renderMarkdown } from "@/lib/markdown";
 import { ReturnedFiles } from "@/components/ReturnedFiles";
+import { LatencyTrace, useIsMac } from "./LatencyTrace";
 import { Icon, type IconName } from "../Icons";
 
 function Action({ icon, label, onClick, done }: { icon: IconName; label: string; onClick(): void; done?: boolean }) {
@@ -43,6 +46,7 @@ export function Message({
   fork,
   queued,
   modelLabel,
+  cost,
 }: {
   turn: Turn;
   notebookId: string;
@@ -53,6 +57,8 @@ export function Message({
   fork(turn: Turn, question: string): Promise<void>;
   queued: boolean;
   modelLabel: string;
+  /** What this turn would cost on the API; null when the model has no known price. */
+  cost: ReturnType<typeof turnCost>;
 }) {
   const [editing, setEditing] = useState(false);
   const [question, setQuestion] = useState(t.question);
@@ -61,6 +67,8 @@ export function Message({
   const [saving, setSaving] = useState(false);
   const [copiedQ, copyQ] = useCopied();
   const [copiedA, copyA] = useCopied();
+  const isMac = useIsMac();
+  const [tracing, setTracing] = useState(false);
   async function save() {
     setSaving(true);
     setError("");
@@ -109,6 +117,7 @@ export function Message({
   }, [t.output]);
   const active = ["queued", "running", "uploading"].includes(t.status);
   const finished = ["done", "error", "cancelled"].includes(t.status);
+  const voice = t.attachments.some((a) => VOICE_PATH_RE.test(a.path));
   const sectionNames = t.context?.sectionIds
     .map((id) => sections.find((section) => section.id === id)?.data.title ?? "Unavailable section")
     .join(", ");
@@ -146,12 +155,21 @@ export function Message({
                 </summary>
                 <p className="mt-1 max-w-xs rounded-lg bg-slate-50 p-2 text-slate-600">
                   {t.context.scope} · {sectionNames || "no sections"} · {t.context.bytes.toLocaleString()} bytes · ~{t.context.tokens.toLocaleString()} tokens
+                  {cost && ` · ~${formatUsd(cost.input)} input on the API`}
                 </p>
               </details>
             )}
             {t.attachments.map((a) => (
               <span key={a.path} className="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-500">
-                <Icon name="paperclip" /> {a.path}
+                {VOICE_PATH_RE.test(a.path) ? (
+                  <>
+                    <Icon name="mic" /> Voice message
+                  </>
+                ) : (
+                  <>
+                    <Icon name="paperclip" /> {a.path}
+                  </>
+                )}
               </span>
             ))}
           </div>
@@ -189,7 +207,13 @@ export function Message({
           </div>
         ) : (
           <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-3xl bg-slate-100 px-4 py-2.5 text-[15px] leading-6 text-slate-900">
-            {t.question}
+            {t.question ||
+              (voice && (
+                <span className="flex items-center gap-2 text-slate-500">
+                  <Icon name="mic" className={active ? "animate-pulse motion-reduce:animate-none" : ""} />
+                  {active ? "Transcribing your voice message…" : "Voice message (not transcribed)"}
+                </span>
+              ))}
           </div>
         )}
         {!editing && (
@@ -216,6 +240,17 @@ export function Message({
             <span className="font-medium text-slate-700">{modelLabel}</span>
             {t.options.effort && <span className="text-slate-400">{t.options.effort}</span>}
             {t.status === "cancelled" && <span className="text-slate-400">· stopped</span>}
+            {cost && (
+              <span
+                className="ml-auto tabular-nums text-slate-400"
+                title={`If sent to the API: ~${cost.tokens.input.toLocaleString()} input tokens (this thread so far, the question, context and attachments)${
+                  t.output ? ` + ~${cost.tokens.output.toLocaleString()} output tokens` : ""
+                }. Estimated at ~4 characters a token, at API list prices.`}
+              >
+                ~{formatUsd(cost.input)} in
+                {finished && t.output && ` · ~${formatUsd(cost.total)} total`}
+              </span>
+            )}
           </div>
           {status}
           {t.output && (
@@ -253,12 +288,14 @@ export function Message({
             )}
             {finished && t.output && <Action icon="copy" label="Copy reply" done={copiedA} onClick={() => copyA(t.output)} />}
             {last && finished && <Action icon="refresh" label="Regenerate" onClick={() => action("regenerate", t)} />}
+            {isMac && <Action icon="activity" label={tracing ? "Hide latency trace" : "Latency trace"} onClick={() => setTracing(!tracing)} />}
             {finished && (
               <time className="px-1 text-xs text-slate-400" dateTime={t.updatedAt}>
                 {new Date(t.finishedAt ?? t.updatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
               </time>
             )}
           </div>
+          {isMac && tracing && <LatencyTrace turn={t} />}
         </div>
       </div>
     </article>

@@ -159,6 +159,10 @@ export async function migrate(sql: Sql) {
     `alter table jobs add column if not exists chat_files jsonb`,
     `create table if not exists chat_input_parts (job_id text not null, path text not null, part integer not null, data text not null, primary key(job_id,path,part))`,
     `alter table jobs add column if not exists attachments jsonb not null default '[]'::jsonb`,
+    // A voice message's transcript is in the question (src/server/jobs.ts updateJob).
+    `alter table jobs add column if not exists transcribed boolean not null default false`,
+    // Latency stamps from the device, server and bridge (src/lib/chat-trace.ts).
+    `alter table jobs add column if not exists trace jsonb not null default '{}'::jsonb`,
     `create unique index if not exists jobs_thread_turn_idx on jobs(thread_id, turn) where thread_id is not null`,
     `create index if not exists jobs_thread_updated_idx on jobs(thread_id, updated_at)`,
     `create index if not exists chat_threads_list_idx on chat_threads(deleted_at, archived, last_message_at desc)`,

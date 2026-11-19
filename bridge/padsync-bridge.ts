@@ -9,8 +9,8 @@
 //   node bridge/padsync-bridge.ts uninstall
 
 import { spawnSync } from "node:child_process";
-import { mkdir, unlink, writeFile } from "node:fs/promises";
-import { homedir, hostname } from "node:os";
+import { mkdir, mkdtemp, rm, unlink, writeFile } from "node:fs/promises";
+import { homedir, hostname, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -43,10 +43,12 @@ import {
   type BridgeConfig,
   type ClaimedJob,
   type JobFile,
+  VOICE_PATH_RE,
 } from "./lib.ts";
 import { discoverCatalog, type Catalog } from "./catalog.ts";
+import { Speech, uvVersion } from "./speech.ts";
 
-const VERSION = "0.3.0";
+const VERSION = "0.4.0";
 const POLL_MS = 3000;
 const MAX_BACKOFF_MS = 60_000;
 const FLUSH_MS = 1000;
@@ -108,6 +110,7 @@ async function status() {
   if (!cfg) return console.log("Not set up. Run: pbpaste | node bridge/padsync-bridge.ts setup --server <url>");
   console.log(`server  ${cfg.server}\ntoken   ${maskToken(cfg.token)}\nconfig  ${configPath()}`);
   for (const a of cfg.agents ?? AGENTS) console.log(`${a.padEnd(7)} ${available(a, cfg) ?? "not found"}`);
+  console.log(`speech  ${cfg.speech === false ? "off" : (uvVersion(cfg.speech?.uvBin) ?? "uv not found (brew install uv)")}`);
   const catalog = await discoverCatalog({ agents: cfg.agents ?? AGENTS, codexHomes: cfg.codexHomes });
   for (const a of catalog.accounts) console.log(`account ${a.id.padEnd(16)} ${a.label}${a.detail ? ` (${a.detail})` : ""}: ${a.models.length} models${catalog.homes[a.id] ? `, ${catalog.homes[a.id]}` : ""}`);
   try {
@@ -131,7 +134,35 @@ function reportStopped(api: BridgeApi, jobId: string, output = "") {
 /** The latest discovered catalog; handleJob maps a job's account to its CODEX_HOME with it. */
 let catalog: Catalog = { accounts: [], homes: {} };
 
-async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
+/** Transcribes voice messages; null when they are turned off or uv is missing. */
+let speech: Speech | null = null;
+
+/** The text of a voice message, written to a private temp file for the speech worker. */
+async function transcribe(file: JobFile, signal: AbortSignal) {
+  if (!speech) throw new Error("This Mac can't transcribe voice messages yet: install uv (brew install uv) and restart the bridge.");
+  const dir = await mkdtemp(join(tmpdir(), "padsync-voice-"));
+  try {
+    const path = join(dir, file.path);
+    await writeFile(path, Buffer.from(file.base64 ?? "", "base64"), { mode: 0o600, flag: "wx" });
+    return await speech.transcribe(path, signal);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob, trace: Record<string, number> = {}) {
+  // Latency stamps (src/lib/chat-trace.ts), sent with every update; the first stamp of each counts.
+  const mark = (event: string) => (trace[`bridge.${event}`] ??= Date.now());
+  trace["bridge.updates"] = 0;
+  trace["bridge.update_ms"] = 0;
+  const update = async (u: Parameters<BridgeApi["update"]>[1], opts?: Parameters<BridgeApi["update"]>[2]) => {
+    if (u.status) mark("final_sent");
+    const sentAt = Date.now();
+    const r = await api.update(job.id, { ...u, trace: { ...trace } }, opts);
+    trace["bridge.updates"]++;
+    trace["bridge.update_ms"] += Date.now() - sentAt;
+    return r;
+  };
   const isImport = job.kind === "import";
   // An import's result is a file in out/, so it may always write there.
   const o = cleanOptions(job.agent, isImport ? { ...job.options, allowEdits: true } : job.options);
@@ -142,7 +173,7 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
   const codexHome = job.agent === "codex" && o.account ? catalog.homes[o.account] : undefined;
   if (job.agent === "codex" && o.account && !codexHome) {
     log(`job ${job.id}: unknown Codex account ${o.account}`);
-    await api.update(job.id, { status: "error", error: `Codex account "${o.account}" isn't set up on this Mac. Pick another model.` }).catch(() => {});
+    await update({ status: "error", error: `Codex account "${o.account}" isn't set up on this Mac. Pick another model.` }).catch(() => {});
     return;
   }
   const abort = new AbortController();
@@ -161,7 +192,7 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
     const out = latest;
     try {
       // Cancelled with the job, so a hung progress request can't hold up stopping it.
-      const r = await api.update(job.id, changed ? { output: out } : {}, { signal: abort.signal });
+      const r = await update(changed ? { output: out } : {}, { signal: abort.signal });
       sent = out;
       lastContact = Date.now();
       if (r.cancelled) {
@@ -184,6 +215,21 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
       const fetched = await fetchUploads(api, job, abort.signal, (done, total) => (latest = `_Fetching the attached files… ${Math.round((done / total) * 100)}%_`));
       job = { ...job, files: [...(job.files ?? []), ...fetched] };
       latest = "";
+      mark("inputs_fetched");
+    }
+    // A voice message becomes the question; the agent gets the words, not the audio.
+    const voice = job.kind === "chat" ? job.files?.find((f) => VOICE_PATH_RE.test(f.path)) : undefined;
+    if (voice) {
+      const started = mark("transcribe_start");
+      const heard = await transcribe(voice, abort.signal);
+      mark("transcribed");
+      if (!heard) throw new Error("No speech was heard in the voice message. Hold the mic (or ⌥M) and try again.");
+      log(`job ${job.id}: transcribed in ${Date.now() - started} ms: ${heard.slice(0, 80)}`);
+      // Anything typed before recording comes first.
+      const question = [job.question.trim(), heard].filter(Boolean).join("\n\n").slice(0, 4000);
+      await update({ question }, { signal: abort.signal });
+      mark("transcript_sent");
+      job = { ...job, question, files: job.files?.filter((f) => f !== voice) };
     }
     if (job.kind === 'chat') job = { ...job, files: job.files?.length ? job.files : [{path:'README.md',mime:'text/markdown',text:'Chat turn. Return changed files in out/ when edits are allowed.'}] };
     // Inputs and the agent's out/ share the job folder, so withJobDir's clean-up covers both,
@@ -204,21 +250,29 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
       };
       const basePrompt = isImport ? buildImportPrompt(job.question, d, job.agent, runOpts) : bundle ? buildBundlePrompt(job.question, d, job.agent, runOpts) : buildAgentPrompt(job.question, d, job.agent);
       const command = agentCommand(job.agent, cfg, bundle ? attachedImages(d.files) : !!d.image, runOpts);
-      const run = (resume: boolean, prefix: string) => runAgent({
+      const run = (resume: boolean, prefix: string) => {
+        mark("agent_spawn");
+        return runAgent({
         cwd: d.dir,
         prompt: prefix + basePrompt,
         command: resume && session ? resumeCommand(command, job.agent, session.sessionId) : command,
         timeoutMs: isImport ? IMPORT_TIMEOUT_MS : JOB_TIMEOUT_MS,
-        onText: (t) => (latest = t),
+        onText: (t) => {
+          mark("first_text");
+          latest = t;
+        },
+        onFirstLine: () => mark("agent_first_event"),
         signal: abort.signal,
         ...(codexHome ? { env: { ...agentEnv(), CODEX_HOME: codexHome } as unknown as NodeJS.ProcessEnv } : {}),
-      });
+        });
+      };
       const result = job.kind === 'chat'
         ? await runChatWithFallback(!!session, async (resume, history) => {
           latest = '';
           return run(resume, history ? await historyPrompt() : '');
         })
         : await run(false, '');
+      mark("agent_exit");
       let files: JobFile[] = [];
       if (result.status === "done" && d.out && runOpts.allowEdits) {
         // A failure here must not cost the answer.
@@ -236,14 +290,14 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
       if (shutdown.signal.aborted) await reportStopped(api, job.id, result.output);
       return;
     }
-    if (result.status !== "done") await api.update(job.id, { output: result.output, status: "error", error: result.error });
-    else if (!files.length) await api.update(job.id, { output: result.output, status: "done", sessionId: result.sessionId });
+    if (result.status !== "done") await update({ output: result.output, status: "error", error: result.error });
+    else if (!files.length) await update({ output: result.output, status: "done", sessionId: result.sessionId });
     else {
       // Keep the answer even if padSync refuses the files (e.g. an older server).
-      await api.update(job.id, { output: result.output, status: "done", sessionId: result.sessionId, files }).catch((e) => {
+      await update({ output: result.output, status: "done", sessionId: result.sessionId, files }).catch((e) => {
         if (!(e instanceof ApiError) || e.status !== 400) throw e;
         log(`job ${job.id}: server refused the returned files: ${e.message}`);
-        return api.update(job.id, { output: `${result.output}\n\n_The files the agent wrote could not be returned: ${e.message}_`, status: "done", sessionId: result.sessionId });
+        return update({ output: `${result.output}\n\n_The files the agent wrote could not be returned: ${e.message}_`, status: "done", sessionId: result.sessionId });
       });
     }
     log(`job ${job.id} ${result.status}${result.error ? `: ${result.error}` : ""}`);
@@ -257,7 +311,7 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob) {
       return;
     }
     log(`job ${job.id} failed: ${(e as Error).message}`);
-    await api.update(job.id, { status: "error", error: (e as Error).message }).catch(() => {});
+    await update({ status: "error", error: (e as Error).message }).catch(() => {});
   } finally {
     clearInterval(ticker);
     shutdown.signal.removeEventListener("abort", onShutdown);
@@ -275,6 +329,15 @@ async function run() {
   if (!agents.length) throw new Error("neither claude nor codex is on PATH");
   const api = new BridgeApi(cfg);
   const info = { hostname: hostname(), version: VERSION };
+  // Load the speech model now, so the first voice message is as quick as the rest.
+  const speechCfg = cfg.speech === false ? null : (cfg.speech ?? {});
+  const uv = speechCfg && uvVersion(speechCfg.uvBin);
+  if (speechCfg && uv) {
+    speech = new Speech({ ...speechCfg, log });
+    log(`speech: ${uv}, loading the voice model`);
+    void speech.start().catch(() => {});
+  } else log(speechCfg ? "speech: uv not found, voice messages are off (brew install uv)" : "speech: turned off in the config");
+  const features = ["import", "chat", ...(speech ? ["voice"] : [])];
   const swept = await sweepStaleJobDirs(STALE_JOB_DIR_MS);
   if (swept) log(`removed ${swept} job folder(s) left over from an earlier run`);
   // One poll: the claim and, if it returned a job, running it. Shutdown waits for the whole of it,
@@ -284,6 +347,7 @@ async function run() {
     if (shutdown.signal.aborted) return;
     log(`${sig}: stopping`);
     shutdown.abort();
+    speech?.stop();
     setTimeout(() => process.exit(1), SHUTDOWN_EXIT_MS).unref();
     void Promise.resolve(active)
       .catch(() => {})
@@ -316,10 +380,15 @@ async function run() {
   while (!shutdown.signal.aborted) {
     if (Date.now() - catalogAt > CATALOG_MS) await refreshCatalog();
     try {
-      active = api.claim(agents, info).then(async ({ job }) => {
+      const claimSent = Date.now();
+      active = api.claim(agents, info, features).then(async ({ job, serverTime }) => {
         if (!job) return false;
+        const claimed = Date.now();
+        // Server clock minus ours, from this round trip, so traces line up across machines.
+        const trace: Record<string, number> = { "bridge.claim_sent": claimSent, "bridge.claimed": claimed, "bridge.claim_rtt": claimed - claimSent };
+        if (serverTime) trace["bridge.clock_offset"] = serverTime - (claimSent + claimed) / 2;
         if (shutdown.signal.aborted) await reportStopped(api, job.id);
-        else await handleJob(api, cfg, job);
+        else await handleJob(api, cfg, job, trace);
         return true;
       });
       const hadJob = await active.finally(() => (active = null));

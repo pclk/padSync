@@ -85,6 +85,8 @@ export interface Turn {
   question: string;
   context: ContextSummary | null;
   attachments: FileInfo[];
+  /** Latency stamps, epoch ms per machine (src/lib/chat-trace.ts). */
+  trace?: Record<string, number>;
   agent: ChatAgent;
   options: ChatOptions;
   status: TurnStatus;
@@ -110,6 +112,8 @@ export interface ThreadResponse {
   bridgeSeenAt: string | null;
   /** Server time; pass it back as `since` on the next poll. */
   now: string;
+  /** Server clock (epoch ms) just before responding, for latency traces. */
+  serverTime?: number;
 }
 
 export interface NewThread {
@@ -134,6 +138,8 @@ export interface NewTurn<F = unknown, U = unknown> {
   uploads: U[];
   context?: ContextSummary;
   options?: ChatOptions;
+  /** The device's own latency stamps from before the request ("client.*"). */
+  trace?: Record<string, number>;
 }
 
 /** Layout of the Mac side panel (src/lib/layout-mode.ts decides it). */

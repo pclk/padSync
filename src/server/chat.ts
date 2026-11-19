@@ -2,8 +2,9 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { MAX_UPLOAD_FILES, MAX_TOTAL_CHARS } from "@/lib/uploads";
+import { VOICE_PATH_RE } from "@/lib/context";
 import type { Sql } from "./db";
-import { jobOptionsSchema } from "./jobs";
+import { NOW_MS, jobOptionsSchema, traceSchema } from "./jobs";
 import type { ThreadSummary, Turn } from "@/lib/chat-types";
 export const threadSchema = z.object({
   notebookId: z.string().max(100).default(""),
@@ -104,7 +105,7 @@ export async function getTurns(
       offsets[n] = len;
   }
   return sql.query<Turn>(
-    `select id as "jobId", turn,question,chat_context as context,attachments,agent,options,status,
+    `select id as "jobId", turn,question,chat_context as context,attachments,trace,agent,options,status,
  substring(output from (case when status='running' then least(length(output),coalesce(($3::jsonb->>turn::text)::int,0)) else 0 end)+1) as output,
  case when status='running' then least(length(output),coalesce(($3::jsonb->>turn::text)::int,0)) else 0 end as "outputOffset",
  error,created_at as "createdAt",updated_at as "updatedAt",finished_at as "finishedAt",
@@ -114,7 +115,8 @@ export async function getTurns(
   );
 }
 export const newTurnSchema = z.object({
-  question: z.string().trim().min(1).max(4000),
+  /** Empty for a voice message: the bridge fills it in with the transcript. */
+  question: z.string().trim().max(4000),
   files: z.array(z.unknown()).default([]),
   uploads: z.array(z.unknown()).default([]),
   context: z
@@ -127,6 +129,7 @@ export const newTurnSchema = z.object({
     })
     .optional(),
   options: jobOptionsSchema.optional(),
+  trace: traceSchema("client").optional(),
 });
 export async function createTurn(
   sql: Sql,
@@ -134,6 +137,7 @@ export async function createTurn(
   raw: z.infer<typeof newTurnSchema>,
   expectedLastTurn?: number,
 ) {
+  const receivedAt = Date.now();
   const { jobFilesSchema, uploadSchema } = await import("./jobs");
   const files = jobFilesSchema.parse(raw.files);
   const uploads = z
@@ -146,6 +150,8 @@ export async function createTurn(
     uploads.reduce((n, u) => n + u.size, 0) > MAX_TOTAL_CHARS
   )
     throw new Error("Invalid attachments");
+  const voices = [...files, ...uploads].filter((f) => VOICE_PATH_RE.test(f.path)).length;
+  if (voices > 1 || (!raw.question && !voices)) throw new Error("Invalid attachments");
   const meta = [
     ...files.map((f) => ({
       path: f.path,
@@ -161,9 +167,10 @@ export async function createTurn(
        where id = $1 and deleted_at is null and ($10::int is null or next_turn = $10)
        returning *
      ) insert into jobs(id, kind, thread_id, turn, notebook_id, agent, question, options,
-         files, chat_files, uploads, status, chat_context, attachments)
+         files, chat_files, uploads, status, chat_context, attachments, trace)
        select $2, 'chat', id, next_turn, notebook_id, agent, $3, coalesce($4::jsonb,options),
-         $5::jsonb, $5::jsonb, $6::jsonb, $7, $8::jsonb, $9::jsonb from t returning id`,
+         $5::jsonb, $5::jsonb, $6::jsonb, $7, $8::jsonb, $9::jsonb,
+         $11::jsonb || jsonb_build_object('server.received', $12::bigint, 'server.created', ${NOW_MS}) from t returning id`,
     [
       key,
       id(),
@@ -175,12 +182,16 @@ export async function createTurn(
       JSON.stringify(raw.context ?? null),
       JSON.stringify(meta),
       expectedLastTurn ?? null,
+      JSON.stringify(raw.trace ?? {}),
+      receivedAt,
     ],
   );
   if (!rows.length) return null;
   await pruneReplay(sql, key);
   return (await getTurns(sql, key, undefined, "", rows[0].id))[0];
 }
+/** Turns made from an earlier one drop its voice message: the transcript is already the question. */
+const withoutVoice = <T extends { path: string }>(fs: T[]) => fs.filter((f) => !VOICE_PATH_RE.test(f.path));
 export async function regenerate(sql: Sql, key: string, n: number) {
   const rows = await sql.query<{
     question: string;
@@ -188,26 +199,30 @@ export async function regenerate(sql: Sql, key: string, n: number) {
     uploads: unknown[];
     context?: z.infer<typeof newTurnSchema>["context"];
     options: z.infer<typeof jobOptionsSchema>;
+    transcribed: boolean;
   }>(
-    `select question,chat_files as files,uploads,options,chat_context as context from jobs where thread_id=$1 and turn=$2 and turn=(select max(turn) from jobs where thread_id=$1)`,
+    `select question,chat_files as files,uploads,options,chat_context as context,transcribed from jobs where thread_id=$1 and turn=$2 and turn=(select max(turn) from jobs where thread_id=$1)`,
     [key, n],
   );
   if (!rows.length) return null;
   const r = rows[0];
-  const parts = await replayParts(sql, key, n);
+  // Untranscribed (it failed, or was stopped first): send the recording again.
+  const keep = r.transcribed ? withoutVoice : <T,>(fs: T[]) => fs;
+  const parts = keep(await replayParts(sql, key, n));
+  const uploads = keep((r.uploads ?? []) as { path: string }[]);
   const created = await createTurn(
     sql,
     key,
     {
       question: r.question,
-      files: r.files ?? [],
-      uploads: r.uploads ?? [],
+      files: keep((r.files ?? []) as { path: string }[]),
+      uploads,
       options: r.options,
       context: r.context ?? undefined,
     },
     n,
   );
-  if (created && r.uploads?.length) {
+  if (created && uploads.length) {
     await copyParts(sql, created.jobId, parts);
     await sql.query(
       `update jobs set status='queued' where id=$1 and (select count(*) from job_inputs where job_id=$1)=(select coalesce(sum((u->>'parts')::int),0) from jsonb_array_elements(uploads) u)`,
@@ -226,7 +241,7 @@ export async function forkThread(
 ) {
   const key2 = id();
   await sql.query(
-    `with t as (insert into chat_threads(id,notebook_id,title,agent,options,forked_from,next_turn) select $2,notebook_id,coalesce($4,title),agent,options,jsonb_build_object('threadId',id,'turn',$3::int),coalesce((select max(turn) from jobs where thread_id=$1 and turn<=$3 and status='done'),0) from chat_threads where id=$1 and deleted_at is null returning id) insert into jobs(id,kind,thread_id,turn,notebook_id,agent,question,options,status,output,chat_context,attachments,result_files,finished_at) select $2||'_'||turn,'chat',t.id,turn,notebook_id,agent,question,options,'done',output,chat_context,attachments,result_files,finished_at from jobs cross join t where thread_id=$1 and turn<=$3 and status='done'`,
+    `with t as (insert into chat_threads(id,notebook_id,title,agent,options,forked_from,next_turn) select $2,notebook_id,coalesce($4,title),agent,options,jsonb_build_object('threadId',id,'turn',$3::int),coalesce((select max(turn) from jobs where thread_id=$1 and turn<=$3 and status='done'),0) from chat_threads where id=$1 and deleted_at is null returning id) insert into jobs(id,kind,thread_id,turn,notebook_id,agent,question,options,status,output,chat_context,attachments,result_files,finished_at,transcribed) select $2||'_'||turn,'chat',t.id,turn,notebook_id,agent,question,options,'done',output,chat_context,attachments,result_files,finished_at,transcribed from jobs cross join t where thread_id=$1 and turn<=$3 and status='done'`,
     [key, key2, n, title ?? null],
   );
   return getThread(sql, key2);
@@ -296,7 +311,7 @@ export async function editTurn(
   const source = (
     await sql.query<{
       chat_files: z.infer<typeof newTurnSchema>["files"] | null;
-      uploads: { parts: number }[] | null;
+      uploads: { path: string; parts: number }[] | null;
       attachments: unknown[];
       chat_context: z.infer<typeof newTurnSchema>["context"];
       options: z.infer<typeof jobOptionsSchema>;
@@ -317,15 +332,16 @@ export async function editTurn(
     );
   const fork = await forkThread(sql, key, n - 1);
   if (!fork) return null;
+  const kept = withoutVoice(parts);
   const next = await createTurn(sql, fork.id, {
     question,
-    files: source.chat_files ?? [],
-    uploads: source.uploads ?? [],
+    files: withoutVoice((source.chat_files ?? []) as { path: string }[]),
+    uploads: withoutVoice(source.uploads ?? []),
     context: source.chat_context ?? undefined,
     options: source.options,
   });
-  if (next && parts.length) {
-    await copyParts(sql, next.jobId, parts);
+  if (next && kept.length) {
+    await copyParts(sql, next.jobId, kept);
     await sql.query(`update jobs set status='queued' where id=$1`, [
       next.jobId,
     ]);

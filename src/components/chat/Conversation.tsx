@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ChatAgent, ChatOptions, Turn } from "@/lib/chat-types";
 import type { SectionEntity } from "@/lib/types";
 import { hasNewOutput, queuedAfterPrevious } from "@/lib/chat-ui";
+import { turnCost, type Price } from "@/lib/chat-cost";
 import { Message } from "./Message";
 import { Icon } from "../Icons";
 
@@ -21,6 +22,7 @@ export function Conversation(p: {
   edit(turn: Turn, question: string): Promise<void>;
   fork(turn: Turn, question: string): Promise<void>;
   modelLabel(s: { agent: ChatAgent; options: ChatOptions }): string;
+  priceOf(s: { agent: ChatAgent; options: ChatOptions }): Price | null;
   /** Fills the composer from an empty-state suggestion. */
   suggest(text: string): void;
   loading: boolean;
@@ -85,6 +87,7 @@ export function Conversation(p: {
                 queued={queuedAfterPrevious(t, p.turns)}
                 last={i === p.turns.length - 1}
                 modelLabel={p.modelLabel(t)}
+                cost={turnCost(p.turns, i, p.priceOf(t))}
               />
             ))}
           </div>

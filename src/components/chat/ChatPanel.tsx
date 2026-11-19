@@ -1,7 +1,9 @@
 "use client";
 import * as api from "@/lib/chat-api";
 import type { PanelMode } from "@/lib/chat-types";
-import { exportMarkdown, writeDraft } from "@/lib/chat-ui";
+import { exportMarkdown, pollDelay, writeDraft } from "@/lib/chat-ui";
+import { latencyReport } from "@/lib/chat-trace";
+import { useIsMac } from "./LatencyTrace";
 import { useChat } from "./useChat";
 import { Composer } from "./Composer";
 import { Conversation } from "./Conversation";
@@ -16,6 +18,7 @@ export function ChatPanel(
   const { open: menuOpen, setOpen: setMenuOpen, ref: menuRef } = usePopover();
   const c = useChat(p);
   const { thread, turns, id } = c;
+  const isMac = useIsMac();
   const wide = p.mode === "chat";
   const running = turns.some((t) =>
     ["queued", "running", "uploading"].includes(t.status),
@@ -46,6 +49,25 @@ export function ChatPanel(
             ),
         ],
         ["export", "download", "Export Markdown", () => c.rowAction("export", thread)],
+        ...(isMac
+          ? ([
+              [
+                "latency",
+                "activity",
+                "Copy latency report",
+                () =>
+                  c.run(() =>
+                    navigator.clipboard.writeText(
+                      latencyReport(thread, turns, {
+                        device: navigator.userAgent,
+                        pollMs: { active: pollDelay("thread", true), idle: pollDelay("thread", false) },
+                        bridgePollMs: 3000, // bridge/padsync-bridge.ts POLL_MS
+                      }),
+                    ),
+                  ),
+              ],
+            ] as [string, IconName, string, () => void][])
+          : []),
         [
           thread.pinned ? "unpin" : "pin",
           "pin",
@@ -150,6 +172,7 @@ export function ChatPanel(
           sections={p.sections}
           action={c.action}
           modelLabel={c.modelLabel}
+          priceOf={c.priceOf}
           loading={c.loading}
           suggest={(text) => {
             c.setDraft(text);
@@ -198,6 +221,7 @@ export function ChatPanel(
             writeDraft(id, s);
           }}
           busy={c.busy}
+          visible={p.visible}
           running={running}
           settings={c.settings}
           setSettings={c.setSettings}

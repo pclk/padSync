@@ -43,10 +43,13 @@ export const MAX_BUNDLE_FILES = 64;
 export const BUNDLE_PATH_RE = /^(?:[A-Za-z0-9][A-Za-z0-9._-]{0,63}\/)?[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
 export const PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 export const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-export const BUNDLE_MIMES = ["text/markdown", "text/plain", "application/json", "image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf", PPTX_MIME, DOCX_MIME] as const;
+export const AUDIO_MIMES = ["audio/mp4", "audio/webm", "audio/ogg", "audio/wav", "audio/mpeg"] as const;
+export const BUNDLE_MIMES = ["text/markdown", "text/plain", "application/json", "image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf", PPTX_MIME, DOCX_MIME, ...AUDIO_MIMES] as const;
+/** A recorded voice message on a chat turn: the Mac transcribes it into the question (bridge/lib.ts). */
+export const VOICE_PATH_RE = /^voice-message\.(?:m4a|webm|ogg|wav|mp3)$/;
 export type BundleMime = (typeof BUNDLE_MIMES)[number];
 /** Binary files travel as base64, the rest as text. */
-export const isBinaryMime = (m: string) => m.startsWith("image/") || m === "application/pdf" || m === PPTX_MIME || m === DOCX_MIME;
+export const isBinaryMime = (m: string) => m.startsWith("image/") || m.startsWith("audio/") || m === "application/pdf" || m === PPTX_MIME || m === DOCX_MIME;
 
 export interface Raster {
   base64: string;

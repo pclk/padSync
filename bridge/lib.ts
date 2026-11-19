@@ -11,6 +11,8 @@ import { ACCOUNT_RE, type CatalogAccount } from "./catalog.ts";
 
 export type Agent = "claude" | "codex";
 export const AGENTS: Agent[] = ["claude", "codex"];
+/** A recorded voice message attached to a chat turn (src/lib/context.ts VOICE_PATH_RE). */
+export const VOICE_PATH_RE = /^voice-message\.(?:m4a|webm|ogg|wav|mp3)$/;
 /** Server-side cap on a job's answer (src/server/jobs.ts MAX_OUTPUT). */
 export const MAX_OUTPUT = 200_000;
 
@@ -70,6 +72,8 @@ export interface BridgeConfig {
   codexBin?: string;
   /** Extra Codex logins besides the ~/.codex* folders found automatically: account id → CODEX_HOME. */
   codexHomes?: Record<string, string>;
+  /** Voice messages (bridge/speech.ts). `false` turns them off; `model` picks another Parakeet. */
+  speech?: false | { uvBin?: string; model?: string };
 }
 
 type Env = Record<string, string | undefined>;
@@ -580,6 +584,8 @@ export interface RunOptions {
   command: AgentCommand;
   timeoutMs: number;
   onText: (fullText: string) => void;
+  /** The agent's first line of output: it has started up (latency traces). */
+  onFirstLine?: () => void;
   signal?: AbortSignal;
   env?: NodeJS.ProcessEnv;
 }
@@ -640,7 +646,12 @@ export function runAgent(opts: RunOptions): Promise<RunResult> {
     if (opts.signal?.aborted) stop("cancelled");
     opts.signal?.addEventListener("abort", onAbort);
 
+    let seenLine = false;
     const handle = (line: string) => {
+      if (!seenLine) {
+        seenLine = true;
+        opts.onFirstLine?.();
+      }
       sessionId = parseSessionId(line) ?? sessionId;
       const u = command.parse(line);
       if (!u) return;
@@ -772,9 +783,10 @@ export class BridgeApi {
     return this.call<{ device: { id: string; name: string } }>("GET", "/api/bridge/whoami");
   }
 
-  claim(agents: Agent[], info: { hostname?: string; version?: string }) {
+  claim(agents: Agent[], info: { hostname?: string; version?: string }, features?: string[]) {
     // "import": this bridge fetches uploads and runs import jobs (older bridges don't get them).
-    return this.call<{ job: ClaimedJob | null }>("POST", "/api/bridge/claim", { agents, info, features: ["import", "chat"] });
+    // "voice": it transcribes voice messages, so it may claim a turn whose question is still empty.
+    return this.call<{ job: ClaimedJob | null; serverTime?: number }>("POST", "/api/bridge/claim", { agents, info, features: features ?? ["import", "chat"] });
   }
 
   /** What this Mac can run, for padSync's model picker (bridge/catalog.ts). */
@@ -786,7 +798,7 @@ export class BridgeApi {
     return this.call<{ data: string }>("GET", `/api/bridge/jobs/${encodeURIComponent(jobId)}/inputs?path=${encodeURIComponent(path)}&part=${part}`, undefined, { ...opts, timeoutMs: 120_000 });
   }
 
-  update(jobId: string, u: { sessionId?: string; output?: string; status?: "done" | "error"; error?: string; files?: JobFile[] }, opts?: { signal?: AbortSignal; timeoutMs?: number }) {
+  update(jobId: string, u: { trace?: Record<string, number>; question?: string; sessionId?: string; output?: string; status?: "done" | "error"; error?: string; files?: JobFile[] }, opts?: { signal?: AbortSignal; timeoutMs?: number }) {
     return this.call<{ status: string; cancelled: boolean }>("POST", `/api/bridge/jobs/${encodeURIComponent(jobId)}`, { ...u, ...(u.output === undefined ? {} : { output: u.output.slice(0, MAX_OUTPUT).replace(/[\uD800-\uDBFF]$/, "") }) }, opts);
   }
 }

@@ -8,6 +8,7 @@ import type {
   ThreadListResponse,
   Turn,
 } from "./chat-types";
+import type { PricingResponse } from "./chat-cost";
 async function call<T>(
   path: string,
   method = "GET",
@@ -80,6 +81,7 @@ export const forkThread = (id: string, uptoTurn: number, title?: string) =>
     title,
   });
 export const getCatalog = () => call<CatalogResponse>("/api/chat/catalog");
+export const getPricing = () => call<PricingResponse>("/api/chat/pricing");
 export const cancelTurn = (jobId: string) =>
   call<unknown>(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, "POST");
 export function mergeTurns(prev: Turn[], incoming: Turn[]): Turn[] {
@@ -129,7 +131,7 @@ export function uploadSpecs(files: InputFile[]): UploadSpec[] {
     throw new Error(`Attach at most ${MAX_UPLOAD_FILES} files.`);
   const seen = new Set<string>();
   const specs = files.map((f) => {
-    if (!/^(image\/(png|jpeg|webp|gif)|application\/pdf)$/.test(f.mime))
+    if (!/^(image\/(png|jpeg|webp|gif)|application\/pdf|audio\/(mp4|webm|ogg|wav|mpeg))$/.test(f.mime))
       throw new Error("Attach an image (PNG, JPEG, WebP, GIF) or PDF.");
     if (
       !/^[a-zA-Z0-9_-][a-zA-Z0-9._-]*(\/[a-zA-Z0-9_-][a-zA-Z0-9._-]*)?$/.test(

@@ -23,7 +23,8 @@ export async function GET(req: NextRequest, c: Context) {
     chat.getTurns(auth.sql, id, since, q.get("from") ?? ""),
     lastBridgeActivity(auth.sql),
   ]);
-  return json({ thread, turns, bridgeSeenAt, now });
+  // serverTime: as late as possible, so the device can estimate its clock offset (chat-trace.ts).
+  return json({ thread, turns, bridgeSeenAt, now, serverTime: Date.now() });
 }
 export async function PATCH(req: NextRequest, c: Context) {
   const auth = await requireSession(req);

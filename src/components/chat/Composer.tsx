@@ -9,6 +9,7 @@ import {
   type ContextProps,
 } from "./ContextPicker";
 import { ModelPicker } from "./ModelPicker";
+import { isTalkKey, useVoice } from "./useVoice";
 import { Icon, type IconName } from "../Icons";
 import { PROMPT_EVENT, takePrompt } from "@/lib/prompts";
 
@@ -19,6 +20,8 @@ export function Composer(
     draft: string;
     setDraft(s: string): void;
     busy: boolean;
+    /** The chat is on screen: the hold-to-talk hotkey only listens then. */
+    visible: boolean;
     /** A reply is queued or streaming: the send button becomes Stop while the box is empty. */
     running: boolean;
     settings: Settings;
@@ -30,6 +33,8 @@ export function Composer(
       context: ContextHandle | null,
       files: File[],
       progress: Parameters<typeof uploadTurnInputs>[2],
+      voice?: Blob,
+      marks?: Record<string, number>,
     ): Promise<void>;
     stop(): void;
   },
@@ -96,15 +101,15 @@ export function Composer(
       panel?.removeEventListener("drop", drop);
     };
   });
-  async function send() {
-    if (!p.draft.trim() || p.busy) return;
+  async function send(voice?: Blob, marks: Record<string, number> = { "client.pressed": Date.now() }) {
+    if ((!p.draft.trim() && !voice) || p.busy) return;
     setError("");
     setProgress(0);
     try {
-      await p.send(p.draft, ctx.current, files, {
+      await p.send(p.draft.trim(), ctx.current, files, {
         onProgress: (sent: number, total: number) =>
           setProgress(total ? (sent / total) * 100 : 100),
-      });
+      }, voice, marks);
       setFiles([]);
     } catch (error) {
       setError((error as Error).message);
@@ -131,6 +136,44 @@ export function Composer(
     window.addEventListener(PROMPT_EVENT, take);
     return () => window.removeEventListener(PROMPT_EVENT, take);
   }, []);
+  const voice = useVoice({
+    // Anything already typed is sent too: the Mac puts the transcript after it.
+    onAudio: (audio, took) => {
+      if (p.busy) setError("Still sending the last message. Try the voice message again in a moment.");
+      else void send(audio, { "client.pressed": took.releasedAt, "client.recorded": Date.now(), "client.recording_ms": took.durationMs });
+    },
+    onError: setError,
+  });
+  // Hold ⌥M to talk, release to send; Esc while holding cancels.
+  useEffect(() => {
+    if (!p.visible || !voice.supported) return;
+    function down(e: KeyboardEvent) {
+      if (voice.active() && e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        voice.cancel();
+        return;
+      }
+      if (!isTalkKey(e)) return;
+      e.preventDefault();
+      if (!e.repeat && !voice.active()) {
+        setError("");
+        voice.start();
+      }
+    }
+    function up(e: KeyboardEvent) {
+      if (e.code === "KeyM" || e.key === "Alt") voice.finish();
+    }
+    const blur = () => voice.cancel();
+    window.addEventListener("keydown", down, true);
+    window.addEventListener("keyup", up, true);
+    window.addEventListener("blur", blur);
+    return () => {
+      window.removeEventListener("keydown", down, true);
+      window.removeEventListener("keyup", up, true);
+      window.removeEventListener("blur", blur);
+    };
+  });
   const toggle = (key: "webSearch" | "allowCode", icon: IconName, label: string, hint: string) => (
     <button
       aria-pressed={tools[key]}
@@ -152,6 +195,19 @@ export function Composer(
         {dragging && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[1.4rem] bg-brand-50/90 text-sm font-medium text-brand-700">
             Drop images or PDFs to attach
+          </div>
+        )}
+        {voice.state !== "idle" && (
+          <div role="status" className="flex items-start gap-2 px-4 pt-3 text-sm">
+            <span className="mt-1.5 h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-rose-500 motion-reduce:animate-none" aria-hidden="true" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs font-medium text-slate-500">
+                {voice.state === "starting" ? "Opening the microphone…" : "Recording · release to send · Esc to cancel"}
+              </span>
+              <span className="tabular-nums text-slate-900">
+                {Math.floor(voice.elapsed / 60)}:{String(voice.elapsed % 60).padStart(2, "0")}
+              </span>
+            </span>
           </div>
         )}
         {files.length > 0 && (
@@ -241,6 +297,31 @@ export function Composer(
               value={p.settings}
               onChange={p.setSettings}
             />
+            {voice.supported && (
+              <button
+                aria-label="Hold to talk"
+                title="Hold to talk, release to send (hold ⌥M). Slide off to cancel."
+                disabled={p.busy}
+                className={`flex h-8 w-8 shrink-0 touch-none select-none items-center justify-center rounded-full transition-colors ${voice.state === "idle" ? "text-slate-500 hover:bg-slate-100 hover:text-slate-800" : "bg-rose-500 text-white"}`}
+                onContextMenu={(e) => e.preventDefault()}
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return;
+                  e.preventDefault();
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                  setError("");
+                  voice.start();
+                }}
+                onPointerUp={(e) => {
+                  const r = e.currentTarget.getBoundingClientRect();
+                  const inside = e.clientX >= r.left - 24 && e.clientX <= r.right + 24 && e.clientY >= r.top - 24 && e.clientY <= r.bottom + 24;
+                  if (inside) voice.finish();
+                  else voice.cancel();
+                }}
+                onPointerCancel={() => voice.cancel()}
+              >
+                <Icon name="mic" />
+              </button>
+            )}
             {showStop ? (
               <button
                 aria-label="Stop the reply"
