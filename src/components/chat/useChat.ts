@@ -16,6 +16,7 @@ import {
   exportMarkdown,
   fallbackCatalog,
   groupThreads,
+  newChatSettings,
   pollDelay,
   readDraft,
   readStored,
@@ -23,6 +24,8 @@ import {
   toolsOf,
   writeDraft,
   writeStored,
+  sameModel,
+  type ModelChoice,
   type ThreadFilter,
 } from "@/lib/chat-ui";
 import { priceFor, type Price } from "@/lib/chat-cost";
@@ -51,6 +54,13 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
   const [defaults, setDefaults] = useState<{ agent: ChatAgent; options: ChatOptions }>(() =>
     readStored("padsync.chat.defaults", { agent: "claude", options: {} }),
   );
+  // The model new chats start on, synced to every device (src/server/prefs.ts); the local copy
+  // shows it instantly while the server's is fetched.
+  const [defaultModel, setDefaultModelState] = useState<ModelChoice | null>(() =>
+    readStored("padsync.chat.defaultModel", null),
+  );
+  /** A model picked before the first message of a new chat: used for that chat only. */
+  const [pendingSettings, setPendingSettings] = useState<{ agent: ChatAgent; options: ChatOptions } | null>(null);
   const [catalog, setCatalog] = useState<CatalogAccount[] | null>(null);
   const catalogAt = useRef(0);
   const [prices, setPrices] = useState<Record<string, Price> | null>(null);
@@ -89,6 +99,7 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
     setDraft(readDraft(next));
     selected.current = next;
     turnsRef.current = [];
+    setPendingSettings(null);
     setId(next);
     setTurns([]);
     setThread(threads.find((t) => t.id === next) ?? null);
@@ -117,6 +128,22 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
       .catch(() => {
         catalogAt.current = 0;
       });
+  }, [p.visible, tabVisible]);
+  useEffect(() => {
+    if (!p.visible || !tabVisible) return;
+    const load = () =>
+      api
+        .getPrefs()
+        .then(({ prefs }) => {
+          const next = (prefs["chat.defaultModel"] as ModelChoice | undefined) ?? null;
+          setDefaultModelState(next);
+          writeStored("padsync.chat.defaultModel", next);
+        })
+        .catch(() => {});
+    load();
+    // Picks up a default changed on another device without a reload.
+    const timer = setInterval(load, 60_000);
+    return () => clearInterval(timer);
   }, [p.visible, tabVisible]);
   useEffect(() => {
     if (!p.visible || prices) return;
@@ -219,22 +246,25 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
     );
   /** "New chat" goes to an untouched chat if there is one, else makes one. */
   const create = async () => {
-    const empty = reusableThread(threads, p.notebookId, {
+    const start = pendingSettings ?? newChatSettings(defaults, defaultModel);
+    setPendingSettings(null);
+    let empty = reusableThread(threads, p.notebookId, {
       id,
       turns: turns.length,
     });
     if (empty) {
-      if (empty.id !== id) {
-        select(empty.id);
-        setThread(empty);
-      }
+      // An untouched chat made earlier still starts on today's default.
+      if (!sameModel(empty, start))
+        empty = (await api.updateThread(empty.id, { agent: start.agent, options: { ...empty.options, ...start.options } })).thread;
+      if (empty.id !== id) select(empty.id);
+      setThread(empty);
       focusComposer();
       return empty;
     }
-    const options = { ...defaults.options, ...toolsOf(defaults.options) };
+    const options = { ...start.options, ...toolsOf(start.options) };
     const data = await api.createThread({
       notebookId: p.notebookId,
-      agent: defaults.agent,
+      agent: start.agent,
       options,
     });
     setThreads((old) => [data.thread, ...old]);
@@ -253,14 +283,28 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
   };
   const settings = thread
     ? { agent: thread.agent, options: thread.options }
-    : defaults;
-  /** Model, effort and tools apply to the open chat's next turns and to new chats. */
+    : (pendingSettings ?? newChatSettings(defaults, defaultModel));
+  /**
+   * Model, effort and tools apply to the open chat's next turns. They are also remembered on this
+   * device for new chats, though a synced default model takes precedence over the model part.
+   */
   const setSettings = (next: { agent: ChatAgent; options: ChatOptions }) => {
     setDefaults(next);
     writeStored("padsync.chat.defaults", next);
-    if (!thread) return;
+    if (!thread) return setPendingSettings(next);
     setThread({ ...thread, ...next });
     patch(next);
+  };
+  /** Saves (or with null, clears) the default model on the server, for every device. */
+  const setDefaultModel = (next: ModelChoice | null) => {
+    const before = defaultModel;
+    setDefaultModelState(next);
+    writeStored("padsync.chat.defaultModel", next);
+    api.putPref("chat.defaultModel", next).catch((e: Error) => {
+      setDefaultModelState(before);
+      writeStored("padsync.chat.defaultModel", before);
+      setError(`Could not save the default model: ${e.message}`);
+    });
   };
   const accounts = catalog?.length ? catalog : fallbackCatalog();
   const modelLabel = (s: { agent: ChatAgent; options: ChatOptions }) =>
@@ -441,6 +485,8 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
     id,
     settings,
     setSettings,
+    defaultModel,
+    setDefaultModel,
     accounts,
     fallbackModels: !catalog?.length,
     modelLabel,

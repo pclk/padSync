@@ -65,7 +65,7 @@ export function Conversation(p: {
               {SUGGESTIONS.map((s) => (
                 <button
                   key={s}
-                  className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 shadow-card transition-colors hover:bg-slate-50 hover:text-slate-900"
+                  className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 shadow-card transition-colors hover:bg-slate-50 hover:text-slate-900 pointer-coarse:px-4 pointer-coarse:py-2.5 pointer-coarse:text-[15px]"
                   onClick={() => p.suggest(s)}
                 >
                   {s}

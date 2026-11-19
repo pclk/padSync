@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import type { CatalogAccount, CatalogModel, ChatAgent, ChatOptions } from "@/lib/chat-types";
-import { EFFORTS, chooseModel, describeModel, filterModels } from "@/lib/chat-ui";
+import { EFFORTS, chooseModel, describeModel, filterModels, modelChoice, sameModel, type ModelChoice } from "@/lib/chat-ui";
 import { Icon } from "../Icons";
 import { usePopover } from "./Popover";
 
@@ -17,6 +17,9 @@ export function ModelPicker(p: {
   fallback: boolean;
   value: Settings;
   onChange(next: Settings): void;
+  /** The synced default for new chats, and saving it (null clears it). */
+  defaultModel: ModelChoice | null;
+  setDefaultModel(next: ModelChoice | null): void;
 }) {
   const { open, setOpen, ref } = usePopover();
   const [q, setQ] = useState("");
@@ -26,6 +29,10 @@ export function ModelPicker(p: {
   const shown = useMemo(() => filterModels(p.accounts, q), [p.accounts, q]);
   const efforts = current.model?.efforts ?? EFFORTS[p.value.agent];
   const multipleOfAgent = (agent: ChatAgent) => p.accounts.filter((a) => a.agent === agent).length > 1;
+  const isDefault = sameModel(p.value, p.defaultModel);
+  const fallbackDefault = p.defaultModel && describeModel(p.accounts, p.defaultModel);
+  // On a touch screen, focusing the search box would raise the keyboard over the list.
+  const touch = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
 
   const pick = (account: CatalogAccount, model: { id: string; efforts?: string[] }) => {
     p.onChange(chooseModel(p.value.options, account, model));
@@ -34,19 +41,21 @@ export function ModelPicker(p: {
   };
   const row = (account: CatalogAccount, m: CatalogModel) => {
     const selected = current.account?.id === account.id && current.model?.id === m.id;
+    const mine = !!p.defaultModel && p.defaultModel.agent === account.agent && describeModel(p.accounts, p.defaultModel).account?.id === account.id && p.defaultModel.options.model === m.id;
     return (
       <button
         key={m.id}
         role="menuitemradio"
         aria-checked={selected}
-        className={`flex w-full items-start gap-2.5 rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-slate-100 ${selected ? "bg-slate-100" : ""}`}
+        className={`flex w-full items-start gap-2.5 rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-slate-100 pointer-coarse:py-2.5 ${selected ? "bg-slate-100" : ""}`}
         onClick={() => pick(account, m)}
       >
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5 font-medium text-slate-800">
             {m.label}
             {m.badge && <span className="rounded-full bg-amber-50 px-1.5 text-[10px] font-medium text-amber-700">{m.badge}</span>}
-            {account.defaultModel === m.id && <span className="text-[10px] font-normal text-slate-400">default</span>}
+            {mine && <span className="rounded-full bg-brand-50 px-1.5 text-[10px] font-medium text-brand-700">Default</span>}
+            {!mine && account.defaultModel === m.id && <span className="text-[10px] font-normal text-slate-400">CLI default</span>}
           </span>
           {(m.description || m.contextWindow) && (
             <span className="block truncate text-xs text-slate-500">
@@ -67,7 +76,7 @@ export function ModelPicker(p: {
         aria-haspopup="menu"
         aria-expanded={open}
         title={[current.account?.label, current.account?.detail].filter(Boolean).join(" · ")}
-        className="flex h-8 min-w-0 items-center gap-1 rounded-full px-2.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 aria-expanded:bg-slate-100"
+        className="flex h-8 min-w-0 items-center gap-1 rounded-full px-2.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 aria-expanded:bg-slate-100 pointer-coarse:h-10 pointer-coarse:text-[13px]"
         onClick={() => setOpen(!open)}
       >
         <span className="truncate">
@@ -88,7 +97,7 @@ export function ModelPicker(p: {
           <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-2">
             <Icon name="search" className="shrink-0 text-slate-400" />
             <input
-              autoFocus
+              autoFocus={!touch}
               aria-label="Search models"
               placeholder="Search models"
               className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
@@ -129,6 +138,29 @@ export function ModelPicker(p: {
             {!shown.length && <p className="px-2.5 py-3 text-center text-xs text-slate-500">No model matches “{q}”.</p>}
           </div>
           <div className="space-y-2 border-t border-slate-200 p-2.5">
+            <div className="flex min-h-8 items-center gap-2 text-xs">
+              {isDefault ? (
+                <>
+                  <Icon name="tick" className="shrink-0 text-brand-600" />
+                  <span className="min-w-0 flex-1 text-slate-600">Default for new chats on all your devices</span>
+                  <button className="shrink-0 rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800" onClick={() => p.setDefaultModel(null)}>
+                    Clear
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="min-w-0 flex-1 truncate text-slate-500">
+                    {fallbackDefault ? `Default: ${fallbackDefault.label}${p.defaultModel?.options.effort ? ` · ${EFFORT_LABEL[p.defaultModel.options.effort] ?? p.defaultModel.options.effort}` : ""}` : "No default: new chats use the last model picked"}
+                  </span>
+                  <button
+                    className="shrink-0 rounded-full border border-slate-200 px-2.5 py-1 font-medium text-slate-700 hover:bg-slate-100 pointer-coarse:py-2"
+                    onClick={() => p.setDefaultModel(modelChoice(p.value))}
+                  >
+                    Make default
+                  </button>
+                </>
+              )}
+            </div>
             {efforts.length > 0 && (
               <div className="flex items-center gap-2">
                 <span className="w-12 shrink-0 text-xs text-slate-500">Effort</span>

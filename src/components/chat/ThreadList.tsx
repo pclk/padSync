@@ -58,11 +58,11 @@ function Row(p: ThreadListProps & { t: ThreadSummary }) {
         />
       ) : (
         <button
-          className="flex min-w-0 flex-1 items-center gap-2 py-1.5 pl-2.5 pr-1 text-left"
+          className="flex min-w-0 flex-1 items-center gap-2 py-1.5 pl-2.5 pr-1 text-left pointer-coarse:py-3"
           title={[t.preview, relativeTime(t.lastMessageAt ?? t.updatedAt, p.now)].filter(Boolean).join(" · ")}
           onClick={() => p.select(t.id)}
         >
-          <span className={`min-w-0 flex-1 truncate text-sm ${t.id === p.selected ? "font-medium text-slate-900" : "text-slate-700"}`}>
+          <span className={`min-w-0 flex-1 truncate text-sm pointer-coarse:text-[15px] ${t.id === p.selected ? "font-medium text-slate-900" : "text-slate-700"}`}>
             {t.title || "New chat"}
           </span>
           {running ? (
@@ -77,7 +77,7 @@ function Row(p: ThreadListProps & { t: ThreadSummary }) {
       {!renaming && (
         <button
           data-popover-trigger
-          className={`icon-btn mr-0.5 h-7 w-7 shrink-0 rounded-md ${menuOpen ? "" : "opacity-0 focus:opacity-100 group-hover/thread:opacity-100"}`}
+          className={`icon-btn mr-0.5 h-7 w-7 shrink-0 rounded-md pointer-coarse:h-10 pointer-coarse:w-10 ${menuOpen ? "" : "opacity-0 focus:opacity-100 group-hover/thread:opacity-100 pointer-coarse:opacity-60"}`}
           aria-label={`Actions for ${t.title || "New chat"}`}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
@@ -113,17 +113,17 @@ export function ThreadList(p: ThreadListProps) {
     <div className="flex h-full min-h-0 flex-col">
       <div className="space-y-2 p-2">
         <button
-          className="flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-sm font-medium text-slate-800 transition-colors hover:bg-slate-100"
+          className="flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-sm font-medium text-slate-800 transition-colors hover:bg-slate-100 pointer-coarse:h-11 pointer-coarse:text-[15px]"
           onClick={p.create}
         >
           <Icon name="compose" /> New chat <span className="kbd ml-auto">⌥N</span>
         </button>
-        <label className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
+        <label className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100 pointer-coarse:h-11">
           <Icon name="search" className="shrink-0 text-slate-400" />
           <input
             data-chat-search
             aria-label="Search threads"
-            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400 pointer-coarse:text-base"
             placeholder="Search chats"
             value={p.search}
             onChange={(e) => p.setSearch(e.target.value)}
@@ -132,7 +132,7 @@ export function ThreadList(p: ThreadListProps) {
         </label>
         <div className="segmented flex w-full" role="tablist" aria-label="Filter threads">
           {FILTERS.map(([v, label]) => (
-            <button key={v} role="tab" aria-selected={p.filter === v} className="flex-1 justify-center !px-1 text-xs" onClick={() => p.setFilter(v)}>
+            <button key={v} role="tab" aria-selected={p.filter === v} className="flex-1 justify-center !px-1 text-xs pointer-coarse:py-2 pointer-coarse:text-[13px]" onClick={() => p.setFilter(v)}>
               {label}
             </button>
           ))}

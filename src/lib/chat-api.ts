@@ -82,6 +82,10 @@ export const forkThread = (id: string, uptoTurn: number, title?: string) =>
   });
 export const getCatalog = () => call<CatalogResponse>("/api/chat/catalog");
 export const getPricing = () => call<PricingResponse>("/api/chat/pricing");
+/** Preferences synced to every device of the signed-in user (src/server/prefs.ts). */
+export const getPrefs = () => call<{ prefs: Record<string, unknown>; updatedAt: Record<string, string> }>("/api/prefs");
+export const putPref = (key: string, value: unknown) =>
+  call<{ prefs: Record<string, unknown>; updatedAt: Record<string, string> }>("/api/prefs", "PUT", { key, value });
 export const cancelTurn = (jobId: string) =>
   call<unknown>(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, "POST");
 export function mergeTurns(prev: Turn[], incoming: Turn[]): Turn[] {

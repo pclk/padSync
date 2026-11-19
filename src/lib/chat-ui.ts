@@ -284,6 +284,33 @@ export const toolsOf = (o: ChatOptions) => ({
   allowCode: o.allowCode !== false,
 });
 
+/** The synced default for new chats (src/server/prefs.ts "chat.defaultModel"): no tools, just the model. */
+export interface ModelChoice {
+  agent: ChatAgent;
+  options: Pick<ChatOptions, "model" | "effort" | "account">;
+}
+export const modelChoice = (s: { agent: ChatAgent; options: ChatOptions }): ModelChoice => ({
+  agent: s.agent,
+  options: Object.fromEntries(
+    (["model", "effort", "account"] as const).flatMap((k) => (s.options[k] ? [[k, s.options[k]]] : [])),
+  ),
+});
+export const sameModel = (a: { agent: ChatAgent; options: ChatOptions }, b: { agent: ChatAgent; options: ChatOptions } | null) =>
+  !!b && JSON.stringify(modelChoice(a)) === JSON.stringify(modelChoice(b));
+/**
+ * Settings a new chat starts with: the synced default model (when one is set) with the tools
+ * last used on this device; otherwise whatever was last picked here.
+ */
+export function newChatSettings(
+  lastUsed: { agent: ChatAgent; options: ChatOptions },
+  defaultModel: ModelChoice | null,
+): { agent: ChatAgent; options: ChatOptions } {
+  if (!defaultModel) return lastUsed;
+  const tools = { webSearch: lastUsed.options.webSearch, allowEdits: lastUsed.options.allowEdits, allowCode: lastUsed.options.allowCode };
+  const set = Object.fromEntries(Object.entries(tools).filter(([, v]) => v !== undefined));
+  return { agent: defaultModel.agent, options: { ...set, ...defaultModel.options } };
+}
+
 /** An untouched thread "New chat" should reuse instead of making another empty one. */
 export function reusableThread(
   threads: ThreadSummary[],

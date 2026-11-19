@@ -369,6 +369,24 @@ pre,
 .chat-code-copy:focus-visible {
   opacity: 1;
 }
+/* Touch screens (the iPad) have no hover: what the Mac reveals on hover is always there, and
+   keyboard-shortcut hints, which need a keyboard, are hidden. */
+@media (hover: none) {
+  .chat-code-copy {
+    opacity: 1;
+    padding: 0.25rem 0.6rem;
+    font-size: 12px;
+  }
+  [data-chat-root] .kbd {
+    display: none;
+  }
+}
+/* Hold-to-talk: a long press must not open the text callout or select the label. */
+.hold-to-talk {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
 .chat-dots {
   display: inline-flex;
   gap: 3px;

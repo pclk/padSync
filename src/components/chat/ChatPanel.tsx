@@ -85,11 +85,11 @@ export function ChatPanel(
           <ThreadList {...c.list} />
         </aside>
       )}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-12 shrink-0 items-center gap-1 px-2">
+      <div className="relative flex min-w-0 flex-1 flex-col">
+        <header className="flex h-12 shrink-0 items-center gap-1 px-2 pointer-coarse:h-14">
           {wide && (
             <button
-              className="icon-btn h-8 w-8"
+              className="icon-btn h-8 w-8 pointer-coarse:h-10 pointer-coarse:w-10"
               aria-label={c.collapsed ? "Show chats" : "Hide chats"}
               title={c.collapsed ? "Show chats" : "Hide chats"}
               onClick={() => c.setCollapsed(!c.collapsed)}
@@ -121,7 +121,7 @@ export function ChatPanel(
           )}
           {(!wide || c.collapsed) && (
             <button
-              className="icon-btn h-8 w-8"
+              className="icon-btn h-8 w-8 pointer-coarse:h-10 pointer-coarse:w-10"
               aria-label="New chat"
               title="New chat (⌥N)"
               onClick={c.list.create}
@@ -133,7 +133,7 @@ export function ChatPanel(
             <div ref={menuRef} className="relative">
               <button
                 data-popover-trigger
-                className="icon-btn h-8 w-8"
+                className="icon-btn h-8 w-8 pointer-coarse:h-10 pointer-coarse:w-10"
                 aria-label="Chat actions"
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
@@ -142,7 +142,7 @@ export function ChatPanel(
                 <Icon name="more" />
               </button>
               {menuOpen && (
-                <div role="menu" className="absolute right-0 top-full z-40 mt-1 w-48 rounded-xl border border-slate-200 bg-white p-1 shadow-lift">
+                <div role="menu" className="absolute right-0 top-full z-40 mt-1 w-48 pointer-coarse:w-60 rounded-xl border border-slate-200 bg-white p-1 shadow-lift">
                   {threadActions.map(([key, icon, label, fn]) => (
                     <MenuItem
                       key={key}
@@ -225,6 +225,8 @@ export function ChatPanel(
           running={running}
           settings={c.settings}
           setSettings={c.setSettings}
+          defaultModel={c.defaultModel}
+          setDefaultModel={c.setDefaultModel}
           accounts={c.accounts}
           fallbackModels={c.fallbackModels}
           send={c.send}

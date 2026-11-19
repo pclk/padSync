@@ -244,7 +244,7 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
           aria-expanded={open}
           aria-label={`Context: ${active.label}${scope === "section" ? `, ${chip}` : ""}`}
           title={summary}
-          className={`flex h-8 min-w-0 max-w-[14rem] items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors aria-expanded:bg-slate-100 ${scope === "none" ? "border-slate-200 text-slate-500 hover:bg-slate-100" : "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100"}`}
+          className={`flex h-8 min-w-0 max-w-[14rem] items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors aria-expanded:bg-slate-100 pointer-coarse:h-10 pointer-coarse:text-[13px] ${scope === "none" ? "border-slate-200 text-slate-500 hover:bg-slate-100" : "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100"}`}
           onClick={() => setOpen(!open)}
         >
           <Icon name={active.icon} className="shrink-0" />
@@ -263,7 +263,7 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
                   key={s.v}
                   role="radio"
                   aria-checked={scope === s.v}
-                  className={`flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-slate-100 ${scope === s.v ? "bg-slate-100" : ""}`}
+                  className={`flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-slate-100 pointer-coarse:py-2.5 ${scope === s.v ? "bg-slate-100" : ""}`}
                   onClick={() => choose(s.v)}
                 >
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">

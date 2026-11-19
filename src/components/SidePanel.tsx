@@ -106,7 +106,7 @@ export function SidePanel(p: Props) {
             key={t}
             role="tab"
             aria-selected={tab === t}
-            className="relative px-3 py-1.5 text-sm font-medium capitalize text-slate-500 transition-colors hover:text-slate-900 aria-selected:text-slate-900 aria-selected:after:absolute aria-selected:after:inset-x-3 aria-selected:after:-bottom-2 aria-selected:after:h-0.5 aria-selected:after:rounded-full aria-selected:after:bg-brand-600"
+            className="relative px-3 py-1.5 text-sm font-medium capitalize pointer-coarse:px-4 pointer-coarse:py-2.5 text-slate-500 transition-colors hover:text-slate-900 aria-selected:text-slate-900 aria-selected:after:absolute aria-selected:after:inset-x-3 aria-selected:after:-bottom-2 aria-selected:after:h-0.5 aria-selected:after:rounded-full aria-selected:after:bg-brand-600"
             onClick={() => setTab(t)}
           >
             {t}

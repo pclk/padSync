@@ -142,6 +142,11 @@ export async function migrate(sql: Sql) {
       data text not null,
       primary key (job_id, path, part)
     )`,
+    // Preferences that follow the signed-in user to every device (src/server/prefs.ts).
+    `create table if not exists user_prefs (
+      login text not null, key text not null, value jsonb not null,
+      updated_at timestamptz not null default now(), primary key (login, key)
+    )`,
     `create table if not exists chat_threads (
       id text primary key, notebook_id text not null default '', title text not null default '',
       agent text not null, options jsonb not null default '{}'::jsonb,

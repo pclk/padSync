@@ -12,7 +12,7 @@ import { Icon, type IconName } from "../Icons";
 
 function Action({ icon, label, onClick, done }: { icon: IconName; label: string; onClick(): void; done?: boolean }) {
   return (
-    <button aria-label={label} title={label} className="icon-btn h-7 w-7 rounded-lg text-[15px]" onClick={onClick}>
+    <button aria-label={label} title={label} className="icon-btn h-7 w-7 rounded-lg text-[15px] pointer-coarse:h-10 pointer-coarse:w-10 pointer-coarse:text-[17px]" onClick={onClick}>
       <Icon name={done ? "tick" : icon} />
     </button>
   );
@@ -69,6 +69,8 @@ export function Message({
   const [copiedA, copyA] = useCopied();
   const isMac = useIsMac();
   const [tracing, setTracing] = useState(false);
+  // Touch screens can't hover: a tap on your message shows its actions instead.
+  const [revealed, setRevealed] = useState(false);
   async function save() {
     setSaving(true);
     setError("");
@@ -206,7 +208,12 @@ export function Message({
             </div>
           </div>
         ) : (
-          <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-3xl bg-slate-100 px-4 py-2.5 text-[15px] leading-6 text-slate-900">
+          <div
+            className="max-w-[85%] whitespace-pre-wrap break-words rounded-3xl bg-slate-100 px-4 py-2.5 text-[15px] leading-6 text-slate-900"
+            onClick={() => {
+              if (window.matchMedia("(hover: none)").matches && !window.getSelection()?.toString()) setRevealed(!revealed);
+            }}
+          >
             {t.question ||
               (voice && (
                 <span className="flex items-center gap-2 text-slate-500">
@@ -217,7 +224,7 @@ export function Message({
           </div>
         )}
         {!editing && (
-          <div className="flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/user:opacity-100">
+          <div className={`flex items-center gap-0.5 transition-opacity focus-within:opacity-100 group-hover/user:opacity-100 ${revealed ? "" : "opacity-0 pointer-coarse:hidden"}`}>
             <time className="px-1 text-xs text-slate-400" dateTime={t.createdAt}>
               {new Date(t.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
             </time>
@@ -275,7 +282,7 @@ export function Message({
               count={t.resultFiles.length}
             />
           )}
-          <div className={`-ml-1.5 flex items-center gap-0.5 transition-opacity ${last || active || t.status === "error" ? "" : "opacity-0 focus-within:opacity-100 group-hover/reply:opacity-100"}`}>
+          <div className={`-ml-1.5 flex items-center gap-0.5 transition-opacity ${last || active || t.status === "error" ? "" : "opacity-0 focus-within:opacity-100 group-hover/reply:opacity-100 pointer-coarse:opacity-100"}`}>
             {active && (
               <button className="btn btn-ghost btn-sm" onClick={() => action("stop", t)}>
                 <Icon name="stop" /> Stop
