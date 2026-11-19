@@ -21,7 +21,7 @@ const headings = (html: string) => [...html.matchAll(/<h2[^>]*>([^<]+)<\/h2>/g)]
 const sections = (html: string) => html.split("<section").slice(1);
 
 it("puts account and everyday settings before the troubleshooting tools", async () => {
-  expect(headings(await render())).toEqual(["Account and sync", "Appearance", "Notebook", "NUS Canvas", "Troubleshooting"]);
+  expect(headings(await render())).toEqual(["Account and sync", "Appearance", "Notebook", "Touch gestures", "NUS Canvas", "Troubleshooting"]);
 });
 
 it("keeps both Pencil tools in one section, each with its purpose", async () => {

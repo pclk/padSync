@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { deviceId, deviceKind } from "@/lib/db";
 import { useStoredState, useSyncStatus } from "@/lib/hooks";
-import { useShowCopyButtons, useSyncDebug, useThemePreference } from "@/lib/settings";
+import { useGestureBindings, useShowCopyButtons, useSyncDebug, useThemePreference } from "@/lib/settings";
+import { DEFAULT_GESTURES, GESTURES, GESTURE_ACTIONS, type GestureAction } from "@/lib/touch-gestures";
 import { THEME_PREFERENCES } from "@/lib/theme";
 import { requestSync, resetCursor, stopSync } from "@/lib/sync";
 import { SyncTimingSettings } from "./SyncTimingSettings";
@@ -121,6 +122,8 @@ export default function SettingsView() {
         </Setting>
       </section>
 
+      <GestureSettings />
+
       {status?.authed && <SyncTimingSettings />}
       {status?.authed && <DeviceTokens />}
 
@@ -154,6 +157,43 @@ export default function SettingsView() {
         </Setting>
       </section>
     </main>
+  );
+}
+
+/** What each finger gesture does in a notebook on the iPad. */
+function GestureSettings() {
+  const [bindings, setBindings] = useGestureBindings();
+  const changed = GESTURES.some((g) => bindings[g.kind] !== DEFAULT_GESTURES[g.kind]);
+  return (
+    <section id="gestures" className="card mb-5 scroll-mt-4 space-y-4 p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">Touch gestures</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Finger gestures in a notebook on the iPad. Gestures on the page with one finger are ignored just after you use the Pencil, so a resting palm doesn&rsquo;t set them off.
+          </p>
+        </div>
+        <button className="btn btn-ghost btn-sm shrink-0" disabled={!changed} onClick={() => setBindings(DEFAULT_GESTURES)}>
+          Reset
+        </button>
+      </div>
+      {GESTURES.map((g) => (
+        <Setting key={g.kind} title={g.label} hint={g.hint}>
+          <select
+            className="field h-11 w-auto max-w-[14rem] shrink-0 py-0 text-sm"
+            aria-label={g.label}
+            value={bindings[g.kind]}
+            onChange={(e) => setBindings({ ...bindings, [g.kind]: e.target.value as GestureAction })}
+          >
+            {GESTURE_ACTIONS.map((a) => (
+              <option key={a.action} value={a.action}>
+                {a.label}
+              </option>
+            ))}
+          </select>
+        </Setting>
+      ))}
+    </section>
   );
 }
 

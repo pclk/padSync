@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef } from "react";
 import { DEFAULT_RAIL, canHide, isTool, moveItem, setHidden, type RailAlign, type RailDock, type RailItem, type RailLayout } from "@/lib/rail-layout";
 import { Icon, type IconName } from "./Icons";
@@ -105,6 +106,9 @@ export function RailSettings({ layout, setLayout, anchor, onClose }: Props) {
             );
           })}
         </ul>
+        <Link href="/settings#gestures" className="btn btn-secondary btn-sm mt-3 w-full justify-center">
+          Touch gestures…
+        </Link>
         <p className="mt-2 text-[11px] text-slate-500">
           Hidden tools still work from the keyboard. {circle ? "Presses just outside the circle still count." : "Taps near a button, or between buttons, go to the closest one."}
         </p>

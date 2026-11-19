@@ -95,7 +95,7 @@ Without `DATABASE_URL` the app still runs and stores everything on the device ("
 | --- | --- | --- |
 | Write | Apple Pencil (fingers never ink) | mouse / trackpad |
 | Scroll / zoom | one finger / two-finger pinch | scroll / pinch |
-| Undo / redo | two-finger tap / three-finger tap | ⌘Z / ⇧⌘Z |
+| Undo / redo | two-finger tap / three-finger tap (changeable in Settings → Touch gestures) | ⌘Z / ⇧⌘Z |
 | Tools | toolbar | `P` pen, `H` highlighter, `E` eraser, `L` lasso, `T` text |
 
 Sections grow as you write near the bottom. Lasso to move or delete strokes. Text boxes accept

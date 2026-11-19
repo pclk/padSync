@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { THEME_DEFAULT, THEME_KEY, isThemePreference, type ThemePreference } from "./theme";
+import { DEFAULT_GESTURES, GESTURES_KEY, isGestureMap, normalizeGestures, type GestureBindings } from "./touch-gestures";
 
 // App preferences shared by several screens. Stored in localStorage as JSON, like useStoredState,
 // but every component reading a setting re-renders when it changes (here or in another tab).
@@ -74,3 +75,9 @@ export const useSyncDebug = () => useBoolSetting(SYNC_DEBUG_KEY, SYNC_DEBUG_DEFA
 export const readThemePreference = () => readSetting(THEME_KEY, THEME_DEFAULT, isThemePreference);
 export const writeThemePreference = (v: ThemePreference) => writeSetting(THEME_KEY, v);
 export const useThemePreference = () => useSetting(THEME_KEY, THEME_DEFAULT, isThemePreference);
+
+/** What each finger gesture does on the iPad (see touch-gestures), normalised on read. */
+export function useGestureBindings(): [GestureBindings, (v: GestureBindings) => void] {
+  const [raw, set] = useSetting<Partial<GestureBindings>>(GESTURES_KEY, DEFAULT_GESTURES, isGestureMap);
+  return [useMemo(() => normalizeGestures(raw), [raw]), set];
+}

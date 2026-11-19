@@ -18,6 +18,8 @@ import { PAGE_WIDTH, type NotebookEntity, type PresenceData, type PresenceEntity
 import { SectionView } from "./SectionView";
 import { SidePanel } from "./SidePanel";
 import { Toolbar } from "./Toolbar";
+import { GestureRecognizer, actionLabel, type GestureKind, type TouchPoint } from "@/lib/touch-gestures";
+import { useGestureBindings } from "@/lib/settings";
 import { DEFAULT_RAIL, normalizeRail, type RailLayout } from "@/lib/rail-layout";
 import { Icon } from "./Icons";
 
@@ -173,9 +175,14 @@ function Editor({ notebookId }: { notebookId: string }) {
   );
   const [canUndo, canRedo] = undoState.split(":").map((v) => v === "true");
 
+  // The tool before the current one, for the "previous tool" gesture.
+  const previousKind = useRef<ToolState["kind"]>("pen");
   const setTool = useCallback(
     (t: ToolState) => {
-      if (t.kind !== tool.kind) controller.setSelection(null);
+      if (t.kind !== tool.kind) {
+        controller.setSelection(null);
+        previousKind.current = tool.kind;
+      }
       setToolState(t);
       // Log tool and colour picks, not every step of a pen-feel slider.
       const color = t.kind === "highlighter" ? t.hlColor : t.penColor;
@@ -287,13 +294,44 @@ function Editor({ notebookId }: { notebookId: string }) {
     return () => window.removeEventListener("wheel", onWheel);
   }, [measureZoom, commitZoom]);
 
-  // --- touch: Pencil never scrolls; one finger scrolls natively; two fingers pinch/pan;
-  //     two-finger tap = undo, three-finger tap = redo ---------------------------------------
+  // --- finger gestures (taps, double taps, press and hold), each doing what Settings says ----
+  const [gestures] = useGestureBindings();
+  const [gestureNote, setGestureNote] = useState<{ text: string; n: number } | null>(null);
+  const runGesture = useRef<(g: GestureKind) => void>(() => {});
+  const gestureBound = useRef<(g: GestureKind) => boolean>(() => false);
+  useLayoutEffect(() => {
+    gestureBound.current = (g) => gestures[g] !== "none";
+    runGesture.current = (g) => {
+      const action = gestures[g];
+      if (action === "none") return;
+      if (action === "undo") void undo();
+      else if (action === "redo") void redo();
+      else if (action === "previousTool") setTool({ ...tool, kind: previousKind.current === tool.kind ? "pen" : previousKind.current });
+      else if (action === "togglePanel") setPanelOpen(!panelOpen);
+      else if (action === "resetZoom") resetZoom();
+      else setTool({ ...tool, kind: action.slice(5) as ToolState["kind"] });
+      // A short note of what the gesture did, so a stray tap is noticed.
+      const text = action === "previousTool" ? actionLabel(`tool:${previousKind.current === tool.kind ? "pen" : previousKind.current}`) : actionLabel(action);
+      setGestureNote((prev) => ({ text, n: (prev?.n ?? 0) + 1 }));
+    };
+  });
+  useEffect(() => {
+    if (!gestureNote) return;
+    const t = setTimeout(() => setGestureNote(null), 900);
+    return () => clearTimeout(t);
+  }, [gestureNote]);
+
+  // --- touch: Pencil never scrolls; one finger scrolls natively; two fingers pinch/pan; finger
+  //     taps and holds go to the gesture recognizer -----------------------------------------
   useEffect(() => {
     // Until the fingers spread or close by PINCH_DEAD_ZONE a two-finger drag only pans, so a pan
     // keeps the zoom exact; past it the scale carries on smoothly from 1.
     let pinch: { d0: number; zooming: boolean; start: PinchStart; placed: PinchPlacement | null } | null = null;
-    let tap: { n: number; t: number; moved: boolean; start: [number, number][] } | null = null;
+    const gesture = new GestureRecognizer(
+      (g) => runGesture.current(g),
+      (g) => gestureBound.current(g),
+    );
+    const points = (list: Touch[]): TouchPoint[] => list.map((t) => ({ id: t.identifier, x: t.clientX, y: t.clientY }));
 
     const direct = (list: TouchList) => [...list].filter((t) => t.touchType !== "stylus");
     const mid = (a: Touch, b: Touch): [number, number] => [(a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2];
@@ -302,13 +340,14 @@ function Editor({ notebookId }: { notebookId: string }) {
     const onStart = (e: TouchEvent) => {
       const target = e.target as HTMLElement;
       if ([...e.touches].some((t) => t.touchType === "stylus")) {
+        gesture.pencil(performance.now());
         if (target.closest(".ink-surface, .ink-grab")) e.preventDefault();
         return;
       }
       const fingers = direct(e.touches);
-      if (fingers.length >= 2 && !tap) tap = { n: fingers.length, t: performance.now(), moved: false, start: fingers.map((f) => [f.clientX, f.clientY]) };
-      else if (tap) tap.n = Math.max(tap.n, fingers.length);
-      if (fingers.length === 1) tap = null;
+      // One-finger gestures count on the page, not on its controls or in a text box being typed in.
+      const onPage = !!target.closest(".ink-surface, .ink-grab") && !target.closest("textarea, input, [contenteditable]");
+      gesture.start(points(fingers), performance.now(), onPage);
       const start = fingers.length === 2 && !controller.isDrawing() ? measureZoom(mid(fingers[0], fingers[1])) : null;
       if (start) {
         const [a, b] = fingers;
@@ -322,9 +361,7 @@ function Editor({ notebookId }: { notebookId: string }) {
         return;
       }
       const fingers = direct(e.touches);
-      if (tap) {
-        tap.moved ||= fingers.some((f, i) => tap!.start[i] && Math.hypot(f.clientX - tap!.start[i][0], f.clientY - tap!.start[i][1]) > 12);
-      }
+      gesture.move(points(fingers));
       if (!pinch || fingers.length !== 2) return;
       e.preventDefault();
       const [a, b] = fingers;
@@ -354,12 +391,8 @@ function Editor({ notebookId }: { notebookId: string }) {
         // In the same frame the transform comes off, so the page never paints back at the old zoom.
         if (placed) commitZoom(placed, start.zoom);
       }
-      if (tap && fingers.length === 0) {
-        const quick = performance.now() - tap.t < 280 && !tap.moved;
-        if (quick && tap.n === 2) void undo();
-        if (quick && tap.n === 3) void redo();
-        tap = null;
-      }
+      if (e.type === "touchcancel") gesture.cancel();
+      else gesture.end(points(fingers), performance.now());
     };
 
     const opts = { passive: false } as const;
@@ -372,8 +405,9 @@ function Editor({ notebookId }: { notebookId: string }) {
       window.removeEventListener("touchmove", onMove);
       window.removeEventListener("touchend", onEnd);
       window.removeEventListener("touchcancel", onEnd);
+      gesture.dispose();
     };
-  }, [controller, measureZoom, commitZoom, undo, redo]);
+  }, [controller, measureZoom, commitZoom]);
 
   // --- keyboard (Mac) ---------------------------------------------------------------------
   useEffect(() => {
@@ -657,6 +691,9 @@ function Editor({ notebookId }: { notebookId: string }) {
       </div>
 
       <canvas ref={liveRef} className="pointer-events-none fixed left-0 top-0 z-30" />
+      <div aria-live="polite" className="pointer-events-none fixed inset-x-0 top-[4.25rem] z-50 flex justify-center">
+        {gestureNote && <span key={gestureNote.n} className="rounded-full bg-slate-900/80 px-3 py-1 text-sm font-medium text-white shadow-lift">{gestureNote.text}</span>}
+      </div>
 
       {showPanel && (
         <SidePanel
