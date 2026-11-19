@@ -3,7 +3,7 @@
 import type { IconName } from "@/components/Icons";
 import type { LassoMode } from "@/ink/geometry";
 
-export type LassoAction = "delete" | "duplicate" | "recolor" | "bigger" | "smaller" | "ask" | "done";
+export type LassoAction = "delete" | "duplicate" | "recolor" | "bigger" | "smaller" | "ask";
 
 export const LASSO_ACTIONS: { action: LassoAction; label: string; icon: IconName; hint: string }[] = [
   { action: "delete", label: "Delete", icon: "trash", hint: "Remove the selected ink." },
@@ -11,8 +11,7 @@ export const LASSO_ACTIONS: { action: LassoAction; label: string; icon: IconName
   { action: "recolor", label: "Colour", icon: "sparkles", hint: "Fans out the pen colours; the one you pick colours all of it." },
   { action: "bigger", label: "Bigger", icon: "plus", hint: "Scale up by the step below, line widths too." },
   { action: "smaller", label: "Smaller", icon: "minus", hint: "Scale down by the step below." },
-  { action: "ask", label: "Ask AI", icon: "message", hint: "Fans out your prompts and sends the one you pick with the selection." },
-  { action: "done", label: "Done", icon: "tick", hint: "Clear the selection." },
+  { action: "ask", label: "Ask AI", icon: "message", hint: "Its own button beside the circle: fans out your prompts and sends the one you pick with the selection." },
 ];
 
 export interface LassoSettings {

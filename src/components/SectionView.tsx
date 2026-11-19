@@ -155,9 +155,6 @@ export const SectionView = memo(function SectionView(p: Props) {
             <button className="rounded px-3 py-1 hover:bg-slate-700" onPointerDown={(e) => e.stopPropagation()} onClick={() => controller.duplicateSelection(handle)}>
               Duplicate
             </button>
-            <button className="rounded px-3 py-1 hover:bg-slate-700" onPointerDown={(e) => e.stopPropagation()} onClick={() => controller.setSelection(null)}>
-              Done
-            </button>
           </div>}
         </div>
       )}

@@ -900,7 +900,6 @@ function Editor({ notebookId }: { notebookId: string }) {
               if (sec) void controller.duplicateSelection(sec);
             } else if (a === "bigger") void controller.scaleSelection(k);
             else if (a === "smaller") void controller.scaleSelection(1 / k);
-            else if (a === "done") controller.setSelection(null);
           }}
           onRecolor={(color) => void controller.recolorSelection(color)}
           // The chat's own context choice becomes the selection: that is what was asked about.

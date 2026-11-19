@@ -49,7 +49,7 @@ export function LassoSettingsPanel({ ipad, compact = false }: { ipad: boolean; c
       <label className="flex min-h-11 items-center justify-between gap-3">
         <span>
           <span className="block text-sm text-slate-800">Lasso circle</span>
-          <span className={`block ${hint} text-slate-500`}>A circle of actions above each selection, like the toolbar circle. Off: a bar of Delete, Duplicate and Done.</span>
+          <span className={`block ${hint} text-slate-500`}>A circle of actions above each selection, like the toolbar circle. Off: a bar of Delete and Duplicate.</span>
         </span>
         <input type="checkbox" className="switch" checked={s.circle} onChange={(e) => update({ circle: e.target.checked })} />
       </label>

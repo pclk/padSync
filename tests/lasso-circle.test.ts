@@ -39,10 +39,11 @@ describe("lasso settings", () => {
   });
 
   it("mends what was stored, keeping the order and adding new actions", () => {
-    const s = normalizeLasso({ mode: "enclose", order: ["done", "delete", "nope"], hidden: ["ask"], size: 999, step: 1 }, true);
+    const s = normalizeLasso({ mode: "enclose", order: ["smaller", "done", "delete", "nope"], hidden: ["ask"], size: 999, step: 1 }, true);
     expect(s.mode).toBe("enclose");
-    expect(s.order.slice(0, 2)).toEqual(["done", "delete"]);
-    expect(s.order).toHaveLength(7);
+    // "done" was an action once; settings saved then drop it with the other unknowns.
+    expect(s.order.slice(0, 2)).toEqual(["smaller", "delete"]);
+    expect(s.order).toHaveLength(6);
     expect(visibleLassoActions(s)).not.toContain("ask");
     expect(s.size).toBe(96);
     expect(s.step).toBe(5);
