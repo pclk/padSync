@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { CIRCLE_SIZES, DEFAULT_RAIL, canHide, isTool, moveItem, setHidden, type RailAlign, type RailDock, type RailItem, type RailLayout } from "@/lib/rail-layout";
 import { Icon, type IconName } from "./Icons";
-import { usePrompts } from "@/lib/settings";
+import { changePrompts, usePrompts } from "@/lib/settings";
 import { LassoSettingsPanel } from "./LassoSettingsPanel";
 import { DEFAULT_PROMPTS, MAX_PROMPTS, PROMPT_CONTEXTS, PROMPT_ICONS, newPrompt, type ChatPrompt, type PromptContext } from "@/lib/prompts";
 import { useDismiss, usePopoverBox, type PopoverAnchor } from "./popover";
@@ -46,7 +46,7 @@ export function RailSettings({ layout, setLayout, anchor, onClose, initialTab = 
   const ref = useRef<HTMLDivElement>(null);
   const box = usePopoverBox(anchor, 320);
   const [tab, setTab] = useState<"toolbar" | "prompts" | "lasso">(initialTab);
-  const [prompts, setPrompts] = usePrompts();
+  const prompts = usePrompts();
   // Stays open while you use the rail, so changes can be tried as they are made.
   useDismiss(ref, onClose, "[data-tap-zone]");
   const isDefault = JSON.stringify(layout) === JSON.stringify(DEFAULT_RAIL);
@@ -70,12 +70,9 @@ export function RailSettings({ layout, setLayout, anchor, onClose, initialTab = 
             Lasso
           </button>
         </div>
-        {tab === "lasso" ? null : tab === "toolbar" ? (
+        {/* Prompts and Lasso have their own resets in the tab, away from the tabs themselves. */}
+        {tab === "toolbar" && (
           <button className="btn btn-ghost btn-sm" onClick={() => setLayout(DEFAULT_RAIL)} disabled={isDefault}>
-            Reset
-          </button>
-        ) : (
-          <button className="btn btn-ghost btn-sm" onClick={() => setPrompts(DEFAULT_PROMPTS)} disabled={JSON.stringify(prompts) === JSON.stringify(DEFAULT_PROMPTS)}>
             Reset
           </button>
         )}
@@ -85,7 +82,7 @@ export function RailSettings({ layout, setLayout, anchor, onClose, initialTab = 
           <LassoSettingsPanel ipad compact />
         </div>
       )}
-      {tab === "prompts" && <PromptSettings prompts={prompts} setPrompts={setPrompts} shown={!layout.hidden.includes("prompts")} />}
+      {tab === "prompts" && <PromptSettings prompts={prompts} shown={!layout.hidden.includes("prompts")} />}
       <div className={`min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain p-3 ${tab === "toolbar" ? "" : "hidden"}`}>
         <p className="mb-1 text-xs font-medium text-slate-700">Style</p>
         <div role="group" aria-label="Style" className="segmented mb-1 flex w-full [&>button]:flex-1">
@@ -197,16 +194,23 @@ export function RailSettings({ layout, setLayout, anchor, onClose, initialTab = 
  * The prompt menu's prompts: what each says, whether it sends at once or goes into the chat box to
  * finish, its icon, and their order (the order they fan out in).
  */
-function PromptSettings({ prompts, setPrompts, shown }: { prompts: ChatPrompt[]; setPrompts: (p: ChatPrompt[]) => void; shown: boolean }) {
+function PromptSettings({ prompts, shown }: { prompts: ChatPrompt[]; shown: boolean }) {
   const [editing, setEditing] = useState<string | null>(null);
-  const [confirmClear, setConfirmClear] = useState(false);
+  // Restoring and deleting all both take a second tap, so one slip of the finger does neither.
+  const [confirm, setConfirm] = useState<"restore" | "clear" | null>(null);
   const isStarter = JSON.stringify(prompts) === JSON.stringify(DEFAULT_PROMPTS);
-  const update = (id: string, patch: Partial<ChatPrompt>) => setPrompts(prompts.map((p) => (p.id === id ? { ...p, ...patch } : p)));
-  const move = (i: number, d: -1 | 1) => {
-    const next = [...prompts];
-    [next[i], next[i + d]] = [next[i + d], next[i]];
-    setPrompts(next);
-  };
+  // Every change applies to the prompts as stored now (changePrompts), by id, so an edit that
+  // lands late (the keyboard committing text as the field closes) can't bring back a deleted one.
+  const update = (id: string, patch: Partial<ChatPrompt>) => changePrompts((cur) => cur.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  const move = (id: string, d: -1 | 1) =>
+    changePrompts((cur) => {
+      const i = cur.findIndex((p) => p.id === id);
+      const j = i + d;
+      if (i < 0 || j < 0 || j >= cur.length) return cur;
+      const next = [...cur];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
   return (
     <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain p-3">
       <p className="mb-2 text-[11px] text-slate-500">
@@ -224,10 +228,10 @@ function PromptSettings({ prompts, setPrompts, shown }: { prompts: ChatPrompt[];
                 {pr.label}
                 <span className="ml-1.5 text-[11px] text-slate-400">{pr.voice ? "records" : pr.send ? "sends" : "to finish"}</span>
               </button>
-              <button className="icon-btn h-11 w-10" disabled={i === 0} onClick={() => move(i, -1)} aria-label={`Move ${pr.label} up`}>
+              <button className="icon-btn h-11 w-10" disabled={i === 0} onClick={() => move(pr.id, -1)} aria-label={`Move ${pr.label} up`}>
                 <Icon name="arrowUp" />
               </button>
-              <button className="icon-btn h-11 w-10" disabled={i === prompts.length - 1} onClick={() => move(i, 1)} aria-label={`Move ${pr.label} down`}>
+              <button className="icon-btn h-11 w-10" disabled={i === prompts.length - 1} onClick={() => move(pr.id, 1)} aria-label={`Move ${pr.label} down`}>
                 <Icon name="arrowDown" />
               </button>
             </div>
@@ -280,7 +284,7 @@ function PromptSettings({ prompts, setPrompts, shown }: { prompts: ChatPrompt[];
                 <button
                   className="btn btn-ghost btn-sm btn-danger"
                   onClick={() => {
-                    setPrompts(prompts.filter((p) => p.id !== pr.id));
+                    changePrompts((cur) => cur.filter((p) => p.id !== pr.id));
                     setEditing(null);
                   }}
                 >
@@ -296,29 +300,38 @@ function PromptSettings({ prompts, setPrompts, shown }: { prompts: ChatPrompt[];
         disabled={prompts.length >= MAX_PROMPTS}
         onClick={() => {
           const p = newPrompt();
-          setPrompts([...prompts, p]);
+          changePrompts((cur) => (cur.length >= MAX_PROMPTS ? cur : [...cur, p]));
           setEditing(p.id);
         }}
       >
         <Icon name="plus" /> Add prompt{prompts.length >= MAX_PROMPTS ? ` (up to ${MAX_PROMPTS})` : ""}
       </button>
       <div className="mt-3 flex gap-2 border-t border-slate-100 pt-3">
-        <button className="btn btn-ghost btn-sm h-11 flex-1 justify-center" disabled={isStarter} onClick={() => setPrompts(DEFAULT_PROMPTS)}>
-          <Icon name="refresh" /> Restore starters
-        </button>
-        {/* Two taps, so one slip of the finger can't wipe them all. */}
         <button
-          className={`btn btn-sm h-11 flex-1 justify-center ${confirmClear ? "bg-rose-600 text-white" : "btn-ghost btn-danger"}`}
+          className={`btn btn-sm h-11 flex-1 justify-center ${confirm === "restore" ? "bg-brand-600 text-on-accent" : "btn-ghost"}`}
+          disabled={isStarter}
+          onClick={() => {
+            if (confirm !== "restore") return setConfirm("restore");
+            changePrompts(() => DEFAULT_PROMPTS);
+            setEditing(null);
+            setConfirm(null);
+          }}
+          onBlur={() => setConfirm(null)}
+        >
+          <Icon name="refresh" /> {confirm === "restore" ? "Tap again: replaces yours" : "Restore starters"}
+        </button>
+        <button
+          className={`btn btn-sm h-11 flex-1 justify-center ${confirm === "clear" ? "bg-rose-600 text-white" : "btn-ghost btn-danger"}`}
           disabled={!prompts.length}
           onClick={() => {
-            if (!confirmClear) return setConfirmClear(true);
-            setPrompts([]);
+            if (confirm !== "clear") return setConfirm("clear");
+            changePrompts(() => []);
             setEditing(null);
-            setConfirmClear(false);
+            setConfirm(null);
           }}
-          onBlur={() => setConfirmClear(false)}
+          onBlur={() => setConfirm(null)}
         >
-          <Icon name="trash" /> {confirmClear ? "Tap again to delete all" : "Delete all"}
+          <Icon name="trash" /> {confirm === "clear" ? "Tap again to delete all" : "Delete all"}
         </button>
       </div>
     </div>

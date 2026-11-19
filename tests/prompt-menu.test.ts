@@ -166,3 +166,32 @@ describe("circle sizes", () => {
     expect(html).toContain("width:40px;height:40px");
   });
 });
+
+describe("editing prompts", () => {
+  const stubStorage = () => {
+    const values = new Map<string, string>();
+    vi.stubGlobal("localStorage", { getItem: (k: string) => values.get(k) ?? null, setItem: (k: string, v: string) => values.set(k, v), removeItem: (k: string) => values.delete(k) });
+  };
+
+  it("never brings back a deleted prompt when an edit made from an older list lands late", async () => {
+    stubStorage();
+    const { changePrompts, readPrompts } = await import("@/lib/settings");
+    const [first, second] = readPrompts();
+    // Delete the first prompt…
+    changePrompts((cur) => cur.filter((p) => p.id !== first.id));
+    // …then a late edit (say, the keyboard committing text) to it, and one to another prompt.
+    changePrompts((cur) => cur.map((p) => (p.id === first.id ? { ...p, text: "late" } : p)));
+    changePrompts((cur) => cur.map((p) => (p.id === second.id ? { ...p, label: "Renamed" } : p)));
+    const now = readPrompts();
+    expect(now.map((p) => p.id)).not.toContain(first.id);
+    expect(now.find((p) => p.id === second.id)?.label).toBe("Renamed");
+    expect(now).toHaveLength(DEFAULT_PROMPTS.length - 1);
+  });
+
+  it("keeps an emptied list empty", async () => {
+    stubStorage();
+    const { changePrompts, readPrompts } = await import("@/lib/settings");
+    changePrompts(() => []);
+    expect(readPrompts()).toEqual([]);
+  });
+});

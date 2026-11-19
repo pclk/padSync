@@ -109,10 +109,22 @@ export function useGestureTuning(): [GestureTuning, (v: GestureTuning) => void] 
   return [useMemo(() => normalizeTuning(raw), [raw]), set];
 }
 
+const isList = (v: unknown): v is unknown[] => Array.isArray(v);
+
+/** The prompts as stored right now, not as some render last saw them. */
+export const readPrompts = () => normalizePrompts(readSetting<unknown>(PROMPTS_KEY, DEFAULT_PROMPTS, isList));
+
+/**
+ * Changes the stored prompts by applying `change` to them as they are at that moment. A change
+ * made from a list a render captured earlier could write back a prompt deleted since, so every
+ * edit goes through here.
+ */
+export const changePrompts = (change: (current: ChatPrompt[]) => ChatPrompt[]) => writeSetting(PROMPTS_KEY, change(readPrompts()));
+
 /** The prompt menu's ready-made chat prompts (see prompts.ts), normalised on read. */
-export function usePrompts(): [ChatPrompt[], (v: ChatPrompt[]) => void] {
-  const [raw, set] = useSetting<unknown>(PROMPTS_KEY, DEFAULT_PROMPTS, (v): v is unknown => Array.isArray(v));
-  return [useMemo(() => normalizePrompts(raw), [raw]), set];
+export function usePrompts(): ChatPrompt[] {
+  const [raw] = useSetting<unknown>(PROMPTS_KEY, DEFAULT_PROMPTS, isList);
+  return useMemo(() => normalizePrompts(raw), [raw]);
 }
 
 const isStored = (v: unknown): v is unknown => v !== undefined;

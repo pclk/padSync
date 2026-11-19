@@ -319,7 +319,7 @@ function Editor({ notebookId }: { notebookId: string }) {
   const note = useCallback((text: string) => setGestureNote((prev) => (gestureTuning.current.showNote ? { text, n: (prev?.n ?? 0) + 1 } : null)), []);
 
   // --- the prompt menu: ready-made chat prompts in a circle, from the toolbar or a gesture ----
-  const [prompts] = usePrompts();
+  const prompts = usePrompts();
   const [promptFan, setPromptFanState] = useState<FanState | null>(null);
   // Touch handlers read the fan before React has re-rendered it.
   const promptFanRef = useRef<FanState | null>(null);
