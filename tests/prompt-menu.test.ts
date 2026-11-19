@@ -141,3 +141,28 @@ describe("prompt settings", () => {
     expect(prompts).toContain("Voice message");
   });
 });
+
+describe("circle sizes", () => {
+  it("keeps each circle's size within its range", async () => {
+    const { CIRCLE_SIZES } = await import("@/lib/rail-layout");
+    expect(normalizeRail({}).size).toEqual({ tools: 60, prompts: 48 });
+    expect(normalizeRail({ size: { tools: 999, prompts: 2 } }).size).toEqual({ tools: CIRCLE_SIZES.tools.max, prompts: CIRCLE_SIZES.prompts.min });
+  });
+
+  it("widens the page's clear strip for a bigger docked circle, and not for a moved one", async () => {
+    const { railThickness } = await import("@/lib/rail-layout");
+    const circle = { ...DEFAULT_RAIL, style: "circle" as const };
+    expect(railThickness(DEFAULT_RAIL, RAIL_INSET)).toBe(RAIL_INSET);
+    expect(railThickness(circle, RAIL_INSET)).toBe(RAIL_INSET);
+    expect(railThickness({ ...circle, size: { tools: 100, prompts: 48 } }, RAIL_INSET)).toBe(116);
+    // The big circle moved away: only the docked prompt circle counts.
+    expect(railThickness({ ...circle, size: { tools: 100, prompts: 48 }, free: { tools: [0.5, 0.5] } }, RAIL_INSET)).toBe(64);
+    expect(overlayInsets({ kind: "ipad", sidebarOpen: false, panelWidth: 0, railInset: 116 }).left).toBe(116);
+  });
+
+  it("draws the circles at their sizes", async () => {
+    const html = await renderToolbar({ ...DEFAULT_RAIL, style: "circle", size: { tools: 88, prompts: 40 } });
+    expect(html).toContain("width:88px;height:88px");
+    expect(html).toContain("width:40px;height:40px");
+  });
+});

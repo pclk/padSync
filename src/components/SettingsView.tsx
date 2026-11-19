@@ -171,7 +171,7 @@ function GestureSettings() {
         <div>
           <h2 className="text-base font-semibold text-slate-900">Touch gestures</h2>
           <p className="mt-1 text-xs text-slate-500">
-            Finger gestures in a notebook on the iPad. Gestures on the page with one finger are ignored just after you use the Pencil, so a resting palm doesn&rsquo;t set them off.
+            Finger gestures in a notebook on the iPad. Gestures on the page with one finger are ignored just after you use the Pencil, so a resting palm doesn&rsquo;t set them off. Saved on this device only.
           </p>
         </div>
         <button

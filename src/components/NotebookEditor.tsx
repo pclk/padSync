@@ -13,7 +13,7 @@ import { useLayoutMode, useStoredState } from "@/lib/hooks";
 import { addTextBox, insertSectionAfter, liveSections, logEvent, putEntities } from "@/lib/store";
 import { registerDebugProbe } from "@/lib/sync-debug";
 import { renderFlag } from "@/lib/render-flags";
-import { SIDEBAR_W, TOOLBAR_H, columnLayout, fitZoom, gutterFor, overlayInsets, pinchPlacement, toolbarVariant, verticalPadding, type PinchPlacement, type PinchStart } from "@/lib/notebook-viewport";
+import { RAIL_INSET, SIDEBAR_W, TOOLBAR_H, columnLayout, fitZoom, gutterFor, overlayInsets, pinchPlacement, toolbarVariant, verticalPadding, type PinchPlacement, type PinchStart } from "@/lib/notebook-viewport";
 import { PAGE_WIDTH, type NotebookEntity, type PresenceData, type PresenceEntity, type SectionEntity } from "@/lib/types";
 import { SectionView } from "./SectionView";
 import { SidePanel } from "./SidePanel";
@@ -23,7 +23,7 @@ import { useGestureBindings, useGestureTuning, usePrompts } from "@/lib/settings
 import { queuePrompt, type ChatPrompt } from "@/lib/prompts";
 import { RadialFan, fanAt, pointAt, promptItems, type FanState } from "./RadialFan";
 import { PromptRecorder } from "./PromptRecorder";
-import { DEFAULT_RAIL, normalizeRail, railFloats, type RailLayout } from "@/lib/rail-layout";
+import { DEFAULT_RAIL, normalizeRail, railFloats, railThickness, type RailLayout } from "@/lib/rail-layout";
 import { Icon } from "./Icons";
 
 const emitLocalText = (notebookId: string) => emitActivity({ notebookId, source: "local", kinds: ["text"], at: Date.now() });
@@ -141,9 +141,10 @@ function Editor({ notebookId }: { notebookId: string }) {
   // What covers the window around the page, and where the page sits so every part of it can be
   // panned clear of the header, the tools and the side panel (see notebook-viewport).
   const floating = railFloats(rail);
+  const railInset = railThickness(rail, RAIL_INSET);
   const insets = useMemo(
-    () => overlayInsets({ kind, sidebarOpen, panelWidth: panelOpen ? panelWidth : 0, railDock: rail.dock, railFloating: floating }),
-    [kind, sidebarOpen, panelOpen, panelWidth, rail.dock, floating],
+    () => overlayInsets({ kind, sidebarOpen, panelWidth: panelOpen ? panelWidth : 0, railDock: rail.dock, railFloating: floating, railInset }),
+    [kind, sidebarOpen, panelOpen, panelWidth, rail.dock, floating, railInset],
   );
   const column = columnLayout(viewport.w, PAGE_WIDTH * zoom, insets, gutter);
   const vpad = verticalPadding(insets, gutter);

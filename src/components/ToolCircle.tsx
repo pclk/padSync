@@ -37,6 +37,9 @@ interface Props {
   setRail: (l: RailLayout) => void;
 }
 
+/** A circle `d` px across, its icon scaled with it. */
+const circleBox = (d: number) => ({ width: d, height: d, fontSize: Math.round(d * 0.4) });
+
 const centerOf = (el: HTMLElement): [number, number] => {
   const r = el.getBoundingClientRect();
   return [r.left + r.width / 2, r.top + r.height / 2];
@@ -147,14 +150,17 @@ export function ToolCircle(p: Props) {
       <aside ref={circleRef} data-rail-settings="" aria-label="Drawing tools" className={`tool-circle rounded-full ${moving}`}>
         {/* Pointer taps are handled by the zone; a click with no pointer detail is the keyboard. */}
         <button
-          className="relative flex h-[60px] w-[60px] items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-2xl text-slate-800 shadow-lift backdrop-blur-md"
+          className="relative flex items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-slate-800 shadow-lift backdrop-blur-md"
+          style={circleBox(p.rail.size.tools)}
           aria-label={`${label}: hold and drag to change tool, tap for colours and sizes`}
           aria-haspopup="dialog"
           aria-expanded={panel !== null}
           onClick={(e) => e.detail === 0 && togglePanel()}
         >
           <Icon name={RAIL_ITEM_INFO[p.tool.kind].icon!} />
-          {p.showColors && <span className="absolute bottom-1.5 right-1.5 h-3 w-3 rounded-full ring-2 ring-white" style={{ background: p.color }} />}
+          {p.showColors && (
+            <span className="absolute rounded-full ring-2 ring-white" style={{ background: p.color, width: p.rail.size.tools / 5, height: p.rail.size.tools / 5, right: p.rail.size.tools / 10, bottom: p.rail.size.tools / 10 }} />
+          )}
         </button>
       </aside>
     </div>
@@ -163,7 +169,8 @@ export function ToolCircle(p: Props) {
     <div key="prompts" data-tap-zone="" data-circle="prompts" className={zone} style={{ WebkitTouchCallout: "none", ...shift("prompts") }} {...(p.arranging ? mover : prompts.handlers)} onContextMenu={(e) => e.preventDefault()}>
       <aside ref={promptRef} aria-label="Chat prompts" className={`rounded-full ${moving}`}>
         <button
-          className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-xl text-brand-700 shadow-lift backdrop-blur-md"
+          className="flex items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-brand-700 shadow-lift backdrop-blur-md"
+          style={circleBox(p.rail.size.prompts)}
           aria-label="Chat prompts: tap to choose, or hold and drag towards one"
           aria-haspopup="menu"
           aria-expanded={prompts.fan !== null}

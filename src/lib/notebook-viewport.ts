@@ -29,6 +29,8 @@ export interface OverlayState {
   railDock?: RailDock;
   /** The iPad's toolbar circles were all moved by hand and float over the page. */
   railFloating?: boolean;
+  /** How wide a strip the iPad's docked toolbar takes (RAIL_INSET for the bar; circles vary). */
+  railInset?: number;
 }
 
 /** The parts of the window covered by fixed controls: header, tool rail or sidebar, side panel. */
@@ -37,11 +39,12 @@ export function overlayInsets(o: OverlayState): Insets {
   if (toolbarVariant(o.kind) === "sidebar") return { top: TOOLBAR_H, right: panel, bottom: 0, left: o.sidebarOpen ? SIDEBAR_W.expanded : SIDEBAR_W.collapsed };
   if (o.railFloating) return { top: TOOLBAR_H, right: panel, bottom: 0, left: 0 };
   const dock = o.railDock ?? "left";
+  const inset = o.railInset ?? RAIL_INSET;
   return {
     top: TOOLBAR_H,
-    right: panel + (dock === "right" ? RAIL_INSET : 0),
-    bottom: dock === "bottom" ? RAIL_INSET : 0,
-    left: dock === "left" ? RAIL_INSET : 0,
+    right: panel + (dock === "right" ? inset : 0),
+    bottom: dock === "bottom" ? inset : 0,
+    left: dock === "left" ? inset : 0,
   };
 }
 

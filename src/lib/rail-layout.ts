@@ -23,10 +23,18 @@ export interface RailLayout {
   style: RailStyle;
   /** Circles placed by hand; the others stay docked. */
   free: CirclePlaces;
+  /** Each circle's diameter in CSS px. */
+  size: Record<CircleKey, number>;
 }
 
+/** The range of each circle's diameter, for the sliders and for clamping stored values. */
+export const CIRCLE_SIZES: Record<CircleKey, { min: number; max: number; step: number; label: string }> = {
+  tools: { min: 44, max: 112, step: 4, label: "Tool circle" },
+  prompts: { min: 36, max: 96, step: 4, label: "Prompt circle" },
+};
+
 export const RAIL_ITEMS: readonly RailItem[] = ["pen", "highlighter", "eraser", "lasso", "text", "colors", "sizes", "history", "prompts"];
-export const DEFAULT_RAIL: RailLayout = { order: [...RAIL_ITEMS], hidden: [], dock: "left", align: "center", style: "bar", free: {} };
+export const DEFAULT_RAIL: RailLayout = { order: [...RAIL_ITEMS], hidden: [], dock: "left", align: "center", style: "bar", free: {}, size: { tools: 60, prompts: 48 } };
 
 const DOCKS: readonly RailDock[] = ["left", "right", "bottom"];
 const ALIGNS: readonly RailAlign[] = ["start", "center", "end"];
@@ -51,6 +59,7 @@ export function normalizeRail(raw: Partial<RailLayout> | null | undefined): Rail
     align: ALIGNS.includes(raw?.align as RailAlign) ? raw!.align! : DEFAULT_RAIL.align,
     style: STYLES.includes(raw?.style as RailStyle) ? raw!.style! : DEFAULT_RAIL.style,
     free: normalizePlaces(raw?.free),
+    size: normalizeSizes(raw?.size),
   };
 }
 
@@ -102,3 +111,25 @@ function normalizePlaces(raw: unknown): CirclePlaces {
  * strip kept clear for them.
  */
 export const railFloats = (l: RailLayout) => l.style === "circle" && !!l.free.tools && (!!l.free.prompts || l.hidden.includes("prompts"));
+
+function normalizeSizes(raw: unknown): Record<CircleKey, number> {
+  const out = { ...DEFAULT_RAIL.size };
+  if (!raw || typeof raw !== "object") return out;
+  for (const k of ["tools", "prompts"] as const) {
+    const v = (raw as Record<string, unknown>)[k];
+    const r = CIRCLE_SIZES[k];
+    if (typeof v === "number" && Number.isFinite(v)) out[k] = Math.min(r.max, Math.max(r.min, Math.round(v)));
+  }
+  return out;
+}
+
+/**
+ * How wide a strip the docked toolbar needs at its edge: the bar's fixed width, or the widest
+ * docked circle with its tap zone's 12 px and a little air. Undefined when nothing is docked.
+ */
+export function railThickness(l: RailLayout, barInset: number): number | undefined {
+  if (l.style !== "circle") return barInset;
+  const docked = (["tools", "prompts"] as const).filter((k) => !l.free[k] && (k === "tools" || !l.hidden.includes("prompts")));
+  if (!docked.length) return undefined;
+  return Math.max(...docked.map((k) => l.size[k])) + 16;
+}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { DEFAULT_RAIL, canHide, isTool, moveItem, setHidden, type RailAlign, type RailDock, type RailItem, type RailLayout } from "@/lib/rail-layout";
+import { CIRCLE_SIZES, DEFAULT_RAIL, canHide, isTool, moveItem, setHidden, type RailAlign, type RailDock, type RailItem, type RailLayout } from "@/lib/rail-layout";
 import { Icon, type IconName } from "./Icons";
 import { usePrompts } from "@/lib/settings";
 import { DEFAULT_PROMPTS, MAX_PROMPTS, PROMPT_CONTEXTS, PROMPT_ICONS, newPrompt, type ChatPrompt, type PromptContext } from "@/lib/prompts";
@@ -89,6 +89,38 @@ export function RailSettings({ layout, setLayout, anchor, onClose, initialTab = 
         <p className="mb-3 text-[11px] text-slate-500">
           {circle ? "Hold the circle and drag towards a tool to pick it; tap it for colours and sizes." : "Every tool, colour and size as a button."}
         </p>
+        {circle && (
+          <div className="mb-4 space-y-2">
+            {(["tools", "prompts"] as const).map((k) => {
+              const r = CIRCLE_SIZES[k];
+              return (
+                <label key={k} className="block">
+                  <span className="flex items-baseline justify-between text-xs font-medium text-slate-700">
+                    {r.label}
+                    <span className="flex items-baseline gap-2">
+                      {layout.size[k] !== DEFAULT_RAIL.size[k] && (
+                        <button type="button" className="text-[11px] font-medium text-brand-600 hover:underline" onClick={() => setLayout({ ...layout, size: { ...layout.size, [k]: DEFAULT_RAIL.size[k] } })}>
+                          Reset
+                        </button>
+                      )}
+                      <span className="tabular-nums text-slate-500">{layout.size[k]} px</span>
+                    </span>
+                  </span>
+                  <input
+                    type="range"
+                    min={r.min}
+                    max={r.max}
+                    step={r.step}
+                    value={layout.size[k]}
+                    onChange={(e) => setLayout({ ...layout, size: { ...layout.size, [k]: Number(e.target.value) } })}
+                    className="h-8 w-full"
+                    aria-label={`${r.label} size`}
+                  />
+                </label>
+              );
+            })}
+          </div>
+        )}
         {circle && onArrange && (
           <div className="mb-4">
             <button className="btn btn-secondary btn-sm h-11 w-full justify-center" onClick={onArrange}>
@@ -145,7 +177,7 @@ export function RailSettings({ layout, setLayout, anchor, onClose, initialTab = 
           Touch gestures…
         </Link>
         <p className="mt-2 text-[11px] text-slate-500">
-          Hidden tools still work from the keyboard. {circle ? "Presses just outside the circle still count." : "Taps near a button, or between buttons, go to the closest one."}
+          Saved on this device only, so the iPad and the Mac each keep their own. Hidden tools still work from the keyboard. {circle ? "Presses just outside the circle still count." : "Taps near a button, or between buttons, go to the closest one."}
         </p>
       </div>
     </div>
@@ -169,7 +201,7 @@ function PromptSettings({ prompts, setPrompts, shown }: { prompts: ChatPrompt[];
   return (
     <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain p-3">
       <p className="mb-2 text-[11px] text-slate-500">
-        Open the prompt menu from the <Icon name="message" className="inline align-[-2px]" /> button{shown ? "" : " (hidden: show Chat prompts on the Toolbar tab)"} or a gesture set to Prompt menu. Tap a prompt to change it.
+        Open the prompt menu from the <Icon name="message" className="inline align-[-2px]" /> button{shown ? "" : " (hidden: show Chat prompts on the Toolbar tab)"} or a gesture set to Prompt menu. Tap a prompt to change it. Prompts are saved on this device only.
       </p>
       {!prompts.length && (
         <p className="mb-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">No prompts. Add your own, or restore the starter ones.</p>
