@@ -188,7 +188,7 @@ describe("PenSettings", () => {
   it("renders the quick sliders, every parameter and a preview stroke", async () => {
     const { PenSettings } = await import("@/components/PenSettings");
     const tool = { kind: "pen" as const, penColor: "#111827", penSize: 3.4, hlColor: "#ff0", hlSize: 20, eraserSize: 20 };
-    const html = renderToStaticMarkup(createElement(PenSettings, { tool, setTool() {}, anchorY: 200, onClose() {} }));
+    const html = renderToStaticMarkup(createElement(PenSettings, { tool, setTool() {}, anchor: { edge: "left", bar: { top: 100, left: 12, right: 70, bottom: 600 }, x: 40, y: 200 }, onClose() {} }));
     expect(html).toContain('aria-label="Pen settings"');
     expect(html).toContain('aria-label="Smoothness"');
     expect(html).toContain('aria-label="Pressure"');
@@ -199,7 +199,7 @@ describe("PenSettings", () => {
   it("puts the two everyday sliders first and tucks the rest under a closed Fine-tune", async () => {
     const { PenSettings } = await import("@/components/PenSettings");
     const tool = { kind: "pen" as const, penColor: "#111827", penSize: 3.4, hlColor: "#ff0", hlSize: 20, eraserSize: 20 };
-    const html = renderToStaticMarkup(createElement(PenSettings, { tool, setTool() {}, anchorY: 200, onClose() {} }));
+    const html = renderToStaticMarkup(createElement(PenSettings, { tool, setTool() {}, anchor: { edge: "left", bar: { top: 100, left: 12, right: 70, bottom: 600 }, x: 40, y: 200 }, onClose() {} }));
     const total = PEN_GROUPS.reduce((n, g) => n + g.params.length, 0);
     expect(html).toMatch(/aria-expanded="false" aria-controls="pen-fine-tune"/);
     expect(html).toContain(`${total} settings`);
@@ -210,7 +210,7 @@ describe("PenSettings", () => {
     expect(html).not.toContain(">Quick<");
 
     const changed = { ...tool, pen: { taperEnd: 20, capStart: false } };
-    const html2 = renderToStaticMarkup(createElement(PenSettings, { tool: changed, setTool() {}, anchorY: 200, onClose() {} }));
+    const html2 = renderToStaticMarkup(createElement(PenSettings, { tool: changed, setTool() {}, anchor: { edge: "left", bar: { top: 100, left: 12, right: 70, bottom: 600 }, x: 40, y: 200 }, onClose() {} }));
     expect(html2).toContain("2 changed");
     expect(html2).toContain("Reset all (2)");
   });

@@ -21,6 +21,7 @@ import {
   type Insets,
   type PinchStart,
 } from "@/lib/notebook-viewport";
+import { DEFAULT_RAIL } from "@/lib/rail-layout";
 import { PAGE_WIDTH, type DeviceKind, type StrokeData, type StrokeEntity } from "@/lib/types";
 
 // The page must never be trapped under the header, the iPad rail, the Mac sidebar or the side
@@ -239,13 +240,23 @@ describe("toolbar markup per device", () => {
     return renderToStaticMarkup(createElement(Toolbar, { ...base, ...extra }));
   };
 
-  it("keeps the iPad's floating rail exactly as it was", async () => {
+  it("floats the iPad's rail at the left edge, inside a tap zone, with a settings gear", async () => {
     const html = await render({});
-    expect(html).toContain(
-      'class="tool-rail fixed left-3 top-1/2 z-40 flex max-h-[calc(100dvh-5rem)] -translate-y-1/2 flex-col items-center gap-2 overflow-y-auto rounded-2xl border border-slate-200/80 bg-white/90 p-1.5 shadow-lift backdrop-blur-md"',
-    );
+    expect(html).toContain('data-dock="left"');
+    expect(html).toContain("data-tap-zone");
+    expect(html).toContain("tool-rail flex flex-col");
+    expect(html).toContain('aria-label="Toolbar settings"');
     expect(html).not.toContain("tool-sidebar");
     expect(html).toContain(">25%<");
+  });
+
+  it("lays the rail out as configured: hidden items gone, order kept, docked at the bottom in a row", async () => {
+    const rail = { ...DEFAULT_RAIL, order: ["text", ...DEFAULT_RAIL.order.filter((i) => i !== "text")], hidden: ["highlighter"], dock: "bottom" };
+    const html = await render({ rail });
+    expect(html).toContain('data-dock="bottom"');
+    expect(html).toContain("tool-rail flex flex-row");
+    expect(html).not.toContain('aria-label="Highlighter"');
+    expect(html.indexOf('aria-label="Text"')).toBeLessThan(html.indexOf('aria-label="Pen"'));
   });
 
   it("docks a labelled sidebar on the Mac that collapses to icons", async () => {
@@ -264,6 +275,17 @@ describe("toolbar markup per device", () => {
     expect(closed).not.toContain(">Pen</span>");
     // Tools and undo/redo stay one click away while collapsed.
     for (const label of ["Pen", "Highlighter", "Eraser", "Lasso", "Text", "Undo", "Redo"]) expect(closed).toContain(`aria-label="${label}"`);
+  });
+});
+
+describe("rail dock insets", () => {
+  it("reserves the rail's strip on whichever edge it is docked to", () => {
+    const at = (railDock: "left" | "right" | "bottom", panelWidth = 0) => overlayInsets({ kind: "ipad", sidebarOpen: false, panelWidth, railDock });
+    expect(at("left")).toEqual({ top: TOOLBAR_H, right: 0, bottom: 0, left: RAIL_INSET });
+    expect(at("right", 360)).toEqual({ top: TOOLBAR_H, right: 360 + RAIL_INSET, bottom: 0, left: 0 });
+    expect(at("bottom")).toEqual({ top: TOOLBAR_H, right: 0, bottom: RAIL_INSET, left: 0 });
+    // The Mac sidebar ignores the rail's dock.
+    expect(overlayInsets({ kind: "desktop", sidebarOpen: true, panelWidth: 0, railDock: "right" }).left).toBe(SIDEBAR_W.expanded);
   });
 });
 

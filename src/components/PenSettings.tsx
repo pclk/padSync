@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { ToolState } from "@/ink/controller";
 import {
   DEFAULT_PEN,
@@ -18,6 +18,7 @@ import {
 import { strokeSvgPath } from "@/ink/render";
 import { STROKE_STRIDE, type StrokeData } from "@/lib/types";
 import { Icon } from "./Icons";
+import { useDismiss, usePopoverBox, type PopoverAnchor } from "./popover";
 
 const PREVIEW_W = 232;
 const PREVIEW_H = 64;
@@ -53,10 +54,8 @@ let fineTuneOpen = false;
 interface Props {
   tool: ToolState;
   setTool: (t: ToolState) => void;
-  /** Viewport y of the pen button's centre; the popover's header lines up with it. */
-  anchorY: number;
-  /** Viewport x of the popover's left edge; by default it sits just right of the iPad rail. */
-  left?: number;
+  /** The pen button, and the toolbar it sits in. */
+  anchor: PopoverAnchor;
   onClose: () => void;
 }
 
@@ -64,7 +63,7 @@ interface Props {
  * Pen settings, opened by tapping the pen tool again while it is selected: two everyday sliders,
  * and under Fine-tune every pen parameter in tabs, each adjustable and resettable on its own.
  */
-export function PenSettings({ tool, setTool, anchorY, left, onClose }: Props) {
+export function PenSettings({ tool, setTool, anchor, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const params = useMemo(() => withOverrides(tool.pen), [tool.pen]);
   const overrides = penOverrides(params);
@@ -76,23 +75,10 @@ export function PenSettings({ tool, setTool, anchorY, left, onClose }: Props) {
     fineTuneOpen = !fineTune;
     setFineTune(fineTuneOpen);
   };
-  const box = usePopoverBox(anchorY);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    // Close on a press outside, but not on the rail's pen button (it toggles us itself).
-    const onDown = (e: PointerEvent) => {
-      const t = e.target as Element | null;
-      if (ref.current?.contains(t) || t?.closest?.("[data-pen-tool]")) return;
-      onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("pointerdown", onDown, true);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("pointerdown", onDown, true);
-    };
-  }, [onClose]);
+  const box = usePopoverBox(anchor, 320);
+  // Not closed by the pen button, which toggles us itself, or by the rail's tap zone, whose
+  // near-miss taps reach the pen button only on release.
+  useDismiss(ref, onClose, "[data-pen-tool], [data-tap-zone]");
 
   const preview = useMemo(() => {
     const data: StrokeData = { tool: "pen", color: tool.penColor, size: tool.penSize, pts: PREVIEW_PTS, t0: 0, input: "pen", device: "", pen: penOverrides(params) };
@@ -108,8 +94,8 @@ export function PenSettings({ tool, setTool, anchorY, left, onClose }: Props) {
       ref={ref}
       role="dialog"
       aria-label="Pen settings"
-      className="card fixed left-[4.75rem] z-50 flex w-80 max-w-[calc(100vw-6rem)] flex-col overflow-hidden shadow-lift"
-      style={{ top: box.top, maxHeight: box.maxHeight, ...(left === undefined ? {} : { left }) }}
+      className="card fixed z-50 flex w-80 max-w-[calc(100vw-6rem)] flex-col overflow-hidden shadow-lift"
+      style={box}
     >
       <div className="shrink-0 border-b border-slate-100 p-3">
         <div className="mb-2 flex items-center justify-between">
@@ -173,40 +159,6 @@ export function PenSettings({ tool, setTool, anchorY, left, onClose }: Props) {
       </div>
     </div>
   );
-}
-
-/**
- * Top and height for the popover from the visible screen (visualViewport where there is one, so
- * Safari's bars and the keyboard are accounted for), kept up to date as it changes.
- */
-function usePopoverBox(anchorY: number) {
-  const measure = () => {
-    if (typeof window === "undefined") return { top: 68, maxHeight: 600 };
-    const vv = window.visualViewport;
-    const height = vv?.height ?? window.innerHeight;
-    const offset = vv?.offsetTop ?? 0;
-    const margin = 12;
-    // Line the header up with the pen button, but never so low that less than 320 px fit.
-    const top = Math.max(offset + 68, Math.min(anchorY - 28, offset + height - 320 - margin));
-    return { top, maxHeight: Math.max(200, offset + height - top - margin) };
-  };
-  const [box, setBox] = useState(measure);
-  useEffect(() => {
-    const update = () => setBox(measure());
-    const vv = window.visualViewport;
-    window.addEventListener("resize", update);
-    vv?.addEventListener("resize", update);
-    vv?.addEventListener("scroll", update);
-    update();
-    return () => {
-      window.removeEventListener("resize", update);
-      vv?.removeEventListener("resize", update);
-      vv?.removeEventListener("scroll", update);
-    };
-    // measure reads anchorY; re-measure when it changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [anchorY]);
-  return box;
 }
 
 function Param({ spec, value, onChange }: { spec: PenParamSpec; value: PenParams[keyof PenParams]; onChange: (v: PenParams[keyof PenParams]) => void }) {

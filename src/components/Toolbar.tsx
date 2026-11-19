@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { ToolKind, ToolState } from "@/ink/controller";
 import { SyncBadge } from "./SyncBadge";
 import { Icon, type IconName } from "./Icons";
 import { PenSettings } from "./PenSettings";
-import { SIDEBAR_W, type ToolbarVariant } from "@/lib/notebook-viewport";
+import { RailSettings } from "./RailSettings";
+import { anchorOf, type PopoverAnchor } from "./popover";
+import { SIDEBAR_W, TOOLBAR_H, type ToolbarVariant } from "@/lib/notebook-viewport";
+import { DEFAULT_RAIL, visibleItems, type RailItem, type RailLayout } from "@/lib/rail-layout";
 
 const PEN_COLORS = ["#111827", "#1d4ed8", "#dc2626", "#047857", "#7c3aed"];
 const HL_COLORS = ["#facc15", "#4ade80", "#f472b6", "#60a5fa"];
@@ -41,6 +44,11 @@ interface Props {
   variant?: ToolbarVariant;
   sidebarOpen?: boolean;
   onToggleSidebar?: () => void;
+  /** The iPad rail's items and dock, from its settings popover. */
+  rail?: RailLayout;
+  setRail?: (l: RailLayout) => void;
+  /** Width covered at the right edge (the side panel), so a right-docked rail sits beside it. */
+  rightInset?: number;
 }
 
 export function Toolbar(p: Props) {
@@ -49,10 +57,24 @@ export function Toolbar(p: Props) {
   const color = tool.kind === "highlighter" ? tool.hlColor : tool.penColor;
   const sizes = tool.kind === "highlighter" ? HL_SIZES : tool.kind === "eraser" ? ERASER_SIZES : PEN_SIZES;
   const size = tool.kind === "highlighter" ? tool.hlSize : tool.kind === "eraser" ? tool.eraserSize : tool.penSize;
+  const rail = p.rail ?? DEFAULT_RAIL;
+  const edge = p.variant === "sidebar" ? "left" : rail.dock;
   // Tapping the pen again while it is selected opens its settings (smoothness, pressure).
-  const [penMenuY, setPenMenuY] = useState<number | null>(null);
-  const closePenMenu = useCallback(() => setPenMenuY(null), []);
-  const penMenuOpen = penMenuY !== null && tool.kind === "pen";
+  const [penMenu, setPenMenu] = useState<PopoverAnchor | null>(null);
+  const closePenMenu = useCallback(() => setPenMenu(null), []);
+  const penMenuOpen = penMenu !== null && tool.kind === "pen";
+  const [railMenu, setRailMenu] = useState<PopoverAnchor | null>(null);
+  const closeRailMenu = useCallback(() => setRailMenu(null), []);
+  // Hiding the tool in use leaves you with the pen rather than an invisible selection.
+  const setRail = (l: RailLayout) => {
+    p.setRail?.(l);
+    if (l.hidden.includes(tool.kind)) setTool({ ...tool, kind: "pen" });
+    // The settings stay open while the rail moves or changes, so they follow its gear once it has.
+    requestAnimationFrame(() => {
+      const gear = document.querySelector<HTMLElement>("[data-rail-settings]");
+      if (gear) setRailMenu((m) => (m ? anchorOf(gear, l.dock) : m));
+    });
+  };
   const showColors = tool.kind === "pen" || tool.kind === "highlighter";
   const showSizes = showColors || tool.kind === "eraser";
 
@@ -61,11 +83,11 @@ export function Toolbar(p: Props) {
     setTool(tool.kind === "highlighter" ? { ...tool, hlSize: s } : tool.kind === "eraser" ? { ...tool, eraserSize: s } : { ...tool, penSize: s });
   const pick = (kind: ToolKind, button: HTMLElement) => {
     if (kind === "pen" && tool.kind === "pen") {
-      const r = button.getBoundingClientRect();
-      setPenMenuY(penMenuOpen ? null : r.top + r.height / 2);
+      setRailMenu(null);
+      setPenMenu(penMenuOpen ? null : anchorOf(button, edge));
       return;
     }
-    setPenMenuY(null);
+    setPenMenu(null);
     setTool({ ...tool, kind });
   };
   const tools: ToolControls = { tool, colors, color, sizes, size, showColors, showSizes, penMenuOpen, pick, setColor, setSize };
@@ -103,17 +125,23 @@ export function Toolbar(p: Props) {
       {p.variant === "sidebar" ? (
         <ToolSidebar {...tools} open={p.sidebarOpen ?? true} onToggle={p.onToggleSidebar} canUndo={p.canUndo} canRedo={p.canRedo} onUndo={p.onUndo} onRedo={p.onRedo} />
       ) : (
-        <ToolRail {...tools} canUndo={p.canUndo} canRedo={p.canRedo} onUndo={p.onUndo} onRedo={p.onRedo} />
-      )}
-      {penMenuOpen && (
-        <PenSettings
-          tool={tool}
-          setTool={setTool}
-          anchorY={penMenuY}
-          left={p.variant === "sidebar" ? (p.sidebarOpen ?? true ? SIDEBAR_W.expanded : SIDEBAR_W.collapsed) + 8 : undefined}
-          onClose={closePenMenu}
+        <ToolRail
+          {...tools}
+          canUndo={p.canUndo}
+          canRedo={p.canRedo}
+          onUndo={p.onUndo}
+          onRedo={p.onRedo}
+          rail={rail}
+          rightInset={p.rightInset ?? 0}
+          settingsOpen={railMenu !== null}
+          onSettings={(button) => {
+            setPenMenu(null);
+            setRailMenu(railMenu ? null : anchorOf(button, rail.dock));
+          }}
         />
       )}
+      {penMenuOpen && <PenSettings tool={tool} setTool={setTool} anchor={penMenu} onClose={closePenMenu} />}
+      {railMenu && <RailSettings layout={rail} setLayout={setRail} anchor={railMenu} onClose={closeRailMenu} />}
     </>
   );
 }
@@ -142,66 +170,170 @@ const toolTitle = (t: (typeof TOOLS)[number]) => (t.kind === "pen" ? `${t.label}
 const penAttrs = (t: (typeof TOOLS)[number], open: boolean) =>
   t.kind === "pen" ? { "data-pen-tool": "", "aria-haspopup": "dialog" as const, "aria-expanded": open } : {};
 
-function ToolRail({ tool, colors, color, sizes, size, showColors, showSizes, penMenuOpen, pick, setColor, setSize, canUndo, canRedo, onUndo, onRedo }: ToolControls & HistoryControls) {
-  return (
-    <aside className="tool-rail fixed left-3 top-1/2 z-40 flex max-h-[calc(100dvh-5rem)] -translate-y-1/2 flex-col items-center gap-2 overflow-y-auto rounded-2xl border border-slate-200/80 bg-white/90 p-1.5 shadow-lift backdrop-blur-md">
-      <div className="flex flex-col gap-0.5">
-        {TOOLS.map((t) => (
-          <button
-            key={t.kind}
-            title={toolTitle(t)}
-            aria-label={t.label}
-            aria-pressed={tool.kind === t.kind}
-            {...penAttrs(t, penMenuOpen)}
-            onClick={(e) => pick(t.kind, e.currentTarget)}
-            className={`flex h-11 w-11 items-center justify-center rounded-xl text-xl transition-colors ${tool.kind === t.kind ? "bg-brand-600 text-on-accent shadow-sm" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"}`}
-          >
-            <Icon name={t.icon} />
-          </button>
-        ))}
-      </div>
+interface RailControls {
+  rail: RailLayout;
+  rightInset: number;
+  settingsOpen: boolean;
+  onSettings: (button: HTMLElement) => void;
+}
 
-      {/* Colour and size slots are always laid out (hidden when the tool has none) so the rail
-          keeps one height and nothing moves under your finger when you switch tools. */}
-      <div className={`flex flex-col items-center gap-2 border-t border-slate-100 pt-2 ${showColors ? "" : "invisible"}`} aria-hidden={!showColors}>
-        {Array.from({ length: COLOR_SLOTS }, (_, i) => {
-          const c = colors[i];
-          if (!c) return <span key={`empty${i}`} className="h-7 w-7" />;
+/** How far past a control's edge a tap still counts as that control, in CSS px. */
+const TAP_REACH = 32;
+/** A press that moves further than this is a scroll, not a tap. */
+const TAP_SLOP = 10;
+
+/**
+ * Taps that land on the rail but not on a button (its padding, the gaps between buttons, or the
+ * invisible margin around it) go to the closest enabled button within TAP_REACH, so a finger
+ * that is a little off still hits something. Presses on a button are left to the button.
+ */
+function useGenerousTaps() {
+  const down = useRef<{ id: number; x: number; y: number } | null>(null);
+  const onPointerDown = (e: ReactPointerEvent<HTMLElement>) => {
+    down.current = (e.target as Element).closest("button, input, label") ? null : { id: e.pointerId, x: e.clientX, y: e.clientY };
+  };
+  const onPointerUp = (e: ReactPointerEvent<HTMLElement>) => {
+    const d = down.current;
+    down.current = null;
+    if (!d || d.id !== e.pointerId || Math.hypot(e.clientX - d.x, e.clientY - d.y) > TAP_SLOP) return;
+    const best = nearestButton(e.currentTarget, e.clientX, e.clientY);
+    if (best) {
+      e.preventDefault();
+      best.click();
+    }
+  };
+  const onPointerCancel = () => (down.current = null);
+  return { onPointerDown, onPointerUp, onPointerCancel };
+}
+
+export function nearestButton(root: HTMLElement, x: number, y: number): HTMLButtonElement | null {
+  let best: HTMLButtonElement | null = null;
+  let bestD = TAP_REACH;
+  for (const b of root.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")) {
+    if (b.closest('[aria-hidden="true"]')) continue;
+    const r = b.getBoundingClientRect();
+    const d = Math.hypot(Math.max(r.left - x, 0, x - r.right), Math.max(r.top - y, 0, y - r.bottom));
+    if (d <= bestD) [best, bestD] = [b, d];
+  }
+  return best;
+}
+
+const JUSTIFY = { start: "justify-start", center: "justify-center", end: "justify-end" } as const;
+
+function ToolRail({ tool, colors, color, sizes, size, showColors, showSizes, penMenuOpen, pick, setColor, setSize, canUndo, canRedo, onUndo, onRedo, rail, rightInset, settingsOpen, onSettings }: ToolControls & HistoryControls & RailControls) {
+  const row = rail.dock === "bottom";
+  const taps = useGenerousTaps();
+  // Runs of tools stay together; colours, sizes and undo/redo are each their own group.
+  const groups: RailItem[][] = [];
+  for (const item of visibleItems(rail)) {
+    const last = groups[groups.length - 1];
+    if (TOOLS.some((t) => t.kind === item) && last && TOOLS.some((t) => t.kind === last[0])) last.push(item);
+    else groups.push([item]);
+  }
+  const flow = row ? "flex-row" : "flex-col";
+  const divider = row ? "border-l border-slate-100 pl-2" : "border-t border-slate-100 pt-2";
+
+  const renderGroup = (group: RailItem[]) => {
+    const item = group[0];
+    if (item === "colors") {
+      // Colour and size slots are always laid out (hidden when the tool has none) so the rail
+      // keeps one size and nothing moves under your finger when you switch tools. Each swatch's
+      // button is bigger than its dot, so the dot needn't be hit exactly.
+      return (
+        <div className={`flex ${flow} items-center ${showColors ? "" : "invisible"}`} aria-hidden={!showColors}>
+          {Array.from({ length: COLOR_SLOTS }, (_, i) => {
+            const c = colors[i];
+            if (!c) return <span key={`empty${i}`} className="flex h-9 w-11"><span className="h-7 w-7" /></span>;
+            return (
+              <button key={c} onClick={() => setColor(c)} tabIndex={showColors ? 0 : -1} className="flex h-9 w-11 items-center justify-center" aria-label={`Color ${c}`}>
+                <span className={`h-7 w-7 rounded-full ring-offset-2 transition-shadow ${color === c ? "ring-2 ring-slate-400" : "ring-1 ring-black/10"}`} style={{ background: c }} />
+              </button>
+            );
+          })}
+        </div>
+      );
+    }
+    if (item === "sizes") {
+      return (
+        <div className={`flex ${flow} items-center gap-0.5 ${showSizes ? "" : "invisible"}`} aria-hidden={!showSizes}>
+          {sizes.map((s, i) => (
+            <button
+              key={i}
+              onClick={() => setSize(s)}
+              tabIndex={showSizes ? 0 : -1}
+              className={`flex h-10 w-11 items-center justify-center rounded-lg ${size === s ? "bg-slate-100 ring-1 ring-slate-300" : "hover:bg-slate-50"}`}
+              aria-label={`Size ${i + 1}`}
+            >
+              <span className="rounded-full bg-slate-700" style={{ width: 4 + i * 5, height: 4 + i * 5 }} />
+            </button>
+          ))}
+        </div>
+      );
+    }
+    if (item === "history") {
+      return (
+        <div className={`flex ${flow}`}>
+          <button className="icon-btn h-11 w-11 text-lg" disabled={!canUndo} onClick={onUndo} title="Undo (two-finger tap, ⌘Z)" aria-label="Undo">
+            <Icon name="undo" />
+          </button>
+          <button className="icon-btn h-11 w-11 text-lg" disabled={!canRedo} onClick={onRedo} title="Redo (three-finger tap, ⇧⌘Z)" aria-label="Redo">
+            <Icon name="redo" />
+          </button>
+        </div>
+      );
+    }
+    return (
+      <div className={`flex ${flow} gap-0.5`}>
+        {group.map((kind) => {
+          const t = TOOLS.find((x) => x.kind === kind)!;
           return (
             <button
-              key={c}
-              onClick={() => setColor(c)}
-              tabIndex={showColors ? 0 : -1}
-              className={`h-7 w-7 rounded-full ring-offset-2 transition-shadow ${color === c ? "ring-2 ring-slate-400" : "ring-1 ring-black/10"}`}
-              style={{ background: c }}
-              aria-label={`Color ${c}`}
-            />
+              key={t.kind}
+              title={toolTitle(t)}
+              aria-label={t.label}
+              aria-pressed={tool.kind === t.kind}
+              {...penAttrs(t, penMenuOpen)}
+              onClick={(e) => pick(t.kind, e.currentTarget)}
+              className={`flex h-11 w-11 items-center justify-center rounded-xl text-xl transition-colors ${tool.kind === t.kind ? "bg-brand-600 text-on-accent shadow-sm" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"}`}
+            >
+              <Icon name={t.icon} />
+            </button>
           );
         })}
       </div>
-      <div className={`flex flex-col items-center gap-1 ${showSizes ? "" : "invisible"}`} aria-hidden={!showSizes}>
-        {sizes.map((s, i) => (
-          <button
-            key={i}
-            onClick={() => setSize(s)}
-            tabIndex={showSizes ? 0 : -1}
-            className={`flex h-9 w-9 items-center justify-center rounded-lg ${size === s ? "bg-slate-100 ring-1 ring-slate-300" : "hover:bg-slate-50"}`}
-            aria-label={`Size ${i + 1}`}
-          >
-            <span className="rounded-full bg-slate-700" style={{ width: 4 + i * 5, height: 4 + i * 5 }} />
-          </button>
-        ))}
-      </div>
+    );
+  };
 
-      <div className="flex flex-col border-t border-slate-100 pt-1">
-        <button className="icon-btn h-10 w-11 text-lg" disabled={!canUndo} onClick={onUndo} title="Undo (two-finger tap, ⌘Z)" aria-label="Undo">
-          <Icon name="undo" />
-        </button>
-        <button className="icon-btn h-10 w-11 text-lg" disabled={!canRedo} onClick={onRedo} title="Redo (three-finger tap, ⇧⌘Z)" aria-label="Redo">
-          <Icon name="redo" />
-        </button>
+  // The strip along the docked edge passes touches through; only the hit zone around the rail
+  // takes them, and its padding is the invisible margin where taps still reach the closest button.
+  const strip = row ? { left: 0, right: rightInset, bottom: 0 } : { top: TOOLBAR_H, bottom: 0, ...(rail.dock === "left" ? { left: 0 } : { right: rightInset }) };
+  return (
+    <div className={`tool-rail-dock pointer-events-none fixed z-40 flex ${flow} ${JUSTIFY[rail.align]} ${row ? "items-end" : rail.dock === "left" ? "items-start" : "items-end"}`} style={strip} data-dock={rail.dock}>
+      <div data-tap-zone="" className={`pointer-events-auto flex touch-manipulation p-3 ${row ? "pb-[max(0.75rem,env(safe-area-inset-bottom))]" : ""}`} {...taps}>
+        <aside
+          className={`tool-rail flex ${flow} items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/90 p-1.5 shadow-lift backdrop-blur-md ${row ? "overflow-x-auto" : "overflow-y-auto"}`}
+          style={row ? { maxWidth: `calc(100vw - ${rightInset}px - 1.5rem)` } : { maxHeight: `calc(100dvh - ${TOOLBAR_H}px - 1.5rem)` }}
+          aria-label="Drawing tools"
+        >
+          {groups.map((g, i) => (
+            <div key={g[0]} className={`shrink-0 ${i > 0 ? divider : ""}`}>
+              {renderGroup(g)}
+            </div>
+          ))}
+          <button
+            className={`icon-btn h-9 w-11 shrink-0 text-base ${settingsOpen ? "bg-slate-100 text-slate-900" : ""}`}
+            onClick={(e) => onSettings(e.currentTarget)}
+            data-rail-settings=""
+            aria-haspopup="dialog"
+            aria-expanded={settingsOpen}
+            aria-label="Toolbar settings"
+            title="Toolbar settings"
+          >
+            <Icon name="settings" />
+          </button>
+        </aside>
       </div>
-    </aside>
+    </div>
   );
 }
 

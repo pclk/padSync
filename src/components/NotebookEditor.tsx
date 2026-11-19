@@ -18,6 +18,7 @@ import { PAGE_WIDTH, type NotebookEntity, type PresenceData, type PresenceEntity
 import { SectionView } from "./SectionView";
 import { SidePanel } from "./SidePanel";
 import { Toolbar } from "./Toolbar";
+import { DEFAULT_RAIL, normalizeRail, type RailLayout } from "@/lib/rail-layout";
 import { Icon } from "./Icons";
 
 const emitLocalText = (notebookId: string) => emitActivity({ notebookId, source: "local", kinds: ["text"], at: Date.now() });
@@ -94,6 +95,8 @@ function Editor({ notebookId }: { notebookId: string }) {
   // The Mac's tool sidebar; the iPad keeps its floating rail.
   const variant = toolbarVariant(kind);
   const [sidebarOpen, setSidebarOpen] = useStoredState("padsync.toolSidebar", true);
+  const [storedRail, setRail] = useStoredState<RailLayout>("padsync.rail", DEFAULT_RAIL);
+  const rail = useMemo(() => normalizeRail(storedRail), [storedRail]);
   const gutter = gutterFor(kind);
   const viewport = useViewport();
   // A first guess until the layout mode knows the panel width; the refit below corrects it.
@@ -132,7 +135,7 @@ function Editor({ notebookId }: { notebookId: string }) {
   const panelWidth = isIpad ? 360 : layout.width;
   // What covers the window around the page, and where the page sits so every part of it can be
   // panned clear of the header, the tools and the side panel (see notebook-viewport).
-  const insets = useMemo(() => overlayInsets({ kind, sidebarOpen, panelWidth: panelOpen ? panelWidth : 0 }), [kind, sidebarOpen, panelOpen, panelWidth]);
+  const insets = useMemo(() => overlayInsets({ kind, sidebarOpen, panelWidth: panelOpen ? panelWidth : 0, railDock: rail.dock }), [kind, sidebarOpen, panelOpen, panelWidth, rail.dock]);
   const column = columnLayout(viewport.w, PAGE_WIDTH * zoom, insets, gutter);
   const vpad = verticalPadding(insets, gutter);
   // What a pinch needs to work out the scroll limits at its new zoom.
@@ -620,6 +623,9 @@ function Editor({ notebookId }: { notebookId: string }) {
         variant={variant}
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+        rail={rail}
+        setRail={setRail}
+        rightInset={showPanel ? panelWidth : 0}
       />
 
       {/* Not one transform over the whole notebook: on the iPad a scaled layer that tall (300k px for

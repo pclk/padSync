@@ -1,5 +1,6 @@
 // Where the notebook column sits on screen and how far it can pan, given the controls drawn over
 // it. Pure numbers in CSS px, so the editor and the tests share one model.
+import type { RailDock } from "./rail-layout";
 import { PAGE_WIDTH, type DeviceKind } from "./types";
 
 export const MIN_ZOOM = 0.25;
@@ -7,7 +8,7 @@ export const MAX_ZOOM = 3;
 export const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 
 export const TOOLBAR_H = 56;
-/** The iPad's floating tool rail: left-3 + 44 px buttons + padding and border, and a little air. */
+/** The iPad's floating tool rail: 12 px from the edge + 44 px buttons + padding and border, and a little air. */
 export const RAIL_INSET = 76;
 /** The Mac's docked tool sidebar. */
 export const SIDEBAR_W = { expanded: 184, collapsed: 52 } as const;
@@ -24,12 +25,21 @@ export interface OverlayState {
   sidebarOpen: boolean;
   /** Width of the side panel (chat/notes) on the right, 0 when closed. */
   panelWidth: number;
+  /** The screen edge the iPad rail is docked to (left unless moved in its settings). */
+  railDock?: RailDock;
 }
 
 /** The parts of the window covered by fixed controls: header, tool rail or sidebar, side panel. */
 export function overlayInsets(o: OverlayState): Insets {
-  const left = toolbarVariant(o.kind) === "rail" ? RAIL_INSET : o.sidebarOpen ? SIDEBAR_W.expanded : SIDEBAR_W.collapsed;
-  return { top: TOOLBAR_H, right: Math.max(0, o.panelWidth), bottom: 0, left };
+  const panel = Math.max(0, o.panelWidth);
+  if (toolbarVariant(o.kind) === "sidebar") return { top: TOOLBAR_H, right: panel, bottom: 0, left: o.sidebarOpen ? SIDEBAR_W.expanded : SIDEBAR_W.collapsed };
+  const dock = o.railDock ?? "left";
+  return {
+    top: TOOLBAR_H,
+    right: panel + (dock === "right" ? RAIL_INSET : 0),
+    bottom: dock === "bottom" ? RAIL_INSET : 0,
+    left: dock === "left" ? RAIL_INSET : 0,
+  };
 }
 
 /** Air between the page and whatever covers the window around it. */
