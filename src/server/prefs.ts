@@ -2,6 +2,12 @@ import "server-only";
 import { z } from "zod";
 import type { Sql } from "./db";
 import { AGENTS, jobOptionsSchema } from "./jobs";
+import { DEVICE_SETTING_KEYS } from "@/lib/device-setting-keys";
+
+/** Each setting's stored JSON and when it changed; the prompts are the largest, a few KB. */
+const deviceSettings = z
+  .partialRecord(z.enum(DEVICE_SETTING_KEYS), z.object({ v: z.string().max(100_000), at: z.number().nonnegative() }).strict())
+  .nullable();
 
 // Preferences that follow the signed-in user to every device, unlike src/lib/settings.ts, which
 // stay in one browser. Each key has its own schema; unknown keys are refused.
@@ -15,6 +21,9 @@ export const PREF_SCHEMAS = {
     })
     .strict()
     .nullable(),
+  /** One kind of device's own settings (src/lib/device-settings.ts), kept apart per kind. */
+  "device.ipad": deviceSettings,
+  "device.desktop": deviceSettings,
 } as const;
 export type PrefKey = keyof typeof PREF_SCHEMAS;
 export const isPrefKey = (k: string): k is PrefKey => Object.hasOwn(PREF_SCHEMAS, k);

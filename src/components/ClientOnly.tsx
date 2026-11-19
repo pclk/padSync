@@ -3,6 +3,8 @@
 import dynamic from "next/dynamic";
 import { Suspense, useEffect } from "react";
 import { startSync } from "@/lib/sync";
+import { deviceKind } from "@/lib/db";
+import { startDeviceSettings } from "@/lib/device-settings";
 
 // Every screen reads IndexedDB, so screens render only in the browser. The server sends a
 // static shell, which the service worker caches for offline use.
@@ -25,6 +27,9 @@ export function ClientOnly({ view }: { view: keyof typeof views }) {
       navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).catch(() => {});
     }
     navigator.storage?.persist?.().catch(() => {});
+    // Brings this device's settings back if this browser lost them (a new address, Safari's
+    // storage clean-up), and keeps the server copy up to date.
+    void startDeviceSettings(deviceKind());
   }, []);
   const View = views[view];
   return (

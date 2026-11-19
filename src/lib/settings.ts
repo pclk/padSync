@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { noteSettingWrite, notifySettings, subscribeSettings } from "./device-settings";
 import { THEME_DEFAULT, THEME_KEY, isThemePreference, type ThemePreference } from "./theme";
 import { LASSO_KEY, normalizeLasso, type LassoSettings } from "./lasso-settings";
 import { DEFAULT_PROMPTS, PROMPTS_KEY, normalizePrompts, type ChatPrompt } from "./prompts";
@@ -12,8 +13,6 @@ import { DEFAULT_GESTURES, DEFAULT_TUNING, GESTURES_KEY, GESTURE_TUNING_KEY, nor
 export const SHOW_COPY_BUTTONS_KEY = "padsync.showCopyButtons";
 /** The Mac bridge replaced copy-paste into a chat, so the section copy buttons are hidden unless turned on. */
 export const SHOW_COPY_BUTTONS_DEFAULT = false;
-
-const listeners = new Set<() => void>();
 
 function storage(): Storage | null {
   try {
@@ -43,10 +42,14 @@ export function readSetting<T>(key: string, fallback: T, valid: (v: unknown) => 
 }
 
 export function writeSetting<T>(key: string, value: T) {
+  const next = JSON.stringify(value);
   try {
-    storage()?.setItem(key, JSON.stringify(value));
+    const store = storage();
+    const before = store?.getItem(key) ?? null;
+    store?.setItem(key, next);
+    noteSettingWrite(key, before, next);
   } catch {}
-  listeners.forEach((fn) => fn());
+  notifySettings();
 }
 
 const isBool = (v: unknown): v is boolean => typeof v === "boolean";
@@ -56,12 +59,13 @@ export const readBoolSetting = (key: string, fallback: boolean) => readSetting(k
 export const writeBoolSetting = (key: string, value: boolean) => writeSetting(key, value);
 
 function subscribe(fn: () => void) {
-  listeners.add(fn);
-  // Another tab wrote localStorage. useSyncExternalStore skips the re-render if nothing changed.
+  // A write here, settings restored from the server copy (device-settings.ts), or another tab
+  // writing localStorage. useSyncExternalStore skips the re-render if nothing changed.
+  const stop = subscribeSettings(fn);
   const onStorage = () => fn();
   if (typeof window !== "undefined") window.addEventListener("storage", onStorage);
   return () => {
-    listeners.delete(fn);
+    stop();
     if (typeof window !== "undefined") window.removeEventListener("storage", onStorage);
   };
 }

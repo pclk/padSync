@@ -2,6 +2,7 @@
 
 import { useEffect, useReducer, useState, useSyncExternalStore, type RefObject } from "react";
 import { getSyncState, subscribeSync } from "./sync";
+import { noteSettingWrite, subscribeSettings } from "./device-settings";
 
 import { onActivity } from "@/lib/activity";
 import type { InkController } from "@/ink/controller";
@@ -33,9 +34,24 @@ export function useStoredState<T>(key: string, initial: T): [T, (v: T) => void] 
   });
   useEffect(() => {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      const next = JSON.stringify(value);
+      const before = localStorage.getItem(key);
+      localStorage.setItem(key, next);
+      // Automatic: the first save of a default into empty storage is not a change of setting.
+      noteSettingWrite(key, before, next, true);
     } catch {}
   }, [key, value]);
+  // Settings restored from this device's server copy (device-settings.ts) show straight away.
+  useEffect(
+    () =>
+      subscribeSettings(() => {
+        try {
+          const raw = localStorage.getItem(key);
+          if (raw !== null) setValue((prev) => (JSON.stringify(prev) === raw ? prev : (JSON.parse(raw) as T)));
+        } catch {}
+      }),
+    [key],
+  );
   return [value, setValue];
 }
 
