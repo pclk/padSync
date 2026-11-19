@@ -369,7 +369,10 @@ function Editor({ notebookId }: { notebookId: string }) {
   useEffect(() => {
     // Until the fingers spread or close by PINCH_DEAD_ZONE a two-finger drag only pans, so a pan
     // keeps the zoom exact; past it the scale carries on smoothly from 1.
-    let pinch: { d0: number; zooming: boolean; start: PinchStart; placed: PinchPlacement | null } | null = null;
+    // `moved`: how far the point between the fingers has travelled, to tell a pan from a tap.
+    let pinch: { d0: number; zooming: boolean; start: PinchStart; placed: PinchPlacement | null; moved: number } | null = null;
+    // Two or more fingers are or were down in this touch: its lifts are ours, not Safari's.
+    let multi = false;
     // The finger drawing a lasso after a press and hold, by touch identifier.
     let lassoFinger: number | null = null;
     // The finger pointing into the prompt menu after a press and hold, where it pressed, and how
@@ -434,10 +437,11 @@ function Editor({ notebookId }: { notebookId: string }) {
       // that) or a text box being typed in.
       const onPage = !!target.closest(".ink-surface") && !target.closest("textarea, input, [contenteditable]");
       gesture.start(points(fingers), performance.now(), onPage);
+      if (fingers.length > 1) multi = true;
       const start = fingers.length === 2 && !controller.isDrawing() ? measureZoom(mid(fingers[0], fingers[1])) : null;
       if (start) {
         const [a, b] = fingers;
-        pinch = { d0: dist(a, b), zooming: false, start, placed: null };
+        pinch = { d0: dist(a, b), zooming: false, start, placed: null, moved: 0 };
       }
     };
 
@@ -480,7 +484,9 @@ function Editor({ notebookId }: { notebookId: string }) {
         pinch.d0 = d;
       }
       const { start } = pinch;
-      const placed = (pinch.placed = pinchPlacement(start, pinch.zooming ? d / pinch.d0 : 1, mid(a, b)));
+      const m = mid(a, b);
+      pinch.moved = Math.max(pinch.moved, Math.hypot(m[0] - start.anchor[0], m[1] - start.anchor[1]));
+      const placed = (pinch.placed = pinchPlacement(start, pinch.zooming ? d / pinch.d0 : 1, m));
       // Drawn exactly where the commit will put the page, scroll limits included. Measured from
       // where the column sits now, in case Safari scrolled the window before the pinch took over.
       const x = placed.left - (start.left + start.scrollX - window.scrollX);
@@ -493,13 +499,19 @@ function Editor({ notebookId }: { notebookId: string }) {
     const onEnd = (e: TouchEvent) => {
       const fingers = direct(e.touches);
       if (pinch && fingers.length < 2) {
-        const { placed, start } = pinch;
+        const { placed, start, zooming, moved } = pinch;
         pinch = null;
         const wrap = pinchRef.current;
         if (wrap) wrap.style.transform = "";
         // In the same frame the transform comes off, so the page never paints back at the old zoom.
-        if (placed) commitZoom(placed, start.zoom);
+        // Fingers that only wobbled (a two-finger tap) leave the page where it was.
+        if (placed && (zooming || moved > gestureTuning.current.slop)) commitZoom(placed, start.zoom);
       }
+      // Two quick two-finger taps look to Safari like a double tap, which it answers by scrolling
+      // the tapped section to the top of the screen. Taking the lifts of a multi-finger touch for
+      // ourselves stops that; there is no click to lose, as more than one finger never makes one.
+      if (multi && e.cancelable) e.preventDefault();
+      if (!fingers.length) multi = false;
       // Lifting the lasso finger selects what it circled.
       if (lassoFinger !== null && !fingers.some((t) => t.identifier === lassoFinger)) endLasso(false);
       if (promptFinger && !fingers.some((t) => t.identifier === promptFinger!.id)) endPromptFinger(e.type !== "touchcancel");
@@ -510,7 +522,7 @@ function Editor({ notebookId }: { notebookId: string }) {
     const opts = { passive: false } as const;
     window.addEventListener("touchstart", onStart, opts);
     window.addEventListener("touchmove", onMove, opts);
-    window.addEventListener("touchend", onEnd);
+    window.addEventListener("touchend", onEnd, opts);
     window.addEventListener("touchcancel", onEnd);
     return () => {
       window.removeEventListener("touchstart", onStart);
