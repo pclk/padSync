@@ -17,7 +17,7 @@ describe("rail layout", () => {
     const up = moveItem(DEFAULT_RAIL, "highlighter", -1);
     expect(up.order.slice(0, 2)).toEqual(["highlighter", "pen"]);
     expect(moveItem(up, "highlighter", -1)).toBe(up);
-    expect(moveItem(DEFAULT_RAIL, "history", 1)).toBe(DEFAULT_RAIL);
+    expect(moveItem(DEFAULT_RAIL, "prompts", 1)).toBe(DEFAULT_RAIL);
   });
 
   it("hides and shows items, never the pen", () => {

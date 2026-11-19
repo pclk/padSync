@@ -16,6 +16,7 @@ import type { PresenceEntity, SectionEntity } from "@/lib/types";
 import { EarlierQuestions } from "./AskPanel";
 import { ChatPanel } from "./chat/ChatPanel";
 import type { PanelMode } from "@/lib/chat-types";
+import { PROMPT_EVENT } from "@/lib/prompts";
 
 interface Props {
   mode?: PanelMode;
@@ -47,6 +48,13 @@ export function SidePanel(p: Props) {
     () => (current ? sectionStats(current.id) : undefined),
     [current?.id, current?.hlc],
   );
+
+  // A prompt from the iPad's prompt menu goes to the chat, so show it.
+  useEffect(() => {
+    const show = () => setTab("chat");
+    window.addEventListener(PROMPT_EVENT, show);
+    return () => window.removeEventListener(PROMPT_EVENT, show);
+  }, []);
 
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(

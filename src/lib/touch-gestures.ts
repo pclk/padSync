@@ -12,6 +12,8 @@ export type GestureAction =
   | `tool:${ToolKind}`
   | "togglePanel"
   | "resetZoom"
+  /** Chat prompts in a circle: around a tap to be tapped, or around a held finger to point into. */
+  | "promptMenu"
   /** Press and hold only: the held finger draws a lasso, and lifting it selects what it circled. */
   | "lassoHold";
 
@@ -40,6 +42,7 @@ export const GESTURE_ACTIONS: { action: GestureAction; label: string; only?: Ges
   { action: "tool:text", label: "Text" },
   { action: "togglePanel", label: "Show or hide the side panel" },
   { action: "resetZoom", label: "Reset zoom" },
+  { action: "promptMenu", label: "Prompt menu" },
 ];
 
 export const GESTURES_KEY = "padsync.gestures";

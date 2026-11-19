@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { ToolKind, ToolState } from "@/ink/controller";
-import { visibleTools, type RailLayout } from "@/lib/rail-layout";
-import { DRAG_SLOP, FAN_RADIUS, HOLD_MS, fanAngles, fanPoint, pickByDirection } from "@/lib/tool-circle";
+import type { ChatPrompt } from "@/lib/prompts";
+import { isTool, visibleItems, visibleTools, type RailLayout } from "@/lib/rail-layout";
 import { Icon } from "./Icons";
 import { anchorOf, useDismiss, usePopoverBox, type PopoverAnchor } from "./popover";
+import { RadialFan, fanAt, promptItems, useFanPress } from "./RadialFan";
 import { dockStrip, tapZonePadding } from "./rail-dock";
 import { RAIL_ITEM_INFO } from "./RailSettings";
 
@@ -29,136 +30,116 @@ interface Props {
   /** Open the pen's or the toolbar's settings beside the circle. */
   onPenSettings: (circle: HTMLElement) => void;
   onSettings: (circle: HTMLElement) => void;
+  prompts: ChatPrompt[];
+  onPrompt: (p: ChatPrompt) => void;
 }
 
-interface Fan {
-  tools: ToolKind[];
-  angles: number[];
-  center: [number, number];
-  viewport: [number, number];
-  /** The tool the finger points at, or -1. */
-  hot: number;
-  /** Held and let go without pointing anywhere: the fan stays open to be tapped. */
-  sticky: boolean;
-}
+const centerOf = (el: HTMLElement): [number, number] => {
+  const r = el.getBoundingClientRect();
+  return [r.left + r.width / 2, r.top + r.height / 2];
+};
 
 /**
  * The iPad's circle toolbar. Press and hold the circle (or start dragging) and the tools fan out
  * around it; move towards one and let go to pick it. Let go without pointing and the fan stays
  * open to be tapped; point back at the edge and nothing changes. A quick tap opens the current
  * tool's colours and sizes. The whole tap zone around the circle counts as the circle.
+ *
+ * Beside it, unless hidden, a smaller circle does the same for chat prompts; a tap on it opens
+ * them to be tapped.
  */
 export function ToolCircle(p: Props) {
   const circleRef = useRef<HTMLElement>(null);
-  const [fan, setFanState] = useState<Fan | null>(null);
-  // Pointer handlers read the fan before React has re-rendered it.
-  const fanRef = useRef<Fan | null>(null);
-  const setFan = (f: Fan | null) => {
-    fanRef.current = f;
-    setFanState(f);
-  };
-  const press = useRef<{ id: number; x: number; y: number; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const promptRef = useRef<HTMLElement>(null);
   const [panel, setPanel] = useState<PopoverAnchor | null>(null);
   const closePanel = useCallback(() => setPanel(null), []);
-  const closeFan = useCallback(() => {
-    fanRef.current = null;
-    setFanState(null);
-  }, []);
   const label = RAIL_ITEM_INFO[p.tool.kind].label;
+  const togglePanel = () => {
+    if (circleRef.current) setPanel(panel ? null : anchorOf(circleRef.current, p.rail.dock));
+  };
 
-  const openFan = () => {
-    const el = circleRef.current;
-    if (!el || fanRef.current) return;
-    const r = el.getBoundingClientRect();
-    const center: [number, number] = [r.left + r.width / 2, r.top + r.height / 2];
-    const viewport: [number, number] = [window.innerWidth, window.innerHeight];
-    const tools = visibleTools(p.rail);
+  const tools = useFanPress({
+    open: () => {
+      if (!circleRef.current) return null;
+      setPanel(null);
+      const items = visibleTools(p.rail).map((k) => ({ key: k, label: RAIL_ITEM_INFO[k].label, icon: RAIL_ITEM_INFO[k].icon!, current: k === p.tool.kind }));
+      return fanAt(items, centerOf(circleRef.current));
+    },
+    onPick: (item) => p.selectTool(item.key as ToolKind),
+    // A quick tap: the current tool's colours and sizes.
+    onTap: togglePanel,
+  });
+  const openPrompts = (sticky: boolean) => {
+    if (!promptRef.current || !p.prompts.length) return null;
     setPanel(null);
-    setFan({ tools, angles: fanAngles(tools.length, center, viewport), center, viewport, hot: -1, sticky: false });
+    return fanAt(promptItems(p.prompts), centerOf(promptRef.current), sticky);
   };
-  const endPress = () => {
-    if (press.current) clearTimeout(press.current.timer);
-    press.current = null;
-  };
-  useEffect(() => endPress, []);
+  const prompts = useFanPress({
+    open: () => openPrompts(false),
+    onPick: (item) => {
+      const pr = p.prompts.find((x) => x.id === item.key);
+      if (pr) p.onPrompt(pr);
+    },
+    onTap: () => prompts.setFan(prompts.fan ? null : openPrompts(true)),
+  });
 
-  const onPointerDown = (e: ReactPointerEvent<HTMLElement>) => {
-    if (press.current) return;
-    closeFan();
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {}
-    press.current = { id: e.pointerId, x: e.clientX, y: e.clientY, timer: setTimeout(openFan, HOLD_MS) };
-  };
-  const onPointerMove = (e: ReactPointerEvent<HTMLElement>) => {
-    const d = press.current;
-    if (!d || d.id !== e.pointerId) return;
-    const dx = e.clientX - d.x;
-    const dy = e.clientY - d.y;
-    if (!fanRef.current && Math.hypot(dx, dy) > DRAG_SLOP) {
-      clearTimeout(d.timer);
-      openFan();
-    }
-    const f = fanRef.current;
-    if (!f) return;
-    const hot = pickByDirection(f.angles, dx, dy);
-    if (hot !== f.hot) setFan({ ...f, hot });
-  };
-  const onPointerUp = (e: ReactPointerEvent<HTMLElement>) => {
-    const d = press.current;
-    if (!d || d.id !== e.pointerId) return;
-    endPress();
-    const f = fanRef.current;
-    const moved = Math.hypot(e.clientX - d.x, e.clientY - d.y) > DRAG_SLOP;
-    if (!f) {
-      // A quick tap: the current tool's colours and sizes.
-      const el = circleRef.current;
-      if (el) setPanel(panel ? null : anchorOf(el, p.rail.dock));
-      return;
-    }
-    if (f.hot >= 0) {
-      p.selectTool(f.tools[f.hot]);
-      closeFan();
-    } else if (!moved) setFan({ ...f, sticky: true });
-    else closeFan();
-  };
-  const onPointerCancel = () => {
-    endPress();
-    if (!fanRef.current?.sticky) closeFan();
-  };
-
+  const visible = visibleItems(p.rail);
+  const showPrompts = visible.includes("prompts");
+  // The prompt circle goes before the tool circle when it comes before the tools in the order.
+  const promptsFirst = showPrompts && visible.indexOf("prompts") < visible.findIndex(isTool);
   const strip = dockStrip(p.rail, p.rightInset);
+  const zone = `pointer-events-auto touch-none select-none ${tapZonePadding(p.rail)}`;
+  const toolCircle = (
+    <div key="tools" data-tap-zone="" className={zone} style={{ WebkitTouchCallout: "none" }} {...tools.handlers} onContextMenu={(e) => e.preventDefault()}>
+      <aside ref={circleRef} data-rail-settings="" aria-label="Drawing tools" className="tool-circle rounded-full">
+        {/* Pointer taps are handled by the zone; a click with no pointer detail is the keyboard. */}
+        <button
+          className="relative flex h-[60px] w-[60px] items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-2xl text-slate-800 shadow-lift backdrop-blur-md"
+          aria-label={`${label}: hold and drag to change tool, tap for colours and sizes`}
+          aria-haspopup="dialog"
+          aria-expanded={panel !== null}
+          onClick={(e) => e.detail === 0 && togglePanel()}
+        >
+          <Icon name={RAIL_ITEM_INFO[p.tool.kind].icon!} />
+          {p.showColors && <span className="absolute bottom-1.5 right-1.5 h-3 w-3 rounded-full ring-2 ring-white" style={{ background: p.color }} />}
+        </button>
+      </aside>
+    </div>
+  );
+  const promptCircle = showPrompts && (
+    <div key="prompts" data-tap-zone="" className={zone} style={{ WebkitTouchCallout: "none" }} {...prompts.handlers} onContextMenu={(e) => e.preventDefault()}>
+      <aside ref={promptRef} aria-label="Chat prompts" className="rounded-full">
+        <button
+          className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-xl text-brand-700 shadow-lift backdrop-blur-md"
+          aria-label="Chat prompts: tap to choose, or hold and drag towards one"
+          aria-haspopup="menu"
+          aria-expanded={prompts.fan !== null}
+          onClick={(e) => e.detail === 0 && prompts.setFan(prompts.fan ? null : openPrompts(true))}
+        >
+          <Icon name="message" />
+        </button>
+      </aside>
+    </div>
+  );
   return (
     <>
-      <div className={strip.className} style={strip.style} data-dock={p.rail.dock} data-style="circle">
-        <div
-          data-tap-zone=""
-          className={`pointer-events-auto touch-none select-none ${tapZonePadding(p.rail)}`}
-          style={{ WebkitTouchCallout: "none" }}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerCancel}
-          onContextMenu={(e) => e.preventDefault()}
-        >
-          <aside ref={circleRef} data-rail-settings="" aria-label="Drawing tools" className="tool-circle rounded-full">
-            {/* Pointer taps are handled above; a click with no pointer detail is the keyboard. */}
-            <button
-              className="relative flex h-[60px] w-[60px] items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-2xl text-slate-800 shadow-lift backdrop-blur-md"
-              aria-label={`${label}: hold and drag to change tool, tap for colours and sizes`}
-              aria-haspopup="dialog"
-              aria-expanded={panel !== null}
-              onClick={(e) => {
-                if (e.detail === 0 && circleRef.current) setPanel(panel ? null : anchorOf(circleRef.current, p.rail.dock));
-              }}
-            >
-              <Icon name={RAIL_ITEM_INFO[p.tool.kind].icon!} />
-              {p.showColors && <span className="absolute bottom-1.5 right-1.5 h-3 w-3 rounded-full ring-2 ring-white" style={{ background: p.color }} />}
-            </button>
-          </aside>
-        </div>
+      {/* The two tap zones overlap by half their padding, so the circles sit 12 px apart. */}
+      <div className={`${strip.className} ${p.rail.dock === "bottom" ? "[&>*+*]:-ml-3" : "[&>*+*]:-mt-3"}`} style={strip.style} data-dock={p.rail.dock} data-style="circle">
+        {promptsFirst ? [promptCircle, toolCircle] : [toolCircle, promptCircle]}
       </div>
-      {fan && <ToolFan fan={fan} current={p.tool.kind} onPick={(k) => { p.selectTool(k); closeFan(); }} onClose={closeFan} />}
+      {tools.fan && <RadialFan fan={tools.fan} label="Tools" onPick={(item) => { p.selectTool(item.key as ToolKind); tools.close(); }} onClose={tools.close} />}
+      {prompts.fan && (
+        <RadialFan
+          fan={prompts.fan}
+          label="Chat prompts"
+          onPick={(item) => {
+            prompts.close();
+            const pr = p.prompts.find((x) => x.id === item.key);
+            if (pr) p.onPrompt(pr);
+          }}
+          onClose={prompts.close}
+        />
+      )}
       {panel && (
         <CirclePanel
           {...p}
@@ -178,42 +159,6 @@ export function ToolCircle(p: Props) {
     </>
   );
 }
-
-/** The fanned-out tools. While dragging it only shows; once sticky its tools can be tapped. */
-function ToolFan({ fan, current, onPick, onClose }: { fan: Fan; current: ToolKind; onPick: (k: ToolKind) => void; onClose: () => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useDismiss(ref, fan.sticky ? onClose : noop, "[data-tap-zone]");
-  const [cx, cy] = fan.center;
-  return (
-    <div ref={ref} className="pointer-events-none fixed inset-0 z-50" role="menu" aria-label="Tools">
-      <span
-        aria-hidden="true"
-        className="absolute rounded-full bg-slate-900/5"
-        style={{ left: cx - FAN_RADIUS - 40, top: cy - FAN_RADIUS - 40, width: 2 * (FAN_RADIUS + 40), height: 2 * (FAN_RADIUS + 40) }}
-      />
-      {fan.tools.map((k, i) => {
-        const [x, y] = fanPoint(fan.angles[i], fan.center, fan.viewport);
-        const hot = i === fan.hot;
-        const { label, icon } = RAIL_ITEM_INFO[k];
-        return (
-          <div key={k} className="absolute flex flex-col items-center" style={{ left: x, top: y, transform: "translate(-50%, -50%)" }}>
-            <button
-              role="menuitem"
-              aria-label={label}
-              tabIndex={fan.sticky ? 0 : -1}
-              onClick={() => onPick(k)}
-              className={`flex h-[52px] w-[52px] items-center justify-center rounded-full text-xl shadow-lift transition-transform duration-100 ${fan.sticky ? "pointer-events-auto" : ""} ${hot ? "scale-115 bg-brand-600 text-on-accent" : k === current ? "bg-white text-brand-700 ring-2 ring-brand-500" : "bg-white text-slate-600"}`}
-            >
-              <Icon name={icon!} />
-            </button>
-            <span className={`mt-1 rounded-full px-1.5 text-[11px] font-medium ${hot ? "bg-brand-600 text-on-accent" : "bg-white/90 text-slate-600"}`}>{label}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-const noop = () => {};
 
 /** The current tool's colours and sizes, from a tap on the circle, with undo, redo and settings. */
 function CirclePanel(p: Props & { label: string; anchor: PopoverAnchor; onClose: () => void; onPenSettings: () => void; onSettings: () => void }) {

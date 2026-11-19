@@ -18,8 +18,10 @@ import { PAGE_WIDTH, type NotebookEntity, type PresenceData, type PresenceEntity
 import { SectionView } from "./SectionView";
 import { SidePanel } from "./SidePanel";
 import { Toolbar } from "./Toolbar";
-import { GestureRecognizer, actionLabel, type GestureAction, type GestureKind, type TouchPoint } from "@/lib/touch-gestures";
-import { useGestureBindings, useGestureTuning } from "@/lib/settings";
+import { GestureRecognizer, actionLabel, type GestureAction, type GestureAt, type GestureKind, type TouchPoint } from "@/lib/touch-gestures";
+import { useGestureBindings, useGestureTuning, usePrompts } from "@/lib/settings";
+import { queuePrompt, type ChatPrompt } from "@/lib/prompts";
+import { RadialFan, fanAt, pointAt, promptItems, type FanState } from "./RadialFan";
 import { DEFAULT_RAIL, normalizeRail, type RailLayout } from "@/lib/rail-layout";
 import { Icon } from "./Icons";
 
@@ -301,18 +303,50 @@ function Editor({ notebookId }: { notebookId: string }) {
   // The ring that fills under a finger while a press and hold counts down. Its own component and
   // store, so a finger starting to scroll doesn't re-render the editor.
   const holdRing = useMemo(() => new HoldRingStore(), []);
-  const runGesture = useRef<(g: GestureKind) => void>(() => {});
+  const runGesture = useRef<(g: GestureKind, at: GestureAt) => void>(() => {});
   const gestureBound = useRef<(g: GestureKind) => boolean>(() => false);
   const gestureAction = useRef<(g: GestureKind) => GestureAction>(() => "none");
   const gestureTuning = useRef(tuning);
   const note = useCallback((text: string) => setGestureNote((prev) => (gestureTuning.current.showNote ? { text, n: (prev?.n ?? 0) + 1 } : null)), []);
+
+  // --- the prompt menu: ready-made chat prompts in a circle, from the toolbar or a gesture ----
+  const [prompts] = usePrompts();
+  const [promptFan, setPromptFanState] = useState<FanState | null>(null);
+  // Touch handlers read the fan before React has re-rendered it.
+  const promptFanRef = useRef<FanState | null>(null);
+  const setPromptFan = useCallback((f: FanState | null) => {
+    promptFanRef.current = f;
+    setPromptFanState(f);
+  }, []);
+  const closePromptFan = useCallback(() => setPromptFan(null), [setPromptFan]);
+  /** Opens the side panel if it is closed and hands the prompt to the chat (see prompts.ts). */
+  const sendPrompt = (pr: ChatPrompt) => {
+    if (!panelOpen) setPanelOpen(true);
+    queuePrompt(pr);
+    note(pr.send ? `Asked: ${pr.label}` : `${pr.label}: finish it in the chat`);
+  };
+  // Set each render below, for the touch handlers.
+  const promptMenu = useRef<{ open: (at: [number, number], sticky: boolean) => FanState | null; pick: (key: string) => void }>({ open: () => null, pick: () => {} });
   useLayoutEffect(() => {
     gestureBound.current = (g) => gestures[g] !== "none";
     gestureAction.current = (g) => gestures[g];
     gestureTuning.current = tuning;
-    runGesture.current = (g) => {
+    promptMenu.current = {
+      open: (at, sticky) => {
+        const f = prompts.length ? fanAt(promptItems(prompts), at, sticky) : null;
+        setPromptFan(f);
+        return f;
+      },
+      pick: (key) => {
+        const pr = prompts.find((x) => x.id === key);
+        if (pr) sendPrompt(pr);
+      },
+    };
+    runGesture.current = (g, at) => {
       const action = gestures[g];
       if (action === "none" || action === "lassoHold") return;
+      // Around the tap, open to be tapped.
+      if (action === "promptMenu") return void promptMenu.current.open([at.x, at.y], true);
       if (action === "undo") void undo();
       else if (action === "redo") void redo();
       else if (action === "previousTool") setTool({ ...tool, kind: previousKind.current === tool.kind ? "pen" : previousKind.current });
@@ -338,6 +372,22 @@ function Editor({ notebookId }: { notebookId: string }) {
     let pinch: { d0: number; zooming: boolean; start: PinchStart; placed: PinchPlacement | null } | null = null;
     // The finger drawing a lasso after a press and hold, by touch identifier.
     let lassoFinger: number | null = null;
+    // The finger pointing into the prompt menu after a press and hold, where it pressed, and how
+    // far it has gone.
+    let promptFinger: { id: number; x: number; y: number; far: number } | null = null;
+    const endPromptFinger = (lifted: boolean) => {
+      if (!promptFinger) return;
+      const { far } = promptFinger;
+      promptFinger = null;
+      const f = promptFanRef.current;
+      if (!f) return;
+      // Lifted pointing at a prompt: send it. Lifted without moving: leave it open to be tapped.
+      if (lifted && f.hot >= 0) {
+        setPromptFan(null);
+        promptMenu.current.pick(f.items[f.hot].key);
+      } else if (lifted && far <= gestureTuning.current.slop) setPromptFan({ ...f, sticky: true });
+      else setPromptFan(null);
+    };
     const gesture = new GestureRecognizer({
       emit: (g, at) => {
         if (g === "fingerHold") holdRing.set(null);
@@ -348,7 +398,11 @@ function Editor({ notebookId }: { notebookId: string }) {
           }
           return;
         }
-        runGesture.current(g);
+        if (g === "fingerHold" && gestureAction.current(g) === "promptMenu") {
+          if (promptMenu.current.open([at.x, at.y], false)) promptFinger = { id: at.id, x: at.x, y: at.y, far: 0 };
+          return;
+        }
+        runGesture.current(g, at);
       },
       isBound: (g) => gestureBound.current(g),
       tuning: () => gestureTuning.current,
@@ -375,6 +429,7 @@ function Editor({ notebookId }: { notebookId: string }) {
       const fingers = direct(e.touches);
       // A second finger while lassoing means a pinch or pan, not a selection: drop the lasso.
       if (lassoFinger !== null && fingers.length > 1) endLasso(true);
+      if (promptFinger && fingers.length > 1) endPromptFinger(false);
       // One-finger gestures count on the page, not on its controls, a selection (a finger drags
       // that) or a text box being typed in.
       const onPage = !!target.closest(".ink-surface") && !target.closest("textarea, input, [contenteditable]");
@@ -392,6 +447,20 @@ function Editor({ notebookId }: { notebookId: string }) {
         return;
       }
       const fingers = direct(e.touches);
+      if (promptFinger) {
+        const pf = promptFinger;
+        const f = fingers.find((t) => t.identifier === pf.id);
+        const fan = promptFanRef.current;
+        if (f && fan) {
+          e.preventDefault();
+          const dx = f.clientX - pf.x;
+          const dy = f.clientY - pf.y;
+          pf.far = Math.max(pf.far, Math.hypot(dx, dy));
+          const next = pointAt(fan, dx, dy);
+          if (next !== fan) setPromptFan(next);
+          return;
+        }
+      }
       if (lassoFinger !== null) {
         const f = fingers.find((t) => t.identifier === lassoFinger);
         if (f) {
@@ -433,6 +502,7 @@ function Editor({ notebookId }: { notebookId: string }) {
       }
       // Lifting the lasso finger selects what it circled.
       if (lassoFinger !== null && !fingers.some((t) => t.identifier === lassoFinger)) endLasso(false);
+      if (promptFinger && !fingers.some((t) => t.identifier === promptFinger!.id)) endPromptFinger(e.type !== "touchcancel");
       if (e.type === "touchcancel") gesture.cancel();
       else gesture.end(points(fingers), performance.now());
     };
@@ -449,8 +519,9 @@ function Editor({ notebookId }: { notebookId: string }) {
       window.removeEventListener("touchcancel", onEnd);
       gesture.dispose();
       endLasso(true);
+      endPromptFinger(false);
     };
-  }, [controller, measureZoom, commitZoom, note, holdRing]);
+  }, [controller, measureZoom, commitZoom, note, holdRing, setPromptFan]);
 
   // --- keyboard (Mac) ---------------------------------------------------------------------
   useEffect(() => {
@@ -703,6 +774,8 @@ function Editor({ notebookId }: { notebookId: string }) {
         rail={rail}
         setRail={setRail}
         rightInset={showPanel ? panelWidth : 0}
+        prompts={prompts}
+        onPrompt={sendPrompt}
       />
 
       {/* Not one transform over the whole notebook: on the iPad a scaled layer that tall (300k px for
@@ -735,6 +808,17 @@ function Editor({ notebookId }: { notebookId: string }) {
 
       <canvas ref={liveRef} className="pointer-events-none fixed left-0 top-0 z-30" />
       <HoldRing store={holdRing} holdMs={tuning.holdMs} />
+      {promptFan && (
+        <RadialFan
+          fan={promptFan}
+          label="Chat prompts"
+          onPick={(item) => {
+            setPromptFan(null);
+            promptMenu.current.pick(item.key);
+          }}
+          onClose={closePromptFan}
+        />
+      )}
       <div aria-live="polite" className="pointer-events-none fixed inset-x-0 top-[4.25rem] z-50 flex justify-center">
         {gestureNote && <span key={gestureNote.n} className="rounded-full bg-slate-900/80 px-3 py-1 text-sm font-medium text-white shadow-lift">{gestureNote.text}</span>}
       </div>

@@ -2,7 +2,7 @@
 // order, and where on screen it docks. Pure data, so the editor (insets) and the rail share it.
 import type { ToolKind } from "@/ink/controller";
 
-export type RailItem = ToolKind | "colors" | "sizes" | "history";
+export type RailItem = ToolKind | "colors" | "sizes" | "history" | "prompts";
 /** The screen edge the rail sits against; "bottom" lays it out in a row. */
 export type RailDock = "left" | "right" | "bottom";
 /** Where along that edge: top/left, middle, bottom/right. */
@@ -18,7 +18,7 @@ export interface RailLayout {
   style: RailStyle;
 }
 
-export const RAIL_ITEMS: readonly RailItem[] = ["pen", "highlighter", "eraser", "lasso", "text", "colors", "sizes", "history"];
+export const RAIL_ITEMS: readonly RailItem[] = ["pen", "highlighter", "eraser", "lasso", "text", "colors", "sizes", "history", "prompts"];
 export const DEFAULT_RAIL: RailLayout = { order: [...RAIL_ITEMS], hidden: [], dock: "left", align: "center", style: "bar" };
 
 const DOCKS: readonly RailDock[] = ["left", "right", "bottom"];
@@ -68,6 +68,6 @@ export function setHidden(layout: RailLayout, item: RailItem, hide: boolean): Ra
 
 export const visibleItems = (layout: RailLayout) => layout.order.filter((i) => !layout.hidden.includes(i));
 
-export const isTool = (i: RailItem): i is ToolKind => !["colors", "sizes", "history"].includes(i);
+export const isTool = (i: RailItem): i is ToolKind => !["colors", "sizes", "history", "prompts"].includes(i);
 /** The tools the rail shows, in its order: the circle's fan. */
 export const visibleTools = (layout: RailLayout) => visibleItems(layout).filter(isTool);

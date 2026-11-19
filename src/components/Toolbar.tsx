@@ -10,6 +10,8 @@ import { RailSettings } from "./RailSettings";
 import { anchorOf, type PopoverAnchor } from "./popover";
 import { dockStrip, tapZonePadding } from "./rail-dock";
 import { ToolCircle } from "./ToolCircle";
+import { RadialFan, fanAt, promptItems, useFanPress } from "./RadialFan";
+import type { ChatPrompt } from "@/lib/prompts";
 import { SIDEBAR_W, TOOLBAR_H, type ToolbarVariant } from "@/lib/notebook-viewport";
 import { DEFAULT_RAIL, visibleItems, type RailItem, type RailLayout } from "@/lib/rail-layout";
 
@@ -51,6 +53,9 @@ interface Props {
   setRail?: (l: RailLayout) => void;
   /** Width covered at the right edge (the side panel), so a right-docked rail sits beside it. */
   rightInset?: number;
+  /** The prompt menu's chat prompts, and what picking one does. */
+  prompts?: ChatPrompt[];
+  onPrompt?: (p: ChatPrompt) => void;
 }
 
 export function Toolbar(p: Props) {
@@ -147,6 +152,8 @@ export function Toolbar(p: Props) {
             setPenMenu(null);
             setRailMenu(anchorOf(circle, rail.dock));
           }}
+          prompts={p.prompts ?? []}
+          onPrompt={p.onPrompt ?? (() => {})}
         />
       ) : (
         <ToolRail
@@ -157,6 +164,8 @@ export function Toolbar(p: Props) {
           onRedo={p.onRedo}
           rail={rail}
           rightInset={p.rightInset ?? 0}
+          prompts={p.prompts ?? []}
+          onPrompt={p.onPrompt ?? (() => {})}
           settingsOpen={railMenu !== null}
           onSettings={(button) => {
             setPenMenu(null);
@@ -195,6 +204,8 @@ const penAttrs = (t: (typeof TOOLS)[number], open: boolean) =>
   t.kind === "pen" ? { "data-pen-tool": "", "aria-haspopup": "dialog" as const, "aria-expanded": open } : {};
 
 interface RailControls {
+  prompts: ChatPrompt[];
+  onPrompt: (p: ChatPrompt) => void;
   rail: RailLayout;
   rightInset: number;
   settingsOpen: boolean;
@@ -242,7 +253,7 @@ export function nearestButton(root: HTMLElement, x: number, y: number): HTMLButt
   return best;
 }
 
-function ToolRail({ tool, colors, color, sizes, size, showColors, showSizes, penMenuOpen, pick, setColor, setSize, canUndo, canRedo, onUndo, onRedo, rail, rightInset, settingsOpen, onSettings }: ToolControls & HistoryControls & RailControls) {
+function ToolRail({ tool, colors, color, sizes, size, showColors, showSizes, penMenuOpen, pick, setColor, setSize, canUndo, canRedo, onUndo, onRedo, rail, rightInset, settingsOpen, onSettings, prompts, onPrompt }: ToolControls & HistoryControls & RailControls) {
   const row = rail.dock === "bottom";
   const taps = useGenerousTaps();
   // Runs of tools stay together; colours, sizes and undo/redo are each their own group.
@@ -292,6 +303,7 @@ function ToolRail({ tool, colors, color, sizes, size, showColors, showSizes, pen
         </div>
       );
     }
+    if (item === "prompts") return <PromptButton prompts={prompts} onPrompt={onPrompt} />;
     if (item === "history") {
       return (
         <div className={`flex ${flow}`}>
@@ -355,6 +367,53 @@ function ToolRail({ tool, colors, color, sizes, size, showColors, showSizes, pen
         </aside>
       </div>
     </div>
+  );
+}
+
+/**
+ * The bar's prompt menu: a tap fans the chat prompts out around the button to be tapped; holding
+ * it and dragging towards one picks it on release, as on the circle toolbar.
+ */
+function PromptButton({ prompts, onPrompt }: { prompts: ChatPrompt[]; onPrompt: (p: ChatPrompt) => void }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const open = (sticky: boolean) => {
+    const el = ref.current;
+    if (!el || !prompts.length) return null;
+    const r = el.getBoundingClientRect();
+    return fanAt(promptItems(prompts), [r.left + r.width / 2, r.top + r.height / 2], sticky);
+  };
+  const pick = (key: string) => {
+    const pr = prompts.find((x) => x.id === key);
+    if (pr) onPrompt(pr);
+  };
+  const press = useFanPress({ open: () => open(false), onPick: (item) => pick(item.key), onTap: () => press.setFan(press.fan ? null : open(true)) });
+  return (
+    <>
+      <button
+        ref={ref}
+        className="icon-btn h-11 w-11 touch-none text-xl text-brand-700"
+        aria-label="Chat prompts"
+        title="Chat prompts: tap to choose, or hold and drag towards one"
+        aria-haspopup="menu"
+        aria-expanded={press.fan !== null}
+        {...press.handlers}
+        // A click with no pointer detail is the keyboard, or a near-miss tap the rail forwarded.
+        onClick={(e) => e.detail === 0 && press.setFan(press.fan ? null : open(true))}
+      >
+        <Icon name="message" />
+      </button>
+      {press.fan && (
+        <RadialFan
+          fan={press.fan}
+          label="Chat prompts"
+          onPick={(item) => {
+            press.close();
+            pick(item.key);
+          }}
+          onClose={press.close}
+        />
+      )}
+    </>
   );
 }
 

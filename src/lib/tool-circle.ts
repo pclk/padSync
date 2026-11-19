@@ -1,5 +1,5 @@
-// The iPad's circle toolbar: press and hold the circle, the tools fan out around it, and the
-// direction the finger then moves picks one. Pure geometry in viewport px and degrees (0° points
+// The iPad's circle menus (tools, chat prompts): press and hold, the items fan out around the
+// press, and the direction the finger then moves picks one. Pure geometry in viewport px and degrees (0° points
 // right, 90° down, as on screen), so the tests can check it without a DOM.
 
 /** How far from the circle's centre the tools fan out. */
@@ -28,10 +28,37 @@ export function fanAngles(n: number, center: [number, number], viewport: [number
   return Array.from({ length: n }, (_, i) => dir - span / 2 + (i * span) / (n - 1));
 }
 
-/** Where the tool at `angle` is drawn, its centre clamped `inset` px inside the viewport. */
-export function fanPoint(angle: number, center: [number, number], viewport: [number, number], inset = 30): [number, number] {
-  const x = center[0] + FAN_RADIUS * Math.cos(rad(angle));
-  const y = center[1] + FAN_RADIUS * Math.sin(rad(angle));
+/** Room each item needs along the arc, so neighbouring bubbles don't touch. */
+const ITEM_ARC = 62;
+/** Space a full ring needs past its radius on every side (bubbles and their labels). */
+const RING_MARGIN = 70;
+
+export interface FanLayout {
+  angles: number[];
+  radius: number;
+}
+
+/**
+ * Angles and radius for `n` items around `center`. With room on every side (a gesture in the
+ * middle of the page) they make a full ring starting at the top; near an edge or a corner they
+ * fan out over up to a half circle facing the middle of the screen (fanAngles). The radius grows
+ * when there are too many items to fit around the default one.
+ */
+export function fanLayout(n: number, center: [number, number], viewport: [number, number], top = 0): FanLayout {
+  if (n <= 0) return { angles: [], radius: FAN_RADIUS };
+  const ring = 360 / n;
+  const ringRadius = Math.max(FAN_RADIUS, ITEM_ARC / rad(ring));
+  const room = Math.min(center[0], center[1] - top, viewport[0] - center[0], viewport[1] - center[1]);
+  if (n > 2 && room >= ringRadius + RING_MARGIN) return { angles: Array.from({ length: n }, (_, i) => -90 + i * ring), radius: ringRadius };
+  const angles = fanAngles(n, center, viewport);
+  const step = n > 1 ? Math.abs(angles[1] - angles[0]) : 180;
+  return { angles, radius: Math.max(FAN_RADIUS, ITEM_ARC / rad(step)) };
+}
+
+/** Where the item at `angle` is drawn, its centre clamped `inset` px inside the viewport. */
+export function fanPoint(angle: number, center: [number, number], viewport: [number, number], inset = 30, radius = FAN_RADIUS): [number, number] {
+  const x = center[0] + radius * Math.cos(rad(angle));
+  const y = center[1] + radius * Math.sin(rad(angle));
   return [Math.min(viewport[0] - inset, Math.max(inset, x)), Math.min(viewport[1] - inset, Math.max(inset, y))];
 }
 

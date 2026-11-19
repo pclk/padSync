@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { THEME_DEFAULT, THEME_KEY, isThemePreference, type ThemePreference } from "./theme";
+import { DEFAULT_PROMPTS, PROMPTS_KEY, normalizePrompts, type ChatPrompt } from "./prompts";
 import { DEFAULT_GESTURES, DEFAULT_TUNING, GESTURES_KEY, GESTURE_TUNING_KEY, normalizeGestures, normalizeTuning, type GestureBindings, type GestureTuning } from "./touch-gestures";
 
 // App preferences shared by several screens. Stored in localStorage as JSON, like useStoredState,
@@ -21,13 +22,20 @@ function storage(): Storage | null {
   }
 }
 
+function parseSetting<T>(raw: string | null, fallback: T, valid: (v: unknown) => v is T): T {
+  if (raw == null) return fallback;
+  try {
+    const v: unknown = JSON.parse(raw);
+    return valid(v) ? v : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 /** Reads a setting. Missing, unreadable or invalid values fall back to `fallback`. */
 export function readSetting<T>(key: string, fallback: T, valid: (v: unknown) => v is T): T {
   try {
-    const raw = storage()?.getItem(key);
-    if (raw == null) return fallback;
-    const v: unknown = JSON.parse(raw);
-    return valid(v) ? v : fallback;
+    return parseSetting(storage()?.getItem(key) ?? null, fallback, valid);
   } catch {
     return fallback;
   }
@@ -58,8 +66,18 @@ function subscribe(fn: () => void) {
 }
 
 export function useSetting<T>(key: string, fallback: T, valid: (v: unknown) => v is T): [T, (v: T) => void] {
-  const read = () => readSetting(key, fallback, valid);
-  const value = useSyncExternalStore(subscribe, read, read);
+  // The snapshot is the stored string, not the parsed value: an object parsed afresh on every
+  // read would never compare equal, and useSyncExternalStore would re-render forever.
+  const read = () => {
+    try {
+      return storage()?.getItem(key) ?? null;
+    } catch {
+      return null;
+    }
+  };
+  const raw = useSyncExternalStore(subscribe, read, read);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const value = useMemo(() => parseSetting(raw, fallback, valid), [raw]);
   const set = useCallback((v: T) => writeSetting(key, v), [key]);
   return [value, set];
 }
@@ -88,4 +106,10 @@ export function useGestureBindings(): [GestureBindings, (v: GestureBindings) => 
 export function useGestureTuning(): [GestureTuning, (v: GestureTuning) => void] {
   const [raw, set] = useSetting<Partial<GestureTuning>>(GESTURE_TUNING_KEY, DEFAULT_TUNING, isObject);
   return [useMemo(() => normalizeTuning(raw), [raw]), set];
+}
+
+/** The prompt menu's ready-made chat prompts (see prompts.ts), normalised on read. */
+export function usePrompts(): [ChatPrompt[], (v: ChatPrompt[]) => void] {
+  const [raw, set] = useSetting<unknown>(PROMPTS_KEY, DEFAULT_PROMPTS, (v): v is unknown => Array.isArray(v));
+  return [useMemo(() => normalizePrompts(raw), [raw]), set];
 }
