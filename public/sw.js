@@ -1,57 +1,39 @@
-// Offline shell for the iPad. Pages are network-first (fresh deploys win when online) and fall
-// back to the cached copy; hashed build assets are cache-first. API calls are never cached:
-// offline data lives in IndexedDB.
+// The production build supplies every chunk, including screens loaded by dynamic import.
+importScripts("/sw-assets.js");
+const { cache: CACHE, assets } = self.padSyncBuild;
+const SHELL = ["/", "/notebook", "/import", "/settings", "/pencil-test", "/pencil-lab"];
+const APP_METADATA = ["/manifest.webmanifest", "/icon", "/apple-icon"];
+const OFFLINE_FILES = [...SHELL, ...APP_METADATA, ...assets];
 
-const CACHE = "padsync-v2";
-const SHELL = ["/", "/notebook", "/import", "/settings", "/pencil-test"];
-
-self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+self.addEventListener("install", event => {
+  // addAll is atomic. A failed update leaves the previous installed app usable.
+  event.waitUntil(caches.open(CACHE).then(cache =>
+    cache.addAll(OFFLINE_FILES.map(url => new Request(url, { cache: "reload" }))),
+  ));
 });
 
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches
-      .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim()),
-  );
+self.addEventListener("activate", event => {
+  // Let open notebooks finish using their build before retiring its chunks.
+  event.waitUntil((async () => {
+    for (const key of await caches.keys()) {
+      if (key !== CACHE && (key === "padsync-v2" || key.startsWith("padsync-build-"))) await caches.delete(key);
+    }
+    await self.clients.claim();
+  })());
 });
 
-self.addEventListener("fetch", (event) => {
+self.addEventListener("fetch", event => {
   const req = event.request;
   const url = new URL(req.url);
-  if (req.method !== "GET" || url.origin !== self.location.origin || (url.pathname === "/api" || url.pathname.startsWith("/api/"))) return;
-
-  if (url.pathname.startsWith("/_next/static/")) {
-    event.respondWith(
-      caches.match(req).then(
-        (hit) =>
-          hit ||
-          fetch(req).then((res) => {
-            if (res.ok) {
-              const copy = res.clone();
-              event.waitUntil(caches.open(CACHE).then((c) => c.put(req, copy)));
-            }
-            return res;
-          }),
-      ),
-    );
-    return;
-  }
-
-  // Flight responses and other subresources must never replace an HTML shell.
-  if (req.mode !== "navigate") return;
-
-  event.respondWith(
-    fetch(req, { cache: "no-store" })
-      .then((res) => {
-        if (res.ok) {
-          const copy = res.clone();
-          event.waitUntil(caches.open(CACHE).then((c) => c.put(req, copy)));
-        }
-        return res;
-      })
-      .catch(() => caches.match(req, { ignoreSearch: true }).then((hit) => hit || caches.match("/"))),
-  );
+  if (req.method !== "GET" || url.origin !== self.location.origin) return;
+  const page = req.mode === "navigate" && SHELL.includes(url.pathname);
+  if (!page && !APP_METADATA.includes(url.pathname) && !url.pathname.startsWith("/_next/static/")) return;
+  // Notebook ids and deployment query parameters share the same static shell or hashed file.
+  // Restrict the lookup to this build so HTML and its JavaScript change together.
+  event.respondWith((async () => {
+    const cached = await caches.open(CACHE)
+      .then(cache => cache.match(url.pathname, { ignoreVary: true }))
+      .catch(() => undefined);
+    return cached || fetch(req);
+  })());
 });

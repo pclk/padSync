@@ -22,7 +22,7 @@ export function ClientOnly({ view }: { view: keyof typeof views }) {
   useEffect(() => {
     startSync();
     if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).catch(() => {});
     }
     navigator.storage?.persist?.().catch(() => {});
   }, []);
