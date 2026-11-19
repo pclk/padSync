@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { CIRCLE_SIZES, DEFAULT_RAIL, canHide, isTool, moveItem, setHidden, type RailAlign, type RailDock, type RailItem, type RailLayout } from "@/lib/rail-layout";
 import { Icon, type IconName } from "./Icons";
 import { usePrompts } from "@/lib/settings";
+import { LassoSettingsPanel } from "./LassoSettingsPanel";
 import { DEFAULT_PROMPTS, MAX_PROMPTS, PROMPT_CONTEXTS, PROMPT_ICONS, newPrompt, type ChatPrompt, type PromptContext } from "@/lib/prompts";
 import { useDismiss, usePopoverBox, type PopoverAnchor } from "./popover";
 
@@ -32,7 +33,7 @@ interface Props {
   setLayout: (l: RailLayout) => void;
   anchor: PopoverAnchor;
   onClose: () => void;
-  initialTab?: "toolbar" | "prompts";
+  initialTab?: "toolbar" | "prompts" | "lasso";
   /** Start moving the circles by hand (circle style). */
   onArrange?: () => void;
 }
@@ -44,7 +45,7 @@ interface Props {
 export function RailSettings({ layout, setLayout, anchor, onClose, initialTab = "toolbar", onArrange }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const box = usePopoverBox(anchor, 320);
-  const [tab, setTab] = useState<"toolbar" | "prompts">(initialTab);
+  const [tab, setTab] = useState<"toolbar" | "prompts" | "lasso">(initialTab);
   const [prompts, setPrompts] = usePrompts();
   // Stays open while you use the rail, so changes can be tried as they are made.
   useDismiss(ref, onClose, "[data-tap-zone]");
@@ -65,8 +66,11 @@ export function RailSettings({ layout, setLayout, anchor, onClose, initialTab = 
           <button role="tab" aria-selected={tab === "prompts"} onClick={() => setTab("prompts")}>
             Prompts
           </button>
+          <button role="tab" aria-selected={tab === "lasso"} onClick={() => setTab("lasso")}>
+            Lasso
+          </button>
         </div>
-        {tab === "toolbar" ? (
+        {tab === "lasso" ? null : tab === "toolbar" ? (
           <button className="btn btn-ghost btn-sm" onClick={() => setLayout(DEFAULT_RAIL)} disabled={isDefault}>
             Reset
           </button>
@@ -76,6 +80,11 @@ export function RailSettings({ layout, setLayout, anchor, onClose, initialTab = 
           </button>
         )}
       </div>
+      {tab === "lasso" && (
+        <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain p-3">
+          <LassoSettingsPanel ipad compact />
+        </div>
+      )}
       {tab === "prompts" && <PromptSettings prompts={prompts} setPrompts={setPrompts} shown={!layout.hidden.includes("prompts")} />}
       <div className={`min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain p-3 ${tab === "toolbar" ? "" : "hidden"}`}>
         <p className="mb-1 text-xs font-medium text-slate-700">Style</p>

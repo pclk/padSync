@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { THEME_DEFAULT, THEME_KEY, isThemePreference, type ThemePreference } from "./theme";
+import { LASSO_KEY, normalizeLasso, type LassoSettings } from "./lasso-settings";
 import { DEFAULT_PROMPTS, PROMPTS_KEY, normalizePrompts, type ChatPrompt } from "./prompts";
 import { DEFAULT_GESTURES, DEFAULT_TUNING, GESTURES_KEY, GESTURE_TUNING_KEY, normalizeGestures, normalizeTuning, type GestureBindings, type GestureTuning } from "./touch-gestures";
 
@@ -112,4 +113,12 @@ export function useGestureTuning(): [GestureTuning, (v: GestureTuning) => void] 
 export function usePrompts(): [ChatPrompt[], (v: ChatPrompt[]) => void] {
   const [raw, set] = useSetting<unknown>(PROMPTS_KEY, DEFAULT_PROMPTS, (v): v is unknown => Array.isArray(v));
   return [useMemo(() => normalizePrompts(raw), [raw]), set];
+}
+
+const isStored = (v: unknown): v is unknown => v !== undefined;
+
+/** The lasso's settings on this device (see lasso-settings.ts), normalised on read. */
+export function useLassoSettings(ipad: boolean): [LassoSettings, (v: LassoSettings) => void] {
+  const [raw, set] = useSetting<unknown>(LASSO_KEY, null, isStored);
+  return [useMemo(() => normalizeLasso(raw, ipad), [raw, ipad]), set];
 }

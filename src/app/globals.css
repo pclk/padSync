@@ -672,7 +672,8 @@ pre,
    in after a moment, so a finger that is only starting to scroll doesn't flash it. */
 .hold-ring {
   opacity: 0;
-  animation: hold-ring-show 120ms linear 100ms forwards;
+  /* A fifth of the hold in, so a short hold still shows most of its fill. */
+  animation: hold-ring-show 80ms linear calc(var(--hold-ms, 500ms) * 0.2) forwards;
 }
 .hold-ring circle:last-child {
   stroke-dashoffset: 377;

@@ -18,6 +18,8 @@ export interface FanItem {
   icon: IconName;
   /** Marked as the one in use (the current tool). */
   current?: boolean;
+  /** Shown as a swatch of this colour instead of the icon (the lasso's colour fan). */
+  color?: string;
 }
 
 export interface FanState {
@@ -154,7 +156,7 @@ export function RadialFan({ fan, label, onPick, onClose }: { fan: FanState; labe
               className={`absolute flex h-[52px] w-[52px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-xl shadow-lift transition-transform duration-100 ${fan.sticky ? "pointer-events-auto" : ""} ${hot ? "scale-115 bg-brand-600 text-on-accent" : item.current ? "bg-white text-brand-700 ring-2 ring-brand-500" : "bg-white text-slate-600"}`}
               style={{ left: x, top: y }}
             >
-              <Icon name={item.icon} />
+              {item.color ? <span className="h-7 w-7 rounded-full ring-1 ring-black/10" style={{ background: item.color }} /> : <Icon name={item.icon} />}
             </button>
             <span
               aria-hidden="true"

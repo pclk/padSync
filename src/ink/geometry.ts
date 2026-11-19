@@ -89,8 +89,14 @@ export function pointInPolygon(x: number, y: number, poly: number[][]) {
   return inside;
 }
 
-/** A stroke is lassoed when at least half of its points fall inside the polygon. */
-export function lassoStrokes(strokes: StrokeEntity[], poly: number[][]): StrokeEntity[] {
+/**
+ * How a lasso picks strokes: "touch" takes any stroke it reaches (a point inside, or its line
+ * running over the stroke's ink); "enclose" only those with at least half their points inside.
+ */
+export type LassoMode = "touch" | "enclose";
+
+/** The strokes a lasso drawn along `poly` (closed back to its start) selects. */
+export function lassoStrokes(strokes: StrokeEntity[], poly: number[][], mode: LassoMode = "enclose"): StrokeEntity[] {
   if (poly.length < 3) return [];
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const [x, y] of poly) {
@@ -100,15 +106,24 @@ export function lassoStrokes(strokes: StrokeEntity[], poly: number[][]): StrokeE
     if (y > maxY) maxY = y;
   }
   return strokes.filter((s) => {
-    // Strokes clear of the lasso's bounds can't have points inside it.
+    // Strokes clear of the lasso's bounds (and, touching, its line's reach) can't be picked.
     const b = strokeBox(s);
-    if (b.maxX < minX || b.minX > maxX || b.maxY < minY || b.minY > maxY) return false;
+    const reach = mode === "touch" ? s.data.size / 2 : 0;
+    if (b.maxX < minX - reach || b.minX > maxX + reach || b.maxY < minY - reach || b.minY > maxY + reach) return false;
     const p = s.data.pts;
     let inside = 0, total = 0;
     for (let i = 0; i < p.length; i += STROKE_STRIDE) {
       total++;
-      if (pointInPolygon(p[i], p[i + 1], poly)) inside++;
+      if (pointInPolygon(p[i], p[i + 1], poly)) {
+        if (mode === "touch") return true;
+        inside++;
+      }
     }
-    return total > 0 && inside / total >= 0.5;
+    if (mode === "enclose") return total > 0 && inside / total >= 0.5;
+    // The line as drawn (not the closing edge back to the start) crossing or grazing the ink.
+    for (let k = 1; k < poly.length; k++) {
+      if (hitStrokes([s], poly[k - 1][0], poly[k - 1][1], poly[k][0], poly[k][1], 0).length) return true;
+    }
+    return false;
   });
 }

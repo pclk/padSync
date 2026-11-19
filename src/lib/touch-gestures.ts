@@ -86,7 +86,7 @@ export interface GestureTuning {
   showNote: boolean;
 }
 
-export const DEFAULT_TUNING: GestureTuning = { tapMs: 280, doubleMs: 300, holdMs: 500, slop: 10, pencilQuietMs: 800, showNote: true };
+export const DEFAULT_TUNING: GestureTuning = { tapMs: 280, doubleMs: 300, holdMs: 250, slop: 10, pencilQuietMs: 800, showNote: true };
 
 /** The range and step of each numeric tuning, for the sliders and for clamping stored values. */
 export const TUNING_RANGES: Record<Exclude<keyof GestureTuning, "showNote">, { min: number; max: number; step: number; unit: string; label: string; hint: string }> = {

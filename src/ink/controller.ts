@@ -4,7 +4,7 @@ import { db, deviceId } from "@/lib/db";
 import { logEvent, moveStrokes, newEntity, putEntities, setDeleted } from "@/lib/store";
 import { PAGE_WIDTH, STROKE_STRIDE, type StrokeData, type StrokeEntity } from "@/lib/types";
 import { isStrayDot, type Contact } from "./filters";
-import { dataBox, hitStrokes, lassoStrokes, strokeBox, unionBox, type Box } from "./geometry";
+import { dataBox, hitStrokes, lassoStrokes, strokeBox, unionBox, type Box, type LassoMode } from "./geometry";
 import { penOverrides, withOverrides, type PenParams } from "./pen-feel";
 import { paintStroke, strokePath, cachedPath, seedPath } from "./render";
 import { appendPoint, toLocal } from "./samples";
@@ -112,6 +112,12 @@ export class InkController {
   zoom = 1;
   notebookId: string;
   readonly undo = new UndoStack();
+  /** How the lasso picks strokes (Settings → Lasso). */
+  private lassoMode: LassoMode = "touch";
+
+  setLassoMode(mode: LassoMode) {
+    this.lassoMode = mode;
+  }
   /** The tool's pen parameters, and the part of them new pen strokes store. */
   private pen!: PenParams;
   private penOverrides!: Partial<PenParams>;
@@ -405,6 +411,12 @@ export class InkController {
     return () => void this.sections.delete(sec);
   }
 
+  /** A mounted section by id (the lasso circle's Duplicate needs the selection's section). */
+  sectionById(id: string) {
+    for (const sec of this.sections) if (sec.id === id) return sec;
+    return null;
+  }
+
   private sectionAt(clientX: number, clientY: number) {
     for (const sec of this.sections) {
       const el = sec.el as HTMLElement | null;
@@ -516,6 +528,70 @@ export class InkController {
     void logEvent(this.notebookId, sec.id, "lasso_duplicate", { from: [...sel.ids], ids, dx, dy });
   }
 
+  /** Gives the selected strokes one colour, as one undoable step. */
+  recolorSelection(color: string) {
+    return this.restyleSelection("recolour", (d) => ({ ...d, color }));
+  }
+
+  /**
+   * Scales the selection by `k` about its centre, line widths too, as one undoable step. A box
+   * that would cross the page's left, right or top edge is moved back onto the page.
+   */
+  scaleSelection(k: number) {
+    const sel = this.selection;
+    if (!sel) return;
+    const cx = (sel.box.minX + sel.box.maxX) / 2;
+    const cy = (sel.box.minY + sel.box.maxY) / 2;
+    const scaled = { minX: cx + (sel.box.minX - cx) * k, maxX: cx + (sel.box.maxX - cx) * k, minY: cy + (sel.box.minY - cy) * k, maxY: cy + (sel.box.maxY - cy) * k };
+    const dx = scaled.minX < 0 ? -scaled.minX : scaled.maxX > PAGE_WIDTH ? Math.max(-scaled.minX, PAGE_WIDTH - scaled.maxX) : 0;
+    const dy = scaled.minY < 0 ? -scaled.minY : 0;
+    return this.restyleSelection(
+      k > 1 ? "enlarge" : "shrink",
+      (d) => {
+        const pts = d.pts.slice();
+        for (let i = 0; i < pts.length; i += STROKE_STRIDE) {
+          pts[i] = cx + (pts[i] - cx) * k + dx;
+          pts[i + 1] = cy + (pts[i + 1] - cy) * k + dy;
+        }
+        return { ...d, pts, size: d.size * k };
+      },
+      shift(scaled, dx, dy),
+    );
+  }
+
+  /** Rewrites the selected strokes' data as one undoable step, the selection box becoming `box`. */
+  private async restyleSelection(label: string, change: (d: StrokeData) => StrokeData, box?: Box) {
+    const sel = this.selection;
+    if (!sel || !this.persist) return;
+    const rows = (await db.entities.bulkGet([...sel.ids])).filter((r): r is StrokeEntity => !!r && !r.deleted);
+    if (!rows.length) return;
+    const before = new Map(rows.map((r) => [r.id, r.data]));
+    const after = new Map(rows.map((r) => [r.id, change(r.data)]));
+    const write = async (data: Map<string, StrokeData>) => {
+      const now = (await db.entities.bulkGet([...data.keys()])).filter(Boolean) as StrokeEntity[];
+      await putEntities(now.map((r) => ({ ...r, data: data.get(r.id)! })));
+    };
+    await write(after);
+    if (box && this.selection?.ids === sel.ids) this.setSelection({ ...sel, box });
+    emitActivity({ notebookId: this.notebookId, source: "local", kinds: ["stroke"], at: Date.now() });
+    // The box follows a resize back and forth while those strokes are still the selection.
+    const frame = (b: Box) => {
+      if (box && this.selection && [...this.selection.ids].every((id) => sel.ids.has(id))) this.setSelection({ ...this.selection, box: b });
+    };
+    this.undo.push({
+      label,
+      undo: async () => {
+        await write(before);
+        frame(sel.box);
+      },
+      redo: async () => {
+        await write(after);
+        if (box) frame(box);
+      },
+    });
+    void logEvent(this.notebookId, sel.sectionId, `lasso_${label}`, { ids: [...sel.ids] });
+  }
+
   private addPoints(g: Extract<Gesture, { type: "ink" }>, evs: InkPointer[]) {
     const pts = g.data.pts;
     for (const ev of evs) {
@@ -579,7 +655,7 @@ export class InkController {
   }
 
   private commitLasso(g: Extract<Gesture, { type: "lasso" }>) {
-    const picked = lassoStrokes(g.sec.strokes(), g.poly);
+    const picked = lassoStrokes(g.sec.strokes(), g.poly, this.lassoMode);
     if (!picked.length) return;
     const box = unionBox(picked.map(strokeBox))!;
     this.setSelection({ sectionId: g.sec.id, ids: new Set(picked.map((s) => s.id)), box });

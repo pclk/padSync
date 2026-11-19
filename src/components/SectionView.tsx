@@ -23,6 +23,8 @@ interface Props {
   /** This section's selection only, so other sections' memo holds while lassoing. */
   selection: Selection | null;
   draggingIds: Set<string> | null;
+  /** The bar of Delete, Duplicate and Done over a selection; off when the lasso circle shows instead. */
+  selectionBar?: boolean;
   editingTextId: string | null;
   setEditingTextId: (id: string | null) => void;
   registerEl: (id: string, el: HTMLElement | null) => void;
@@ -145,7 +147,7 @@ export const SectionView = memo(function SectionView(p: Props) {
           onLostPointerCapture={(e) => controller.lostCapture(e.nativeEvent, handle)}
           title="Drag to move"
         >
-          <div className="pointer-events-auto absolute -top-11 left-0 flex gap-1 rounded-xl bg-slate-900 p-1 text-sm text-white shadow-lg">
+          {p.selectionBar !== false && <div className="pointer-events-auto absolute -top-11 left-0 flex gap-1 rounded-xl bg-slate-900 p-1 text-sm text-white shadow-lg">
             <button className="rounded px-3 py-1 hover:bg-slate-700" onPointerDown={(e) => e.stopPropagation()} onClick={() => controller.deleteSelection()}>
               Delete
             </button>
@@ -155,7 +157,7 @@ export const SectionView = memo(function SectionView(p: Props) {
             <button className="rounded px-3 py-1 hover:bg-slate-700" onPointerDown={(e) => e.stopPropagation()} onClick={() => controller.setSelection(null)}>
               Done
             </button>
-          </div>
+          </div>}
         </div>
       )}
     </section>

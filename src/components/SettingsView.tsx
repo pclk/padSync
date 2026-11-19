@@ -11,6 +11,7 @@ import { requestSync, resetCursor, stopSync } from "@/lib/sync";
 import { SyncTimingSettings } from "./SyncTimingSettings";
 import { DeviceTokens } from "./DeviceTokens";
 import { Icon } from "./Icons";
+import { LassoSettingsPanel } from "./LassoSettingsPanel";
 
 interface Status {
   db: boolean;
@@ -123,6 +124,11 @@ export default function SettingsView() {
       </section>
 
       <GestureSettings />
+
+      <section id="lasso" className="card mb-5 scroll-mt-4 p-5">
+        <h2 className="mb-3 text-base font-semibold text-slate-900">Lasso</h2>
+        <LassoSettingsPanel ipad={deviceKind() === "ipad"} />
+      </section>
 
       {status?.authed && <SyncTimingSettings />}
       {status?.authed && <DeviceTokens />}

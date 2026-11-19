@@ -15,7 +15,9 @@ import type { ChatPrompt } from "@/lib/prompts";
 import { SIDEBAR_W, TOOLBAR_H, type ToolbarVariant } from "@/lib/notebook-viewport";
 import { DEFAULT_RAIL, visibleItems, type RailItem, type RailLayout } from "@/lib/rail-layout";
 
-const PEN_COLORS = ["#111827", "#1d4ed8", "#dc2626", "#047857", "#7c3aed"];
+export const PEN_COLORS = ["#111827", "#1d4ed8", "#dc2626", "#047857", "#7c3aed"];
+/** The pen colours by name, for the lasso's colour fan. */
+export const PEN_COLOR_NAMES: Record<string, string> = { "#111827": "Black", "#1d4ed8": "Blue", "#dc2626": "Red", "#047857": "Green", "#7c3aed": "Purple" };
 const HL_COLORS = ["#facc15", "#4ade80", "#f472b6", "#60a5fa"];
 const PEN_SIZES = [2.2, 3.4, 5.5];
 const HL_SIZES = [14, 22, 32];

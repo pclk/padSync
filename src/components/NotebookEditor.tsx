@@ -19,10 +19,11 @@ import { SectionView } from "./SectionView";
 import { SidePanel } from "./SidePanel";
 import { Toolbar } from "./Toolbar";
 import { GestureRecognizer, actionLabel, type GestureAction, type GestureAt, type GestureKind, type TouchPoint } from "@/lib/touch-gestures";
-import { useGestureBindings, useGestureTuning, usePrompts } from "@/lib/settings";
+import { useGestureBindings, useGestureTuning, useLassoSettings, usePrompts } from "@/lib/settings";
 import { queuePrompt, type ChatPrompt } from "@/lib/prompts";
 import { RadialFan, fanAt, pointAt, promptItems, type FanState } from "./RadialFan";
 import { PromptRecorder } from "./PromptRecorder";
+import { LassoCircle } from "./LassoCircle";
 import { DEFAULT_RAIL, normalizeRail, railFloats, railThickness, type RailLayout } from "@/lib/rail-layout";
 import { Icon } from "./Icons";
 
@@ -101,6 +102,7 @@ function Editor({ notebookId }: { notebookId: string }) {
   const variant = toolbarVariant(kind);
   const [sidebarOpen, setSidebarOpen] = useStoredState("padsync.toolSidebar", true);
   const [storedRail, setRail] = useStoredState<RailLayout>("padsync.rail", DEFAULT_RAIL);
+  const [lasso] = useLassoSettings(isIpad);
   const rail = useMemo(() => normalizeRail(storedRail), [storedRail]);
   const gutter = gutterFor(kind);
   const viewport = useViewport();
@@ -155,7 +157,8 @@ function Editor({ notebookId }: { notebookId: string }) {
   }, [viewport.w, insets, gutter]);
   useLayoutEffect(() => {
     controller.configure(tool, zoom);
-  }, [controller, tool, zoom]);
+    controller.setLassoMode(lasso.mode);
+  }, [controller, tool, zoom, lasso.mode]);
   useEffect(
     () =>
       registerDebugProbe("Editor", () => ({
@@ -762,6 +765,7 @@ function Editor({ notebookId }: { notebookId: string }) {
     return cleanup;
   }, [loaded, savedPosition, controller]);
 
+  const sectionEl = useCallback((sid: string) => els.current.get(sid), []);
   const registerEl = useCallback((sid: string, el: HTMLElement | null) => {
     if (el) els.current.set(sid, el);
     else els.current.delete(sid);
@@ -817,6 +821,7 @@ function Editor({ notebookId }: { notebookId: string }) {
             zoom={zoom}
             selection={selection?.sectionId === s.id ? selection : null}
             draggingIds={selection?.sectionId === s.id ? dragging : null}
+            selectionBar={!lasso.circle}
             editingTextId={editingText}
             setEditingTextId={setEditingText}
             registerEl={registerEl}
@@ -834,6 +839,29 @@ function Editor({ notebookId }: { notebookId: string }) {
 
       <canvas ref={liveRef} className="pointer-events-none fixed left-0 top-0 z-30" />
       <HoldRing store={holdRing} holdMs={tuning.holdMs} label={gestures.fingerHold === "lassoHold" ? "Hold to lasso" : `Hold: ${actionLabel(gestures.fingerHold)}`} />
+      {lasso.circle && selection && !dragging && (
+        <LassoCircle
+          selection={selection}
+          sectionEl={sectionEl}
+          zoom={zoom}
+          settings={lasso}
+          prompts={prompts}
+          onAction={(a) => {
+            const k = 1 + lasso.step / 100;
+            if (a === "delete") void controller.deleteSelection();
+            else if (a === "duplicate") {
+              const sec = controller.sectionById(selection.sectionId);
+              if (sec) void controller.duplicateSelection(sec);
+            } else if (a === "bigger") void controller.scaleSelection(k);
+            else if (a === "smaller") void controller.scaleSelection(1 / k);
+            else if (a === "done") controller.setSelection(null);
+          }}
+          onRecolor={(color) => void controller.recolorSelection(color)}
+          // The chat's own context choice becomes the selection: that is what was asked about.
+          onPrompt={(pr) => sendPrompt({ ...pr, context: pr.context === "chat" ? "selection" : pr.context })}
+          onNote={note}
+        />
+      )}
       {recording && <PromptRecorder key={recording.id} prompt={recording} onAudio={(audio) => sendPrompt(recording, audio)} onClose={closeRecorder} />}
       {promptFan && (
         <RadialFan
@@ -859,7 +887,7 @@ function Editor({ notebookId }: { notebookId: string }) {
           selection={selection}
           sections={sections}
           current={current}
-          sectionEl={(sid) => els.current.get(sid)}
+          sectionEl={sectionEl}
           follow={follow}
           setFollow={setFollow}
           ipad={ipad}
