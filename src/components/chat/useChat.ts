@@ -60,6 +60,8 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
   );
   /** A model picked before the first message of a new chat: used for that chat only. */
   const [pendingSettings, setPendingSettings] = useState<{ agent: ChatAgent; options: ChatOptions } | null>(null);
+  /** When the synced preferences last loaded; 0 until they have. */
+  const prefsAt = useRef(0);
   const [catalog, setCatalog] = useState<CatalogAccount[] | null>(null);
   const catalogAt = useRef(0);
   const [prices, setPrices] = useState<Record<string, Price> | null>(null);
@@ -135,6 +137,7 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
         .getPrefs()
         .then(({ prefs }) => {
           const next = (prefs["chat.defaultModel"] as ModelChoice | undefined) ?? null;
+          prefsAt.current = Date.now();
           setDefaultModelState(next);
           writeStored("padsync.chat.defaultModel", next);
         })
@@ -245,10 +248,16 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
     );
   /** "New chat" goes to an untouched chat if there is one, else makes one. */
   const create = async () => {
-    // A toolbar prompt can open the panel and send before its preference poll finishes.
-    const savedModel = pendingSettings ? null : await api.getPrefs()
-      .then(({ prefs }) => (prefs["chat.defaultModel"] as ModelChoice | undefined) ?? null)
-      .catch(() => defaultModel);
+    // A toolbar prompt can open the panel and send before its preference poll finishes; once it
+    // has (the poll repeats every minute), the default is known without another round trip.
+    const savedModel = pendingSettings
+      ? null
+      : prefsAt.current
+        ? defaultModel
+        : await api
+            .getPrefs()
+            .then(({ prefs }) => (prefs["chat.defaultModel"] as ModelChoice | undefined) ?? null)
+            .catch(() => defaultModel);
     const start = pendingSettings ?? newChatSettings(defaults, savedModel);
     const options = { ...start.options, ...toolsOf(start.options) };
     setPendingSettings(null);
@@ -257,8 +266,12 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
       turns: turns.length,
     });
     if (empty) {
-      // An untouched chat made earlier still starts on today's default.
-      empty = (await api.updateThread(empty.id, { agent: start.agent, options })).thread;
+      // An untouched chat made earlier still starts on today's default, and its tools; one that
+      // already does needs no update.
+      const current = empty.options as Record<string, unknown>;
+      const wanted = options as Record<string, unknown>;
+      const same = empty.agent === start.agent && Object.keys({ ...current, ...wanted }).every((k) => JSON.stringify(current[k]) === JSON.stringify(wanted[k]));
+      if (!same) empty = (await api.updateThread(empty.id, { agent: start.agent, options })).thread;
       if (empty.id !== id) select(empty.id);
       setThread(empty);
       focusComposer();

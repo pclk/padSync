@@ -553,9 +553,15 @@ function Editor({ notebookId }: { notebookId: string }) {
     };
 
     const opts = { passive: false } as const;
+    // The app went to the background or lost focus mid-touch: its touchend may never come, so
+    // drop whatever the touch was doing rather than leave a pinch preview or a fan hanging.
     const interrupt = () => {
       gesture.cancel();
       endLasso(true);
+      endPromptFinger(false);
+      if (pinch && pinchRef.current) pinchRef.current.style.transform = "";
+      pinch = null;
+      multi = false;
     };
     const onVisibility = () => { if (document.hidden) interrupt(); };
     document.addEventListener("visibilitychange", onVisibility);

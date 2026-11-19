@@ -195,3 +195,15 @@ describe("editing prompts", () => {
     expect(readPrompts()).toEqual([]);
   });
 });
+
+describe("prompt queue", () => {
+  it("keeps every prompt picked while the chat is busy, in order", () => {
+    vi.stubGlobal("window", { dispatchEvent: () => true });
+    queuePrompt(DEFAULT_PROMPTS[0]);
+    queuePrompt(DEFAULT_PROMPTS[1]);
+    expect(peekPrompt()?.prompt.id).toBe(DEFAULT_PROMPTS[0].id);
+    expect(takePrompt()?.prompt.id).toBe(DEFAULT_PROMPTS[0].id);
+    expect(takePrompt()?.prompt.id).toBe(DEFAULT_PROMPTS[1].id);
+    expect(takePrompt()).toBe(null);
+  });
+});

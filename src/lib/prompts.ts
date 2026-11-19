@@ -82,19 +82,18 @@ export interface QueuedPrompt {
   prompt: ChatPrompt;
   audio?: Blob;
 }
-let queued: QueuedPrompt | null = null;
+// First in, first out: a prompt picked while an earlier one waits for the chat goes after it.
+const queued: QueuedPrompt[] = [];
 
 export function queuePrompt(prompt: ChatPrompt, audio?: Blob) {
-  queued = { prompt, ...(audio ? { audio } : {}) };
+  queued.push({ prompt, ...(audio ? { audio } : {}) });
   window.dispatchEvent(new Event(PROMPT_EVENT));
 }
 
-/** The queued prompt, if any, left in place (the composer may have to wait to send it). */
-export const peekPrompt = () => queued;
+/** The next queued prompt, if any, left in place (the composer may have to wait to send it). */
+export const peekPrompt = () => queued[0] ?? null;
 
-/** The queued prompt, if any, removing it so only one composer acts on it. */
+/** The next queued prompt, if any, removing it so only one composer acts on it. */
 export function takePrompt() {
-  const p = queued;
-  queued = null;
-  return p;
+  return queued.shift() ?? null;
 }
