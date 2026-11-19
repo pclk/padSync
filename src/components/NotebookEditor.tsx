@@ -434,6 +434,9 @@ function Editor({ notebookId }: { notebookId: string }) {
         }
         runGesture.current(g, at);
       },
+      onPageTap: () => {
+        if (controller.selection) controller.setSelection(null);
+      },
       isBound: (g) => gestureBound.current(g),
       tuning: () => gestureTuning.current,
       onHold: (state, at) => holdRing.set(state === "start" ? { x: at.x, y: at.y, n: performance.now() } : null),

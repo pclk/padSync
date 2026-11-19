@@ -150,6 +150,7 @@ export interface RecognizerOptions {
   tuning?: () => GestureTuning;
   /** A press and hold is counting down ("start", at the finger) or stopped short of it ("stop"). */
   onHold?: (state: "start" | "stop", at: GestureAt) => void;
+  onPageTap?: () => void;
   timers?: Timers;
 }
 
@@ -166,9 +167,11 @@ export class GestureRecognizer {
   private isBound: RecognizerOptions["isBound"];
   private tuning: () => GestureTuning;
   private onHold: NonNullable<RecognizerOptions["onHold"]>;
+  private onPageTap: RecognizerOptions["onPageTap"];
   private timers: Timers;
 
   constructor(o: RecognizerOptions) {
+    this.onPageTap = o.onPageTap;
     this.emit = o.emit;
     this.isBound = o.isBound;
     this.tuning = o.tuning ?? (() => DEFAULT_TUNING);
@@ -243,7 +246,10 @@ export class GestureRecognizer {
     this.stopHold(c);
     if (c.held || c.moved || now - c.t0 >= this.tuning().tapMs) return;
     if (c.most === 1) {
-      if (c.onPage && !c.pencil) this.tap(1, now, c.first, "fingerDoubleTap", null);
+      if (c.onPage && !c.pencil) {
+        this.onPageTap?.();
+        this.tap(1, now, c.first, "fingerDoubleTap", null);
+      }
     } else if (c.most === 2) this.tap(2, now, c.first, "twoDoubleTap", "twoTap");
     else this.emit(c.most === 3 ? "threeTap" : "fourTap", c.first);
   }

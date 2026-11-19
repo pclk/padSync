@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_GESTURES,
   DEFAULT_TUNING,
@@ -25,7 +25,9 @@ function setup(bindings: Partial<GestureBindings> = {}, tuning: Partial<GestureT
   let now = 0;
   let timers: { at: number; fn: () => void; id: number }[] = [];
   let next = 0;
+  const onPageTap = vi.fn();
   const r = new GestureRecognizer({
+    onPageTap,
     emit: (g, where) => {
       fired.push(g);
       at.push(where);
@@ -55,7 +57,7 @@ function setup(bindings: Partial<GestureBindings> = {}, tuning: Partial<GestureT
     advance(ms);
     r.end([], now);
   };
-  return { r, fired, at, holds, advance, tap, fingers, now: () => now };
+  return { r, onPageTap, fired, at, holds, advance, tap, fingers, now: () => now };
 }
 
 describe("touch gestures", () => {
@@ -65,6 +67,25 @@ describe("touch gestures", () => {
     advance(50);
     tap(3);
     expect(fired).toEqual(["twoTap", "threeTap"]);
+  });
+
+  it("dismisses a selection only on a completed one-finger page tap", () => {
+    const { r, tap, onPageTap, fingers, now, advance } = setup({ fingerHold: "lassoHold" });
+    tap(1, { onPage: false }); // selection handle or a control
+    tap(2);
+    tap(1, { ms: HOLD_MS + 1 }); // lifting the lasso itself
+    r.start(fingers(1), now(), true);
+    r.move(fingers(1, 150));
+    r.end([], now());
+    r.start(fingers(1), now(), true);
+    r.cancel();
+    r.end([], now());
+    expect(onPageTap).not.toHaveBeenCalled();
+    r.start(fingers(1), now(), true);
+    advance(60);
+    expect(onPageTap).not.toHaveBeenCalled();
+    r.end([], now());
+    expect(onPageTap).toHaveBeenCalledTimes(1);
   });
 
   it("reads four-finger taps", () => {
