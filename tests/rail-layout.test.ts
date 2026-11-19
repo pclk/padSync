@@ -45,3 +45,56 @@ describe("generous rail taps", () => {
     expect(nearestButton(r, 140, 120)).toBe(null); // too far away
   });
 });
+
+describe("circle toolbar", () => {
+  const vp: [number, number] = [1024, 768];
+
+  it("is an option, kept through normalising", () => {
+    expect(DEFAULT_RAIL.style).toBe("bar");
+    expect(normalizeRail({ style: "circle" }).style).toBe("circle");
+    expect(normalizeRail({ style: "blob" as never }).style).toBe("bar");
+  });
+
+  it("fans the tools out away from the docked edge, over at most a half circle", async () => {
+    const { fanAngles } = await import("@/lib/tool-circle");
+    // Middle of the left edge: centred on pointing right, from straight up to straight down.
+    expect(fanAngles(5, [44, 384], vp).map(Math.round)).toEqual([-90, -45, 0, 45, 90]);
+    // Middle of the bottom: centred on pointing up.
+    const up = fanAngles(3, [512, 700], vp);
+    expect(up[1]).toBeCloseTo(-90);
+    expect(up[2] - up[0]).toBeCloseTo(90);
+    expect(fanAngles(1, [44, 384], vp)).toHaveLength(1);
+  });
+
+  it("picks the tool the finger moves towards, nothing in the dead zone or back towards the edge", async () => {
+    const { fanAngles, pickByDirection, PICK_DEAD_ZONE } = await import("@/lib/tool-circle");
+    const angles = fanAngles(5, [44, 384], vp); // up, up-right, right, down-right, down
+    expect(pickByDirection(angles, 60, 0)).toBe(2);
+    expect(pickByDirection(angles, 40, -45)).toBe(1);
+    expect(pickByDirection(angles, 5, 80)).toBe(4);
+    expect(pickByDirection(angles, PICK_DEAD_ZONE - 1, 0)).toBe(-1);
+    expect(pickByDirection(angles, -60, 0)).toBe(-1);
+  });
+
+  it("reorders among tools only when asked, skipping the rest", () => {
+    const isTool = (i: string) => !["colors", "sizes", "history"].includes(i);
+    const l = { ...DEFAULT_RAIL, order: ["pen", "colors", "text", "sizes", "history"] as typeof DEFAULT_RAIL.order };
+    expect(moveItem(l, "pen", 1, isTool as never).order).toEqual(["text", "colors", "pen", "sizes", "history"]);
+    expect(moveItem(l, "text", 1, isTool as never)).toBe(l);
+  });
+
+  it("renders one circle instead of the bar", async () => {
+    const { createElement } = await import("react");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { Toolbar } = await import("@/components/Toolbar");
+    const tool = { kind: "highlighter" as const, penColor: "#111827", penSize: 2.2, hlColor: "#facc15", hlSize: 14, eraserSize: 12 };
+    const html = renderToStaticMarkup(
+      createElement(Toolbar, { title: "t", tool, setTool() {}, canUndo: true, canRedo: false, onUndo() {}, onRedo() {}, zoom: 1, onZoomReset() {}, panelOpen: false, onTogglePanel() {}, rail: { ...DEFAULT_RAIL, style: "circle" } }),
+    );
+    expect(html).toContain('data-style="circle"');
+    expect(html).toContain("data-tap-zone");
+    expect(html).toContain('aria-label="Highlighter: hold and drag to change tool, tap for colours and sizes"');
+    expect(html).not.toContain("tool-rail flex");
+    expect(html).not.toContain('aria-label="Undo"');
+  });
+});

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { DEFAULT_RAIL, canHide, moveItem, setHidden, type RailAlign, type RailDock, type RailItem, type RailLayout } from "@/lib/rail-layout";
+import { DEFAULT_RAIL, canHide, isTool, moveItem, setHidden, type RailAlign, type RailDock, type RailItem, type RailLayout } from "@/lib/rail-layout";
 import { Icon, type IconName } from "./Icons";
 import { useDismiss, usePopoverBox, type PopoverAnchor } from "./popover";
 
@@ -40,6 +40,10 @@ export function RailSettings({ layout, setLayout, anchor, onClose }: Props) {
   // Stays open while you use the rail, so changes can be tried as they are made.
   useDismiss(ref, onClose, "[data-tap-zone]");
   const isDefault = JSON.stringify(layout) === JSON.stringify(DEFAULT_RAIL);
+  const circle = layout.style === "circle";
+  // The circle's tap panel holds colours, sizes and undo, so only its tools are listed.
+  const among = circle ? isTool : () => true;
+  const rows = layout.order.filter(among);
 
   return (
     <div ref={ref} role="dialog" aria-label="Toolbar settings" className="card fixed z-50 flex w-72 max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden shadow-lift" style={box}>
@@ -50,6 +54,17 @@ export function RailSettings({ layout, setLayout, anchor, onClose }: Props) {
         </button>
       </div>
       <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain p-3">
+        <p className="mb-1 text-xs font-medium text-slate-700">Style</p>
+        <div role="group" aria-label="Style" className="segmented mb-1 flex w-full [&>button]:flex-1">
+          {(["bar", "circle"] as const).map((st) => (
+            <button key={st} aria-pressed={layout.style === st} onClick={() => setLayout({ ...layout, style: st })}>
+              {st === "bar" ? "Bar" : "Circle"}
+            </button>
+          ))}
+        </div>
+        <p className="mb-3 text-[11px] text-slate-500">
+          {circle ? "Hold the circle and drag towards a tool to pick it; tap it for colours and sizes." : "Every tool, colour and size as a button."}
+        </p>
         <p className="mb-1 text-xs font-medium text-slate-700">Position</p>
         <div role="group" aria-label="Position" className="segmented mb-2 flex w-full [&>button]:flex-1">
           {(Object.keys(DOCK_LABELS) as RailDock[]).map((d) => (
@@ -66,9 +81,9 @@ export function RailSettings({ layout, setLayout, anchor, onClose }: Props) {
           ))}
         </div>
 
-        <p className="mb-1 text-xs font-medium text-slate-700">Items</p>
+        <p className="mb-1 text-xs font-medium text-slate-700">{circle ? "Tools, in fan order" : "Items"}</p>
         <ul className="-mx-1">
-          {layout.order.map((item, i) => {
+          {rows.map((item, i) => {
             const { label, icon } = RAIL_ITEM_INFO[item];
             const shown = !layout.hidden.includes(item);
             return (
@@ -77,10 +92,10 @@ export function RailSettings({ layout, setLayout, anchor, onClose }: Props) {
                   {icon ? <Icon name={icon} /> : item === "colors" ? <span className="h-4 w-4 rounded-full" style={{ background: "conic-gradient(#dc2626, #facc15, #047857, #1d4ed8, #7c3aed, #dc2626)" }} /> : <span className="flex items-center gap-0.5">{[3, 5, 7].map((d) => <span key={d} className="rounded-full bg-slate-500" style={{ width: d, height: d }} />)}</span>}
                 </span>
                 <span className={`flex-1 truncate pl-1 text-sm ${shown ? "text-slate-800" : "text-slate-400"}`}>{label}</span>
-                <button className="icon-btn h-11 w-10" disabled={i === 0} onClick={() => setLayout(moveItem(layout, item, -1))} aria-label={`Move ${label} up`}>
+                <button className="icon-btn h-11 w-10" disabled={i === 0} onClick={() => setLayout(moveItem(layout, item, -1, among))} aria-label={`Move ${label} up`}>
                   <Icon name="arrowUp" />
                 </button>
-                <button className="icon-btn h-11 w-10" disabled={i === layout.order.length - 1} onClick={() => setLayout(moveItem(layout, item, 1))} aria-label={`Move ${label} down`}>
+                <button className="icon-btn h-11 w-10" disabled={i === rows.length - 1} onClick={() => setLayout(moveItem(layout, item, 1, among))} aria-label={`Move ${label} down`}>
                   <Icon name="arrowDown" />
                 </button>
                 <label className="flex h-11 w-12 items-center justify-center" title={canHide(item) ? undefined : "The pen is always shown"}>
@@ -90,7 +105,9 @@ export function RailSettings({ layout, setLayout, anchor, onClose }: Props) {
             );
           })}
         </ul>
-        <p className="mt-2 text-[11px] text-slate-500">Hidden tools still work from the keyboard. Taps near a button, or between buttons, go to the closest one.</p>
+        <p className="mt-2 text-[11px] text-slate-500">
+          Hidden tools still work from the keyboard. {circle ? "Presses just outside the circle still count." : "Taps near a button, or between buttons, go to the closest one."}
+        </p>
       </div>
     </div>
   );

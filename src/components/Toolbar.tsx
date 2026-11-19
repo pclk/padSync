@@ -8,6 +8,8 @@ import { Icon, type IconName } from "./Icons";
 import { PenSettings } from "./PenSettings";
 import { RailSettings } from "./RailSettings";
 import { anchorOf, type PopoverAnchor } from "./popover";
+import { dockStrip, tapZonePadding } from "./rail-dock";
+import { ToolCircle } from "./ToolCircle";
 import { SIDEBAR_W, TOOLBAR_H, type ToolbarVariant } from "@/lib/notebook-viewport";
 import { DEFAULT_RAIL, visibleItems, type RailItem, type RailLayout } from "@/lib/rail-layout";
 
@@ -124,6 +126,28 @@ export function Toolbar(p: Props) {
 
       {p.variant === "sidebar" ? (
         <ToolSidebar {...tools} open={p.sidebarOpen ?? true} onToggle={p.onToggleSidebar} canUndo={p.canUndo} canRedo={p.canRedo} onUndo={p.onUndo} onRedo={p.onRedo} />
+      ) : rail.style === "circle" ? (
+        <ToolCircle
+          {...tools}
+          selectTool={(kind) => {
+            setPenMenu(null);
+            setTool({ ...tool, kind });
+          }}
+          canUndo={p.canUndo}
+          canRedo={p.canRedo}
+          onUndo={p.onUndo}
+          onRedo={p.onRedo}
+          rail={rail}
+          rightInset={p.rightInset ?? 0}
+          onPenSettings={(circle) => {
+            setRailMenu(null);
+            setPenMenu(anchorOf(circle, rail.dock));
+          }}
+          onSettings={(circle) => {
+            setPenMenu(null);
+            setRailMenu(anchorOf(circle, rail.dock));
+          }}
+        />
       ) : (
         <ToolRail
           {...tools}
@@ -218,8 +242,6 @@ export function nearestButton(root: HTMLElement, x: number, y: number): HTMLButt
   return best;
 }
 
-const JUSTIFY = { start: "justify-start", center: "justify-center", end: "justify-end" } as const;
-
 function ToolRail({ tool, colors, color, sizes, size, showColors, showSizes, penMenuOpen, pick, setColor, setSize, canUndo, canRedo, onUndo, onRedo, rail, rightInset, settingsOpen, onSettings }: ToolControls & HistoryControls & RailControls) {
   const row = rail.dock === "bottom";
   const taps = useGenerousTaps();
@@ -304,12 +326,11 @@ function ToolRail({ tool, colors, color, sizes, size, showColors, showSizes, pen
     );
   };
 
-  // The strip along the docked edge passes touches through; only the hit zone around the rail
-  // takes them, and its padding is the invisible margin where taps still reach the closest button.
-  const strip = row ? { left: 0, right: rightInset, bottom: 0 } : { top: TOOLBAR_H, bottom: 0, ...(rail.dock === "left" ? { left: 0 } : { right: rightInset }) };
+  // The tap zone's padding is the invisible margin where taps still reach the closest button.
+  const strip = dockStrip(rail, rightInset);
   return (
-    <div className={`tool-rail-dock pointer-events-none fixed z-40 flex ${flow} ${JUSTIFY[rail.align]} ${row ? "items-end" : rail.dock === "left" ? "items-start" : "items-end"}`} style={strip} data-dock={rail.dock}>
-      <div data-tap-zone="" className={`pointer-events-auto flex touch-manipulation p-3 ${row ? "pb-[max(0.75rem,env(safe-area-inset-bottom))]" : ""}`} {...taps}>
+    <div className={strip.className} style={strip.style} data-dock={rail.dock}>
+      <div data-tap-zone="" className={`pointer-events-auto flex touch-manipulation ${tapZonePadding(rail)}`} {...taps}>
         <aside
           className={`tool-rail flex ${flow} items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/90 p-1.5 shadow-lift backdrop-blur-md ${row ? "overflow-x-auto" : "overflow-y-auto"}`}
           style={row ? { maxWidth: `calc(100vw - ${rightInset}px - 1.5rem)` } : { maxHeight: `calc(100dvh - ${TOOLBAR_H}px - 1.5rem)` }}

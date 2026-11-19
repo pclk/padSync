@@ -7,19 +7,23 @@ export type RailItem = ToolKind | "colors" | "sizes" | "history";
 export type RailDock = "left" | "right" | "bottom";
 /** Where along that edge: top/left, middle, bottom/right. */
 export type RailAlign = "start" | "center" | "end";
+/** A bar of buttons, or one circle you press and drag from to pick a tool. */
+export type RailStyle = "bar" | "circle";
 
 export interface RailLayout {
   order: RailItem[];
   hidden: RailItem[];
   dock: RailDock;
   align: RailAlign;
+  style: RailStyle;
 }
 
 export const RAIL_ITEMS: readonly RailItem[] = ["pen", "highlighter", "eraser", "lasso", "text", "colors", "sizes", "history"];
-export const DEFAULT_RAIL: RailLayout = { order: [...RAIL_ITEMS], hidden: [], dock: "left", align: "center" };
+export const DEFAULT_RAIL: RailLayout = { order: [...RAIL_ITEMS], hidden: [], dock: "left", align: "center", style: "bar" };
 
 const DOCKS: readonly RailDock[] = ["left", "right", "bottom"];
 const ALIGNS: readonly RailAlign[] = ["start", "center", "end"];
+const STYLES: readonly RailStyle[] = ["bar", "circle"];
 const isItem = (v: unknown): v is RailItem => RAIL_ITEMS.includes(v as RailItem);
 
 /** The pen is the one tool the rail always shows, so there is always something to draw with. */
@@ -38,14 +42,19 @@ export function normalizeRail(raw: Partial<RailLayout> | null | undefined): Rail
     hidden,
     dock: DOCKS.includes(raw?.dock as RailDock) ? raw!.dock! : DEFAULT_RAIL.dock,
     align: ALIGNS.includes(raw?.align as RailAlign) ? raw!.align! : DEFAULT_RAIL.align,
+    style: STYLES.includes(raw?.style as RailStyle) ? raw!.style! : DEFAULT_RAIL.style,
   };
 }
 
-/** Moves an item one place up (-1) or down (+1); no change at either end. */
-export function moveItem(layout: RailLayout, item: RailItem, delta: -1 | 1): RailLayout {
+/**
+ * Moves an item one place up (-1) or down (+1) past the next item `among` accepts (all of them by
+ * default; the circle's settings list only tools); no change at either end.
+ */
+export function moveItem(layout: RailLayout, item: RailItem, delta: -1 | 1, among: (i: RailItem) => boolean = () => true): RailLayout {
   const order = [...layout.order];
   const i = order.indexOf(item);
-  const j = i + delta;
+  let j = i + delta;
+  while (j >= 0 && j < order.length && !among(order[j])) j += delta;
   if (i < 0 || j < 0 || j >= order.length) return layout;
   [order[i], order[j]] = [order[j], order[i]];
   return { ...layout, order };
@@ -58,3 +67,7 @@ export function setHidden(layout: RailLayout, item: RailItem, hide: boolean): Ra
 }
 
 export const visibleItems = (layout: RailLayout) => layout.order.filter((i) => !layout.hidden.includes(i));
+
+export const isTool = (i: RailItem): i is ToolKind => !["colors", "sizes", "history"].includes(i);
+/** The tools the rail shows, in its order: the circle's fan. */
+export const visibleTools = (layout: RailLayout) => visibleItems(layout).filter(isTool);
