@@ -33,7 +33,7 @@ export function Composer(
     fallbackModels: boolean;
     send(
       text: string,
-      context: ContextHandle | null,
+      context: Pick<ContextHandle, "prepare"> | null,
       files: File[],
       progress: Parameters<typeof uploadTurnInputs>[2],
       voice?: Blob,
@@ -123,7 +123,8 @@ export function Composer(
   // While a reply is still being sent it waits, and goes once the composer is free.
   const sendPrompt = ({ prompt, audio }: QueuedPrompt) => {
     const scope = prompt.context === "chat" ? undefined : prompt.context;
-    const context: ContextHandle | null = ctx.current && { prepare: () => ctx.current!.prepare(scope) };
+    const picker = ctx.current;
+    const context = picker && { prepare: () => picker.prepare(scope) };
     return p.send(prompt.text.trim(), context, [], { onProgress: () => {} }, audio).catch((error) => setError((error as Error).message));
   };
   const latest = useRef({ sendPrompt, setDraft: p.setDraft, busy: p.busy });
@@ -138,6 +139,7 @@ export function Composer(
     if (sending && l.busy) return;
     takePrompt();
     if (sending) return void l.sendPrompt(q);
+    if (q.prompt.context !== "chat") ctx.current?.chooseScope(q.prompt.context);
     l.setDraft(q.prompt.text);
     area.current?.focus();
   }, []);

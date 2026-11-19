@@ -37,6 +37,15 @@ export function LassoSettingsPanel({ ipad, compact = false }: { ipad: boolean; c
         </p>
       </div>
 
+      <label className="flex min-h-11 items-center justify-between text-sm">
+        Press-and-hold magnifier
+        <input type="checkbox" className="switch" checked={s.lens} onChange={(e) => update({ lens: e.target.checked })} />
+      </label>
+      {s.lens && <>
+        <Range label="Lens size" unit="px" value={s.lensSize} range={{ min: 72, max: 160, step: 4 }} onChange={(lensSize) => update({ lensSize })} />
+        <Range label="Magnification" unit="×" value={s.lensZoom} range={{ min: 2, max: 4, step: 1 }} onChange={(lensZoom) => update({ lensZoom })} />
+      </>}
+
       <label className="flex min-h-11 items-center justify-between gap-3">
         <span>
           <span className="block text-sm text-slate-800">Lasso circle</span>

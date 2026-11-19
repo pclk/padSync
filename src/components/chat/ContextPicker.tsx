@@ -27,6 +27,7 @@ import { focusedSection } from "@/lib/chat-ui";
 import { Icon, type IconName } from "../Icons";
 import { usePopover } from "./Popover";
 export interface ContextHandle {
+  chooseScope(scope: ContextSummary["scope"]): void;
   /** `scope`: send this instead of what the picker is set to (a prompt menu prompt's own context). */
   prepare(scope?: ContextSummary["scope"]): Promise<{
     files: Bundle["files"];
@@ -190,7 +191,13 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
       if (!sending) setPreview({ sig, bundle });
       return bundle;
     };
+    const choose = (next: Scope) => {
+      setScope(next);
+      setPreview(null);
+      if (next === "sections" && !ids.length && focusedId) setIds([focusedId]);
+    };
     useImperativeHandle(ref, () => ({
+      chooseScope: choose,
       async prepare(override) {
         const b = await prepare(true, override);
         const scope = override ?? scopeNow;
@@ -212,11 +219,6 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
         };
       },
     }));
-    const choose = (next: Scope) => {
-      setScope(next);
-      setPreview(null);
-      if (next === "sections" && !ids.length && focusedId) setIds([focusedId]);
-    };
     const SCOPES: { v: Scope; icon: IconName; label: string; hint: string }[] = [
       {
         v: "section",

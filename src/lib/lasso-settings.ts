@@ -16,6 +16,9 @@ export const LASSO_ACTIONS: { action: LassoAction; label: string; icon: IconName
 ];
 
 export interface LassoSettings {
+  lens: boolean;
+  lensSize: number;
+  lensZoom: number;
   mode: LassoMode;
   /** The circle of actions above a selection; off, the bar of buttons shows instead. */
   circle: boolean;
@@ -34,6 +37,9 @@ export const LASSO_STEPS = { min: 5, max: 100, step: 5 } as const;
 
 /** The circle by default on the iPad, where there is no keyboard; the Mac keeps the bar. */
 export const defaultLasso = (ipad: boolean): LassoSettings => ({
+  lens: true,
+  lensSize: 104,
+  lensZoom: 2,
   mode: "touch",
   circle: ipad,
   order: LASSO_ACTIONS.map((a) => a.action),
@@ -53,6 +59,9 @@ export function normalizeLasso(raw: unknown, ipad: boolean): LassoSettings {
   const order = [...new Set((Array.isArray(r.order) ? r.order : []).filter(isAction))];
   for (const a of d.order) if (!order.includes(a)) order.push(a);
   return {
+    lens: typeof r.lens === "boolean" ? r.lens : d.lens,
+    lensSize: num(r.lensSize, { min: 72, max: 160 }, d.lensSize),
+    lensZoom: num(r.lensZoom, { min: 2, max: 4 }, d.lensZoom),
     mode: r.mode === "enclose" || r.mode === "touch" ? r.mode : d.mode,
     circle: typeof r.circle === "boolean" ? r.circle : d.circle,
     order,

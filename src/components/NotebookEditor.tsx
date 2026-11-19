@@ -19,6 +19,7 @@ import { SectionView } from "./SectionView";
 import { SidePanel } from "./SidePanel";
 import { Toolbar } from "./Toolbar";
 import { GestureRecognizer, actionLabel, type GestureAction, type GestureAt, type GestureKind, type TouchPoint } from "@/lib/touch-gestures";
+import { createLassoLens } from "./lasso-lens";
 import { useGestureBindings, useGestureTuning, useLassoSettings, usePrompts } from "@/lib/settings";
 import { queuePrompt, type ChatPrompt } from "@/lib/prompts";
 import { RadialFan, fanAt, pointAt, promptItems, type FanState } from "./RadialFan";
@@ -215,7 +216,11 @@ function Editor({ notebookId }: { notebookId: string }) {
 
   // A callback ref: the overlay canvas only mounts once the notebook has loaded, after the
   // controller's mount effects have already run.
-  const liveRef = useCallback((c: HTMLCanvasElement | null) => controller.attachLive(c), [controller]);
+  const liveCanvas = useRef<HTMLCanvasElement>(null);
+  const liveRef = useCallback((c: HTMLCanvasElement | null) => {
+    liveCanvas.current = c;
+    controller.attachLive(c);
+  }, [controller]);
   useEffect(() => {
     const onResize = () => controller.resizeLive();
     window.addEventListener("resize", onResize);
@@ -391,6 +396,7 @@ function Editor({ notebookId }: { notebookId: string }) {
     // Two or more fingers are or were down in this touch: its lifts are ours, not Safari's.
     let multi = false;
     // The finger drawing a lasso after a press and hold, by touch identifier.
+    let lens: ReturnType<typeof createLassoLens> | undefined;
     let lassoFinger: number | null = null;
     // The finger pointing into the prompt menu after a press and hold, where it pressed, and how
     // far it has gone.
@@ -414,6 +420,10 @@ function Editor({ notebookId }: { notebookId: string }) {
         if (g === "fingerHold" && gestureAction.current(g) === "lassoHold") {
           if (controller.beginFingerLasso(at.x, at.y)) {
             lassoFinger = at.id;
+            if (lasso.lens && liveCanvas.current) {
+              lens = createLassoLens(lasso.lensSize, lasso.lensZoom, liveCanvas.current);
+              lens.move(at.x, at.y);
+            }
             note("Lasso");
           }
           return;
@@ -430,6 +440,8 @@ function Editor({ notebookId }: { notebookId: string }) {
     });
     const endLasso = (cancel: boolean) => {
       if (lassoFinger === null) return;
+      lens?.remove();
+      lens = undefined;
       lassoFinger = null;
       controller.endFingerLasso(cancel);
     };
@@ -488,6 +500,7 @@ function Editor({ notebookId }: { notebookId: string }) {
           // The held finger draws the lasso; the page must not scroll under it.
           e.preventDefault();
           controller.extendFingerLasso(f.clientX, f.clientY);
+          lens?.move(f.clientX, f.clientY);
           return;
         }
       }
@@ -530,18 +543,29 @@ function Editor({ notebookId }: { notebookId: string }) {
       if (multi && e.cancelable) e.preventDefault();
       if (!fingers.length) multi = false;
       // Lifting the lasso finger selects what it circled.
-      if (lassoFinger !== null && !fingers.some((t) => t.identifier === lassoFinger)) endLasso(false);
+      if (lassoFinger !== null && !fingers.some((t) => t.identifier === lassoFinger)) endLasso(e.type === "touchcancel");
       if (promptFinger && !fingers.some((t) => t.identifier === promptFinger!.id)) endPromptFinger(e.type !== "touchcancel");
       if (e.type === "touchcancel") gesture.cancel();
       else gesture.end(points(fingers), performance.now());
     };
 
     const opts = { passive: false } as const;
+    const interrupt = () => {
+      gesture.cancel();
+      endLasso(true);
+    };
+    const onVisibility = () => { if (document.hidden) interrupt(); };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("blur", interrupt);
+    window.addEventListener("pagehide", interrupt);
     window.addEventListener("touchstart", onStart, opts);
     window.addEventListener("touchmove", onMove, opts);
     window.addEventListener("touchend", onEnd, opts);
     window.addEventListener("touchcancel", onEnd);
     return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("blur", interrupt);
+      window.removeEventListener("pagehide", interrupt);
       window.removeEventListener("touchstart", onStart);
       window.removeEventListener("touchmove", onMove);
       window.removeEventListener("touchend", onEnd);
@@ -550,7 +574,7 @@ function Editor({ notebookId }: { notebookId: string }) {
       endLasso(true);
       endPromptFinger(false);
     };
-  }, [controller, measureZoom, commitZoom, note, holdRing, setPromptFan]);
+  }, [controller, measureZoom, commitZoom, note, holdRing, setPromptFan, lasso.lens, lasso.lensSize, lasso.lensZoom]);
 
   // --- keyboard (Mac) ---------------------------------------------------------------------
   useEffect(() => {

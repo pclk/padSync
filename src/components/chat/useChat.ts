@@ -24,7 +24,6 @@ import {
   toolsOf,
   writeDraft,
   writeStored,
-  sameModel,
   type ModelChoice,
   type ThreadFilter,
 } from "@/lib/chat-ui";
@@ -246,7 +245,12 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
     );
   /** "New chat" goes to an untouched chat if there is one, else makes one. */
   const create = async () => {
-    const start = pendingSettings ?? newChatSettings(defaults, defaultModel);
+    // A toolbar prompt can open the panel and send before its preference poll finishes.
+    const savedModel = pendingSettings ? null : await api.getPrefs()
+      .then(({ prefs }) => (prefs["chat.defaultModel"] as ModelChoice | undefined) ?? null)
+      .catch(() => defaultModel);
+    const start = pendingSettings ?? newChatSettings(defaults, savedModel);
+    const options = { ...start.options, ...toolsOf(start.options) };
     setPendingSettings(null);
     let empty = reusableThread(threads, p.notebookId, {
       id,
@@ -254,14 +258,12 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
     });
     if (empty) {
       // An untouched chat made earlier still starts on today's default.
-      if (!sameModel(empty, start))
-        empty = (await api.updateThread(empty.id, { agent: start.agent, options: { ...empty.options, ...start.options } })).thread;
+      empty = (await api.updateThread(empty.id, { agent: start.agent, options })).thread;
       if (empty.id !== id) select(empty.id);
       setThread(empty);
       focusComposer();
       return empty;
     }
-    const options = { ...start.options, ...toolsOf(start.options) };
     const data = await api.createThread({
       notebookId: p.notebookId,
       agent: start.agent,
@@ -344,7 +346,7 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
     });
   const send = async (
     text: string,
-    context: ContextHandle | null,
+    context: Pick<ContextHandle, "prepare"> | null,
     files: File[],
     onProgress: Parameters<typeof api.uploadTurnInputs>[2],
     /** A recorded voice message: the Mac transcribes it into (the rest of) the question. */
