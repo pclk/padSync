@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { lassoStrokes } from "@/ink/geometry";
+import { dataBox, lassoStrokes } from "@/ink/geometry";
 import { defaultLasso, normalizeLasso, visibleLassoActions } from "@/lib/lasso-settings";
 import { DEFAULT_TUNING } from "@/lib/touch-gestures";
 import type { StrokeEntity } from "@/lib/types";
@@ -82,7 +82,8 @@ async function selected() {
   const c = new InkController("nb", { kind: "lasso", penColor: "#000", penSize: 3, hlColor: "#ff0", hlSize: 20, eraserSize: 20 }, { onSelection() {}, onDragging() {}, onTextCreate() {} });
   const s = stroke("a", [100, 100, 200, 140], 4);
   rowsRef.rows.set("a", s);
-  c.setSelection({ sectionId: "sec", ids: new Set(["a"]), box: { minX: 100, minY: 100, maxX: 200, maxY: 140 } });
+  // As the lasso makes it: the ink's extent, line width included (96..204, 96..144).
+  c.setSelection({ sectionId: "sec", ids: new Set(["a"]), box: dataBox(s.data) });
   return c;
 }
 
@@ -93,17 +94,17 @@ describe("lasso circle actions", () => {
     const d = rowsRef.rows.get("a")!.data;
     expect([d.pts[0], d.pts[1], d.pts[6], d.pts[7]]).toEqual([50, 80, 250, 160]);
     expect(d.size).toBe(8);
-    expect(c.selection?.box).toEqual({ minX: 50, minY: 80, maxX: 250, maxY: 160 });
+    expect(c.selection?.box).toEqual({ minX: 42, minY: 72, maxX: 258, maxY: 168 });
     await c.undo.undo();
     expect(rowsRef.rows.get("a")!.data.size).toBe(4);
-    expect(c.selection?.box).toEqual({ minX: 100, minY: 100, maxX: 200, maxY: 140 });
+    expect(c.selection?.box).toEqual({ minX: 96, minY: 96, maxX: 204, maxY: 144 });
   });
 
   it("keeps a scaled selection on the page", async () => {
     const c = await selected();
     await c.scaleSelection(4);
-    expect(c.selection!.box.minX).toBe(0);
-    expect(c.selection!.box.minY).toBe(40);
+    expect(c.selection!.box.minX).toBeCloseTo(0);
+    expect(c.selection!.box.minY).toBeCloseTo(24);
   });
 
   it("recolours the selection and undoes it", async () => {
@@ -112,5 +113,40 @@ describe("lasso circle actions", () => {
     expect(rowsRef.rows.get("a")!.data.color).toBe("#dc2626");
     await c.undo.undo();
     expect(rowsRef.rows.get("a")!.data.color).toBe("#000");
+  });
+});
+
+describe("lasso undo keeps later edits", () => {
+  it("undoing a recolour restores only the colour, not an older position", async () => {
+    const c = await selected();
+    await c.recolorSelection("#dc2626");
+    // Moved since, on another device.
+    const row = rowsRef.rows.get("a")!;
+    rowsRef.rows.set("a", { ...row, data: { ...row.data, pts: row.data.pts.map((v, i) => (i % 6 === 0 ? v + 75 : v)) } });
+    await c.undo.undo();
+    const d = rowsRef.rows.get("a")!.data;
+    expect(d.color).toBe("#000");
+    expect(d.pts[0]).toBe(175);
+  });
+
+  it("leaves a resize alone on undo once the stroke was changed since, and fits the box to a smaller selection", async () => {
+    const c = await selected();
+    await c.scaleSelection(2);
+    const row = rowsRef.rows.get("a")!;
+    rowsRef.rows.set("a", { ...row, data: { ...row.data, pts: row.data.pts.map((v, i) => (i % 6 === 1 ? v + 10 : v)) } });
+    await c.undo.undo();
+    expect(rowsRef.rows.get("a")!.data.size).toBe(8);
+  });
+
+  it("never grows a selection wider than the page", async () => {
+    const { PAGE_WIDTH } = await import("@/lib/types");
+    const c = await selected();
+    const wide = stroke("a", [100, 100, 900, 140], 4);
+    rowsRef.rows.set("a", wide);
+    c.setSelection({ sectionId: "sec", ids: new Set(["a"]), box: dataBox(wide.data) });
+    await c.scaleSelection(2);
+    const b = c.selection!.box;
+    expect(b.maxX - b.minX).toBeLessThanOrEqual(PAGE_WIDTH + 0.01);
+    expect(b.minX).toBeGreaterThanOrEqual(-0.01);
   });
 });

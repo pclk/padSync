@@ -124,6 +124,7 @@ export function LassoCircle(p: Props) {
         <RadialFan
           fan={press.fan}
           label="Selection"
+          keep=".lasso-circle"
           onPick={(item) => {
             press.close();
             pick(item.key as LassoAction);
@@ -135,6 +136,7 @@ export function LassoCircle(p: Props) {
         <RadialFan
           fan={sub.fan}
           label={sub.kind === "color" ? "Colour" : "Ask AI"}
+          keep=".lasso-circle"
           onPick={(item) => {
             setSubState(null);
             if (sub.kind === "color") return p.onRecolor(item.key);

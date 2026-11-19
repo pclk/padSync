@@ -125,24 +125,34 @@ export function Composer(
     const scope = prompt.context === "chat" ? undefined : prompt.context;
     const picker = ctx.current;
     const context = picker && { prepare: () => picker.prepare(scope) };
-    return p.send(prompt.text.trim(), context, [], { onProgress: () => {} }, audio).catch((error) => setError((error as Error).message));
+    return p.send(prompt.text.trim(), context, [], { onProgress: () => {} }, audio).catch((error) => {
+      setError((error as Error).message);
+      // A recording can't be made again: keep it to retry rather than lose it with the error.
+      if (audio) setFailed({ prompt, audio, notebookId: p.notebookId });
+    });
   };
+  const [failed, setFailed] = useState<QueuedPrompt | null>(null);
   const latest = useRef({ sendPrompt, setDraft: p.setDraft, busy: p.busy });
   useEffect(() => {
     latest.current = { sendPrompt, setDraft: p.setDraft, busy: p.busy };
   });
+  // Works through the queue: prompts to finish go into the box, and the first one to send goes
+  // (the rest follow as each send finishes). A prompt to finish doesn't stop the ones after it.
+  const notebookId = p.notebookId;
   const takeQueued = useCallback(() => {
-    const q = peekPrompt();
-    if (!q) return;
-    const l = latest.current;
-    const sending = q.audio || q.prompt.send;
-    if (sending && l.busy) return;
-    takePrompt();
-    if (sending) return void l.sendPrompt(q);
-    if (q.prompt.context !== "chat") ctx.current?.chooseScope(q.prompt.context);
-    l.setDraft(q.prompt.text);
-    area.current?.focus();
-  }, []);
+    for (;;) {
+      const q = peekPrompt(notebookId);
+      if (!q) return;
+      const l = latest.current;
+      const sending = q.audio || q.prompt.send;
+      if (sending && l.busy) return;
+      takePrompt(notebookId);
+      if (sending) return void l.sendPrompt(q);
+      if (q.prompt.context !== "chat") ctx.current?.chooseScope(q.prompt.context);
+      l.setDraft(q.prompt.text);
+      area.current?.focus();
+    }
+  }, [notebookId]);
   useEffect(() => {
     window.addEventListener(PROMPT_EVENT, takeQueued);
     return () => window.removeEventListener(PROMPT_EVENT, takeQueued);
@@ -397,6 +407,26 @@ export function Composer(
         <p role="alert" className="mx-auto mt-1.5 max-w-[48rem] px-2 text-xs text-rose-700">
           {error}
         </p>
+      )}
+      {failed && (
+        <div role="status" className="mx-auto mt-1.5 flex max-w-[48rem] items-center gap-2 px-2 text-xs text-slate-700">
+          <span className="min-w-0 flex-1 truncate">Voice message for &ldquo;{failed.prompt.label}&rdquo; not sent.</span>
+          <button
+            className="btn btn-secondary btn-sm h-9"
+            disabled={p.busy}
+            onClick={() => {
+              const again = failed;
+              setFailed(null);
+              setError("");
+              void sendPrompt(again);
+            }}
+          >
+            Retry
+          </button>
+          <button className="btn btn-ghost btn-sm h-9" onClick={() => setFailed(null)}>
+            Discard
+          </button>
+        </div>
       )}
     </div>
   );

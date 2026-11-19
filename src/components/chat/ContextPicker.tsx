@@ -55,7 +55,9 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
     const [scope, setScope] = useState<Scope>("section");
     const [options, setOptions] = useState<ContextOptions>(DEFAULT_CONTEXT);
     const [ids, setIds] = useState<string[]>([]);
-    const [text, setText] = useState<TextSelection | null>(null);
+    // Highlighted text, with the section it came from: it counts only while that section is the
+    // current one, so text picked in one section is never sent as another's.
+    const [textAt, setTextAt] = useState<{ sectionId: string; sel: TextSelection } | null>(null);
     const [preview, setPreview] = useState<{
       sig: string;
       bundle: Bundle;
@@ -82,6 +84,7 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
     }, [current]);
     const [error, setError] = useState("");
     const currentId = current?.id ?? "";
+    const text = textAt && textAt.sectionId === currentId ? textAt.sel : null;
     const { sections, notebookTitle } = p;
     const ctxFor = (sc: Scope): ContextOptions => ({
       ...options,
@@ -92,7 +95,8 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
     const ctx: ContextOptions = useMemo(() => ctxFor(scope), [options, scope, focusedId, ids]);
     useEffect(() => {
       let live = true;
-      void gatherSections(sections)
+      // Nothing from the notebook needs none of its strokes read.
+      void (scope === "none" ? Promise.resolve([]) : gatherSections(sections))
         .then((inputs) => {
           if (!live) return;
           if (scope === "none") {
@@ -132,9 +136,13 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
       const scope = override ?? scopeNow;
       const ctx = override ? ctxFor(override) : ctxNow;
       const preview = override ? null : previewNow;
+      if (scope === "none") return { files: [], sectionIds: [], bytes: 0, tokens: 0, skipped: [] } as Bundle;
       const inputs = await gatherSections(p.sections);
-      const lasso =
-        p.selection?.sectionId === p.current?.id ? p.selection : null;
+      // The lasso's own section, which needn't be the one the screen is centred on (the lasso
+      // circle's Ask AI can be used on a selection lower down).
+      const lassoed = p.selection ? (p.sections.find((s) => s.id === p.selection!.sectionId) ?? null) : null;
+      const target = scope === "selection" && lassoed ? lassoed : p.current;
+      const lasso = p.selection && lassoed && p.selection.sectionId === target?.id ? p.selection : null;
       const key = [
         scope,
         text?.text,
@@ -142,31 +150,23 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
       ];
       const sig = bundleSignature(p.notebookTitle, inputs, key, ctx);
       if (sending && preview?.sig === sig) return preview.bundle;
-      const el = p.current && p.sectionEl(p.current.id);
+      const el = target && p.sectionEl(target.id);
       const selection =
-        scope === "selection" && p.current
+        scope === "selection" && target
           ? {
-              sectionId: p.current.id,
-              text: text?.text,
+              sectionId: target.id,
+              // Highlighted text belongs to the screen's section; with another section's lasso, leave it out.
+              text: target.id === p.current?.id ? text?.text : undefined,
               crop:
                 lasso && el
-                  ? await cropSelection(p.current, el, lasso.box, 2, {
+                  ? await cropSelection(target, el, lasso.box, 2, {
                       notes: !ctx.notes,
                       images: !ctx.images,
                     })
                   : null,
             }
           : null;
-      const bundle =
-        scope === "none"
-          ? ({
-              files: [],
-              sectionIds: [],
-              bytes: 0,
-              tokens: 0,
-              skipped: [],
-            } as Bundle)
-          : buildBundle(
+      const bundle = buildBundle(
               {
                 title: p.notebookTitle,
                 sections: await addRenders(
@@ -296,7 +296,7 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
                   currentId={focusedId}
                   source={source}
                   textSel={text}
-                  setTextSel={setText}
+                  setTextSel={(sel) => setTextAt(sel ? { sectionId: currentId, sel } : null)}
                   lassoCount={p.selection?.ids.size ?? 0}
                   summary={summary}
                 />

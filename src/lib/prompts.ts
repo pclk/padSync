@@ -81,19 +81,24 @@ export const PROMPT_EVENT = "padsync:prompt";
 export interface QueuedPrompt {
   prompt: ChatPrompt;
   audio?: Blob;
+  /** The notebook it was picked in: only that notebook's chat sends it, with its pages. */
+  notebookId: string;
 }
 // First in, first out: a prompt picked while an earlier one waits for the chat goes after it.
 const queued: QueuedPrompt[] = [];
 
-export function queuePrompt(prompt: ChatPrompt, audio?: Blob) {
-  queued.push({ prompt, ...(audio ? { audio } : {}) });
+export function queuePrompt(notebookId: string, prompt: ChatPrompt, audio?: Blob) {
+  // Left behind by another notebook (picked there, then the notebook was closed): not for here.
+  for (let i = queued.length - 1; i >= 0; i--) if (queued[i].notebookId !== notebookId) queued.splice(i, 1);
+  queued.push({ prompt, notebookId, ...(audio ? { audio } : {}) });
   window.dispatchEvent(new Event(PROMPT_EVENT));
 }
 
-/** The next queued prompt, if any, left in place (the composer may have to wait to send it). */
-export const peekPrompt = () => queued[0] ?? null;
+/** The next prompt queued in `notebookId`, if any, left in place (the composer may have to wait). */
+export const peekPrompt = (notebookId: string) => queued.find((q) => q.notebookId === notebookId) ?? null;
 
-/** The next queued prompt, if any, removing it so only one composer acts on it. */
-export function takePrompt() {
-  return queued.shift() ?? null;
+/** The next prompt queued in `notebookId`, if any, removing it so only one composer acts on it. */
+export function takePrompt(notebookId: string) {
+  const i = queued.findIndex((q) => q.notebookId === notebookId);
+  return i < 0 ? null : queued.splice(i, 1)[0];
 }

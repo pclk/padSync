@@ -340,7 +340,7 @@ function Editor({ notebookId }: { notebookId: string }) {
   const sendPrompt = (pr: ChatPrompt, audio?: Blob) => {
     if (pr.voice && !audio) return setRecording(pr);
     if (!panelOpen) setPanelOpen(true);
-    queuePrompt(pr, audio);
+    queuePrompt(notebookId, pr, audio);
     note(audio ? `Sent: ${pr.label}` : pr.send ? `Asked: ${pr.label}` : `${pr.label}: finish it in the chat`);
   };
   // Set each render below, for the touch handlers.
@@ -392,7 +392,8 @@ function Editor({ notebookId }: { notebookId: string }) {
     // Until the fingers spread or close by PINCH_DEAD_ZONE a two-finger drag only pans, so a pan
     // keeps the zoom exact; past it the scale carries on smoothly from 1.
     // `moved`: how far the point between the fingers has travelled, to tell a pan from a tap.
-    let pinch: { d0: number; zooming: boolean; start: PinchStart; placed: PinchPlacement | null; moved: number } | null = null;
+    // `ids`: the two fingers it follows; another pair means starting over from where they are.
+    let pinch: { ids: [number, number]; d0: number; zooming: boolean; start: PinchStart; placed: PinchPlacement | null; moved: number } | null = null;
     // Two or more fingers are or were down in this touch: its lifts are ours, not Safari's.
     let multi = false;
     // The finger drawing a lasso after a press and hold, by touch identifier.
@@ -470,11 +471,23 @@ function Editor({ notebookId }: { notebookId: string }) {
       const onPage = !!target.closest(".ink-surface") && !target.closest("textarea, input, [contenteditable]");
       gesture.start(points(fingers), performance.now(), onPage);
       if (fingers.length > 1) multi = true;
-      const start = fingers.length === 2 && !controller.isDrawing() ? measureZoom(mid(fingers[0], fingers[1])) : null;
-      if (start) {
-        const [a, b] = fingers;
-        pinch = { d0: dist(a, b), zooming: false, start, placed: null, moved: 0 };
-      }
+      if (fingers.length === 2 && !controller.isDrawing()) beginPinch(fingers[0], fingers[1]);
+    };
+
+    const beginPinch = (a: Touch, b: Touch) => {
+      const start = measureZoom(mid(a, b));
+      pinch = start ? { ids: [a.identifier, b.identifier], d0: dist(a, b), zooming: false, start, placed: null, moved: 0 } : null;
+    };
+    /** Ends the pinch where it is: the preview comes off and, if it really pinched or panned, lands. */
+    const endPinch = () => {
+      if (!pinch) return;
+      const { placed, start, zooming, moved } = pinch;
+      pinch = null;
+      const wrap = pinchRef.current;
+      if (wrap) wrap.style.transform = "";
+      // In the same frame the transform comes off, so the page never paints back at the old zoom.
+      // Fingers that only wobbled (a two-finger tap) leave the page where it was.
+      if (placed && (zooming || moved > gestureTuning.current.slop)) commitZoom(placed, start.zoom);
     };
 
     const onMove = (e: TouchEvent) => {
@@ -510,11 +523,19 @@ function Editor({ notebookId }: { notebookId: string }) {
       gesture.move(points(fingers));
       if (!pinch || fingers.length !== 2) return;
       e.preventDefault();
+      // A finger swapped mid-pinch: carry on from the new pair, not the old pair's distance.
+      if (!fingers.every((f) => pinch!.ids.includes(f.identifier))) {
+        endPinch();
+        beginPinch(fingers[0], fingers[1]);
+        if (!pinch) return;
+      }
       const [a, b] = fingers;
       const d = dist(a, b);
       if (!pinch.zooming && Math.abs(d / pinch.d0 - 1) > PINCH_DEAD_ZONE) {
         pinch.zooming = true;
         pinch.d0 = d;
+        // Zooming: this touch is no longer a two-finger tap (which would undo).
+        gesture.consume();
       }
       const { start } = pinch;
       const m = mid(a, b);
@@ -531,15 +552,7 @@ function Editor({ notebookId }: { notebookId: string }) {
 
     const onEnd = (e: TouchEvent) => {
       const fingers = direct(e.touches);
-      if (pinch && fingers.length < 2) {
-        const { placed, start, zooming, moved } = pinch;
-        pinch = null;
-        const wrap = pinchRef.current;
-        if (wrap) wrap.style.transform = "";
-        // In the same frame the transform comes off, so the page never paints back at the old zoom.
-        // Fingers that only wobbled (a two-finger tap) leave the page where it was.
-        if (placed && (zooming || moved > gestureTuning.current.slop)) commitZoom(placed, start.zoom);
-      }
+      if (pinch && fingers.length < 2) endPinch();
       // Two quick two-finger taps look to Safari like a double tap, which it answers by scrolling
       // the tapped section to the top of the screen. Taking the lifts of a multi-finger touch for
       // ourselves stops that; there is no click to lose, as more than one finger never makes one.

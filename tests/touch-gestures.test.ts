@@ -167,6 +167,14 @@ describe("touch gestures", () => {
     expect(fired).toEqual(["fingerDoubleTap"]);
   });
 
+  it("is not a two-finger tap once a pinch has taken it, however quick", () => {
+    const { r, fired, fingers } = setup();
+    r.start(fingers(2), 0, true);
+    r.consume();
+    r.end([], 60);
+    expect(fired).toEqual([]);
+  });
+
   it("counts nothing when the system cancels the touches", () => {
     const { r, fired, fingers } = setup();
     r.start(fingers(4), 0, true);

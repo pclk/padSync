@@ -198,11 +198,12 @@ export function ToolCircle(p: Props) {
           </div>
         );
       })}
-      {tools.fan && <RadialFan fan={tools.fan} label="Tools" onPick={(item) => { p.selectTool(item.key as ToolKind); tools.close(); }} onClose={tools.close} />}
+      {tools.fan && <RadialFan fan={tools.fan} label="Tools" keep='[data-circle="tools"]' onPick={(item) => { p.selectTool(item.key as ToolKind); tools.close(); }} onClose={tools.close} />}
       {prompts.fan && (
         <RadialFan
           fan={prompts.fan}
           label="Chat prompts"
+          keep='[data-circle="prompts"]'
           onPick={(item) => {
             prompts.close();
             const pr = p.prompts.find((x) => x.id === item.key);

@@ -1,4 +1,5 @@
 import type { Box } from "@/ink/geometry";
+import { PAGE_WIDTH } from "@/lib/types";
 import { MAX_BUNDLE_BYTES, pickSections, type ContextOptions, type Raster, type SectionInput, type SelectionInput } from "./context";
 import { sectionPng, type RenderOmit } from "./export";
 import { db } from "./db";
@@ -76,6 +77,9 @@ export async function addRenders(inputs: SectionInput[], sections: SectionEntity
 /** The render cropped to the lasso box (plus a margin), so a selection shows its context. */
 export async function cropSelection(section: SectionEntity, el: HTMLElement, box: Box, scale = 2, omit: RenderOmit = {}): Promise<Raster> {
   const full = await createImageBitmap(await sectionPng(section, el, scale, omit));
+  // A tall section comes back smaller than asked (the renderer caps a side at 16,384 px), so map
+  // page units by the bitmap's actual scale, not the requested one.
+  scale = full.width / PAGE_WIDTH;
   const pad = 24;
   const x0 = Math.max(0, Math.floor((box.minX - pad) * scale));
   const y0 = Math.max(0, Math.floor((box.minY - pad) * scale));

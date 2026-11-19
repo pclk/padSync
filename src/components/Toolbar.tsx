@@ -454,6 +454,8 @@ function PromptButton({ prompts, onPrompt, onEmpty }: { prompts: ChatPrompt[]; o
         <RadialFan
           fan={press.fan}
           label="Chat prompts"
+          // The whole rail: its near-miss taps reach this button only on release.
+          keep="[data-tap-zone]"
           onPick={(item) => {
             press.close();
             pick(item.key);

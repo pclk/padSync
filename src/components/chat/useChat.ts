@@ -68,6 +68,11 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
   const [loadedId, setLoadedId] = useState("");
   const [error, setError] = useState("");
   const [draft, setDraft] = useState(() => readDraft(""));
+  // The draft as typed now, which a send that took a while compares with what it sent.
+  const draftNow = useRef(draft);
+  useEffect(() => {
+    draftNow.current = draft;
+  }, [draft]);
   const [busy, setBusy] = useState(false);
   const [seen, setSeen] = useState<Record<string, string>>(() =>
     readStored("padsync.chat.seen", {}),
@@ -293,7 +298,9 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
     if (thread)
       run(async () => {
         const data = await api.updateThread(thread.id, input);
-        setThread(data.thread);
+        // Switched to another chat meanwhile: this one's reply mustn't become the open chat,
+        // or the next message would go to it.
+        if (selected.current === data.thread.id) setThread(data.thread);
       });
   };
   const settings = thread
@@ -414,8 +421,11 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
       });
       markLocal(sent.turn.jobId, "client.response");
       await api.uploadTurnInputs(sent.turn.jobId, inputs, onProgress);
-      if (selected.current === target.id) setDraft("");
-      writeDraft(target.id, "");
+      // Clears the box only if it still holds what was sent: not a draft typed during a slow
+      // upload, nor one a toolbar prompt (which sends its own text) found there.
+      const sentText = text.trim();
+      if (selected.current === target.id && draftNow.current.trim() === sentText) setDraft("");
+      if (readDraft(target.id).trim() === sentText) writeDraft(target.id, "");
       refresh();
     } finally {
       setBusy(false);

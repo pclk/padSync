@@ -89,6 +89,56 @@ export function pointInPolygon(x: number, y: number, poly: number[][]) {
   return inside;
 }
 
+/** Page units between the lasso points kept for testing. */
+const LASSO_STEP = 2;
+/** The most points of one stroke tested against the lasso. */
+const SAMPLES = 24;
+
+/**
+ * An inside test for a closed loop, precomputed as scanlines one page unit apart: where the loop
+ * crosses each row, so a point costs a row lookup and a binary search instead of a pass over
+ * every edge. Exact to within a page unit vertically, which a finger-drawn lasso can't tell apart.
+ */
+function loopTester(poly: number[][], minY: number, maxY: number) {
+  const rows: Float64Array[] = [];
+  const h = Math.ceil(maxY - minY) + 1;
+  for (let r = 0; r < h; r++) {
+    const y = minY + r + 0.5;
+    const xs: number[] = [];
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, yi] = poly[i], [xj, yj] = poly[j];
+      if (yi > y !== yj > y) xs.push(((xj - xi) * (y - yi)) / (yj - yi) + xi);
+    }
+    rows.push(Float64Array.from(xs).sort());
+  }
+  return (x: number, y: number) => {
+    const row = rows[Math.floor(y - minY)];
+    if (!row) return false;
+    // Inside when an odd number of crossings lie to the left.
+    let lo = 0, hi = row.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (row[mid] < x) lo = mid + 1;
+      else hi = mid;
+    }
+    return (lo & 1) === 1;
+  };
+}
+
+/** `path` with points closer than `step` to the last kept one dropped; the last point always kept. */
+export function thinPath(path: number[][], step: number): number[][] {
+  if (path.length < 3) return path;
+  const out = [path[0]];
+  const s2 = step * step;
+  for (let i = 1; i < path.length - 1; i++) {
+    const [x, y] = path[i];
+    const [px, py] = out[out.length - 1];
+    if ((x - px) ** 2 + (y - py) ** 2 >= s2) out.push(path[i]);
+  }
+  out.push(path[path.length - 1]);
+  return out;
+}
+
 /**
  * How a lasso picks strokes: "touch" takes any stroke it reaches (a point inside, or its line
  * running over the stroke's ink); "enclose" only those with at least half their points inside.
@@ -96,7 +146,10 @@ export function pointInPolygon(x: number, y: number, poly: number[][]) {
 export type LassoMode = "touch" | "enclose";
 
 /** The strokes a lasso drawn along `poly` (closed back to its start) selects. */
-export function lassoStrokes(strokes: StrokeEntity[], poly: number[][], mode: LassoMode = "enclose"): StrokeEntity[] {
+export function lassoStrokes(strokes: StrokeEntity[], drawn: number[][], mode: LassoMode = "enclose"): StrokeEntity[] {
+  // Every sample tests against every edge, so a long lasso (hundreds of touch samples) made lifting
+  // slow on a full page. Points closer than this to the last kept one change nothing visible.
+  const poly = thinPath(drawn, LASSO_STEP);
   if (poly.length < 3) return [];
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const [x, y] of poly) {
@@ -105,24 +158,38 @@ export function lassoStrokes(strokes: StrokeEntity[], poly: number[][], mode: La
     if (y < minY) minY = y;
     if (y > maxY) maxY = y;
   }
+  const inLoop = loopTester(poly, minY, maxY);
+  // Each edge's bounds, so the line test skips edges nowhere near a stroke.
+  const edges: Box[] = [];
+  for (let k = 1; k < poly.length; k++) {
+    const [ax, ay] = poly[k - 1], [bx, by] = poly[k];
+    edges.push({ minX: Math.min(ax, bx), minY: Math.min(ay, by), maxX: Math.max(ax, bx), maxY: Math.max(ay, by) });
+  }
   return strokes.filter((s) => {
     // Strokes clear of the lasso's bounds (and, touching, its line's reach) can't be picked.
     const b = strokeBox(s);
     const reach = mode === "touch" ? s.data.size / 2 : 0;
     if (b.maxX < minX - reach || b.minX > maxX + reach || b.maxY < minY - reach || b.minY > maxY + reach) return false;
+    // At most SAMPLES points, evenly spaced: enough for the inside share, and a stroke only partly
+    // inside is caught by the line test anyway. Long strokes no longer cost a test per sample.
     const p = s.data.pts;
+    const n = p.length / STROKE_STRIDE;
+    const every = Math.max(1, Math.floor(n / SAMPLES));
     let inside = 0, total = 0;
-    for (let i = 0; i < p.length; i += STROKE_STRIDE) {
+    for (let j = 0; j < n; j += every) {
+      const i = j * STROKE_STRIDE;
       total++;
-      if (pointInPolygon(p[i], p[i + 1], poly)) {
+      if (inLoop(p[i], p[i + 1])) {
         if (mode === "touch") return true;
         inside++;
       }
     }
     if (mode === "enclose") return total > 0 && inside / total >= 0.5;
     // The line as drawn (not the closing edge back to the start) crossing or grazing the ink.
-    for (let k = 1; k < poly.length; k++) {
-      if (hitStrokes([s], poly[k - 1][0], poly[k - 1][1], poly[k][0], poly[k][1], 0).length) return true;
+    for (let k = 0; k < edges.length; k++) {
+      const e = edges[k];
+      if (e.maxX < b.minX - reach || e.minX > b.maxX + reach || e.maxY < b.minY - reach || e.minY > b.maxY + reach) continue;
+      if (hitStrokes([s], poly[k][0], poly[k][1], poly[k + 1][0], poly[k + 1][1], 0).length) return true;
     }
     return false;
   });

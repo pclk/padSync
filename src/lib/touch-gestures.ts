@@ -282,6 +282,14 @@ export class GestureRecognizer {
     if (p.n === 2) this.emit("twoTap", p.at);
   }
 
+  /** Something else took this touch (a pinch started zooming): it is no longer a tap or a hold. */
+  consume() {
+    const c = this.contact;
+    if (!c) return;
+    c.moved = true;
+    this.stopHold(c);
+  }
+
   /** The system took the touches (touchcancel): whatever they were doing counts for nothing. */
   cancel() {
     if (this.contact) this.stopHold(this.contact);

@@ -530,66 +530,66 @@ export class InkController {
 
   /** Gives the selected strokes one colour, as one undoable step. */
   recolorSelection(color: string) {
-    return this.restyleSelection("recolour", (d) => ({ ...d, color }));
+    return this.restyleSelection("recolour", () => ({ color }));
   }
 
   /**
    * Scales the selection by `k` about its centre, line widths too, as one undoable step. A box
    * that would cross the page's left, right or top edge is moved back onto the page.
    */
-  scaleSelection(k: number) {
+  scaleSelection(factor: number) {
     const sel = this.selection;
     if (!sel) return;
+    // Never wider than the page: past that the ink would be clipped wherever it was moved.
+    const width = sel.box.maxX - sel.box.minX;
+    const k = factor > 1 && width > 0 ? Math.max(1, Math.min(factor, PAGE_WIDTH / width)) : factor;
+    if (k === 1) return;
     const cx = (sel.box.minX + sel.box.maxX) / 2;
     const cy = (sel.box.minY + sel.box.maxY) / 2;
     const scaled = { minX: cx + (sel.box.minX - cx) * k, maxX: cx + (sel.box.maxX - cx) * k, minY: cy + (sel.box.minY - cy) * k, maxY: cy + (sel.box.maxY - cy) * k };
     const dx = scaled.minX < 0 ? -scaled.minX : scaled.maxX > PAGE_WIDTH ? Math.max(-scaled.minX, PAGE_WIDTH - scaled.maxX) : 0;
     const dy = scaled.minY < 0 ? -scaled.minY : 0;
-    return this.restyleSelection(
-      k > 1 ? "enlarge" : "shrink",
-      (d) => {
-        const pts = d.pts.slice();
-        for (let i = 0; i < pts.length; i += STROKE_STRIDE) {
-          pts[i] = cx + (pts[i] - cx) * k + dx;
-          pts[i + 1] = cy + (pts[i + 1] - cy) * k + dy;
-        }
-        return { ...d, pts, size: d.size * k };
-      },
-      shift(scaled, dx, dy),
-    );
+    return this.restyleSelection(k > 1 ? "enlarge" : "shrink", (d) => {
+      const pts = d.pts.slice();
+      for (let i = 0; i < pts.length; i += STROKE_STRIDE) {
+        pts[i] = cx + (pts[i] - cx) * k + dx;
+        pts[i + 1] = cy + (pts[i + 1] - cy) * k + dy;
+      }
+      return { pts, size: d.size * k };
+    });
   }
 
-  /** Rewrites the selected strokes' data as one undoable step, the selection box becoming `box`. */
-  private async restyleSelection(label: string, change: (d: StrokeData) => StrokeData, box?: Box) {
+  /**
+   * Changes some fields of the selected strokes (`patchOf` returns just those) as one undoable
+   * step. Undo and redo touch only those fields, and only on strokes that still hold what the step
+   * left: an edit made since (a move synced from the Mac, say) is kept, not rolled back.
+   */
+  private async restyleSelection(label: string, patchOf: (d: StrokeData) => Partial<StrokeData>) {
     const sel = this.selection;
     if (!sel || !this.persist) return;
     const rows = (await db.entities.bulkGet([...sel.ids])).filter((r): r is StrokeEntity => !!r && !r.deleted);
     if (!rows.length) return;
-    const before = new Map(rows.map((r) => [r.id, r.data]));
-    const after = new Map(rows.map((r) => [r.id, change(r.data)]));
-    const write = async (data: Map<string, StrokeData>) => {
-      const now = (await db.entities.bulkGet([...data.keys()])).filter(Boolean) as StrokeEntity[];
-      await putEntities(now.map((r) => ({ ...r, data: data.get(r.id)! })));
+    const after = new Map(rows.map((r) => [r.id, patchOf(r.data)]));
+    const before = new Map(rows.map((r) => [r.id, pick(r.data, Object.keys(after.get(r.id)!) as (keyof StrokeData)[])]));
+    const apply = async (from: Map<string, Partial<StrokeData>>, to: Map<string, Partial<StrokeData>>) => {
+      const now = (await db.entities.bulkGet([...to.keys()])).filter((r): r is StrokeEntity => !!r && holds((r as StrokeEntity).data, from.get(r.id)!));
+      if (now.length) await putEntities(now.map((r) => ({ ...r, data: { ...r.data, ...to.get(r.id)! } })));
+      await this.refreshSelectionBox();
     };
-    await write(after);
-    if (box && this.selection?.ids === sel.ids) this.setSelection({ ...sel, box });
+    await apply(before, after);
     emitActivity({ notebookId: this.notebookId, source: "local", kinds: ["stroke"], at: Date.now() });
-    // The box follows a resize back and forth while those strokes are still the selection.
-    const frame = (b: Box) => {
-      if (box && this.selection && [...this.selection.ids].every((id) => sel.ids.has(id))) this.setSelection({ ...this.selection, box: b });
-    };
-    this.undo.push({
-      label,
-      undo: async () => {
-        await write(before);
-        frame(sel.box);
-      },
-      redo: async () => {
-        await write(after);
-        if (box) frame(box);
-      },
-    });
+    this.undo.push({ label, undo: () => apply(after, before), redo: () => apply(before, after) });
     void logEvent(this.notebookId, sel.sectionId, `lasso_${label}`, { ids: [...sel.ids] });
+  }
+
+  /** Fits the selection box to its strokes as stored now, after an edit, undo or redo moved them. */
+  private async refreshSelectionBox() {
+    const sel = this.selection;
+    if (!sel) return;
+    const rows = (await db.entities.bulkGet([...sel.ids])).filter((r): r is StrokeEntity => !!r && !r.deleted);
+    const box = unionBox(rows.map((r) => dataBox(r.data)));
+    // Only if it is still the same selection once the rows have been read.
+    if (box && this.selection === sel) this.setSelection({ ...sel, box });
   }
 
   private addPoints(g: Extract<Gesture, { type: "ink" }>, evs: InkPointer[]) {
@@ -672,9 +672,11 @@ export class InkController {
     this.cb.onDragging(null);
     if (sel) this.setSelection({ ...sel, box: shift(sel.box, dx, dy) });
     const ids = strokes.map((s) => s.id);
+    // The selection box follows the ink back and forth, if those strokes are still selected.
     const current = async (ddx: number, ddy: number) => {
       const rows = (await db.entities.bulkGet(ids)).filter(Boolean) as StrokeEntity[];
       await moveStrokes(rows, ddx, ddy);
+      await this.refreshSelectionBox();
     };
     emitActivity({ notebookId: this.notebookId, source: "local", kinds: ["stroke"], at: Date.now() });
     this.undo.push({ label: "move", undo: () => current(-dx, -dy), redo: () => current(dx, dy) });
@@ -789,6 +791,17 @@ function inBox(b: Box, x: number, y: number, pad: number) {
 
 /** How far a duplicate lands from its original, down and to the right (page units). */
 const DUPLICATE_OFFSET = 24;
+
+function pick<T extends object>(o: T, keys: (keyof T)[]): Partial<T> {
+  const out: Partial<T> = {};
+  for (const k of keys) out[k] = o[k];
+  return out;
+}
+
+/** Whether `d` still has every field as in `fields`. */
+function holds(d: StrokeData, fields: Partial<StrokeData>) {
+  return (Object.keys(fields) as (keyof StrokeData)[]).every((k) => JSON.stringify(d[k]) === JSON.stringify(fields[k]));
+}
 
 function shiftPts(src: number[], dx: number, dy: number) {
   const pts = src.slice();

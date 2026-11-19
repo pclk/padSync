@@ -127,9 +127,11 @@ export function useFanPress(o: { open: () => FanState | null; onPick: (item: Fan
  * The fanned-out items. While a finger points it only shows; once sticky its items can be tapped.
  * Portalled to the body: a toolbar's backdrop blur would otherwise be what `fixed` is relative to.
  */
-export function RadialFan({ fan, label, onPick, onClose }: { fan: FanState; label: string; onPick: (item: FanItem) => void; onClose: () => void }) {
+export function RadialFan({ fan, label, onPick, onClose, keep = NOTHING }: { fan: FanState; label: string; onPick: (item: FanItem) => void; onClose: () => void; keep?: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  useDismiss(ref, fan.sticky ? onClose : noop, "[data-tap-zone]");
+  // `keep`: the circle that opened it, which toggles it itself. A press anywhere else, another
+  // circle included, closes it, so two fans are never open together.
+  useDismiss(ref, fan.sticky ? onClose : noop, keep);
   useEffect(() => {
     if (!fan.sticky) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -174,3 +176,5 @@ export function RadialFan({ fan, label, onPick, onClose }: { fan: FanState; labe
   );
 }
 const noop = () => {};
+/** A selector nothing matches: a fan opened by a gesture closes on any press outside it. */
+const NOTHING = "[data-never]";

@@ -29,15 +29,15 @@ describe("chat prompts", () => {
   it("hands a picked prompt to the chat once, even if the chat mounts later or is busy", () => {
     const events: string[] = [];
     vi.stubGlobal("window", { dispatchEvent: (e: Event) => events.push(e.type) });
-    queuePrompt(DEFAULT_PROMPTS[0]);
+    queuePrompt("nb", DEFAULT_PROMPTS[0]);
     expect(events).toEqual([PROMPT_EVENT]);
     // A busy composer looks without taking, and takes it once free.
-    expect(peekPrompt()).toEqual({ prompt: DEFAULT_PROMPTS[0] });
-    expect(takePrompt()).toEqual({ prompt: DEFAULT_PROMPTS[0] });
-    expect(takePrompt()).toBe(null);
+    expect(peekPrompt("nb")).toEqual({ prompt: DEFAULT_PROMPTS[0], notebookId: "nb" });
+    expect(takePrompt("nb")).toEqual({ prompt: DEFAULT_PROMPTS[0], notebookId: "nb" });
+    expect(takePrompt("nb")).toBe(null);
     const audio = new Blob(["x"], { type: "audio/webm" });
-    queuePrompt(DEFAULT_PROMPTS[0], audio);
-    expect(takePrompt()?.audio).toBe(audio);
+    queuePrompt("nb", DEFAULT_PROMPTS[0], audio);
+    expect(takePrompt("nb")?.audio).toBe(audio);
   });
 
   it("keeps each prompt's context and voice choice, a voice prompt always sending", () => {
@@ -199,11 +199,23 @@ describe("editing prompts", () => {
 describe("prompt queue", () => {
   it("keeps every prompt picked while the chat is busy, in order", () => {
     vi.stubGlobal("window", { dispatchEvent: () => true });
-    queuePrompt(DEFAULT_PROMPTS[0]);
-    queuePrompt(DEFAULT_PROMPTS[1]);
-    expect(peekPrompt()?.prompt.id).toBe(DEFAULT_PROMPTS[0].id);
-    expect(takePrompt()?.prompt.id).toBe(DEFAULT_PROMPTS[0].id);
-    expect(takePrompt()?.prompt.id).toBe(DEFAULT_PROMPTS[1].id);
-    expect(takePrompt()).toBe(null);
+    queuePrompt("nb", DEFAULT_PROMPTS[0]);
+    queuePrompt("nb", DEFAULT_PROMPTS[1]);
+    expect(peekPrompt("nb")?.prompt.id).toBe(DEFAULT_PROMPTS[0].id);
+    expect(takePrompt("nb")?.prompt.id).toBe(DEFAULT_PROMPTS[0].id);
+    expect(takePrompt("nb")?.prompt.id).toBe(DEFAULT_PROMPTS[1].id);
+    expect(takePrompt("nb")).toBe(null);
+  });
+});
+
+describe("prompts stay with their notebook", () => {
+  it("never hands a prompt picked in one notebook to another's chat", () => {
+    vi.stubGlobal("window", { dispatchEvent: () => true });
+    queuePrompt("a", DEFAULT_PROMPTS[0]);
+    expect(peekPrompt("b")).toBe(null);
+    // Picking one in b drops what a left behind.
+    queuePrompt("b", DEFAULT_PROMPTS[1]);
+    expect(takePrompt("a")).toBe(null);
+    expect(takePrompt("b")?.prompt.id).toBe(DEFAULT_PROMPTS[1].id);
   });
 });
