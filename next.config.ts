@@ -11,7 +11,8 @@ const nextConfig: NextConfig = {
       const files = await readdir(root, { recursive: true, withFileTypes: true });
       const assets = files.filter(file => file.isFile() && !file.name.endsWith(".map"))
         .map(file => path.relative(root, path.join(file.parentPath, file.name)).split(path.sep).join("/"))
-        .filter(file => file.startsWith("chunks/") || file.startsWith("media/"))
+        // Vercel places content-addressed files under static/immutable/. Keep that prefix in the URL.
+        .filter(file => /^(?:immutable\/)?(?:chunks|media)\//.test(file))
         .map(file => "/_next/static/" + file).sort();
       if (!assets.some(file => file.endsWith(".js"))) throw new Error("Missing offline app chunks");
       const manifest = { cache: "padsync-build-" + randomUUID(), assets };
