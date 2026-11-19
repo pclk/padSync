@@ -1,35 +1,46 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_GESTURES,
-  DOUBLE_MS,
+  DEFAULT_TUNING,
   GestureRecognizer,
-  HOLD_MS,
-  PENCIL_QUIET_MS,
-  TAP_MS,
+  actionsFor,
   normalizeGestures,
+  normalizeTuning,
+  type GestureAt,
   type GestureBindings,
   type GestureKind,
+  type GestureTuning,
   type TouchPoint,
 } from "@/lib/touch-gestures";
 
+const { tapMs: TAP_MS, doubleMs: DOUBLE_MS, holdMs: HOLD_MS, pencilQuietMs: PENCIL_QUIET_MS } = DEFAULT_TUNING;
+
 // A recognizer on a fake clock: timers run when the clock passes them.
-function setup(bindings: Partial<GestureBindings> = {}) {
-  const b = { ...DEFAULT_GESTURES, ...bindings };
+function setup(bindings: Partial<GestureBindings> = {}, tuning: Partial<GestureTuning> = {}) {
+  const b = { ...DEFAULT_GESTURES, fingerHold: "none", ...bindings } as GestureBindings;
+  const t = { ...DEFAULT_TUNING, ...tuning };
   const fired: GestureKind[] = [];
+  const at: GestureAt[] = [];
+  const holds: string[] = [];
   let now = 0;
   let timers: { at: number; fn: () => void; id: number }[] = [];
   let next = 0;
-  const r = new GestureRecognizer(
-    (g) => fired.push(g),
-    (g) => b[g] !== "none",
-    {
+  const r = new GestureRecognizer({
+    emit: (g, where) => {
+      fired.push(g);
+      at.push(where);
+    },
+    isBound: (g) => b[g] !== "none",
+    tuning: () => t,
+    onHold: (state) => holds.push(state),
+    timers: {
       set: (fn, ms) => {
         timers.push({ at: now + ms, fn, id: ++next });
         return next;
       },
-      clear: (id) => (timers = timers.filter((t) => t.id !== id)),
+      clear: (id) => (timers = timers.filter((x) => x.id !== id)),
     },
-  );
+  });
   const advance = (ms: number) => {
     now += ms;
     for (const t of timers.filter((t) => t.at <= now)) {
@@ -44,7 +55,7 @@ function setup(bindings: Partial<GestureBindings> = {}) {
     advance(ms);
     r.end([], now);
   };
-  return { r, fired, advance, tap, fingers, now: () => now };
+  return { r, fired, at, holds, advance, tap, fingers, now: () => now };
 }
 
 describe("touch gestures", () => {
@@ -141,6 +152,57 @@ describe("touch gestures", () => {
     r.cancel();
     r.end([], 50);
     expect(fired).toEqual([]);
+  });
+
+  it("holds as long as the tuning says, ringing while it counts down, and reports where", () => {
+    const { r, fired, at, holds, advance, fingers, now } = setup({ fingerHold: "lassoHold" }, { holdMs: 900 });
+    r.start(fingers(1, 220), now(), true);
+    advance(600);
+    expect(fired).toEqual([]);
+    advance(310);
+    expect(fired).toEqual(["fingerHold"]);
+    expect(at[0]).toEqual({ id: 0, x: 220, y: 100 });
+    // Once held, moving (drawing the lasso) and lifting change nothing more.
+    r.move(fingers(1, 400));
+    r.end([], now());
+    expect(fired).toEqual(["fingerHold"]);
+    expect(holds).toEqual(["start"]);
+  });
+
+  it("stops the hold ring when the finger moves past the stillness setting, not before", () => {
+    const { r, fired, holds, advance, fingers, now } = setup({ fingerHold: "lassoHold" }, { slop: 20 });
+    r.start(fingers(1), now(), true);
+    r.move(fingers(1, 115));
+    expect(holds).toEqual(["start"]);
+    r.move(fingers(1, 125));
+    expect(holds).toEqual(["start", "stop"]);
+    advance(HOLD_MS + 10);
+    r.end([], now());
+    expect(fired).toEqual([]);
+  });
+
+  it("uses the tuned tap length, double-tap speed and palm guard, clamped to their ranges", () => {
+    const { fired, tap, advance, r, now } = setup({ twoDoubleTap: "undo", fingerDoubleTap: "redo" }, { tapMs: 150, doubleMs: 500, pencilQuietMs: 0 });
+    tap(3, { ms: 160 });
+    expect(fired).toEqual([]);
+    tap(2);
+    advance(350);
+    tap(2);
+    expect(fired).toEqual(["twoDoubleTap"]);
+    // Palm guard off: a finger double tap right after the Pencil counts.
+    r.pencil(now());
+    advance(1);
+    tap(1);
+    tap(1);
+    expect(fired).toEqual(["twoDoubleTap", "fingerDoubleTap"]);
+    expect(normalizeTuning({ holdMs: 99999, slop: -3, showNote: false })).toEqual({ ...DEFAULT_TUNING, holdMs: 1500, slop: 4, showNote: false });
+  });
+
+  it("offers Lasso while held only for press and hold, and makes it the default there", () => {
+    expect(DEFAULT_GESTURES.fingerHold).toBe("lassoHold");
+    expect(actionsFor("fingerHold").map((a) => a.action)).toContain("lassoHold");
+    expect(actionsFor("twoTap").map((a) => a.action)).not.toContain("lassoHold");
+    expect(normalizeGestures({ twoTap: "lassoHold" }).twoTap).toBe("undo");
   });
 
   it("fills in stored bindings and drops unknown actions", () => {

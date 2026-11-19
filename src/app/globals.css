@@ -649,3 +649,30 @@ pre,
     background: var(--color-brand-50);
   }
 }
+
+/* The ring that fills under a finger while a press and hold counts down (NotebookEditor). It fades
+   in after a moment, so a finger that is only starting to scroll doesn't flash it. */
+.hold-ring {
+  opacity: 0;
+  animation: hold-ring-show 120ms linear 100ms forwards;
+}
+.hold-ring circle:last-child {
+  stroke-dashoffset: 151;
+  animation: hold-ring-fill var(--hold-ms, 500ms) linear forwards;
+}
+@keyframes hold-ring-show {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes hold-ring-fill {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hold-ring circle:last-child {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}

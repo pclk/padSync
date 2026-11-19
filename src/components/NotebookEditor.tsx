@@ -18,8 +18,8 @@ import { PAGE_WIDTH, type NotebookEntity, type PresenceData, type PresenceEntity
 import { SectionView } from "./SectionView";
 import { SidePanel } from "./SidePanel";
 import { Toolbar } from "./Toolbar";
-import { GestureRecognizer, actionLabel, type GestureKind, type TouchPoint } from "@/lib/touch-gestures";
-import { useGestureBindings } from "@/lib/settings";
+import { GestureRecognizer, actionLabel, type GestureAction, type GestureKind, type TouchPoint } from "@/lib/touch-gestures";
+import { useGestureBindings, useGestureTuning } from "@/lib/settings";
 import { DEFAULT_RAIL, normalizeRail, type RailLayout } from "@/lib/rail-layout";
 import { Icon } from "./Icons";
 
@@ -296,14 +296,23 @@ function Editor({ notebookId }: { notebookId: string }) {
 
   // --- finger gestures (taps, double taps, press and hold), each doing what Settings says ----
   const [gestures] = useGestureBindings();
+  const [tuning] = useGestureTuning();
   const [gestureNote, setGestureNote] = useState<{ text: string; n: number } | null>(null);
+  // The ring that fills under a finger while a press and hold counts down. Its own component and
+  // store, so a finger starting to scroll doesn't re-render the editor.
+  const holdRing = useMemo(() => new HoldRingStore(), []);
   const runGesture = useRef<(g: GestureKind) => void>(() => {});
   const gestureBound = useRef<(g: GestureKind) => boolean>(() => false);
+  const gestureAction = useRef<(g: GestureKind) => GestureAction>(() => "none");
+  const gestureTuning = useRef(tuning);
+  const note = useCallback((text: string) => setGestureNote((prev) => (gestureTuning.current.showNote ? { text, n: (prev?.n ?? 0) + 1 } : null)), []);
   useLayoutEffect(() => {
     gestureBound.current = (g) => gestures[g] !== "none";
+    gestureAction.current = (g) => gestures[g];
+    gestureTuning.current = tuning;
     runGesture.current = (g) => {
       const action = gestures[g];
-      if (action === "none") return;
+      if (action === "none" || action === "lassoHold") return;
       if (action === "undo") void undo();
       else if (action === "redo") void redo();
       else if (action === "previousTool") setTool({ ...tool, kind: previousKind.current === tool.kind ? "pen" : previousKind.current });
@@ -312,7 +321,7 @@ function Editor({ notebookId }: { notebookId: string }) {
       else setTool({ ...tool, kind: action.slice(5) as ToolState["kind"] });
       // A short note of what the gesture did, so a stray tap is noticed.
       const text = action === "previousTool" ? actionLabel(`tool:${previousKind.current === tool.kind ? "pen" : previousKind.current}`) : actionLabel(action);
-      setGestureNote((prev) => ({ text, n: (prev?.n ?? 0) + 1 }));
+      note(text);
     };
   });
   useEffect(() => {
@@ -327,10 +336,29 @@ function Editor({ notebookId }: { notebookId: string }) {
     // Until the fingers spread or close by PINCH_DEAD_ZONE a two-finger drag only pans, so a pan
     // keeps the zoom exact; past it the scale carries on smoothly from 1.
     let pinch: { d0: number; zooming: boolean; start: PinchStart; placed: PinchPlacement | null } | null = null;
-    const gesture = new GestureRecognizer(
-      (g) => runGesture.current(g),
-      (g) => gestureBound.current(g),
-    );
+    // The finger drawing a lasso after a press and hold, by touch identifier.
+    let lassoFinger: number | null = null;
+    const gesture = new GestureRecognizer({
+      emit: (g, at) => {
+        if (g === "fingerHold") holdRing.set(null);
+        if (g === "fingerHold" && gestureAction.current(g) === "lassoHold") {
+          if (controller.beginFingerLasso(at.x, at.y)) {
+            lassoFinger = at.id;
+            note("Lasso");
+          }
+          return;
+        }
+        runGesture.current(g);
+      },
+      isBound: (g) => gestureBound.current(g),
+      tuning: () => gestureTuning.current,
+      onHold: (state, at) => holdRing.set(state === "start" ? { x: at.x, y: at.y, n: performance.now() } : null),
+    });
+    const endLasso = (cancel: boolean) => {
+      if (lassoFinger === null) return;
+      lassoFinger = null;
+      controller.endFingerLasso(cancel);
+    };
     const points = (list: Touch[]): TouchPoint[] => list.map((t) => ({ id: t.identifier, x: t.clientX, y: t.clientY }));
 
     const direct = (list: TouchList) => [...list].filter((t) => t.touchType !== "stylus");
@@ -345,8 +373,11 @@ function Editor({ notebookId }: { notebookId: string }) {
         return;
       }
       const fingers = direct(e.touches);
-      // One-finger gestures count on the page, not on its controls or in a text box being typed in.
-      const onPage = !!target.closest(".ink-surface, .ink-grab") && !target.closest("textarea, input, [contenteditable]");
+      // A second finger while lassoing means a pinch or pan, not a selection: drop the lasso.
+      if (lassoFinger !== null && fingers.length > 1) endLasso(true);
+      // One-finger gestures count on the page, not on its controls, a selection (a finger drags
+      // that) or a text box being typed in.
+      const onPage = !!target.closest(".ink-surface") && !target.closest("textarea, input, [contenteditable]");
       gesture.start(points(fingers), performance.now(), onPage);
       const start = fingers.length === 2 && !controller.isDrawing() ? measureZoom(mid(fingers[0], fingers[1])) : null;
       if (start) {
@@ -361,6 +392,15 @@ function Editor({ notebookId }: { notebookId: string }) {
         return;
       }
       const fingers = direct(e.touches);
+      if (lassoFinger !== null) {
+        const f = fingers.find((t) => t.identifier === lassoFinger);
+        if (f) {
+          // The held finger draws the lasso; the page must not scroll under it.
+          e.preventDefault();
+          controller.extendFingerLasso(f.clientX, f.clientY);
+          return;
+        }
+      }
       gesture.move(points(fingers));
       if (!pinch || fingers.length !== 2) return;
       e.preventDefault();
@@ -391,6 +431,8 @@ function Editor({ notebookId }: { notebookId: string }) {
         // In the same frame the transform comes off, so the page never paints back at the old zoom.
         if (placed) commitZoom(placed, start.zoom);
       }
+      // Lifting the lasso finger selects what it circled.
+      if (lassoFinger !== null && !fingers.some((t) => t.identifier === lassoFinger)) endLasso(false);
       if (e.type === "touchcancel") gesture.cancel();
       else gesture.end(points(fingers), performance.now());
     };
@@ -406,8 +448,9 @@ function Editor({ notebookId }: { notebookId: string }) {
       window.removeEventListener("touchend", onEnd);
       window.removeEventListener("touchcancel", onEnd);
       gesture.dispose();
+      endLasso(true);
     };
-  }, [controller, measureZoom, commitZoom]);
+  }, [controller, measureZoom, commitZoom, note, holdRing]);
 
   // --- keyboard (Mac) ---------------------------------------------------------------------
   useEffect(() => {
@@ -691,6 +734,7 @@ function Editor({ notebookId }: { notebookId: string }) {
       </div>
 
       <canvas ref={liveRef} className="pointer-events-none fixed left-0 top-0 z-30" />
+      <HoldRing store={holdRing} holdMs={tuning.holdMs} />
       <div aria-live="polite" className="pointer-events-none fixed inset-x-0 top-[4.25rem] z-50 flex justify-center">
         {gestureNote && <span key={gestureNote.n} className="rounded-full bg-slate-900/80 px-3 py-1 text-sm font-medium text-white shadow-lift">{gestureNote.text}</span>}
       </div>
@@ -729,4 +773,41 @@ function useViewport() {
     return () => window.removeEventListener("resize", update);
   }, []);
   return size;
+}
+
+type Ring = { x: number; y: number; n: number } | null;
+
+class HoldRingStore {
+  private ring: Ring = null;
+  private listeners = new Set<() => void>();
+  get = () => this.ring;
+  set(r: Ring) {
+    if (r === this.ring) return;
+    this.ring = r;
+    this.listeners.forEach((fn) => fn());
+  }
+  subscribe = (fn: () => void) => {
+    this.listeners.add(fn);
+    return () => void this.listeners.delete(fn);
+  };
+}
+
+/** Fills over the hold time under the finger (see .hold-ring); press and hold fires as it closes. */
+function HoldRing({ store, holdMs }: { store: HoldRingStore; holdMs: number }) {
+  const ring = useSyncExternalStore(store.subscribe, store.get, () => null);
+  if (!ring) return null;
+  return (
+    <svg
+      key={ring.n}
+      aria-hidden="true"
+      className="hold-ring pointer-events-none fixed z-50"
+      width="64"
+      height="64"
+      viewBox="0 0 64 64"
+      style={{ left: ring.x - 32, top: ring.y - 32, ["--hold-ms" as string]: `${holdMs}ms` }}
+    >
+      <circle cx="32" cy="32" r="24" fill="rgb(37 99 235 / 0.08)" stroke="rgb(37 99 235 / 0.25)" strokeWidth="4" />
+      <circle cx="32" cy="32" r="24" fill="none" stroke="#2563eb" strokeWidth="4" strokeLinecap="round" strokeDasharray="151" transform="rotate(-90 32 32)" />
+    </svg>
+  );
 }

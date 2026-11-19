@@ -104,6 +104,9 @@ export interface ControllerOptions {
 
 const round = (v: number, f: number) => Math.round(v * f) / f;
 
+/** The pointerId of a lasso drawn by a held finger: fed from touch events, it matches no pointer. */
+export const FINGER_LASSO = -1;
+
 export class InkController {
   tool: ToolState;
   zoom = 1;
@@ -128,6 +131,8 @@ export class InkController {
   private now: () => number;
   private device: string | undefined;
   private unsaved = 0;
+  /** Mounted sections, so a finger lasso can find the one under the finger. */
+  private sections = new Set<SectionHandle>();
 
   constructor(notebookId: string, tool: ToolState, cb: ControllerCallbacks, opts: ControllerOptions = {}) {
     this.notebookId = notebookId;
@@ -392,6 +397,54 @@ export class InkController {
     // Only the gesture's own section: a stale gesture's section losing capture to a new stroke with
     // the same pointerId must not end that new stroke.
     if (g && e.pointerId === g.pointerId && sec.id === g.sec.id) this.end(g, null);
+  }
+
+  /** Adds a mounted section; returns the call that removes it. */
+  registerSection(sec: SectionHandle) {
+    this.sections.add(sec);
+    return () => void this.sections.delete(sec);
+  }
+
+  private sectionAt(clientX: number, clientY: number) {
+    for (const sec of this.sections) {
+      const el = sec.el as HTMLElement | null;
+      const r = el?.getBoundingClientRect();
+      if (r && clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom) return sec;
+    }
+    return null;
+  }
+
+  /**
+   * Starts a lasso from a finger press and hold, whatever the tool. Fingers never reach down()
+   * (they scroll), so the editor feeds it from touch events: extendFingerLasso as the finger moves,
+   * endFingerLasso when it lifts. False when there is no page under the finger or the Pencil is busy.
+   */
+  beginFingerLasso(clientX: number, clientY: number) {
+    if (this.gesture) return false;
+    const sec = this.sectionAt(clientX, clientY);
+    if (!sec) return false;
+    const rect = sec.el.getBoundingClientRect();
+    this.hover = null;
+    if (this.selection) this.setSelection(null);
+    this.setGesture({ type: "lasso", sec, rect, poly: [toLocal(clientX, clientY, rect, this.zoom)], pointerId: FINGER_LASSO });
+    this.requestFrame();
+    return true;
+  }
+
+  extendFingerLasso(clientX: number, clientY: number) {
+    const g = this.gesture;
+    if (g?.type !== "lasso" || g.pointerId !== FINGER_LASSO) return;
+    g.poly.push(toLocal(clientX, clientY, g.rect, this.zoom));
+    this.requestFrame();
+  }
+
+  /** Lifting selects what the lasso circled; `cancel` (a second finger, say) drops it instead. */
+  endFingerLasso(cancel = false) {
+    const g = this.gesture;
+    if (g?.type !== "lasso" || g.pointerId !== FINGER_LASSO) return;
+    if (!cancel) return this.end(g, null);
+    this.setGesture(null);
+    this.requestFrame();
   }
 
   /** Ends the open gesture, keeping what was drawn: page hidden, window blurred, section unmounted. */

@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { deviceId, deviceKind } from "@/lib/db";
 import { useStoredState, useSyncStatus } from "@/lib/hooks";
-import { useGestureBindings, useShowCopyButtons, useSyncDebug, useThemePreference } from "@/lib/settings";
-import { DEFAULT_GESTURES, GESTURES, GESTURE_ACTIONS, type GestureAction } from "@/lib/touch-gestures";
+import { useGestureBindings, useGestureTuning, useShowCopyButtons, useSyncDebug, useThemePreference } from "@/lib/settings";
+import { DEFAULT_GESTURES, DEFAULT_TUNING, GESTURES, TUNING_RANGES, actionsFor, type GestureAction } from "@/lib/touch-gestures";
 import { THEME_PREFERENCES } from "@/lib/theme";
 import { requestSync, resetCursor, stopSync } from "@/lib/sync";
 import { SyncTimingSettings } from "./SyncTimingSettings";
@@ -163,7 +163,8 @@ export default function SettingsView() {
 /** What each finger gesture does in a notebook on the iPad. */
 function GestureSettings() {
   const [bindings, setBindings] = useGestureBindings();
-  const changed = GESTURES.some((g) => bindings[g.kind] !== DEFAULT_GESTURES[g.kind]);
+  const [tuning, setTuning] = useGestureTuning();
+  const changed = GESTURES.some((g) => bindings[g.kind] !== DEFAULT_GESTURES[g.kind]) || JSON.stringify(tuning) !== JSON.stringify(DEFAULT_TUNING);
   return (
     <section id="gestures" className="card mb-5 scroll-mt-4 space-y-4 p-5">
       <div className="flex items-start justify-between gap-3">
@@ -173,7 +174,14 @@ function GestureSettings() {
             Finger gestures in a notebook on the iPad. Gestures on the page with one finger are ignored just after you use the Pencil, so a resting palm doesn&rsquo;t set them off.
           </p>
         </div>
-        <button className="btn btn-ghost btn-sm shrink-0" disabled={!changed} onClick={() => setBindings(DEFAULT_GESTURES)}>
+        <button
+          className="btn btn-ghost btn-sm shrink-0"
+          disabled={!changed}
+          onClick={() => {
+            setBindings(DEFAULT_GESTURES);
+            setTuning(DEFAULT_TUNING);
+          }}
+        >
           Reset
         </button>
       </div>
@@ -185,7 +193,7 @@ function GestureSettings() {
             value={bindings[g.kind]}
             onChange={(e) => setBindings({ ...bindings, [g.kind]: e.target.value as GestureAction })}
           >
-            {GESTURE_ACTIONS.map((a) => (
+            {actionsFor(g.kind).map((a) => (
               <option key={a.action} value={a.action}>
                 {a.label}
               </option>
@@ -193,6 +201,54 @@ function GestureSettings() {
           </select>
         </Setting>
       ))}
+      {bindings.fingerHold === "lassoHold" && (
+        <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          Lasso while held: hold a finger on the page until the ring fills, then drag around what you want and lift. It works whatever tool is selected, and a second finger cancels it.
+        </p>
+      )}
+
+      <details className="group border-t border-slate-100 pt-3">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 font-medium text-slate-800">
+          <Icon name="chevronRight" className="text-slate-400 transition-transform group-open:rotate-90" />
+          Fine-tune
+        </summary>
+        <div className="mt-2 space-y-4">
+          {(Object.keys(TUNING_RANGES) as (keyof typeof TUNING_RANGES)[]).map((k) => {
+            const r = TUNING_RANGES[k];
+            return (
+              <label key={k} className="block">
+                <span className="flex items-baseline justify-between gap-3">
+                  <span className="text-slate-800">{r.label}</span>
+                  <span className="flex items-baseline gap-2">
+                    {tuning[k] !== DEFAULT_TUNING[k] && (
+                      <button type="button" className="text-xs font-medium text-brand-600 hover:underline" onClick={() => setTuning({ ...tuning, [k]: DEFAULT_TUNING[k] })}>
+                        Reset
+                      </button>
+                    )}
+                    <span className="tabular-nums text-slate-600">
+                      {tuning[k]} {r.unit}
+                    </span>
+                  </span>
+                </span>
+                <span className="block text-xs text-slate-500">{r.hint}</span>
+                <input
+                  type="range"
+                  aria-label={r.label}
+                  min={r.min}
+                  max={r.max}
+                  step={r.step}
+                  value={tuning[k]}
+                  onChange={(e) => setTuning({ ...tuning, [k]: Number(e.target.value) })}
+                  className="mt-1 block h-8 w-full"
+                />
+              </label>
+            );
+          })}
+          <Setting label title="Show what a gesture did" hint="A short note under the toolbar, such as Undo or Lasso, so a stray gesture is noticed.">
+            <input type="checkbox" className="switch" checked={tuning.showNote} onChange={(e) => setTuning({ ...tuning, showNote: e.target.checked })} />
+          </Setting>
+        </div>
+      </details>
     </section>
   );
 }

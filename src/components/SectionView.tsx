@@ -67,6 +67,7 @@ export const SectionView = memo(function SectionView(p: Props) {
     [section.id],
   );
 
+  useEffect(() => controller.registerSection(handle), [controller, handle]);
   // A stroke on a section that unmounts never gets its pointerup here; don't leave it open.
   useEffect(() => () => controller.endGesture(section.id), [controller, section.id]);
 

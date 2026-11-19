@@ -148,3 +148,49 @@ describe("duplicating a lasso selection", () => {
     expect(store.putEntities).not.toHaveBeenCalled();
   });
 });
+
+describe("lasso from a held finger", () => {
+  const surface = { getBoundingClientRect: () => ({ left: 0, top: 0, right: 800, bottom: 600, height: 600 }), setPointerCapture() {} } as unknown as HTMLElement;
+  const page = { id: "sec", el: surface, strokes: () => [stroke] };
+  const make = async () => {
+    const { InkController } = await import("@/ink/controller");
+    const onSelection = vi.fn();
+    // Whatever the tool: holding a finger lassoes even with the pen selected.
+    const c = new InkController("nb", { kind: "pen", penColor: "#000", penSize: 3, hlColor: "#ff0", hlSize: 20, eraserSize: 20 }, { onSelection, onDragging() {}, onTextCreate() {} });
+    c.registerSection(page);
+    return { c, onSelection };
+  };
+  const circle = (c: { extendFingerLasso: (x: number, y: number) => void }) => [[160, 90], [160, 140], [90, 140], [90, 90]].forEach(([x, y]) => c.extendFingerLasso(x, y));
+
+  it("selects what the finger circled when it lifts", async () => {
+    const { c } = await make();
+    expect(c.beginFingerLasso(90, 90)).toBe(true);
+    expect(c.isDrawing()).toBe(true);
+    circle(c);
+    c.endFingerLasso();
+    expect(c.isDrawing()).toBe(false);
+    expect([...(c.selection?.ids ?? [])]).toEqual(["a"]);
+  });
+
+  it("selects nothing when cancelled, and doesn't start off the page", async () => {
+    const { c } = await make();
+    c.beginFingerLasso(90, 90);
+    circle(c);
+    c.endFingerLasso(true);
+    expect(c.selection).toBe(null);
+    expect(c.isDrawing()).toBe(false);
+    expect(c.beginFingerLasso(900, 90)).toBe(false);
+  });
+
+  it("leaves the Pencil's stroke alone, and pointer events never feed the finger's lasso", async () => {
+    const { c } = await make();
+    c.down(ev("pointerdown", 300, 300, "pen"), page);
+    expect(c.beginFingerLasso(90, 90)).toBe(false);
+    c.up(ev("pointerup", 300, 300, "pen"));
+    c.beginFingerLasso(90, 90);
+    c.move(ev("pointermove", 400, 400), page);
+    c.up(ev("pointerup", 400, 400));
+    expect(c.isDrawing()).toBe(true);
+    c.endFingerLasso(true);
+  });
+});
