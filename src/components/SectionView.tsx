@@ -250,15 +250,28 @@ function BlockView({ block }: { block: Block }) {
   }
 }
 
-// Repaints after a zoom run once the frame has painted, a few tiles per frame.
-const repaints = new Set<() => void>();
+// Repaints after a zoom run once the frame has painted, a few tiles per frame. A tile in view
+// paints its new bitmap off screen and returns a swap; the swaps all run in one frame once every
+// tile in view is ready, so the page sharpens in one step instead of tile by tile. Tiles off
+// screen repaint in place, after those.
+type Repaint = () => (() => void) | void;
+const inView = new Set<Repaint>();
+const offView = new Set<Repaint>();
+const swaps = new Map<Repaint, () => void>();
 let repaintScheduled = false;
-registerDebugProbe("Ink tiles", () => ({ queuedRepaints: repaints.size }));
+let swapScheduled = false;
+registerDebugProbe("Ink tiles", () => ({ queuedRepaints: inView.size + offView.size, waitingSwaps: swaps.size }));
 
-function queueRepaint(paint: () => void) {
-  repaints.add(paint);
+/** Queues `paint`; pass `discard` for a tile in view, whose paint returns its swap. */
+function queueRepaint(paint: Repaint, discard?: () => void) {
+  (discard ? inView : offView).add(paint);
   scheduleRepaints();
-  return () => void repaints.delete(paint);
+  return () => {
+    inView.delete(paint);
+    offView.delete(paint);
+    if (swaps.delete(paint)) discard?.();
+    scheduleSwaps(); // the other tiles in view may have been waiting on this one
+  };
 }
 
 function scheduleRepaints() {
@@ -270,12 +283,28 @@ function scheduleRepaints() {
 function runRepaints() {
   repaintScheduled = false;
   const end = performance.now() + 8;
-  for (const paint of repaints) {
-    repaints.delete(paint);
-    paint();
+  for (const queue of [inView, offView]) {
+    for (const paint of queue) {
+      queue.delete(paint);
+      const swap = paint();
+      if (swap) swaps.set(paint, swap);
+      if (performance.now() > end) break;
+    }
     if (performance.now() > end) break;
   }
-  if (repaints.size) scheduleRepaints();
+  scheduleSwaps();
+  if (inView.size || offView.size) scheduleRepaints();
+}
+
+function scheduleSwaps() {
+  if (swapScheduled || inView.size || !swaps.size) return;
+  swapScheduled = true;
+  requestAnimationFrame(() => {
+    swapScheduled = false;
+    if (inView.size) return; // a new zoom queued more; they swap with those
+    for (const swap of swaps.values()) swap();
+    swaps.clear();
+  });
 }
 
 interface TileProps {
@@ -308,43 +337,80 @@ const InkTile = memo(function InkTile({ top, height, strokes, zoom, hidden, cont
   // What the bitmap currently shows, so a new stroke on top can be painted alone.
   const painted = useRef<{ strokes: StrokeEntity[]; scale: number; hidden: Set<string> | null } | null>(null);
 
-  useEffect(() => {
+  // A layout effect, so a tile that comes into view has its ink in the same frame.
+  useLayoutEffect(() => {
     const c = canvas.current;
-    if (!visible || !c) {
+    const el = holder.current;
+    if (!visible || !c || !el) {
       painted.current = null;
       return;
     }
     // Quarter steps: half steps drew 80% zoom at 2.0x for 1.6x, 56% more pixels.
     const scale = tileScale(zoom, window.devicePixelRatio || 1, renderFlag("quarterSteps"));
+    const w = Math.round(PAGE_WIDTH * scale);
+    const h = Math.round(height * scale);
+    const shown = hidden ? strokes.filter((s) => !hidden.has(s.id)) : strokes;
+    const done = (list: StrokeEntity[], started: number) => {
+      painted.current = { strokes: shown, scale, hidden };
+      recordSyncPaint(list, debugNow() - started);
+      controller.ackPainted(list.map((s) => s.id));
+    };
+    const draw = (ctx: CanvasRenderingContext2D, list: StrokeEntity[]) => {
+      ctx.setTransform(scale, 0, 0, scale, 0, -top * scale);
+      paintStrokes(ctx, list);
+    };
     const paint = () => {
-      const paintStarted = debugNow();
-      const w = Math.round(PAGE_WIDTH * scale);
-      const h = Math.round(height * scale);
-      const shown = hidden ? strokes.filter((s) => !hidden.has(s.id)) : strokes;
+      const started = debugNow();
       const prev = painted.current;
       // Null once Safari's canvas memory is spent; skip rather than throw and take the page down.
       const ctx = c.getContext("2d");
       if (!ctx) return;
       const delta = prev && prev.scale === scale && prev.hidden === hidden && c.width === w && c.height === h ? paintDelta(prev.strokes, shown) : null;
-      if (delta) {
-        ctx.setTransform(scale, 0, 0, scale, 0, -top * scale);
-        paintStrokes(ctx, delta);
-      } else {
+      if (!delta) {
         if (c.width !== w) c.width = w;
         if (c.height !== h) c.height = h;
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, w, h);
-        ctx.setTransform(scale, 0, 0, scale, 0, -top * scale);
-        paintStrokes(ctx, shown);
       }
-      painted.current = { strokes: shown, scale, hidden };
-      recordSyncPaint(delta ?? shown, debugNow() - paintStarted);
-      controller.ackPainted((delta ?? shown).map((s) => s.id));
+      draw(ctx, delta ?? shown);
+      done(delta ?? shown, started);
     };
-    // After a zoom the old bitmap still shows, stretched by CSS; repainting every tile at the new
-    // resolution right away blocks Safari from redrawing the page itself, which flashes black.
-    if (painted.current && painted.current.scale !== scale) return queueRepaint(paint);
-    paint();
+    if (!painted.current || painted.current.scale === scale) return void paint();
+    // After a zoom the old bitmap still shows, stretched by CSS as it was during the pinch.
+    // Repainting every tile right away blocks Safari from redrawing the page itself, which
+    // flashes black, so the repaints are queued. Tiles off screen repaint in place; tiles in view
+    // paint off screen first and swap in together (one extra bitmap each until then).
+    const box = el.getBoundingClientRect();
+    if (box.bottom < 0 || box.top > window.innerHeight) return queueRepaint(paint);
+    let off: HTMLCanvasElement | null = null;
+    const free = () => {
+      if (off) off.width = off.height = 0;
+      off = null;
+    };
+    return queueRepaint(() => {
+      const started = debugNow();
+      off = document.createElement("canvas");
+      off.width = w;
+      off.height = h;
+      const octx = off.getContext("2d");
+      if (!octx) {
+        free();
+        return paint();
+      }
+      draw(octx, shown);
+      return () => {
+        const ctx = c.getContext("2d");
+        if (ctx && off) {
+          if (c.width !== w) c.width = w;
+          if (c.height !== h) c.height = h;
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.clearRect(0, 0, w, h);
+          ctx.drawImage(off, 0, 0);
+          done(shown, started);
+        }
+        free();
+      };
+    }, free);
   }, [visible, strokes, zoom, height, top, hidden, controller]);
 
   useEffect(() => {

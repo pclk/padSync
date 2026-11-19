@@ -25,9 +25,16 @@ export function PdfBackground({ page, zoom }: { page: PdfPage; zoom: number }) {
     const observer = new IntersectionObserver(entries => {
       near = entries[0].isIntersecting;
       if (!near) { show(''); return; }
-      pdfRaster(page, density).then(blob => {
+      pdfRaster(page, density).then(async blob => {
         if (!active || !near) return;
-        show(URL.createObjectURL(blob)); setError('');
+        // Decoded before it replaces the raster on screen: Safari otherwise paints the page blank
+        // for a frame or more while it decodes, a flash on every zoom.
+        const next = URL.createObjectURL(blob);
+        const img = new Image();
+        img.src = next;
+        await img.decode().catch(() => {});
+        if (!active || !near) return URL.revokeObjectURL(next);
+        show(next); setError('');
       }, e => { if (active) setError(String(e.message)); });
     }, { rootMargin: '800px' });
     observer.observe(ref.current!);
@@ -37,6 +44,6 @@ export function PdfBackground({ page, zoom }: { page: PdfPage; zoom: number }) {
   return <div ref={ref} className="pointer-events-none absolute left-0 top-0" style={{ width: 1376, height: page.height }} data-pdf-background>
     {/* PDF rasters are local blob URLs, generated only near the viewport. */}
     {/* eslint-disable-next-line @next/next/no-img-element */}
-    {url ? <img src={url} alt={`${page.name}, page ${page.page}`} width={1376} height={page.height} decoding="async" /> : <p role="status" className="p-6 text-slate-500">{error || `PDF page ${page.page} · loading when visible`}</p>}
+    {url ? <img src={url} alt={`${page.name}, page ${page.page}`} width={1376} height={page.height} decoding="sync" /> : <p role="status" className="p-6 text-slate-500">{error || `PDF page ${page.page} · loading when visible`}</p>}
   </div>;
 }
