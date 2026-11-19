@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import type { ToolKind, ToolState } from "@/ink/controller";
 import type { ChatPrompt } from "@/lib/prompts";
-import { isTool, visibleItems, visibleTools, type RailLayout } from "@/lib/rail-layout";
+import { clampPlace, isTool, visibleItems, visibleTools, type CircleKey, type RailDock, type RailLayout } from "@/lib/rail-layout";
 import { Icon } from "./Icons";
 import { anchorOf, useDismiss, usePopoverBox, type PopoverAnchor } from "./popover";
 import { RadialFan, fanAt, promptItems, useFanPress } from "./RadialFan";
@@ -27,11 +27,14 @@ interface Props {
   onRedo: () => void;
   rail: RailLayout;
   rightInset: number;
-  /** Open the pen's or the toolbar's settings beside the circle. */
-  onPenSettings: (circle: HTMLElement) => void;
-  onSettings: (circle: HTMLElement) => void;
+  /** Open the pen's or the toolbar's settings beside the circle, opening away from `edge`. */
+  onPenSettings: (circle: HTMLElement, edge: RailDock) => void;
+  onSettings: (circle: HTMLElement, edge: RailDock, tab?: "prompts") => void;
   prompts: ChatPrompt[];
   onPrompt: (p: ChatPrompt) => void;
+  /** Move mode: dragging a circle places it, and nothing else happens on a press. */
+  arranging: boolean;
+  setRail: (l: RailLayout) => void;
 }
 
 const centerOf = (el: HTMLElement): [number, number] => {
@@ -54,8 +57,51 @@ export function ToolCircle(p: Props) {
   const [panel, setPanel] = useState<PopoverAnchor | null>(null);
   const closePanel = useCallback(() => setPanel(null), []);
   const label = RAIL_ITEM_INFO[p.tool.kind].label;
+
+  // --- moving the circles: in move mode a drag carries a circle along, and letting go places its
+  // centre there. It follows the finger by a transform and only moves out of the docked strip
+  // once let go, so the element under the finger stays the same through the drag.
+  const [drag, setDrag] = useState<{ key: CircleKey; dx: number; dy: number } | null>(null);
+  const grip = useRef<{ id: number; key: CircleKey; sx: number; sy: number; cx: number; cy: number } | null>(null);
+  const placeOf = (key: CircleKey) => p.rail.free[key];
+  // A popover opens away from the nearer side of a moved circle, or away from the dock.
+  const edgeOf = (key: CircleKey): RailDock => {
+    const at = p.rail.free[key];
+    return at ? (at[0] < 0.5 ? "left" : "right") : p.rail.dock;
+  };
+  const shift = (key: CircleKey) => (drag?.key === key ? { transform: `translate(${drag.dx}px, ${drag.dy}px)` } : {});
+  // The tap zone's centre is its circle's centre; data-circle says which circle it is.
+  const mover = {
+    onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
+      if (grip.current) return;
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {}
+      const [cx, cy] = centerOf(e.currentTarget);
+      const key = e.currentTarget.dataset.circle as CircleKey;
+      grip.current = { id: e.pointerId, key, sx: e.clientX, sy: e.clientY, cx, cy };
+      setDrag({ key, dx: 0, dy: 0 });
+    },
+    onPointerMove: (e: React.PointerEvent<HTMLElement>) => {
+      const g = grip.current;
+      if (g && g.id === e.pointerId) setDrag({ key: g.key, dx: e.clientX - g.sx, dy: e.clientY - g.sy });
+    },
+    onPointerUp: (e: React.PointerEvent<HTMLElement>) => {
+      const g = grip.current;
+      if (!g || g.id !== e.pointerId) return;
+      grip.current = null;
+      setDrag(null);
+      const at = clampPlace((g.cx + e.clientX - g.sx) / window.innerWidth, (g.cy + e.clientY - g.sy) / window.innerHeight);
+      p.setRail({ ...p.rail, free: { ...p.rail.free, [g.key]: at } });
+    },
+    onPointerCancel: () => {
+      grip.current = null;
+      setDrag(null);
+    },
+  };
+
   const togglePanel = () => {
-    if (circleRef.current) setPanel(panel ? null : anchorOf(circleRef.current, p.rail.dock));
+    if (circleRef.current) setPanel(panel ? null : anchorOf(circleRef.current, edgeOf("tools")));
   };
 
   const tools = useFanPress({
@@ -70,8 +116,13 @@ export function ToolCircle(p: Props) {
     onTap: togglePanel,
   });
   const openPrompts = (sticky: boolean) => {
-    if (!promptRef.current || !p.prompts.length) return null;
+    if (!promptRef.current) return null;
     setPanel(null);
+    // No prompts left: open the settings where they are added.
+    if (!p.prompts.length) {
+      p.onSettings(promptRef.current, edgeOf("prompts"), "prompts");
+      return null;
+    }
     return fanAt(promptItems(p.prompts), centerOf(promptRef.current), sticky);
   };
   const prompts = useFanPress({
@@ -88,10 +139,12 @@ export function ToolCircle(p: Props) {
   // The prompt circle goes before the tool circle when it comes before the tools in the order.
   const promptsFirst = showPrompts && visible.indexOf("prompts") < visible.findIndex(isTool);
   const strip = dockStrip(p.rail, p.rightInset);
-  const zone = `pointer-events-auto touch-none select-none ${tapZonePadding(p.rail)}`;
+  const zone = `pointer-events-auto touch-none select-none ${tapZonePadding(p.rail)} ${p.arranging ? "cursor-move" : ""}`;
+  // In move mode each circle is ringed with a dashed outline and drags instead of opening.
+  const moving = p.arranging ? "outline-2 outline-offset-4 outline-dashed outline-brand-500" : "";
   const toolCircle = (
-    <div key="tools" data-tap-zone="" className={zone} style={{ WebkitTouchCallout: "none" }} {...tools.handlers} onContextMenu={(e) => e.preventDefault()}>
-      <aside ref={circleRef} data-rail-settings="" aria-label="Drawing tools" className="tool-circle rounded-full">
+    <div key="tools" data-tap-zone="" data-circle="tools" className={zone} style={{ WebkitTouchCallout: "none", ...shift("tools") }} {...(p.arranging ? mover : tools.handlers)} onContextMenu={(e) => e.preventDefault()}>
+      <aside ref={circleRef} data-rail-settings="" aria-label="Drawing tools" className={`tool-circle rounded-full ${moving}`}>
         {/* Pointer taps are handled by the zone; a click with no pointer detail is the keyboard. */}
         <button
           className="relative flex h-[60px] w-[60px] items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-2xl text-slate-800 shadow-lift backdrop-blur-md"
@@ -107,8 +160,8 @@ export function ToolCircle(p: Props) {
     </div>
   );
   const promptCircle = showPrompts && (
-    <div key="prompts" data-tap-zone="" className={zone} style={{ WebkitTouchCallout: "none" }} {...prompts.handlers} onContextMenu={(e) => e.preventDefault()}>
-      <aside ref={promptRef} aria-label="Chat prompts" className="rounded-full">
+    <div key="prompts" data-tap-zone="" data-circle="prompts" className={zone} style={{ WebkitTouchCallout: "none", ...shift("prompts") }} {...(p.arranging ? mover : prompts.handlers)} onContextMenu={(e) => e.preventDefault()}>
+      <aside ref={promptRef} aria-label="Chat prompts" className={`rounded-full ${moving}`}>
         <button
           className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-xl text-brand-700 shadow-lift backdrop-blur-md"
           aria-label="Chat prompts: tap to choose, or hold and drag towards one"
@@ -123,10 +176,21 @@ export function ToolCircle(p: Props) {
   );
   return (
     <>
-      {/* The two tap zones overlap by half their padding, so the circles sit 12 px apart. */}
+      {/* Docked circles share the strip; the two tap zones overlap by half their padding, so the
+          circles sit 12 px apart. A moved circle floats on its own, centred where it was put. */}
       <div className={`${strip.className} ${p.rail.dock === "bottom" ? "[&>*+*]:-ml-3" : "[&>*+*]:-mt-3"}`} style={strip.style} data-dock={p.rail.dock} data-style="circle">
-        {promptsFirst ? [promptCircle, toolCircle] : [toolCircle, promptCircle]}
+        {(promptsFirst ? [["prompts", promptCircle], ["tools", toolCircle]] as const : [["tools", toolCircle], ["prompts", promptCircle]] as const).map(([key, el]) => !placeOf(key) && el)}
       </div>
+      {(["tools", "prompts"] as const).map((key) => {
+        const at = placeOf(key);
+        const el = key === "tools" ? toolCircle : promptCircle;
+        if (!at || !el) return null;
+        return (
+          <div key={key} className="fixed z-40 -translate-x-1/2 -translate-y-1/2" style={{ left: `${at[0] * 100}%`, top: `${at[1] * 100}%` }} data-placed={key}>
+            {el}
+          </div>
+        );
+      })}
       {tools.fan && <RadialFan fan={tools.fan} label="Tools" onPick={(item) => { p.selectTool(item.key as ToolKind); tools.close(); }} onClose={tools.close} />}
       {prompts.fan && (
         <RadialFan
@@ -148,11 +212,11 @@ export function ToolCircle(p: Props) {
           onClose={closePanel}
           onPenSettings={() => {
             setPanel(null);
-            if (circleRef.current) p.onPenSettings(circleRef.current);
+            if (circleRef.current) p.onPenSettings(circleRef.current, edgeOf("tools"));
           }}
           onSettings={() => {
             setPanel(null);
-            if (circleRef.current) p.onSettings(circleRef.current);
+            if (circleRef.current) p.onSettings(circleRef.current, edgeOf("tools"));
           }}
         />
       )}

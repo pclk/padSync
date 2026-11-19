@@ -27,7 +27,8 @@ import { focusedSection } from "@/lib/chat-ui";
 import { Icon, type IconName } from "../Icons";
 import { usePopover } from "./Popover";
 export interface ContextHandle {
-  prepare(): Promise<{
+  /** `scope`: send this instead of what the picker is set to (a prompt menu prompt's own context). */
+  prepare(scope?: ContextSummary["scope"]): Promise<{
     files: Bundle["files"];
     context: ContextSummary;
     options: { allowEdits: boolean };
@@ -81,19 +82,13 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
     const [error, setError] = useState("");
     const currentId = current?.id ?? "";
     const { sections, notebookTitle } = p;
-    const ctx: ContextOptions = useMemo(
-      () => ({
-        ...options,
-        scope:
-          scope === "selection"
-            ? "selection"
-            : scope === "notebook"
-              ? "all"
-              : "sections",
-        sectionIds: scope === "section" ? [focusedId] : ids,
-      }),
-      [options, scope, focusedId, ids],
-    );
+    const ctxFor = (sc: Scope): ContextOptions => ({
+      ...options,
+      scope: sc === "selection" ? "selection" : sc === "notebook" ? "all" : "sections",
+      sectionIds: sc === "section" ? [focusedId] : ids,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const ctx: ContextOptions = useMemo(() => ctxFor(scope), [options, scope, focusedId, ids]);
     useEffect(() => {
       let live = true;
       void gatherSections(sections)
@@ -128,7 +123,14 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
         live = false;
       };
     }, [sections, notebookTitle, scope, ctx, currentId, text]);
-    const prepare = async (sending: boolean) => {
+    const scopeNow = scope;
+    const ctxNow = ctx;
+    const previewNow = preview;
+    // `override`: a prompt's own scope, sent as is, without the review a changed preview asks for.
+    const prepare = async (sending: boolean, override?: Scope) => {
+      const scope = override ?? scopeNow;
+      const ctx = override ? ctxFor(override) : ctxNow;
+      const preview = override ? null : previewNow;
       const inputs = await gatherSections(p.sections);
       const lasso =
         p.selection?.sectionId === p.current?.id ? p.selection : null;
@@ -189,8 +191,9 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
       return bundle;
     };
     useImperativeHandle(ref, () => ({
-      async prepare() {
-        const b = await prepare(true);
+      async prepare(override) {
+        const b = await prepare(true, override);
+        const scope = override ?? scopeNow;
         return {
           files: b.files,
           context: {

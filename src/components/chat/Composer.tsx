@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { composerAction, toolsOf, validateAttachments } from "@/lib/chat-ui";
 import type { uploadTurnInputs } from "@/lib/chat-api";
 import type { CatalogAccount, ChatAgent, ChatOptions } from "@/lib/chat-types";
@@ -11,7 +11,7 @@ import {
 import { ModelPicker } from "./ModelPicker";
 import { isTalkKey, useVoice } from "./useVoice";
 import { Icon, type IconName } from "../Icons";
-import { PROMPT_EVENT, takePrompt } from "@/lib/prompts";
+import { PROMPT_EVENT, peekPrompt, takePrompt, type QueuedPrompt } from "@/lib/prompts";
 
 type Settings = { agent: ChatAgent; options: ChatOptions };
 
@@ -115,27 +115,37 @@ export function Composer(
       setError((error as Error).message);
     }
   }
-  // A prompt picked from the iPad's prompt menu (prompts.ts): sent with this chat's context, or
-  // put in the box to finish when it isn't marked to send, or while a reply is being sent.
-  const sendPrompt = (text: string) =>
-    p.send(text, ctx.current, [], { onProgress: () => {} }).catch((error) => setError((error as Error).message));
+  // A prompt picked from the iPad's prompt menu (prompts.ts): sent with its own context (or this
+  // chat's), and its voice message if it recorded one; one marked to finish goes into the box.
+  // While a reply is still being sent it waits, and goes once the composer is free.
+  const sendPrompt = ({ prompt, audio }: QueuedPrompt) => {
+    const scope = prompt.context === "chat" ? undefined : prompt.context;
+    const context: ContextHandle | null = ctx.current && { prepare: () => ctx.current!.prepare(scope) };
+    return p.send(prompt.text.trim(), context, [], { onProgress: () => {} }, audio).catch((error) => setError((error as Error).message));
+  };
   const latest = useRef({ sendPrompt, setDraft: p.setDraft, busy: p.busy });
   useEffect(() => {
     latest.current = { sendPrompt, setDraft: p.setDraft, busy: p.busy };
   });
-  useEffect(() => {
-    const take = () => {
-      const pr = takePrompt();
-      if (!pr) return;
-      const l = latest.current;
-      if (pr.send && !l.busy) return void l.sendPrompt(pr.text);
-      l.setDraft(pr.text);
-      area.current?.focus();
-    };
-    take();
-    window.addEventListener(PROMPT_EVENT, take);
-    return () => window.removeEventListener(PROMPT_EVENT, take);
+  const takeQueued = useCallback(() => {
+    const q = peekPrompt();
+    if (!q) return;
+    const l = latest.current;
+    const sending = q.audio || q.prompt.send;
+    if (sending && l.busy) return;
+    takePrompt();
+    if (sending) return void l.sendPrompt(q);
+    l.setDraft(q.prompt.text);
+    area.current?.focus();
   }, []);
+  useEffect(() => {
+    window.addEventListener(PROMPT_EVENT, takeQueued);
+    return () => window.removeEventListener(PROMPT_EVENT, takeQueued);
+  }, [takeQueued]);
+  // On mount (the panel was opened for it) and whenever a send finishes.
+  useEffect(() => {
+    if (!p.busy) takeQueued();
+  }, [p.busy, takeQueued]);
   const voice = useVoice({
     // Anything already typed is sent too: the Mac puts the transcript after it.
     onAudio: (audio, took) => {

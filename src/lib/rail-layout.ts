@@ -10,16 +10,23 @@ export type RailAlign = "start" | "center" | "end";
 /** A bar of buttons, or one circle you press and drag from to pick a tool. */
 export type RailStyle = "bar" | "circle";
 
+/** The two circles of the circle style, which can each be moved anywhere on screen. */
+export type CircleKey = "tools" | "prompts";
+/** A moved circle's centre, as fractions of the window's width and height (so it survives a resize). */
+export type CirclePlaces = Partial<Record<CircleKey, [number, number]>>;
+
 export interface RailLayout {
   order: RailItem[];
   hidden: RailItem[];
   dock: RailDock;
   align: RailAlign;
   style: RailStyle;
+  /** Circles placed by hand; the others stay docked. */
+  free: CirclePlaces;
 }
 
 export const RAIL_ITEMS: readonly RailItem[] = ["pen", "highlighter", "eraser", "lasso", "text", "colors", "sizes", "history", "prompts"];
-export const DEFAULT_RAIL: RailLayout = { order: [...RAIL_ITEMS], hidden: [], dock: "left", align: "center", style: "bar" };
+export const DEFAULT_RAIL: RailLayout = { order: [...RAIL_ITEMS], hidden: [], dock: "left", align: "center", style: "bar", free: {} };
 
 const DOCKS: readonly RailDock[] = ["left", "right", "bottom"];
 const ALIGNS: readonly RailAlign[] = ["start", "center", "end"];
@@ -43,6 +50,7 @@ export function normalizeRail(raw: Partial<RailLayout> | null | undefined): Rail
     dock: DOCKS.includes(raw?.dock as RailDock) ? raw!.dock! : DEFAULT_RAIL.dock,
     align: ALIGNS.includes(raw?.align as RailAlign) ? raw!.align! : DEFAULT_RAIL.align,
     style: STYLES.includes(raw?.style as RailStyle) ? raw!.style! : DEFAULT_RAIL.style,
+    free: normalizePlaces(raw?.free),
   };
 }
 
@@ -71,3 +79,26 @@ export const visibleItems = (layout: RailLayout) => layout.order.filter((i) => !
 export const isTool = (i: RailItem): i is ToolKind => !["colors", "sizes", "history", "prompts"].includes(i);
 /** The tools the rail shows, in its order: the circle's fan. */
 export const visibleTools = (layout: RailLayout) => visibleItems(layout).filter(isTool);
+
+/** Keeps a moved circle's centre this far inside the window, as a fraction of it. */
+const PLACE_MARGIN = 0.03;
+export const clampPlace = (x: number, y: number): [number, number] => [
+  Math.min(1 - PLACE_MARGIN, Math.max(PLACE_MARGIN, x)),
+  Math.min(1 - PLACE_MARGIN, Math.max(PLACE_MARGIN, y)),
+];
+
+function normalizePlaces(raw: unknown): CirclePlaces {
+  const out: CirclePlaces = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const k of ["tools", "prompts"] as const) {
+    const v = (raw as Record<string, unknown>)[k];
+    if (Array.isArray(v) && v.length === 2 && v.every((n) => typeof n === "number" && Number.isFinite(n))) out[k] = clampPlace(v[0], v[1]);
+  }
+  return out;
+}
+
+/**
+ * The circle style with no circle left docked: they float over the page, so the page needs no
+ * strip kept clear for them.
+ */
+export const railFloats = (l: RailLayout) => l.style === "circle" && !!l.free.tools && (!!l.free.prompts || l.hidden.includes("prompts"));

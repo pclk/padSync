@@ -22,7 +22,8 @@ import { GestureRecognizer, actionLabel, type GestureAction, type GestureAt, typ
 import { useGestureBindings, useGestureTuning, usePrompts } from "@/lib/settings";
 import { queuePrompt, type ChatPrompt } from "@/lib/prompts";
 import { RadialFan, fanAt, pointAt, promptItems, type FanState } from "./RadialFan";
-import { DEFAULT_RAIL, normalizeRail, type RailLayout } from "@/lib/rail-layout";
+import { PromptRecorder } from "./PromptRecorder";
+import { DEFAULT_RAIL, normalizeRail, railFloats, type RailLayout } from "@/lib/rail-layout";
 import { Icon } from "./Icons";
 
 const emitLocalText = (notebookId: string) => emitActivity({ notebookId, source: "local", kinds: ["text"], at: Date.now() });
@@ -139,7 +140,11 @@ function Editor({ notebookId }: { notebookId: string }) {
   const panelWidth = isIpad ? 360 : layout.width;
   // What covers the window around the page, and where the page sits so every part of it can be
   // panned clear of the header, the tools and the side panel (see notebook-viewport).
-  const insets = useMemo(() => overlayInsets({ kind, sidebarOpen, panelWidth: panelOpen ? panelWidth : 0, railDock: rail.dock }), [kind, sidebarOpen, panelOpen, panelWidth, rail.dock]);
+  const floating = railFloats(rail);
+  const insets = useMemo(
+    () => overlayInsets({ kind, sidebarOpen, panelWidth: panelOpen ? panelWidth : 0, railDock: rail.dock, railFloating: floating }),
+    [kind, sidebarOpen, panelOpen, panelWidth, rail.dock, floating],
+  );
   const column = columnLayout(viewport.w, PAGE_WIDTH * zoom, insets, gutter);
   const vpad = verticalPadding(insets, gutter);
   // What a pinch needs to work out the scroll limits at its new zoom.
@@ -320,10 +325,14 @@ function Editor({ notebookId }: { notebookId: string }) {
   }, []);
   const closePromptFan = useCallback(() => setPromptFan(null), [setPromptFan]);
   /** Opens the side panel if it is closed and hands the prompt to the chat (see prompts.ts). */
-  const sendPrompt = (pr: ChatPrompt) => {
+  // A prompt that records a voice message first: the recorder bar is up while it is set.
+  const [recording, setRecording] = useState<ChatPrompt | null>(null);
+  const closeRecorder = useCallback(() => setRecording(null), []);
+  const sendPrompt = (pr: ChatPrompt, audio?: Blob) => {
+    if (pr.voice && !audio) return setRecording(pr);
     if (!panelOpen) setPanelOpen(true);
-    queuePrompt(pr);
-    note(pr.send ? `Asked: ${pr.label}` : `${pr.label}: finish it in the chat`);
+    queuePrompt(pr, audio);
+    note(audio ? `Sent: ${pr.label}` : pr.send ? `Asked: ${pr.label}` : `${pr.label}: finish it in the chat`);
   };
   // Set each render below, for the touch handlers.
   const promptMenu = useRef<{ open: (at: [number, number], sticky: boolean) => FanState | null; pick: (key: string) => void }>({ open: () => null, pick: () => {} });
@@ -333,7 +342,11 @@ function Editor({ notebookId }: { notebookId: string }) {
     gestureTuning.current = tuning;
     promptMenu.current = {
       open: (at, sticky) => {
-        const f = prompts.length ? fanAt(promptItems(prompts), at, sticky) : null;
+        if (!prompts.length) {
+          note("No prompts: add some in toolbar settings → Prompts");
+          return null;
+        }
+        const f = fanAt(promptItems(prompts), at, sticky);
         setPromptFan(f);
         return f;
       },
@@ -819,7 +832,8 @@ function Editor({ notebookId }: { notebookId: string }) {
       </div>
 
       <canvas ref={liveRef} className="pointer-events-none fixed left-0 top-0 z-30" />
-      <HoldRing store={holdRing} holdMs={tuning.holdMs} />
+      <HoldRing store={holdRing} holdMs={tuning.holdMs} label={gestures.fingerHold === "lassoHold" ? "Hold to lasso" : `Hold: ${actionLabel(gestures.fingerHold)}`} />
+      {recording && <PromptRecorder key={recording.id} prompt={recording} onAudio={(audio) => sendPrompt(recording, audio)} onClose={closeRecorder} />}
       {promptFan && (
         <RadialFan
           fan={promptFan}
@@ -888,22 +902,27 @@ class HoldRingStore {
   };
 }
 
-/** Fills over the hold time under the finger (see .hold-ring); press and hold fires as it closes. */
-function HoldRing({ store, holdMs }: { store: HoldRingStore; holdMs: number }) {
+/**
+ * Fills over the hold time around the finger (see .hold-ring); press and hold fires as it closes.
+ * Wide enough to show around a fingertip, with what the hold will do written above it.
+ */
+function HoldRing({ store, holdMs, label }: { store: HoldRingStore; holdMs: number; label: string }) {
   const ring = useSyncExternalStore(store.subscribe, store.get, () => null);
   if (!ring) return null;
   return (
-    <svg
+    <div
       key={ring.n}
       aria-hidden="true"
-      className="hold-ring pointer-events-none fixed z-50"
-      width="64"
-      height="64"
-      viewBox="0 0 64 64"
-      style={{ left: ring.x - 32, top: ring.y - 32, ["--hold-ms" as string]: `${holdMs}ms` }}
+      className="hold-ring pointer-events-none fixed z-50 flex flex-col items-center"
+      style={{ left: ring.x - HOLD_RING / 2, top: ring.y - HOLD_RING / 2 - 30, width: HOLD_RING, ["--hold-ms" as string]: `${holdMs}ms` }}
     >
-      <circle cx="32" cy="32" r="24" fill="rgb(37 99 235 / 0.08)" stroke="rgb(37 99 235 / 0.25)" strokeWidth="4" />
-      <circle cx="32" cy="32" r="24" fill="none" stroke="#2563eb" strokeWidth="4" strokeLinecap="round" strokeDasharray="151" transform="rotate(-90 32 32)" />
-    </svg>
+      <span className="mb-1.5 whitespace-nowrap rounded-full bg-slate-900/80 px-2.5 py-0.5 text-xs font-medium text-white">{label}</span>
+      <svg width={HOLD_RING} height={HOLD_RING} viewBox="0 0 144 144">
+        <circle cx="72" cy="72" r="60" fill="rgb(37 99 235 / 0.06)" stroke="rgb(37 99 235 / 0.22)" strokeWidth="8" />
+        <circle cx="72" cy="72" r="60" fill="none" stroke="#2563eb" strokeWidth="8" strokeLinecap="round" strokeDasharray="377" transform="rotate(-90 72 72)" />
+      </svg>
+    </div>
   );
 }
+/** The hold ring's size: twice a fingertip, so the part still to fill shows around it. */
+const HOLD_RING = 144;

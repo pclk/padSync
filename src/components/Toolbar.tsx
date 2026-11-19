@@ -70,8 +70,16 @@ export function Toolbar(p: Props) {
   const [penMenu, setPenMenu] = useState<PopoverAnchor | null>(null);
   const closePenMenu = useCallback(() => setPenMenu(null), []);
   const penMenuOpen = penMenu !== null && tool.kind === "pen";
-  const [railMenu, setRailMenu] = useState<PopoverAnchor | null>(null);
-  const closeRailMenu = useCallback(() => setRailMenu(null), []);
+  const [railMenu, setRailMenuState] = useState<PopoverAnchor | null>(null);
+  // The settings tab to open on: Prompts when the prompt menu had none to show.
+  const [railTab, setRailTab] = useState<"toolbar" | "prompts">("toolbar");
+  const setRailMenu = (a: PopoverAnchor | null | ((m: PopoverAnchor | null) => PopoverAnchor | null), tab: "toolbar" | "prompts" = "toolbar") => {
+    setRailTab(tab);
+    setRailMenuState(a);
+  };
+  const closeRailMenu = useCallback(() => setRailMenuState(null), []);
+  // Move mode for the circle style: drag the circles anywhere; Done ends it.
+  const [arranging, setArranging] = useState(false);
   // Hiding the tool in use leaves you with the pen rather than an invisible selection.
   const setRail = (l: RailLayout) => {
     p.setRail?.(l);
@@ -79,7 +87,8 @@ export function Toolbar(p: Props) {
     // The settings stay open while the rail moves or changes, so they follow its gear once it has.
     requestAnimationFrame(() => {
       const gear = document.querySelector<HTMLElement>("[data-rail-settings]");
-      if (gear) setRailMenu((m) => (m ? anchorOf(gear, l.dock) : m));
+      const at = l.style === "circle" ? l.free.tools : undefined;
+      if (gear) setRailMenuState((m) => (m ? anchorOf(gear, at ? (at[0] < 0.5 ? "left" : "right") : l.dock) : m));
     });
   };
   const showColors = tool.kind === "pen" || tool.kind === "highlighter";
@@ -144,16 +153,18 @@ export function Toolbar(p: Props) {
           onRedo={p.onRedo}
           rail={rail}
           rightInset={p.rightInset ?? 0}
-          onPenSettings={(circle) => {
+          onPenSettings={(circle, at) => {
             setRailMenu(null);
-            setPenMenu(anchorOf(circle, rail.dock));
+            setPenMenu(anchorOf(circle, at));
           }}
-          onSettings={(circle) => {
+          onSettings={(circle, at, tab) => {
             setPenMenu(null);
-            setRailMenu(anchorOf(circle, rail.dock));
+            setRailMenu(anchorOf(circle, at), tab);
           }}
           prompts={p.prompts ?? []}
           onPrompt={p.onPrompt ?? (() => {})}
+          arranging={arranging}
+          setRail={setRail}
         />
       ) : (
         <ToolRail
@@ -166,6 +177,7 @@ export function Toolbar(p: Props) {
           rightInset={p.rightInset ?? 0}
           prompts={p.prompts ?? []}
           onPrompt={p.onPrompt ?? (() => {})}
+          onNoPrompts={(button) => setRailMenu(anchorOf(button, rail.dock), "prompts")}
           settingsOpen={railMenu !== null}
           onSettings={(button) => {
             setPenMenu(null);
@@ -174,7 +186,34 @@ export function Toolbar(p: Props) {
         />
       )}
       {penMenuOpen && <PenSettings tool={tool} setTool={setTool} anchor={penMenu} onClose={closePenMenu} />}
-      {railMenu && <RailSettings layout={rail} setLayout={setRail} anchor={railMenu} onClose={closeRailMenu} />}
+      {railMenu && (
+        <RailSettings
+          key={railTab}
+          layout={rail}
+          setLayout={setRail}
+          anchor={railMenu}
+          onClose={closeRailMenu}
+          initialTab={railTab}
+          onArrange={() => {
+            setRailMenu(null);
+            setPenMenu(null);
+            setArranging(true);
+          }}
+        />
+      )}
+      {arranging && rail.style === "circle" && p.variant !== "sidebar" && (
+        <div role="status" className="fixed inset-x-0 top-[4.25rem] z-50 flex justify-center px-3">
+          <div className="card flex max-w-full items-center gap-2 py-1.5 pl-4 pr-1.5 shadow-lift">
+            <span className="min-w-0 text-sm text-slate-700">Drag the circles where you want them</span>
+            <button className="btn btn-ghost h-11 px-3" disabled={!rail.free.tools && !rail.free.prompts} onClick={() => setRail({ ...rail, free: {} })}>
+              Dock them
+            </button>
+            <button className="btn btn-primary h-11 px-4" onClick={() => setArranging(false)}>
+              Done
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -206,6 +245,8 @@ const penAttrs = (t: (typeof TOOLS)[number], open: boolean) =>
 interface RailControls {
   prompts: ChatPrompt[];
   onPrompt: (p: ChatPrompt) => void;
+  /** The prompt button was pressed with no prompts to show. */
+  onNoPrompts: (button: HTMLElement) => void;
   rail: RailLayout;
   rightInset: number;
   settingsOpen: boolean;
@@ -253,7 +294,7 @@ export function nearestButton(root: HTMLElement, x: number, y: number): HTMLButt
   return best;
 }
 
-function ToolRail({ tool, colors, color, sizes, size, showColors, showSizes, penMenuOpen, pick, setColor, setSize, canUndo, canRedo, onUndo, onRedo, rail, rightInset, settingsOpen, onSettings, prompts, onPrompt }: ToolControls & HistoryControls & RailControls) {
+function ToolRail({ tool, colors, color, sizes, size, showColors, showSizes, penMenuOpen, pick, setColor, setSize, canUndo, canRedo, onUndo, onRedo, rail, rightInset, settingsOpen, onSettings, prompts, onPrompt, onNoPrompts }: ToolControls & HistoryControls & RailControls) {
   const row = rail.dock === "bottom";
   const taps = useGenerousTaps();
   // Runs of tools stay together; colours, sizes and undo/redo are each their own group.
@@ -303,7 +344,7 @@ function ToolRail({ tool, colors, color, sizes, size, showColors, showSizes, pen
         </div>
       );
     }
-    if (item === "prompts") return <PromptButton prompts={prompts} onPrompt={onPrompt} />;
+    if (item === "prompts") return <PromptButton prompts={prompts} onPrompt={onPrompt} onEmpty={onNoPrompts} />;
     if (item === "history") {
       return (
         <div className={`flex ${flow}`}>
@@ -374,11 +415,16 @@ function ToolRail({ tool, colors, color, sizes, size, showColors, showSizes, pen
  * The bar's prompt menu: a tap fans the chat prompts out around the button to be tapped; holding
  * it and dragging towards one picks it on release, as on the circle toolbar.
  */
-function PromptButton({ prompts, onPrompt }: { prompts: ChatPrompt[]; onPrompt: (p: ChatPrompt) => void }) {
+function PromptButton({ prompts, onPrompt, onEmpty }: { prompts: ChatPrompt[]; onPrompt: (p: ChatPrompt) => void; onEmpty: (button: HTMLElement) => void }) {
   const ref = useRef<HTMLButtonElement>(null);
   const open = (sticky: boolean) => {
     const el = ref.current;
-    if (!el || !prompts.length) return null;
+    if (!el) return null;
+    // No prompts left: open the settings where they are added.
+    if (!prompts.length) {
+      onEmpty(el);
+      return null;
+    }
     const r = el.getBoundingClientRect();
     return fanAt(promptItems(prompts), [r.left + r.width / 2, r.top + r.height / 2], sticky);
   };

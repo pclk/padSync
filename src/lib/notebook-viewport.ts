@@ -27,12 +27,15 @@ export interface OverlayState {
   panelWidth: number;
   /** The screen edge the iPad rail is docked to (left unless moved in its settings). */
   railDock?: RailDock;
+  /** The iPad's toolbar circles were all moved by hand and float over the page. */
+  railFloating?: boolean;
 }
 
 /** The parts of the window covered by fixed controls: header, tool rail or sidebar, side panel. */
 export function overlayInsets(o: OverlayState): Insets {
   const panel = Math.max(0, o.panelWidth);
   if (toolbarVariant(o.kind) === "sidebar") return { top: TOOLBAR_H, right: panel, bottom: 0, left: o.sidebarOpen ? SIDEBAR_W.expanded : SIDEBAR_W.collapsed };
+  if (o.railFloating) return { top: TOOLBAR_H, right: panel, bottom: 0, left: 0 };
   const dock = o.railDock ?? "left";
   return {
     top: TOOLBAR_H,

@@ -657,7 +657,7 @@ pre,
   animation: hold-ring-show 120ms linear 100ms forwards;
 }
 .hold-ring circle:last-child {
-  stroke-dashoffset: 151;
+  stroke-dashoffset: 377;
   animation: hold-ring-fill var(--hold-ms, 500ms) linear forwards;
 }
 @keyframes hold-ring-show {

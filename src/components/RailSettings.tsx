@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import { DEFAULT_RAIL, canHide, isTool, moveItem, setHidden, type RailAlign, type RailDock, type RailItem, type RailLayout } from "@/lib/rail-layout";
 import { Icon, type IconName } from "./Icons";
 import { usePrompts } from "@/lib/settings";
-import { DEFAULT_PROMPTS, MAX_PROMPTS, PROMPT_ICONS, newPrompt, type ChatPrompt } from "@/lib/prompts";
+import { DEFAULT_PROMPTS, MAX_PROMPTS, PROMPT_CONTEXTS, PROMPT_ICONS, newPrompt, type ChatPrompt, type PromptContext } from "@/lib/prompts";
 import { useDismiss, usePopoverBox, type PopoverAnchor } from "./popover";
 
 export const RAIL_ITEM_INFO: Record<RailItem, { label: string; icon?: IconName }> = {
@@ -32,16 +32,19 @@ interface Props {
   setLayout: (l: RailLayout) => void;
   anchor: PopoverAnchor;
   onClose: () => void;
+  initialTab?: "toolbar" | "prompts";
+  /** Start moving the circles by hand (circle style). */
+  onArrange?: () => void;
 }
 
 /**
  * The rail's own settings, from the gear at its end: where it docks, and which items it shows in
  * what order. Rows move with arrow buttons rather than dragging, so a finger can't miss.
  */
-export function RailSettings({ layout, setLayout, anchor, onClose }: Props) {
+export function RailSettings({ layout, setLayout, anchor, onClose, initialTab = "toolbar", onArrange }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const box = usePopoverBox(anchor, 320);
-  const [tab, setTab] = useState<"toolbar" | "prompts">("toolbar");
+  const [tab, setTab] = useState<"toolbar" | "prompts">(initialTab);
   const [prompts, setPrompts] = usePrompts();
   // Stays open while you use the rail, so changes can be tried as they are made.
   useDismiss(ref, onClose, "[data-tap-zone]");
@@ -86,6 +89,18 @@ export function RailSettings({ layout, setLayout, anchor, onClose }: Props) {
         <p className="mb-3 text-[11px] text-slate-500">
           {circle ? "Hold the circle and drag towards a tool to pick it; tap it for colours and sizes." : "Every tool, colour and size as a button."}
         </p>
+        {circle && onArrange && (
+          <div className="mb-4">
+            <button className="btn btn-secondary btn-sm h-11 w-full justify-center" onClick={onArrange}>
+              <Icon name="layers" /> Move circles…
+            </button>
+            <p className="mt-1 text-[11px] text-slate-500">
+              {layout.free.tools || layout.free.prompts
+                ? "Moved circles float where you put them; the others stay docked as set below."
+                : "Drag each circle anywhere on the screen. Until you do, they stay docked as set below."}
+            </p>
+          </div>
+        )}
         <p className="mb-1 text-xs font-medium text-slate-700">Position</p>
         <div role="group" aria-label="Position" className="segmented mb-2 flex w-full [&>button]:flex-1">
           {(Object.keys(DOCK_LABELS) as RailDock[]).map((d) => (
@@ -143,6 +158,8 @@ export function RailSettings({ layout, setLayout, anchor, onClose }: Props) {
  */
 function PromptSettings({ prompts, setPrompts, shown }: { prompts: ChatPrompt[]; setPrompts: (p: ChatPrompt[]) => void; shown: boolean }) {
   const [editing, setEditing] = useState<string | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const isStarter = JSON.stringify(prompts) === JSON.stringify(DEFAULT_PROMPTS);
   const update = (id: string, patch: Partial<ChatPrompt>) => setPrompts(prompts.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   const move = (i: number, d: -1 | 1) => {
     const next = [...prompts];
@@ -152,8 +169,11 @@ function PromptSettings({ prompts, setPrompts, shown }: { prompts: ChatPrompt[];
   return (
     <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain p-3">
       <p className="mb-2 text-[11px] text-slate-500">
-        Open the prompt menu from the <Icon name="message" className="inline align-[-2px]" /> button{shown ? "" : " (hidden: show Chat prompts on the Toolbar tab)"} or a gesture set to Prompt menu. Prompts use the chat&rsquo;s context: the current page and any lasso selection.
+        Open the prompt menu from the <Icon name="message" className="inline align-[-2px]" /> button{shown ? "" : " (hidden: show Chat prompts on the Toolbar tab)"} or a gesture set to Prompt menu. Tap a prompt to change it.
       </p>
+      {!prompts.length && (
+        <p className="mb-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">No prompts. Add your own, or restore the starter ones.</p>
+      )}
       <ul className="-mx-1 space-y-1">
         {prompts.map((pr, i) => (
           <li key={pr.id} className={`rounded-lg ${editing === pr.id ? "bg-slate-50 ring-1 ring-slate-200" : ""}`}>
@@ -161,7 +181,7 @@ function PromptSettings({ prompts, setPrompts, shown }: { prompts: ChatPrompt[];
               <Icon name={pr.icon} className="shrink-0 text-lg text-slate-600" />
               <button className="min-h-11 flex-1 truncate pl-1 text-left text-sm text-slate-800" onClick={() => setEditing(editing === pr.id ? null : pr.id)} aria-expanded={editing === pr.id}>
                 {pr.label}
-                <span className="ml-1.5 text-[11px] text-slate-400">{pr.send ? "sends" : "to finish"}</span>
+                <span className="ml-1.5 text-[11px] text-slate-400">{pr.voice ? "records" : pr.send ? "sends" : "to finish"}</span>
               </button>
               <button className="icon-btn h-11 w-10" disabled={i === 0} onClick={() => move(i, -1)} aria-label={`Move ${pr.label} up`}>
                 <Icon name="arrowUp" />
@@ -182,10 +202,32 @@ function PromptSettings({ prompts, setPrompts, shown }: { prompts: ChatPrompt[];
                 </label>
                 <label className="flex min-h-11 items-center justify-between gap-2 text-xs font-medium text-slate-700">
                   <span>
-                    Send right away
-                    <span className="block font-normal text-slate-500">Off: it goes into the chat box for you to finish.</span>
+                    Record a voice message
+                    <span className="block font-normal text-slate-500">Picking it starts recording; Send sends what you said with the text above (which can be empty).</span>
                   </span>
-                  <input type="checkbox" className="switch" checked={pr.send} onChange={(e) => update(pr.id, { send: e.target.checked })} />
+                  <input type="checkbox" className="switch" checked={pr.voice} onChange={(e) => update(pr.id, { voice: e.target.checked, ...(e.target.checked ? { send: true } : {}) })} />
+                </label>
+                {!pr.voice && (
+                  <label className="flex min-h-11 items-center justify-between gap-2 text-xs font-medium text-slate-700">
+                    <span>
+                      Send right away
+                      <span className="block font-normal text-slate-500">Off: it goes into the chat box for you to finish.</span>
+                    </span>
+                    <input type="checkbox" className="switch" checked={pr.send} onChange={(e) => update(pr.id, { send: e.target.checked })} />
+                  </label>
+                )}
+                <label className="flex min-h-11 items-center justify-between gap-2 text-xs font-medium text-slate-700">
+                  <span>
+                    Send from the notebook
+                    <span className="block font-normal text-slate-500">What the chat sees with it.</span>
+                  </span>
+                  <select className="field h-10 w-auto py-0 text-xs" value={pr.context} onChange={(e) => update(pr.id, { context: e.target.value as PromptContext })}>
+                    {PROMPT_CONTEXTS.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <div role="radiogroup" aria-label="Icon" className="flex flex-wrap">
                   {PROMPT_ICONS.map((ic) => (
@@ -219,6 +261,25 @@ function PromptSettings({ prompts, setPrompts, shown }: { prompts: ChatPrompt[];
       >
         <Icon name="plus" /> Add prompt{prompts.length >= MAX_PROMPTS ? ` (up to ${MAX_PROMPTS})` : ""}
       </button>
+      <div className="mt-3 flex gap-2 border-t border-slate-100 pt-3">
+        <button className="btn btn-ghost btn-sm h-11 flex-1 justify-center" disabled={isStarter} onClick={() => setPrompts(DEFAULT_PROMPTS)}>
+          <Icon name="refresh" /> Restore starters
+        </button>
+        {/* Two taps, so one slip of the finger can't wipe them all. */}
+        <button
+          className={`btn btn-sm h-11 flex-1 justify-center ${confirmClear ? "bg-rose-600 text-white" : "btn-ghost btn-danger"}`}
+          disabled={!prompts.length}
+          onClick={() => {
+            if (!confirmClear) return setConfirmClear(true);
+            setPrompts([]);
+            setEditing(null);
+            setConfirmClear(false);
+          }}
+          onBlur={() => setConfirmClear(false)}
+        >
+          <Icon name="trash" /> {confirmClear ? "Tap again to delete all" : "Delete all"}
+        </button>
+      </div>
     </div>
   );
 }
