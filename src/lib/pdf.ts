@@ -55,24 +55,49 @@ export function rasterScale(page: Pick<PdfPage, 'height'>, density = typeof wind
   const fit = Math.sqrt(MAX_RASTER_PIXELS / (PAGE_WIDTH * page.height));
   return Math.max(0.25, Math.floor(Math.min(density, 2, fit) * 4) / 4);
 }
-// A small LRU of compressed rasters, shared by the viewport and exports. No 149-page canvas set.
+// An LRU of compressed rasters, shared by the viewport and exports, kept to a byte budget rather
+// than a count: a zoom through a long PDF asks for every page in view at the new density, and
+// going back to the old zoom should find them still here. No 149-page canvas set.
 const renders = new Map<string, Blob>();
+const RENDER_BUDGET = 48 * 1024 * 1024;
 let renderQueue: Promise<unknown> = Promise.resolve();
 registerDebugProbe('PDF cache', () => ({ openDocuments: documents.size, cachedRasters: renders.size, rasterMB: Math.round([...renders.values()].reduce((a, b) => a + b.size, 0) / 10485.76) / 100 }));
-export function pdfRaster(page: PdfPage, density?: number): Promise<Blob> {
+function remember(key: string, blob: Blob) {
+  renders.set(key, blob);
+  let total = 0;
+  for (const b of renders.values()) total += b.size;
+  for (const [k, b] of renders) { if (total <= RENDER_BUDGET || renders.size <= 1) break; renders.delete(k); total -= b.size; }
+}
+/** Any raster of the page already cached, sharpest first, to show while the wanted one renders. */
+export function cachedPdfRaster(page: PdfPage): Blob | null {
+  let best: Blob | null = null, bestScale = 0;
+  for (const [key, blob] of renders) {
+    const at = key.lastIndexOf(':');
+    if (key.slice(0, at) !== `${page.documentId}:${page.page}`) continue;
+    const scale = Number(key.slice(at + 1));
+    if (scale > bestScale) { best = blob; bestScale = scale; }
+  }
+  return best;
+}
+/**
+ * Renders are serialized, so a request whose `signal` aborts before its turn (the page scrolled
+ * away, or the zoom moved on) is skipped rather than holding up the pages in view.
+ */
+export function pdfRaster(page: PdfPage, density?: number, signal?: AbortSignal): Promise<Blob> {
   const scale = rasterScale(page, density);
   const key = `${page.documentId}:${page.page}:${scale}`;
   const cached = renders.get(key);
   if (cached) { renders.delete(key); renders.set(key,cached); return Promise.resolve(cached); }
   const job = renderQueue.catch(() => {}).then(async () => {
     const existing = renders.get(key); if (existing) return existing;
+    signal?.throwIfAborted();
     const doc = await openPdf(page.documentId), p = await doc.getPage(page.page);
     const viewport = p.getViewport({ scale: scale * PAGE_WIDTH / p.getViewport({ scale: 1 }).width });
     const canvas = document.createElement('canvas'); canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
     try {
       await p.render({ canvas, canvasContext: canvas.getContext('2d')!, viewport }).promise;
       const blob = await new Promise<Blob>((resolve,reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('PDF render failed')), 'image/png'));
-      renders.set(key,blob); while (renders.size > 6) renders.delete(renders.keys().next().value!);
+      remember(key, blob);
       return blob;
     } finally { canvas.width = canvas.height = 0; p.cleanup(); }
   });

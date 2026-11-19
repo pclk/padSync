@@ -534,20 +534,18 @@ function Editor({ notebookId }: { notebookId: string }) {
     if (isIpad) return;
     const entry = [...els.current].find(([, el]) => el.getBoundingClientRect().bottom > TOOLBAR_H);
     const offset = entry ? (TOOLBAR_H - entry[1].getBoundingClientRect().top) / controller.zoom : 0;
-    let frame = 0;
-    // Once the panel or sidebar has slid into place (or straight away if nothing animates).
+    // Once the panel or sidebar has slid into place (or straight away if nothing animates). The
+    // zoom and the scroll that keeps the top line in place land in one frame, as in commitZoom.
     const finish = () => {
       clearTimeout(timer);
       window.removeEventListener("transitionend", end);
-      setZoom(fit);
-      frame = requestAnimationFrame(() => {
-        if (entry) window.scrollBy(0, entry[1].getBoundingClientRect().top + offset * fit - TOOLBAR_H);
-      });
+      flushSync(() => setZoom(fit));
+      if (entry) window.scrollBy(0, entry[1].getBoundingClientRect().top + offset * fit - TOOLBAR_H);
     };
     const end = (event: TransitionEvent) => { if (event.propertyName === "width") finish(); };
     window.addEventListener("transitionend", end);
     const timer = setTimeout(finish, controller.zoom === fit ? 0 : 300);
-    return () => { clearTimeout(timer); cancelAnimationFrame(frame); window.removeEventListener("transitionend", end); };
+    return () => { clearTimeout(timer); window.removeEventListener("transitionend", end); };
   }, [fit, isIpad, controller]);
 
   const loaded = sections !== undefined && notebook !== undefined;
