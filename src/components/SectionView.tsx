@@ -73,7 +73,8 @@ export const SectionView = memo(function SectionView(p: Props) {
   // A stroke on a section that unmounts never gets its pointerup here; don't leave it open.
   useEffect(() => () => controller.endGesture(section.id), [controller, section.id]);
 
-  const tiles = useMemo(() => planTiles(height, strokes), [height, strokes]);
+  // Empty transparent ink canvases compete with PDF pages for Safari’s bitmap memory.
+  const tiles = useMemo(() => planTiles(height, strokes).filter(tile => tile.strokes.length > 0), [height, strokes]);
   const margin = section.data.margin;
   const marginPx = margin ? Math.round(PAGE_WIDTH * (margin.width ?? 0.3)) : 0;
 
@@ -84,14 +85,14 @@ export const SectionView = memo(function SectionView(p: Props) {
   // With the sectionScale flag off, the editor scales the whole notebook instead (the old way).
   const zoom = renderFlag("sectionScale") ? p.zoom : 1;
   return (
-    // The box takes the section's size on screen; the section inside is laid out at page size and
-    // scaled into it, so each section is its own (small) scaled layer.
-    <div className="shrink-0" style={{ width: PAGE_WIDTH * zoom, height: height * zoom }}>
+    // Layout zoom keeps page coordinates in notebook units without a persistent transformed
+    // layer for Safari to tile. The wrapper also keeps zoom out of export and magnifier clones.
+    <div className="shrink-0" style={{ width: PAGE_WIDTH, zoom }}>
     <section
       ref={sectionRef}
       data-section-id={section.id}
       className={`paper template-${section.data.template} relative bg-white shadow-[0_1px_3px_rgb(15_23_42/0.08),0_8px_24px_-8px_rgb(15_23_42/0.12)]`}
-      style={{ width: PAGE_WIDTH, height, transform: zoom === 1 ? undefined : `scale(${zoom})`, transformOrigin: "0 0" }}
+      style={{ width: PAGE_WIDTH, height }}
     >
       {section.data.pdf && <PdfBackground page={section.data.pdf} zoom={p.zoom} />}
       {margin && <MarginColumn margin={margin} width={marginPx} />}
