@@ -15,6 +15,7 @@ import type { Selection } from "@/ink/controller";
 import type { PresenceEntity, SectionEntity } from "@/lib/types";
 import { EarlierQuestions } from "./AskPanel";
 import { ChatPanel } from "./chat/ChatPanel";
+import { LecternPanel } from "./LecternPanel";
 import type { PanelMode } from "@/lib/chat-types";
 import { PROMPT_EVENT } from "@/lib/prompts";
 
@@ -101,7 +102,7 @@ export function SidePanel(p: Props) {
         role="tablist"
         aria-label="Side panel"
       >
-        {["chat", "section"].map((t) => (
+        {["chat", "section", "lecture"].map((t) => (
           <button
             key={t}
             role="tab"
@@ -116,6 +117,7 @@ export function SidePanel(p: Props) {
       <div className={tab === "chat" ? "flex min-h-0 flex-1" : "hidden"}>
         <ChatPanel {...p} mode={p.mode ?? "drawing"} visible={tab === "chat"} />
       </div>
+      <LecternPanel current={current} visible={tab === "lecture"} />
       <div className={tab === "section" ? "overflow-y-auto" : "hidden"}>
         <div className="border-b border-slate-200 p-4">
           <label className="flex items-center justify-between gap-2">

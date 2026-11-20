@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { deviceId, deviceKind } from "@/lib/db";
 import { useStoredState, useSyncStatus } from "@/lib/hooks";
+import { LECTERN_URL_DEFAULT, useLecternUrl } from "@/lib/lectern";
 import { useGestureBindings, useGestureTuning, useShowCopyButtons, useSyncDebug, useThemePreference } from "@/lib/settings";
 import { DEFAULT_GESTURES, DEFAULT_TUNING, GESTURES, TUNING_RANGES, actionsFor, type GestureAction } from "@/lib/touch-gestures";
 import { THEME_PREFERENCES } from "@/lib/theme";
@@ -34,6 +35,7 @@ export default function SettingsView() {
   const [showCopy, setShowCopy] = useShowCopyButtons();
   const [syncDebug, setSyncDebug] = useSyncDebug();
   const [theme, setTheme] = useThemePreference();
+  const [lectern, setLectern] = useLecternUrl();
   const [status, setStatus] = useState<Status | null>(null);
   const [authError] = useState(() => new URLSearchParams(window.location.search).get("auth_error"));
   const [canvas, setCanvas] = useState<CanvasCheck | null>(null);
@@ -121,6 +123,11 @@ export default function SettingsView() {
         <Setting label title="Show copy buttons" hint={<>&ldquo;Copy as image&rdquo; and &ldquo;Copy question text&rdquo; in the side panel, for pasting into a chat by hand. Ask AI through the Mac bridge doesn&rsquo;t need them.</>}>
           <input type="checkbox" className="switch" checked={showCopy} onChange={(e) => setShowCopy(e.target.checked)} />
         </Setting>
+        <label className="block">
+          <span className="block text-slate-800">Lectern address</span>
+          <span className="block text-xs text-slate-500">The lecture player on your Mac, shown in the side panel&rsquo;s Lecture tab. On this Mac: {LECTERN_URL_DEFAULT}. On an iPad: the Mac&rsquo;s address after <code>npm run start:lan</code>, e.g. http://your-mac.local:4747.</span>
+          <input aria-label="Lectern address" type="url" defaultValue={lectern} placeholder={LECTERN_URL_DEFAULT} onBlur={(e) => { const v = e.target.value.trim().replace(/\/+$/, ""); if (/^https?:\/\/[^\s/]+/.test(v)) setLectern(v); else e.target.value = lectern; }} className="mt-2 block w-full rounded-md border border-slate-300 px-3 py-2" />
+        </label>
       </section>
 
       <GestureSettings />

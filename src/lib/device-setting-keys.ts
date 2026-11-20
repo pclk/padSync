@@ -14,5 +14,6 @@ export const DEVICE_SETTING_KEYS = [
   "padsync.layoutIdleMs",
   "padsync.theme",
   "padsync.showCopyButtons",
+  "padsync.lecternUrl",
 ] as const;
 export type DeviceSettingKey = (typeof DEVICE_SETTING_KEYS)[number];
