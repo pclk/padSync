@@ -53,11 +53,17 @@ with a free Apple ID. The Mac side stays the web app.
 
 ## Phases
 
-1. **Shell** — XcodeGen project, app icon, WKWebView on the production URL with a persistent
+1. ✅ **Shell** (2026-11-21) — XcodeGen project, app icon, WKWebView on the production URL with a persistent
    data store, cookie hand-off, `/notebook` interception (stub screen). Build and side-load.
-2. **Store + sync** — GRDB schema mirroring the Dexie `entities`/`events` tables, HLC, Swift
-   sync engine (batches of 100 entities / 500 events, `more` paging, backoff, wake on foreground,
-   Neon Realtime later). Unit tests against recorded `/api/sync` fixtures.
+2. ✅ **Store + sync** (2026-11-21) — GRDB 7.12 (`ios/PadSync/Store/`): `entity`, `event` and
+   `meta` tables mirroring Dexie, `data` kept as JSON so unknown fields survive native edits.
+   `SyncEngine` ports src/lib/sync.ts: batches of 100 entities / 500 events, `more` paging,
+   ack only rows not rewritten in flight, newest hlc wins, backoff from `/api/sync-config`,
+   waits up to 3 s for an open stroke. Polls at the visible rate only while a notebook is open
+   (the web screens sync themselves), wakes on foreground, network return and sign-in (cookie
+   observer), and pushes once more when the app goes to the background. No Neon Realtime yet.
+   Tests: `ios/PadSyncTests` (`xcodebuild test`). Checked on the device: the first sync pulled
+   the whole account (~80k rows) into a ~130 MB database.
 3. **Native notebook** — continuous section scroll, PKCanvasView per visible section, templates,
    PDF backgrounds (PDFKit, bytes via `/api/pdfs`, cached on disk), text boxes, section growth,
    two/three-finger undo/redo, PKToolPicker + squeeze, presence.
