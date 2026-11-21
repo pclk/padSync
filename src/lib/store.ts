@@ -10,6 +10,8 @@ import {
   STROKE_STRIDE,
   type Entity,
   type EntityKind,
+  type FolderData,
+  type FolderEntity,
   type NotebookData,
   type NotebookEntity,
   type PadEvent,
@@ -54,9 +56,9 @@ export async function updateData<D>(id: string, patch: (data: D) => D) {
   await putEntities([{ ...row, data: patch(row.data as D) }]);
 }
 
-export async function createNotebook(title: string, sections: Omit<SectionData, "order" | "createdAt">[] = [], description?: string, source?: NotebookData["source"], notebookId?: string) {
+export async function createNotebook(title: string, sections: Omit<SectionData, "order" | "createdAt">[] = [], description?: string, source?: NotebookData["source"], notebookId?: string, folderId?: string) {
   const now = Date.now();
-  const nb = newEntity<"notebook", NotebookData>("notebook", "", "", { title, description, createdAt: now, ...(source ? { source } : {}) });
+  const nb = newEntity<"notebook", NotebookData>("notebook", "", "", { title, description, createdAt: now, ...(source ? { source } : {}), ...(folderId ? { folderId } : {}) });
   if (notebookId) nb.id = notebookId;
   nb.notebookId = nb.id;
   const secs = (sections.length ? sections : [blankSection()]).map((s, i) =>
@@ -126,6 +128,39 @@ export async function findImported(importHash: string) {
 
 export async function listNotebooks() {
   return (await db.entities.where("kind").equals("notebook").toArray()).filter((n) => !n.deleted) as NotebookEntity[];
+}
+
+export async function listFolders() {
+  return (await db.entities.where("kind").equals("folder").toArray()).filter((f) => !f.deleted) as FolderEntity[];
+}
+
+export async function createFolder(name: string, folderId?: string) {
+  const f = newEntity<"folder", FolderData>("folder", "", "", { name, createdAt: Date.now(), ...(folderId ? { folderId } : {}) });
+  f.notebookId = f.id;
+  await putEntities([f]);
+  return f.id;
+}
+
+/** Moves notebooks and folders into a folder ("" for the top level). */
+export async function moveToFolder(items: (NotebookEntity | FolderEntity)[], folderId: string) {
+  const rows = (await db.entities.bulkGet(items.map((i) => i.id))).filter((e): e is NotebookEntity | FolderEntity => !!e && !e.deleted);
+  await putEntities(rows.map((e) => {
+    const { folderId: _old, ...data } = e.data;
+    void _old;
+    return { ...e, data: folderId ? { ...data, folderId } : data } as typeof e;
+  }));
+}
+
+/** Deletes a folder; what was inside moves up to the folder's parent, so nothing is lost. */
+export async function deleteFolder(folder: FolderEntity) {
+  const parent = folder.data.folderId ?? "";
+  await db.transaction("rw", db.entities, async () => {
+    const inside = (await db.entities.where("kind").anyOf("notebook", "folder").toArray())
+      .filter((e) => !e.deleted && (e.data as NotebookData | FolderData).folderId === folder.id) as (NotebookEntity | FolderEntity)[];
+    await moveToFolder(inside, parent);
+    const row = (await db.entities.get(folder.id)) ?? folder;
+    await putEntities([{ ...row, deleted: 1 }]);
+  });
 }
 
 /**

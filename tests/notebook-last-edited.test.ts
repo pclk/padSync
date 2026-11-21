@@ -10,7 +10,7 @@ import type { Entity, NotebookEntity, PresenceData, StrokeData } from "@/lib/typ
 
 const live = vi.hoisted(() => ({ values: [] as unknown[], call: 0 }));
 vi.mock("@/lib/sync", () => ({ requestSync: vi.fn() }));
-vi.mock("dexie-react-hooks", () => ({ useLiveQuery: () => live.values[live.call++ % 4] }));
+vi.mock("dexie-react-hooks", () => ({ useLiveQuery: () => live.values[live.call++ % 5] }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/components/SyncBadge", () => ({ SyncBadge: () => null }));
 import Library from "@/components/Library";
@@ -111,7 +111,7 @@ describe("recently edited sort and label", () => {
   });
   it("defaults the library to Recently edited and shows the label on cards", () => {
     live.call = 0;
-    live.values = [[nb("a", "Algebra", T0 - 3_600_000), nb("b", "Biology", T0 - 60_000)], new Map(), undefined, new Map([["a", T0 - 5 * 60_000]])];
+    live.values = [[nb("a", "Algebra", T0 - 3_600_000), nb("b", "Biology", T0 - 60_000)], new Map(), undefined, new Map([["a", T0 - 5 * 60_000]]), []];
     vi.setSystemTime(T0);
     const html = renderToStaticMarkup(createElement(Library));
     expect(html).toMatch(/<option value="recent" selected="">Recently edited<\/option>/);
@@ -121,7 +121,7 @@ describe("recently edited sort and label", () => {
   });
   it("shows a placeholder until edit times load", () => {
     live.call = 0;
-    live.values = [[nb("a", "Algebra", T0)], new Map(), undefined, undefined];
+    live.values = [[nb("a", "Algebra", T0)], new Map(), undefined, undefined, []];
     expect(renderToStaticMarkup(createElement(Library))).not.toContain("Edited");
   });
 });

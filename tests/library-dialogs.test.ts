@@ -7,7 +7,7 @@ import type { NotebookEntity } from "@/lib/types";
 vi.mock("dexie-react-hooks", () => ({ useLiveQuery: () => undefined }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/lib/db", () => ({ db: {}, deviceId: () => "test" }));
-vi.mock("@/lib/store", () => ({ createNotebook: vi.fn(), lastEditedTimes: vi.fn(), listNotebooks: vi.fn(), putEntities: vi.fn() }));
+vi.mock("@/lib/store", () => ({ createNotebook: vi.fn(), lastEditedTimes: vi.fn(), listNotebooks: vi.fn(), listFolders: vi.fn(), createFolder: vi.fn(), deleteFolder: vi.fn(), moveToFolder: vi.fn(), putEntities: vi.fn() }));
 vi.mock("@/components/SyncBadge", () => ({ SyncBadge: () => null }));
 import { dialogKey } from "@/components/Dialog";
 import { DeleteDialog, RenameDialog, UNDO_MS, UndoToast } from "@/components/Library";

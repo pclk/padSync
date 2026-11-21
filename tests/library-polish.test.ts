@@ -3,13 +3,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { selectNotebooks } from "@/lib/library";
 import type { PresenceEntity } from "@/lib/types";
-import type { NotebookEntity } from "@/lib/types";
+import type { FolderEntity, NotebookEntity } from "@/lib/types";
 
-const state = vi.hoisted(() => ({ notebooks: undefined as NotebookEntity[] | undefined, call: 0, counts: undefined as Map<string, number> | undefined, ipad: undefined as PresenceEntity | undefined, edited: undefined as Map<string, number> | undefined }));
-vi.mock("dexie-react-hooks", () => ({ useLiveQuery: () => [state.notebooks, state.counts, state.ipad, state.edited][state.call++ % 4] }));
+const state = vi.hoisted(() => ({ notebooks: undefined as NotebookEntity[] | undefined, call: 0, counts: undefined as Map<string, number> | undefined, ipad: undefined as PresenceEntity | undefined, edited: undefined as Map<string, number> | undefined, folders: [] as FolderEntity[] }));
+vi.mock("dexie-react-hooks", () => ({ useLiveQuery: () => [state.notebooks, state.counts, state.ipad, state.edited, state.folders][state.call++ % 5] }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/lib/db", () => ({ db: {}, deviceId: () => "test" }));
-vi.mock("@/lib/store", () => ({ createNotebook: vi.fn(), lastEditedTimes: vi.fn(), listNotebooks: vi.fn(), putEntities: vi.fn() }));
+vi.mock("@/lib/store", () => ({ createNotebook: vi.fn(), lastEditedTimes: vi.fn(), listNotebooks: vi.fn(), listFolders: vi.fn(), createFolder: vi.fn(), deleteFolder: vi.fn(), moveToFolder: vi.fn(), putEntities: vi.fn() }));
 vi.mock("@/components/SyncBadge", () => ({ SyncBadge: () => null }));
 import Library from "@/components/Library";
 const nb = (id: string, title: string, createdAt: number) => ({ id, data: { title, createdAt } }) as NotebookEntity;

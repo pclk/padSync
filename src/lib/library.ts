@@ -1,4 +1,4 @@
-import type { NotebookEntity } from "./types";
+import type { FolderEntity, NotebookEntity } from "./types";
 
 export type LibrarySort = "recent" | "newest" | "oldest" | "title";
 
@@ -29,4 +29,26 @@ export function formatEdited(at: number, now: number) {
   if (days === 1) return "Edited yesterday";
   if (days < 7) return `Edited ${days} days ago`;
   return `Edited ${new Date(at).toLocaleDateString()}`;
+}
+
+/** The folder an item sits in, or "" for the top level (also when its folder is gone). */
+export function folderOf(item: NotebookEntity | FolderEntity, folders: Map<string, FolderEntity>) {
+  const id = item.data.folderId;
+  return id && folders.has(id) ? id : "";
+}
+
+/** The folders from the top level down to `id` (empty at the top level). Stops on a cycle. */
+export function folderPath(id: string, folders: Map<string, FolderEntity>) {
+  const path: FolderEntity[] = [];
+  for (let f = folders.get(id); f && !path.includes(f); f = f.data.folderId ? folders.get(f.data.folderId) : undefined) path.unshift(f);
+  return path;
+}
+
+/** Whether `id` is `ancestor` or sits somewhere inside it; a folder can't move into these. */
+export function isWithin(id: string, ancestor: string, folders: Map<string, FolderEntity>) {
+  return id === ancestor || folderPath(id, folders).some((f) => f.id === ancestor);
+}
+
+export function sortFolders(folders: FolderEntity[]) {
+  return [...folders].sort((a, b) => a.data.name.localeCompare(b.data.name, undefined, { numeric: true }) || a.id.localeCompare(b.id));
 }

@@ -11,7 +11,7 @@ export const SCHEMA_VERSION = 2;
 export const PAGE_WIDTH = 1376; // iPad Pro 13" (M4) landscape width in CSS px
 export const SCREEN_HEIGHT = 1032; // landscape height, used for default section sizes
 
-export type EntityKind = "notebook" | "section" | "stroke" | "textbox" | "presence";
+export type EntityKind = "notebook" | "section" | "stroke" | "textbox" | "presence" | "folder";
 
 export interface Entity<K extends EntityKind = EntityKind, D = unknown> {
   id: string;
@@ -33,6 +33,15 @@ export interface NotebookData {
   createdAt: number;
   /** Set on notebooks made by AI import: the payload's hash, to warn before importing it twice. */
   source?: { importHash: string; importedAt: number; jobId?: string };
+  /** The library folder it sits in; missing (or a folder that no longer exists) means the top level. */
+  folderId?: string;
+}
+
+/** A library folder. Folders nest through folderId, like notebooks; notebookId is the folder's own id. */
+export interface FolderData {
+  name: string;
+  createdAt: number;
+  folderId?: string;
 }
 
 export type Template = "plain" | "dots" | "grid" | "lines";
@@ -116,6 +125,7 @@ export type SectionEntity = Entity<"section", SectionData>;
 export type StrokeEntity = Entity<"stroke", StrokeData>;
 export type TextBoxEntity = Entity<"textbox", TextBoxData>;
 export type PresenceEntity = Entity<"presence", PresenceData>;
+export type FolderEntity = Entity<"folder", FolderData>;
 
 /** Append-only analytics log. Never updated, only inserted. */
 export interface PadEvent {

@@ -14,7 +14,7 @@ const PULL_LIMIT = 200; // keeps responses under Vercel's 4.5 MB body limit
 
 const entity = z.object({
   id: z.string().min(1).max(100),
-  kind: z.enum(["notebook", "section", "stroke", "textbox", "presence"]),
+  kind: z.enum(["notebook", "section", "stroke", "textbox", "presence", "folder"]),
   notebookId: z.string().max(100),
   parentId: z.string().max(100),
   data: z.record(z.string(), z.unknown()),
