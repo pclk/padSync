@@ -12,7 +12,7 @@ struct WebScreen: UIViewRepresentable {
         Coordinator(onOpenNotebook: onOpenNotebook)
     }
 
-    func makeUIView(context: Context) -> WKWebView {
+    func makeUIView(context: Context) -> WebContainer {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
         config.limitsNavigationsToAppBoundDomains = true
@@ -29,19 +29,39 @@ struct WebScreen: UIViewRepresentable {
         web.backgroundColor = .clear
         context.coordinator.attach(web)
         web.load(URLRequest(url: Server.baseURL))
-        return web
+        let container = WebContainer(web: web)
+        context.coordinator.container = container
+        return container
     }
 
-    func updateUIView(_ web: WKWebView, context: Context) {}
+    func updateUIView(_ container: WebContainer, context: Context) {}
 
     /// Tells the web app it runs inside the native app.
+    /// Also reports the page's background colour on load and whenever the theme changes.
     static let bridgeScript = """
     window.padsyncNative = Object.freeze({ version: 1 });
+    (function () {
+      var last = null;
+      function report() {
+        if (!document.body) return;
+        var c = getComputedStyle(document.body).backgroundColor;
+        if (c === "transparent" || (c.indexOf("rgba(") === 0 && c.slice(-3) === " 0)")) c = getComputedStyle(document.documentElement).backgroundColor;
+        if (c === last) return;
+        last = c;
+        window.webkit.messageHandlers.padsync.postMessage({ type: "pageColor", color: c });
+      }
+      document.addEventListener("DOMContentLoaded", function () {
+        report();
+        new MutationObserver(report).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class", "style"] });
+      });
+      window.addEventListener("load", report);
+    })();
     """
 
     @MainActor
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
         let onOpenNotebook: (String) -> Void
+        weak var container: WebContainer?
         private weak var web: WKWebView?
         private var urlObservation: NSKeyValueObservation?
 
@@ -74,6 +94,8 @@ struct WebScreen: UIViewRepresentable {
             switch type {
             case "openNotebook":
                 if let id = body["id"] as? String, !id.isEmpty { onOpenNotebook(id) }
+            case "pageColor":
+                if let css = body["color"] as? String, let color = UIColor(css: css) { container?.pageColor = color }
             default:
                 break
             }
@@ -111,6 +133,69 @@ struct WebScreen: UIViewRepresentable {
         func webViewWebContentProcessDidTerminate(_ web: WKWebView) {
             web.reload()
         }
+    }
+}
+
+/// Fills the screen edge to edge in the page's background colour, with the web view inside the
+/// safe area, so the status bar and home indicator strips match the page instead of showing white.
+/// The status bar text follows the page too: the window takes the page's light or dark style,
+/// while the web view keeps the system's, so the web app's "System" appearance still sees the OS.
+final class WebContainer: UIView {
+    let web: WKWebView
+    private var watchingScene = false
+    /// The page's background, reported by the bridge script.
+    var pageColor = UIColor(red: 0xf1 / 255, green: 0xf5 / 255, blue: 0xf9 / 255, alpha: 1) {
+        didSet { applyPageColor() }
+    }
+
+    init(web: WKWebView) {
+        self.web = web
+        super.init(frame: .zero)
+        backgroundColor = pageColor
+        addSubview(web)
+        web.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            web.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor),
+            web.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor),
+            web.leadingAnchor.constraint(equalTo: leadingAnchor),
+            web.trailingAnchor.constraint(equalTo: trailingAnchor),
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        guard let scene = window?.windowScene else { return }
+        if !watchingScene {
+            watchingScene = true
+            scene.registerForTraitChanges([UITraitUserInterfaceStyle.self]) { [weak self] (_: UIWindowScene, _: UITraitCollection) in self?.syncWebStyle() }
+        }
+        syncWebStyle()
+        applyPageColor()
+    }
+
+    private func applyPageColor() {
+        backgroundColor = pageColor
+        var white: CGFloat = 1
+        pageColor.getWhite(&white, alpha: nil)
+        window?.overrideUserInterfaceStyle = white < 0.5 ? .dark : .light
+    }
+
+    /// The web view reports the OS appearance, not the window's page-matched one.
+    private func syncWebStyle() {
+        guard let system = window?.windowScene?.traitCollection.userInterfaceStyle else { return }
+        if web.overrideUserInterfaceStyle != system { web.overrideUserInterfaceStyle = system }
+    }
+}
+
+extension UIColor {
+    /// Parses a computed CSS colour: `rgb(r, g, b)` or `rgba(r, g, b, a)`. Transparent counts as none.
+    convenience init?(css: String) {
+        let parts = css.drop { $0 != "(" }.dropFirst().prefix { $0 != ")" }
+            .split(whereSeparator: { $0 == "," || $0 == " " || $0 == "/" }).compactMap { Double($0) }
+        guard parts.count >= 3, (parts.count < 4 || parts[3] > 0) else { return nil }
+        self.init(red: parts[0] / 255, green: parts[1] / 255, blue: parts[2] / 255, alpha: 1)
     }
 }
 
