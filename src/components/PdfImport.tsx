@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { useRouter } from 'next/navigation';
 import { nanoid } from 'nanoid';
 import { cachePdf, pdfEngine } from '@/lib/pdf';
@@ -20,12 +20,16 @@ function put(url: string, blob: Blob, signal: AbortSignal, progress: (n: number)
     signal.addEventListener('abort',abort,{ once: true }); if (signal.aborted) { reject(new Error('Cancelled')); return; } xhr.send(blob);
   });
 }
-export default function PdfImport({ folderId }: { folderId?: string }) {
+/** Lets the library start an import from a drop anywhere on the page, or onto a folder. */
+export interface PdfImportHandle { importFiles(files: File[], folderId: string): void }
+/** Whether a drag carries files from outside (not a card being moved inside the library). */
+export const dragHasFiles = (e: { dataTransfer: DataTransfer }) => e.dataTransfer.types.includes('Files');
+export default function PdfImport({ folderId, ref }: { folderId?: string; ref?: Ref<PdfImportHandle> }) {
   const router = useRouter(), cancel = useRef<AbortController | null>(null);
   const [busy,setBusy] = useState(false), [status,setStatus] = useState(''), [problems,setProblems] = useState<string[]>([]), [progress,setProgress] = useState(0), [local,setLocal] = useState(false), [offline,setOffline] = useState(false), [over,setOver] = useState(false);
   useEffect(() => { const update = () => setOffline(!navigator.onLine); update(); window.addEventListener('online',update); window.addEventListener('offline',update); return () => { window.removeEventListener('online',update); window.removeEventListener('offline',update); cancel.current?.abort(); }; },[]);
   /** Imports one PDF as a notebook and returns its id. `say` prefixes progress with the file's place in the queue. */
-  async function importOne(file: File, signal: AbortSignal, say: (s: string) => void) {
+  async function importOne(file: File, signal: AbortSignal, say: (s: string) => void, into: string) {
     let remoteId = '', committed = false;
     try {
       if (file.size > MAX_PDF_BYTES || !pdfSignature(new Uint8Array(await file.slice(0,5).arrayBuffer()))) throw new Error('Choose a PDF up to 100 MiB.');
@@ -59,11 +63,12 @@ export default function PdfImport({ folderId }: { folderId?: string }) {
       }
       signal.throwIfAborted(); say('Saving notebook…');
       await cachePdf(documentId,file);
-      await createNotebook(file.name.replace(/\.pdf$/i,''),pdfSections(documentId,file.name,pages),local ? 'PDF stored on this device only.' : undefined,undefined,notebookId,folderId || undefined);
+      await createNotebook(file.name.replace(/\.pdf$/i,''),pdfSections(documentId,file.name,pages),local ? 'PDF stored on this device only.' : undefined,undefined,notebookId,into || undefined);
       committed = true; return notebookId;
     } finally { if (remoteId && !committed) await api({ action: 'abort', id: remoteId }).catch(() => {}); }
   }
-  async function run(list?: FileList | File[] | null) {
+  useImperativeHandle(ref, () => ({ importFiles: (files, into) => void run(files, into) }));
+  async function run(list?: FileList | File[] | null, into = folderId ?? '') {
     const files = Array.from(list ?? []);
     if (!files.length || cancel.current) return;
     const controller = new AbortController(); cancel.current = controller; const signal = controller.signal;
@@ -74,7 +79,7 @@ export default function PdfImport({ folderId }: { folderId?: string }) {
         if (signal.aborted) break;
         setProgress(0);
         const say = files.length === 1 ? setStatus : (s: string) => setStatus(`${file.name} (${n+1} of ${files.length}): ${s}`);
-        try { made.push(await importOne(file,signal,say)); }
+        try { made.push(await importOne(file,signal,say,into)); }
         catch(e) { if (signal.aborted) break; errors.push({ name: file.name, error: e instanceof Error ? e.message : 'PDF import failed.' }); }
       }
     } finally { cancel.current = null; setBusy(false); }
@@ -87,8 +92,8 @@ export default function PdfImport({ folderId }: { folderId?: string }) {
   }
   const failed = !busy && !!status && status !== 'Saving notebook…' && !status.startsWith('Imported');
   return <div id="pdf-import" data-over={over} className="dropzone flex flex-wrap items-center gap-x-4 gap-y-3 p-4 sm:p-5"
-    onDragOver={e => { e.preventDefault(); if (!busy) setOver(true); }} onDragLeave={() => setOver(false)}
-    onDrop={e => { e.preventDefault(); setOver(false); if (!busy) void run(e.dataTransfer.files); }}>
+    onDragOver={e => { if (!dragHasFiles(e)) return; e.preventDefault(); e.stopPropagation(); if (!busy) setOver(true); }} onDragLeave={() => setOver(false)}
+    onDrop={e => { if (!dragHasFiles(e)) return; e.preventDefault(); e.stopPropagation(); setOver(false); if (!busy) void run(e.dataTransfer.files); }}>
     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-xl text-rose-600"><Icon name="file" /></span>
     <div className="min-w-0 flex-1 basis-56">
       <p className="font-medium text-slate-900">Import PDFs</p>

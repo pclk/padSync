@@ -9,7 +9,7 @@ const state = vi.hoisted(() => ({ notebooks: undefined as NotebookEntity[] | und
 vi.mock("dexie-react-hooks", () => ({ useLiveQuery: () => [state.notebooks, state.counts, state.ipad, state.edited, state.folders][state.call++ % 5] }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/lib/db", () => ({ db: {}, deviceId: () => "test" }));
-vi.mock("@/lib/store", () => ({ createNotebook: vi.fn(), lastEditedTimes: vi.fn(), listNotebooks: vi.fn(), listFolders: vi.fn(), createFolder: vi.fn(), deleteFolder: vi.fn(), moveToFolder: vi.fn(), putEntities: vi.fn() }));
+vi.mock("@/lib/store", () => ({ createNotebook: vi.fn(), lastEditedTimes: vi.fn(), listNotebooks: vi.fn(), listFolders: vi.fn(), createFolder: vi.fn(), deleteFolders: vi.fn(), restoreFolders: vi.fn(), moveItems: vi.fn(), setDeleted: vi.fn(), putEntities: vi.fn() }));
 vi.mock("@/components/SyncBadge", () => ({ SyncBadge: () => null }));
 import Library from "@/components/Library";
 const nb = (id: string, title: string, createdAt: number) => ({ id, data: { title, createdAt } }) as NotebookEntity;
@@ -46,8 +46,8 @@ describe("library states and accessible actions", () => {
     const html = render();
     expect(html).toContain("Search notebooks");
     expect(html).toContain("Sort by");
-    expect(html).toContain('aria-label="Rename Algebra"');
-    expect(html).toContain('aria-label="Delete Algebra"');
+    expect(html).toContain('aria-label="More actions for Algebra"');
+    expect(html).toContain('aria-label="Select Algebra"');
     expect(html).not.toContain("group-hover:flex");
     expect(html).toContain('href="/notebook?id=a"');
   });
@@ -73,7 +73,7 @@ describe("independent library rendering regressions", () => {
     const html = render();
     expect(html).not.toContain("<script>");
     expect(html).toContain("&lt;script&gt;");
-    expect(html).toContain('aria-label="Delete &lt;script&gt;');
+    expect(html).toContain('aria-label="More actions for &lt;script&gt;');
   });
   it("hides a presence shortcut whose notebook is no longer live", () => {
     state.ipad = { notebookId: "deleted" } as PresenceEntity;

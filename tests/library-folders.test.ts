@@ -85,7 +85,7 @@ describe("library folders view", () => {
     expect(html).toContain("Back to Year 1");
   });
   it("move dialog leaves out the folder itself and folders inside it", () => {
-    const html = renderToStaticMarkup(createElement(MoveDialog, { item: folders[0], folders, onCancel: () => {}, onMove: () => {} }));
+    const html = renderToStaticMarkup(createElement(MoveDialog, { items: [folders[0]], folders, onCancel: () => {}, onMove: () => {} }));
     expect(html).toContain("All notebooks (top level)");
     expect(html).not.toContain("Physics");
   });

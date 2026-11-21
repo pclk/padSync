@@ -7,7 +7,7 @@ import type { NotebookEntity } from "@/lib/types";
 vi.mock("dexie-react-hooks", () => ({ useLiveQuery: () => undefined }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/lib/db", () => ({ db: {}, deviceId: () => "test" }));
-vi.mock("@/lib/store", () => ({ createNotebook: vi.fn(), lastEditedTimes: vi.fn(), listNotebooks: vi.fn(), listFolders: vi.fn(), createFolder: vi.fn(), deleteFolder: vi.fn(), moveToFolder: vi.fn(), putEntities: vi.fn() }));
+vi.mock("@/lib/store", () => ({ createNotebook: vi.fn(), lastEditedTimes: vi.fn(), listNotebooks: vi.fn(), listFolders: vi.fn(), createFolder: vi.fn(), deleteFolders: vi.fn(), restoreFolders: vi.fn(), moveItems: vi.fn(), setDeleted: vi.fn(), putEntities: vi.fn() }));
 vi.mock("@/components/SyncBadge", () => ({ SyncBadge: () => null }));
 import { dialogKey } from "@/components/Dialog";
 import { DeleteDialog, RenameDialog, UNDO_MS, UndoToast } from "@/components/Library";
@@ -91,14 +91,14 @@ describe("rename and delete dialogs", () => {
   });
 
   it("delete names the notebook, escapes it, and focuses the confirm button so Enter deletes", () => {
-    const html = renderToStaticMarkup(createElement(DeleteDialog, { notebook: nb, onCancel: noop, onDelete: noop }));
+    const html = renderToStaticMarkup(createElement(DeleteDialog, { items: [nb], onCancel: noop, onDelete: noop }));
     expect(html).toContain('role="dialog"');
     expect(html).toContain("Delete “Algebra &lt;1&gt;”?");
     expect(html).toMatch(/<button type="submit" data-autofocus="true"[^>]*>.*Delete<\/button>/);
   });
 
   it("the undo toast is a live status with an Undo button", () => {
-    const html = renderToStaticMarkup(createElement(UndoToast, { title: "Algebra <1>", onUndo: noop }));
+    const html = renderToStaticMarkup(createElement(UndoToast, { message: "Deleted “Algebra <1>”", onUndo: noop }));
     expect(html).toContain('role="status"');
     expect(html).toContain("Deleted “Algebra &lt;1&gt;”");
     expect(html).toMatch(/<button type="button"[^>]*>Undo<\/button>/);

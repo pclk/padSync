@@ -143,24 +143,79 @@ export async function createFolder(name: string, folderId?: string) {
 
 /** Moves notebooks and folders into a folder ("" for the top level). */
 export async function moveToFolder(items: (NotebookEntity | FolderEntity)[], folderId: string) {
-  const rows = (await db.entities.bulkGet(items.map((i) => i.id))).filter((e): e is NotebookEntity | FolderEntity => !!e && !e.deleted);
-  await putEntities(rows.map((e) => {
-    const { folderId: _old, ...data } = e.data;
-    void _old;
-    return { ...e, data: folderId ? { ...data, folderId } : data } as typeof e;
-  }));
+  await moveItems(items.map((item) => ({ id: item.id, to: folderId })));
+}
+
+/**
+ * Moves each item to its own destination folder ("" for the top level) in one write. Checked
+ * against what is stored now, not what the screen showed: a move into a folder that is gone, or
+ * of a folder into itself or a folder inside it, is skipped.
+ */
+export async function moveItems(moves: { id: string; to: string }[]) {
+  await db.transaction("rw", db.entities, async () => {
+    const rows = await db.entities.bulkGet(moves.map((m) => m.id));
+    const parent = new Map(((await db.entities.where("kind").equals("folder").toArray()) as FolderEntity[])
+      .filter((f) => !f.deleted).map((f) => [f.id, f.data.folderId ?? ""]));
+    const within = (id: string, ancestor: string) => {
+      for (const seen = new Set<string>(); id && !seen.has(id); id = parent.get(id) ?? "") {
+        if (id === ancestor) return true;
+        seen.add(id);
+      }
+      return false;
+    };
+    const out: (NotebookEntity | FolderEntity)[] = [];
+    rows.forEach((e, i) => {
+      const to = moves[i].to;
+      if (!e || e.deleted || (e.kind !== "notebook" && e.kind !== "folder")) return;
+      if (to && (!parent.has(to) || (e.kind === "folder" && within(to, e.id)))) return;
+      const { folderId: _old, ...data } = e.data as NotebookData | FolderData;
+      void _old;
+      if (e.kind === "folder") parent.set(e.id, to);
+      out.push({ ...e, data: to ? { ...data, folderId: to } : data } as NotebookEntity | FolderEntity);
+    });
+    await putEntities(out);
+  });
+}
+
+/** What deleteFolders changed, so it can be undone. */
+export interface FolderDeletion { folderIds: string[]; moved: { id: string; from: string }[] }
+
+/**
+ * Deletes folders; what was inside and isn't being deleted moves up to the nearest folder that
+ * survives, so nothing is lost. `keep` names items deleted alongside (left where they are).
+ */
+export async function deleteFolders(folders: FolderEntity[], keep: string[] = []): Promise<FolderDeletion> {
+  const gone = new Set(folders.map((f) => f.id));
+  const skip = new Set(keep);
+  return db.transaction("rw", db.entities, async () => {
+    const all = (await db.entities.where("kind").anyOf("notebook", "folder").toArray()).filter((e) => !e.deleted) as (NotebookEntity | FolderEntity)[];
+    const parent = new Map(all.filter((e) => e.kind === "folder").map((f) => [f.id, f.data.folderId ?? ""]));
+    const survivor = (id: string) => {
+      const seen = new Set<string>();
+      while (id && gone.has(id) && !seen.has(id)) { seen.add(id); id = parent.get(id) ?? ""; }
+      return gone.has(id) ? "" : id;
+    };
+    const moved = all
+      .filter((e) => !gone.has(e.id) && !skip.has(e.id) && e.data.folderId && gone.has(e.data.folderId))
+      .map((e) => ({ id: e.id, from: e.data.folderId!, to: survivor(e.data.folderId!) }));
+    await moveItems(moved);
+    const rows = all.filter((e) => gone.has(e.id));
+    await putEntities(rows.map((e) => ({ ...e, deleted: 1 as const })));
+    return { folderIds: rows.map((r) => r.id), moved: moved.map(({ id, from }) => ({ id, from })) };
+  });
+}
+
+/** Brings deleted folders back and returns what was moved out of them. */
+export async function restoreFolders(d: FolderDeletion) {
+  await db.transaction("rw", db.entities, async () => {
+    await setDeleted(d.folderIds, false);
+    await moveItems(d.moved.map((m) => ({ id: m.id, to: m.from })));
+  });
 }
 
 /** Deletes a folder; what was inside moves up to the folder's parent, so nothing is lost. */
 export async function deleteFolder(folder: FolderEntity) {
-  const parent = folder.data.folderId ?? "";
-  await db.transaction("rw", db.entities, async () => {
-    const inside = (await db.entities.where("kind").anyOf("notebook", "folder").toArray())
-      .filter((e) => !e.deleted && (e.data as NotebookData | FolderData).folderId === folder.id) as (NotebookEntity | FolderEntity)[];
-    await moveToFolder(inside, parent);
-    const row = (await db.entities.get(folder.id)) ?? folder;
-    await putEntities([{ ...row, deleted: 1 }]);
-  });
+  return deleteFolders([folder]);
 }
 
 /**
