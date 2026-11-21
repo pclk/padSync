@@ -46,6 +46,9 @@ interface Props {
   onZoomReset: () => void;
   panelOpen: boolean;
   onTogglePanel: () => void;
+  /** Annotation packs only: show just the question pages (see lib/pack.ts). */
+  questionsOnly?: boolean;
+  onToggleQuestions?: () => void;
   /** "rail" floats over the page (iPad); "sidebar" docks at the left edge (Mac). */
   variant?: ToolbarVariant;
   sidebarOpen?: boolean;
@@ -130,6 +133,11 @@ export function Toolbar(p: Props) {
           {(["auto", "drawing", "chat"] as const).map(mode => <button key={mode} aria-pressed={p.layout!.mode === mode} onClick={() => p.layout!.setMode(mode)}>{mode === "auto" ? "Auto" : mode === "drawing" ? "Drawing" : "Chat"}{mode === "auto" && p.layout!.mode === "auto" && <span aria-label={p.layout!.effective} title={p.layout!.effective} className={`inline-block h-1.5 w-1.5 rounded-full ${p.layout!.effective === "drawing" ? "bg-brand-500" : "bg-emerald-500"}`} />}</button>)}
         </div>}
         <SyncBadge />
+        {p.onToggleQuestions && (
+          <button className="btn btn-ghost px-2.5" aria-pressed={p.questionsOnly} onClick={p.onToggleQuestions} title="Show only question pages; the rest fold into bars">
+            <Icon name="list" className="text-lg" /><span className="hidden lg:inline">Questions only</span>
+          </button>
+        )}
         <button
           className="btn btn-ghost px-2.5"
           aria-pressed={p.panelOpen}

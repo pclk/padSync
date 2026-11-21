@@ -16,6 +16,8 @@ import type { PresenceEntity, SectionEntity } from "@/lib/types";
 import { EarlierQuestions } from "./AskPanel";
 import { ChatPanel } from "./chat/ChatPanel";
 import { LecternPanel } from "./LecternPanel";
+import { MaterialPanel } from "./MaterialPanel";
+import type { PackPage } from "@/lib/pack";
 import type { PanelMode } from "@/lib/chat-types";
 import { PROMPT_EVENT } from "@/lib/prompts";
 
@@ -32,6 +34,8 @@ interface Props {
   setFollow: (v: boolean) => void;
   ipad: PresenceEntity | null;
   onJump: (id: string) => void;
+  /** Annotation packs: each section's page in its PDF's page map (lib/pack.ts). */
+  packMap?: Map<string, PackPage>;
 }
 
 function fmt(ms: number) {
@@ -44,6 +48,7 @@ export function SidePanel(p: Props) {
   const [tab, setTab] = useState("chat");
   const [toast, setToast] = useState<string | null>(null);
   const [showSolution, setShowSolution] = useState(false);
+  const [play, setPlay] = useState<{ path: string; n: number } | null>(null);
   const [showCopy] = useShowCopyButtons();
   const stats = useLiveQuery(
     () => (current ? sectionStats(current.id) : undefined),
@@ -102,7 +107,7 @@ export function SidePanel(p: Props) {
         role="tablist"
         aria-label="Side panel"
       >
-        {["chat", "section", "lecture"].map((t) => (
+        {["chat", "section", "material", "lecture"].map((t) => (
           <button
             key={t}
             role="tab"
@@ -117,7 +122,19 @@ export function SidePanel(p: Props) {
       <div className={tab === "chat" ? "flex min-h-0 flex-1" : "hidden"}>
         <ChatPanel {...p} mode={p.mode ?? "drawing"} visible={tab === "chat"} />
       </div>
-      <LecternPanel current={current} visible={tab === "lecture"} />
+      <MaterialPanel
+        notebookId={p.notebookId}
+        current={current}
+        sections={p.sections}
+        packMap={p.packMap ?? EMPTY}
+        visible={tab === "material"}
+        onJump={p.onJump}
+        onPlay={(path) => {
+          setPlay({ path, n: (play?.n ?? 0) + 1 });
+          setTab("lecture");
+        }}
+      />
+      <LecternPanel current={current} visible={tab === "lecture"} request={play} />
       <div className={tab === "section" ? "overflow-y-auto" : "hidden"}>
         <div className="border-b border-slate-200 p-4">
           <label className="flex items-center justify-between gap-2">
@@ -290,6 +307,8 @@ export function SidePanel(p: Props) {
     </aside>
   );
 }
+
+const EMPTY = new Map<string, PackPage>();
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (

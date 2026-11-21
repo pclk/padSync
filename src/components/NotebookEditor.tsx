@@ -11,6 +11,8 @@ import { emitActivity } from "@/lib/activity";
 import { db, deviceId, deviceKind } from "@/lib/db";
 import { useLayoutMode, useStoredState } from "@/lib/hooks";
 import { addTextBox, insertSectionAfter, liveSections, logEvent, putEntities } from "@/lib/store";
+import { packPages, questionColumn, runOf, type ColumnItem, type PackPage } from "@/lib/pack";
+import { readPosition, writePosition } from "@/lib/position";
 import { registerDebugProbe } from "@/lib/sync-debug";
 import { renderFlag } from "@/lib/render-flags";
 import { RAIL_INSET, SIDEBAR_W, TOOLBAR_H, columnLayout, fitZoom, gutterFor, overlayInsets, pinchPlacement, toolbarVariant, verticalPadding, type PinchPlacement, type PinchStart } from "@/lib/notebook-viewport";
@@ -36,17 +38,6 @@ const PINCH_DEAD_ZONE = 0.03;
 // The Mac only follows the iPad after this long without input of its own.
 const FOLLOW_IDLE_MS = 15000;
 
-// Where this device last was in each notebook: a section and the logical offset into it.
-type Position = { sectionId: string; offsetY: number };
-const positionKey = (notebookId: string) => `padsync.position.${notebookId}`;
-function readPosition(notebookId: string): Position | null {
-  try {
-    const p = JSON.parse(localStorage.getItem(positionKey(notebookId)) ?? "null");
-    return p && typeof p.sectionId === "string" && typeof p.offsetY === "number" ? p : null;
-  } catch {
-    return null;
-  }
-}
 
 const DEFAULT_TOOL: ToolState = {
   kind: "pen",
@@ -113,6 +104,16 @@ function Editor({ notebookId }: { notebookId: string }) {
   const [dragging, setDragging] = useState<Set<string> | null>(null);
   const [editingText, setEditingText] = useState<string | null>(null);
   const [currentId, setCurrentId] = useState<string | null>(null);
+
+  // Annotation packs: the PDF's page map (lib/pack.ts) says which pages are questions. "Questions only" collapses each
+  // run of other pages into one bar; tapping a bar, or jumping to a page in it, opens that run.
+  const [questionsOnly, setQuestionsOnlyState] = useStoredState(`padsync.questionsOnly.${notebookId}`, false);
+  const [packMap, setPackMap] = useState<Map<string, PackPage>>(() => new Map());
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
+  const items = useMemo<ColumnItem[] | null>(
+    () => (questionsOnly && packMap.size && sections ? questionColumn(sections, packMap, expanded) : null),
+    [questionsOnly, packMap, sections, expanded],
+  );
 
   // The column of sections at screen size: each section scales itself (see SectionView), and the
   // gaps scale with them, so (client - column origin) / zoom is still a page coordinate.
@@ -655,9 +656,7 @@ function Editor({ notebookId }: { notebookId: string }) {
     const el = sid ? els.current.get(sid) : undefined;
     if (!restored.current || !sid || !el) return;
     const offsetY = Math.round((TOOLBAR_H - el.getBoundingClientRect().top) / controller.zoom);
-    try {
-      localStorage.setItem(positionKey(notebookId), JSON.stringify({ sectionId: sid, offsetY } satisfies Position));
-    } catch {}
+    writePosition(notebookId, { sectionId: sid, offsetY });
   }, [controller, notebookId]);
 
   useEffect(() => {
@@ -713,7 +712,8 @@ function Editor({ notebookId }: { notebookId: string }) {
       cancelAnimationFrame(frame);
       if (presenceTimer.current) clearTimeout(presenceTimer.current);
     };
-  }, [notebookId, publishPresence, savePosition, sections?.length]);
+    // the column changing (pages folded or opened) moves pages without a scroll event: look again
+  }, [notebookId, publishPresence, savePosition, sections?.length, items]);
 
   const presences = useLiveQuery(() => db.entities.where("kind").equals("presence").toArray(), []) as PresenceEntity[] | undefined;
   const ipad = useMemo(() => {
@@ -811,6 +811,56 @@ function Editor({ notebookId }: { notebookId: string }) {
     return cleanup;
   }, [loaded, savedPosition, controller]);
 
+  // --- questions only ------------------------------------------------------------------------
+  // which PDF page each section shows, as a string so ink and other section writes don't re-read the page maps
+  const pdfLayout = useMemo(() => JSON.stringify((sections ?? []).flatMap((s) => (s.data.pdf ? [{ id: s.id, documentId: s.data.pdf.documentId, page: s.data.pdf.page }] : []))), [sections]);
+  // Collapsing or opening pages above the one you're on would move it: note where it is first, and put it back after.
+  const anchor = useRef<{ sid: string; top: number } | null>(null);
+  const runEls = useRef(new Map<string, HTMLElement>());
+  const keepPlace = useCallback(() => {
+    const sid = currentRef.current;
+    const el = sid ? els.current.get(sid) : undefined;
+    anchor.current = sid && el ? { sid, top: el.getBoundingClientRect().top } : null;
+  }, []);
+  useEffect(() => {
+    let live = true;
+    void packPages(JSON.parse(pdfLayout)).then((map) => {
+      if (!live) return;
+      keepPlace();
+      setPackMap(map);
+    });
+    return () => {
+      live = false;
+    };
+  }, [pdfLayout, keepPlace]);
+  useLayoutEffect(() => {
+    const a = anchor.current;
+    anchor.current = null;
+    if (!a) return;
+    const el = els.current.get(a.sid) ?? (items ? runEls.current.get(runOf(items, a.sid) ?? "") : undefined);
+    if (el) window.scrollBy(0, el.getBoundingClientRect().top - a.top);
+  }, [items]);
+  const pendingJump = useRef<string | null>(null);
+  useEffect(() => {
+    const sid = pendingJump.current;
+    const el = sid ? els.current.get(sid) : undefined;
+    if (!el) return;
+    pendingJump.current = null;
+    window.scrollBy({ top: el.getBoundingClientRect().top - TOOLBAR_H - 12 });
+  }, [items]);
+  const setQuestionsOnly = (on: boolean) => {
+    keepPlace();
+    setExpanded(new Set());
+    setQuestionsOnlyState(on);
+  };
+  const toggleRun = (key: string, open: boolean) => {
+    keepPlace();
+    const next = new Set(expanded);
+    if (open) next.add(key);
+    else next.delete(key);
+    setExpanded(next);
+  };
+
   const sectionEl = useCallback((sid: string) => els.current.get(sid), []);
   const registerEl = useCallback((sid: string, el: HTMLElement | null) => {
     if (el) els.current.set(sid, el);
@@ -820,6 +870,13 @@ function Editor({ notebookId }: { notebookId: string }) {
   const jump = (sid: string) => {
     const el = els.current.get(sid);
     if (el) window.scrollBy({ top: el.getBoundingClientRect().top - TOOLBAR_H - 12, behavior: "smooth" });
+    else {
+      const key = items && runOf(items, sid);
+      if (key) {
+        pendingJump.current = sid;
+        setExpanded(new Set(expanded).add(key));
+      }
+    }
   };
 
   if (notebook === undefined || sections === undefined) return <div className="p-10 text-slate-400">Loading…</div>;
@@ -844,6 +901,8 @@ function Editor({ notebookId }: { notebookId: string }) {
         onZoomReset={resetZoom}
         panelOpen={showPanel}
         onTogglePanel={() => setPanelOpen(!panelOpen)}
+        questionsOnly={questionsOnly}
+        onToggleQuestions={packMap.size ? () => setQuestionsOnly(!questionsOnly) : undefined}
         variant={variant}
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
@@ -858,15 +917,23 @@ function Editor({ notebookId }: { notebookId: string }) {
           150 sections) loses tiles, which show as black blocks, and runs Safari out of memory. */}
       <div ref={pinchRef} style={{ marginLeft: column.left, marginBottom: `max(${vpad.bottomShare * 100}vh, ${vpad.bottomMin}px)`, width: PAGE_WIDTH * zoom, ...(perSection ? {} : { height: pageH * zoom }) }}>
       <div ref={wrapRef} className="page-wrap flex flex-col" style={perSection ? { width: PAGE_WIDTH * zoom, gap: 24 * zoom } : { width: PAGE_WIDTH, gap: 24, transform: `scale(${zoom})`, transformOrigin: "0 0" }}>
-        {sections.map((s, i) => (
+        {(items ?? sections.map((section, index): ColumnItem => ({ type: "section", section, index }))).map((it) => it.type !== "section" ? (
+          <RunBar
+            key={`run:${it.key}:${it.type}`}
+            item={it}
+            width={perSection ? PAGE_WIDTH * zoom : PAGE_WIDTH}
+            onToggle={() => toggleRun(it.key, it.type === "collapsed")}
+            registerEl={it.type === "collapsed" ? (el) => void (el ? runEls.current.set(it.key, el) : runEls.current.delete(it.key)) : undefined}
+          />
+        ) : (
           <SectionView
-            key={s.id}
-            section={s}
-            index={i}
+            key={it.section.id}
+            section={it.section}
+            index={it.index}
             controller={controller}
             zoom={zoom}
-            selection={selection?.sectionId === s.id ? selection : null}
-            draggingIds={selection?.sectionId === s.id ? dragging : null}
+            selection={selection?.sectionId === it.section.id ? selection : null}
+            draggingIds={selection?.sectionId === it.section.id ? dragging : null}
             selectionBar={!lasso.circle}
             editingTextId={editingText}
             setEditingTextId={setEditingText}
@@ -937,6 +1004,7 @@ function Editor({ notebookId }: { notebookId: string }) {
           setFollow={setFollow}
           ipad={ipad}
           onJump={jump}
+          packMap={packMap}
         />
       )}
     </div>
@@ -1000,3 +1068,24 @@ function HoldRing({ store, holdMs, label }: { store: HoldRingStore; holdMs: numb
 }
 /** The hold ring's size: twice a fingertip, so the part still to fill shows around it. */
 const HOLD_RING = 144;
+
+/** "Questions only": a run of collapsed pages (tap to show them), or the bar above an opened run (tap to hide it). */
+function RunBar({ item, width, onToggle, registerEl }: { item: Exclude<ColumnItem, { type: "section" }>; width: number; onToggle: () => void; registerEl?: (el: HTMLElement | null) => void }) {
+  const open = item.type === "opened";
+  const n = item.count;
+  return (
+    <button
+      ref={registerEl}
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      style={{ width }}
+      className={`flex items-center gap-3 rounded-xl border border-dashed px-4 text-left text-sm transition-colors pointer-coarse:py-3.5 ${open ? "border-slate-300 py-1.5 text-slate-500 hover:bg-white" : "border-slate-300 bg-white/60 py-2.5 text-slate-600 hover:border-brand-300 hover:bg-white hover:text-brand-700"}`}
+    >
+      <Icon name={open ? "chevronUp" : "chevronDown"} className="shrink-0" />
+      <span className="min-w-0 flex-1 truncate">
+        {open ? `Hide these ${n} pages` : <><span className="font-medium">{n} {n === 1 ? "page" : "pages"} of material</span> · {item.label}</>}
+      </span>
+    </button>
+  );
+}

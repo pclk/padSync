@@ -36,6 +36,7 @@ const PATHS = {
   code: "m16 18 6-6-6-6 M8 6l-6 6 6 6",
   chevronDown: "m6 9 6 6 6-6",
   chevronRight: "m9 18 6-6-6-6",
+  chevronUp: "m18 15-6-6-6 6",
   tick: "M20 6 9 17l-5-5",
   copy: "M20 9h-9a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Z M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1",
   activity: "M22 12h-4l-3 9L9 3l-3 9H2",

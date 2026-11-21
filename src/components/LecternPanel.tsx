@@ -11,7 +11,12 @@ interface State { title: string; label: string; t: number; chapter: string | nul
  * page you're on, so a question's worked example is one tap away. The iframe stays mounted while hidden, so
  * switching tabs doesn't stop or reload the video.
  */
-export function LecternPanel({ current, visible }: { current: SectionEntity | null; visible: boolean }) {
+export function LecternPanel({ current, visible, request }: {
+  current: SectionEntity | null;
+  visible: boolean;
+  /** A link to play, from elsewhere in the panel (the Material tab); `n` changes for each new request. */
+  request?: { path: string; n: number } | null;
+}) {
   const [base] = useLecternUrl();
   const [path, setPath] = useState("/");
   const [found, setFound] = useState<{ key: string; links: LecternLink[] } | null>(null);
@@ -50,6 +55,15 @@ export function LecternPanel({ current, visible }: { current: SectionEntity | nu
     if (win && loaded.current) win.postMessage({ type: "lectern:open", url: `${next}${next.includes("?") ? "&" : "?"}embed=1` }, new URL(base).origin);
     else setPath(next);
   };
+
+  const lastRequest = useRef(0);
+  useEffect(() => {
+    if (!request || request.n === lastRequest.current) return;
+    lastRequest.current = request.n;
+    open(request.path);
+    // open() only reads refs and the address; re-running it for a new address isn't wanted
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request]);
 
   const copy = async () => {
     if (!state) return;
