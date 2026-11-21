@@ -41,6 +41,11 @@ final class AppModel {
         sync = SyncEngine(db: database)
         cookieWatcher.onSessionChange = { [sync] in sync.wake(reason: "signed in") }
         sync.start()
+        #if DEBUG
+        // `-openNotebook <id>` opens a notebook at launch, for checking the editor in the simulator.
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "-openNotebook"), i + 1 < args.count { openNotebook = NotebookRoute(id: args[i + 1]) }
+        #endif
     }
 
     func scenePhaseChanged(_ phase: ScenePhase) {

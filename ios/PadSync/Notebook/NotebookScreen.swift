@@ -1,14 +1,15 @@
 import PencilKit
 import SwiftUI
 
-/// The native notebook editor. Phase 2 stub: shows what the native store holds for the notebook
-/// and the sync state over a PencilKit scratch canvas. Ink here isn't saved yet.
+/// The native notebook editor: a bar with the title, undo/redo and sync state over the
+/// section column. Waits for the notebook if it hasn't synced to this device yet.
 struct NotebookScreen: View {
     let notebookId: String
     let database: AppDatabase
     let sync: SyncEngine
     let onClose: () -> Void
     @State private var summary: AppDatabase.NotebookSummary?
+    @State private var editor: EditorBox?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -16,35 +17,65 @@ struct NotebookScreen: View {
                 Button(action: onClose) {
                     Label("Library", systemImage: "chevron.left")
                 }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(summary?.notebook == nil ? "Waiting for this notebook to sync…" : summary!.title)
-                        .font(.headline)
-                    Text(detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                Text(summary?.notebook == nil ? "Waiting for this notebook to sync…" : summary!.title)
+                    .font(.headline)
+                    .lineLimit(1)
                 Spacer()
+                Button { editor?.controller.undoTap() } label: { Image(systemName: "arrow.uturn.backward") }
+                    .accessibilityLabel("Undo")
+                Button { editor?.controller.redoTap() } label: { Image(systemName: "arrow.uturn.forward") }
+                    .accessibilityLabel("Redo")
                 SyncBadge(sync: sync)
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 12)
+            .padding(.vertical, 10)
             .background(.bar)
             Divider()
-            ScratchCanvas()
-                .ignoresSafeArea(edges: .bottom)
+            if let editor {
+                NotebookCanvas(controller: editor.controller)
+                    .ignoresSafeArea(edges: .bottom)
+            } else {
+                Spacer()
+            }
         }
         .task {
             do {
-                for try await next in database.observeNotebook(id: notebookId) { summary = next }
+                for try await next in database.observeNotebook(id: notebookId) {
+                    summary = next
+                    if editor == nil, next.notebook != nil { editor = EditorBox(notebookId: notebookId, database: database, sync: sync) }
+                }
             } catch {}
         }
+        .onDisappear { editor?.controller.stop() }
     }
+}
 
-    private var detail: String {
-        guard let summary, summary.notebook != nil else { return "Native editor preview · ink here isn't saved yet" }
-        let strokes = summary.strokeCounts.values.reduce(0, +)
-        return "\(summary.sections.count) sections · \(strokes) strokes in the native store · ink here isn't saved yet"
+/// Holds the UIKit editor for the screen's lifetime.
+@MainActor
+final class EditorBox {
+    let controller: NotebookViewController
+    private let picker: PKToolPicker
+
+    init(notebookId: String, database: AppDatabase, sync: SyncEngine) {
+        // Pen, fountain pen (barrel roll shapes the nib), monoline, highlighter, whole-stroke eraser
+        // (strokes sync whole, so no pixel eraser), lasso and ruler.
+        picker = PKToolPicker(toolItems: [
+            PKToolPickerInkingItem(type: .pen, color: UIColor(hex: "#111827")!, width: 2.2),
+            PKToolPickerInkingItem(type: .fountainPen, color: UIColor(hex: "#1d4ed8")!),
+            PKToolPickerInkingItem(type: .monoline, color: UIColor(hex: "#dc2626")!),
+            PKToolPickerInkingItem(type: .marker, color: UIColor(hex: "#facc15")!),
+            PKToolPickerEraserItem(type: .vector),
+            PKToolPickerLassoItem(),
+            PKToolPickerRulerItem(),
+        ])
+        controller = NotebookViewController(context: EditorContext(notebookId: notebookId, database: database, sync: sync, toolPicker: picker))
     }
+}
+
+struct NotebookCanvas: UIViewControllerRepresentable {
+    let controller: NotebookViewController
+    func makeUIViewController(context: Context) -> NotebookViewController { controller }
+    func updateUIViewController(_ controller: NotebookViewController, context: Context) {}
 }
 
 struct SyncBadge: View {
@@ -86,32 +117,5 @@ struct SyncBadge: View {
         case .needsLogin, .error: .red
         default: .secondary
         }
-    }
-}
-
-/// A full-size PencilKit canvas with the system tool picker. Fingers scroll, the Pencil draws.
-struct ScratchCanvas: UIViewRepresentable {
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    func makeUIView(context: Context) -> PKCanvasView {
-        let canvas = PKCanvasView()
-        canvas.drawingPolicy = .pencilOnly
-        canvas.backgroundColor = .white
-        canvas.isOpaque = true
-        canvas.alwaysBounceVertical = true
-        canvas.contentSize = CGSize(width: 1376, height: 4000)
-        canvas.tool = PKInkingTool(.pen, color: .black, width: 3)
-        let picker = context.coordinator.picker
-        picker.addObserver(canvas)
-        picker.setVisible(true, forFirstResponder: canvas)
-        DispatchQueue.main.async { canvas.becomeFirstResponder() }
-        return canvas
-    }
-
-    func updateUIView(_ canvas: PKCanvasView, context: Context) {}
-
-    @MainActor
-    final class Coordinator {
-        let picker = PKToolPicker()
     }
 }

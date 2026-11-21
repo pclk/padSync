@@ -64,7 +64,8 @@ with a free Apple ID. The Mac side stays the web app.
    observer), and pushes once more when the app goes to the background. No Neon Realtime yet.
    Tests: `ios/PadSyncTests` (`xcodebuild test`). Checked on the device: the first sync pulled
    the whole account (~80k rows) into a ~130 MB database.
-3. **Native notebook** — continuous section scroll, PKCanvasView per visible section, templates,
+3. 🟡 **Native notebook** (3a done 2026-11-21: column, PencilKit, PDF, templates, presence; blocks,
+   text box editing and section add/delete still to do) — continuous section scroll, PKCanvasView per visible section, templates,
    PDF backgrounds (PDFKit, bytes via `/api/pdfs`, cached on disk), text boxes, section growth,
    two/three-finger undo/redo, PKToolPicker + squeeze, presence.
 4. **One source of truth** — until this phase the WKWebView screens keep their own Dexie copy
@@ -72,6 +73,19 @@ with a free Apple ID. The Mac side stays the web app.
    native ink until both sync). Then expose the native store to the web layer through a
    `WKScriptMessageHandler` bridge so Dexie isn't needed in the app.
 5. **Lasso + Ask AI, block rendering** (Markdown/LaTeX blocks, solutions), returned files.
+
+## Notes from phase 3a
+
+- **PencilKit widths aren't point sizes.** Measured in `RenderWidthTests`: pen, monoline and
+  fountain pen draw `2·(size − 2)` pt, so a point size of 2 (the web's default pen is 2.2) is
+  invisible; the marker draws `0.485·size`. `StrokeCodec.pointSize(forWidth:)` converts.
+- **Stroke identity** on iPadOS 26 is creation date + point count + random seed (PKStroke.id
+  needs iPadOS 27). Web strokes get a seed hashed from their id, so a rebuilt stroke keeps its key.
+- **Native strokes keep their PencilKit original** (`pk`, base64 PKDrawing; `pkAt`, the first
+  sample when saved) beside the usual samples, so they reopen exactly as drawn. The web lasso
+  only translates `pts`, which the app applies to the original as a move.
+- The eraser is whole-stroke only: strokes sync whole, and a pixel eraser masks part of one.
+- A remote change to a section redraws its canvas, which clears PencilKit's undo for that section.
 
 ## Risks
 
