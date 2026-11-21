@@ -38,6 +38,15 @@ const body = z.object({
   events: z.array(event).max(2000),
 });
 
+// Postgres jsonb rejects \u0000 and unpaired surrogates (PDF text extraction yields both), and one
+// bad string fails the whole push, so the client retries the same batch forever. Strip them here.
+function pgSafe(v: unknown): unknown {
+  if (typeof v === "string") return v.replace(/\0/g, "").toWellFormed();
+  if (Array.isArray(v)) return v.map(pgSafe);
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [pgSafe(k) as string, pgSafe(x)]));
+  return v;
+}
+
 interface Row {
   id: string;
   kind: string;
@@ -75,7 +84,7 @@ export async function POST(req: NextRequest) {
   // It is held until this statement's implicit transaction commits.
   let lost: Row[] = [];
   if (pushed.length) {
-    const rows = pushed.map((c) => ({ id: c.id, kind: c.kind, notebook_id: c.notebookId, parent_id: c.parentId, data: c.data, hlc: c.hlc, deleted: c.deleted === 1 }));
+    const rows = pushed.map((c) => ({ id: c.id, kind: c.kind, notebook_id: c.notebookId, parent_id: c.parentId, data: pgSafe(c.data), hlc: c.hlc, deleted: c.deleted === 1 }));
     await sql.query(
       `with locked as materialized (select pg_advisory_xact_lock(72419381)), x as (
          select * from jsonb_to_recordset($1::jsonb)
@@ -106,7 +115,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (events.length) {
-    const rows = events.map((e) => ({ id: e.id, notebook_id: e.notebookId, section_id: e.sectionId, type: e.type, t: e.t, device: e.device, data: e.data }));
+    const rows = events.map((e) => ({ id: e.id, notebook_id: e.notebookId, section_id: e.sectionId, type: e.type, t: e.t, device: e.device, data: pgSafe(e.data) }));
     await sql.query(
       `insert into events (id, notebook_id, section_id, type, t, device, data)
        select id, notebook_id, section_id, type, t, device, data
