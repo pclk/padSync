@@ -21,6 +21,7 @@ import { Icon, Logo, type IconName } from "./Icons";
 import { Dialog } from "./Dialog";
 import { NotebookThumb } from "./NotebookThumb";
 import { deferredAction } from "@/lib/deferred";
+import { openNotebookNative } from "@/lib/native";
 import { useMarquee, type MarqueeMode } from "./useMarquee";
 
 /** How long the "Undo" toast stays; a notebook delete is only written after it. */
@@ -187,12 +188,12 @@ export default function Library() {
   const open = (item: Item, newTab = false) => {
     if (item.kind === "folder") return setFolder(item.id);
     if (newTab) window.open(`/notebook?id=${item.id}`, "_blank", "noopener");
-    else router.push(`/notebook?id=${item.id}`);
+    else if (!openNotebookNative(item.id)) router.push(`/notebook?id=${item.id}`);
   };
 
   const newBlank = () => mutate(async () => {
     const id = await createNotebook("Untitled notebook", [], undefined, undefined, undefined, current || undefined);
-    router.push(`/notebook?id=${id}`);
+    if (!openNotebookNative(id)) router.push(`/notebook?id=${id}`);
   });
 
   /** Moves, then offers to put each item back where it was. */
@@ -333,7 +334,11 @@ export default function Library() {
     if (swallowClick.current) { swallowClick.current = false; e.preventDefault(); return; }
     if (e.button !== 0) return;
     const range = e.shiftKey, toggle = e.metaKey || e.ctrlKey;
-    if (!range && !toggle && !selecting) return item.kind === "folder" ? open(item) : undefined; // the link opens it
+    if (!range && !toggle && !selecting) {
+      if (item.kind === "folder") return open(item);
+      if (openNotebookNative(item.id)) e.preventDefault(); // otherwise the link opens it
+      return;
+    }
     e.preventDefault();
     if (range) select(rangeIds(order, anchor.current, item.id), toggle ? "add" : "replace", selected);
     else if (toggle || selectMode || lastPointer.current !== "mouse") {
@@ -718,7 +723,7 @@ export default function Library() {
 
         {error && <p role="alert" className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</p>}
         {ipadNb && (
-          <Link href={`/notebook?id=${ipadNb.id}`} className="mb-6 flex items-center gap-3 rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800 transition-colors hover:bg-brand-100">
+          <Link href={`/notebook?id=${ipadNb.id}`} onClick={(e) => { if (openNotebookNative(ipadNb.id)) e.preventDefault(); }} className="mb-6 flex items-center gap-3 rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800 transition-colors hover:bg-brand-100">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-600 text-on-accent"><Icon name="tablet" /></span>
             <span className="min-w-0 break-words">Currently on <strong>{ipadNb.data.title}</strong>. Open and follow →</span>
           </Link>

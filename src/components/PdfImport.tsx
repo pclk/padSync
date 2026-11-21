@@ -5,6 +5,7 @@ import { nanoid } from 'nanoid';
 import { cachePdf, pdfEngine } from '@/lib/pdf';
 import { MAX_PDF_BYTES, PDF_PART_BYTES, pdfSections, pdfSignature } from '@/lib/pdf-meta';
 import { createNotebook } from '@/lib/store';
+import { openNotebookNative } from '@/lib/native';
 import { Icon } from './Icons';
 async function api(body: unknown, signal?: AbortSignal) {
   const r = await fetch('/api/pdfs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal });
@@ -84,7 +85,7 @@ export default function PdfImport({ folderId, ref }: { folderId?: string; ref?: 
       }
     } finally { cancel.current = null; setBusy(false); }
     // One PDF opens straight away; a batch stays in the library so all the new notebooks are in view.
-    if (files.length === 1 && made.length === 1) { setStatus('Saving notebook…'); router.push(`/notebook?id=${made[0]}`); return; }
+    if (files.length === 1 && made.length === 1) { if (openNotebookNative(made[0])) { setStatus(''); return; } setStatus('Saving notebook…'); router.push(`/notebook?id=${made[0]}`); return; }
     const done = made.length ? `Imported ${made.length} ${made.length === 1 ? 'notebook' : 'notebooks'}.` : '';
     if (signal.aborted) setStatus(`Import cancelled.${done ? ` ${done}` : ''}`);
     else if (files.length === 1) setStatus(errors[0]?.error ?? 'PDF import failed.');
