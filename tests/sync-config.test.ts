@@ -51,6 +51,7 @@ it('upgrades existing minimum constraints and preserves saved values',async()=>{
    await db.sql.query(`alter table sync_config drop constraint sync_config_${column}_check`);
    await db.sql.query(`alter table sync_config add constraint sync_config_${column}_check check(${column} between ${min} and ${max})`);
  }
+ await db.sql.query('delete from schema_state'); // as if the schema were from before the change
  await migrate(db.sql);
  expect((await (await GET(req('/api/sync-config',{session}))).json()).debounceMs).toBe(125);
  expect((await PUT(req('/api/sync-config',{method:'PUT',session,body:{debounceMs:0,visiblePollMs:0,hiddenPollMs:0,retryBaseMs:0}}))).status).toBe(200);

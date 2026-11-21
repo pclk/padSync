@@ -14,6 +14,7 @@ import { addTextBox, insertSectionAfter, liveSections, logEvent, putEntities } f
 import { packPages, questionColumn, runOf, type ColumnItem, type PackPage } from "@/lib/pack";
 import { readPosition, writePosition } from "@/lib/position";
 import { registerDebugProbe } from "@/lib/sync-debug";
+import { setSyncFollowing } from "@/lib/sync";
 import { renderFlag } from "@/lib/render-flags";
 import { RAIL_INSET, SIDEBAR_W, TOOLBAR_H, columnLayout, fitZoom, gutterFor, overlayInsets, pinchPlacement, toolbarVariant, verticalPadding, type PinchPlacement, type PinchStart } from "@/lib/notebook-viewport";
 import { PAGE_WIDTH, type NotebookEntity, type PresenceData, type PresenceEntity, type SectionEntity } from "@/lib/types";
@@ -642,7 +643,6 @@ function Editor({ notebookId }: { notebookId: string }) {
   const lastPresence = useRef(0);
   const presenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentRef = useRef<string | null>(null);
-  const followingScroll = useRef(0);
 
   // Reopen where this device left the notebook. Saving waits until the restore is over, so the
   // scroll-to-top of a fresh mount never overwrites the saved place.
@@ -674,7 +674,9 @@ function Editor({ notebookId }: { notebookId: string }) {
     const offsetY = el ? (TOOLBAR_H - el.getBoundingClientRect().top) / controller.zoom : 0;
     const data: PresenceData = { device: deviceId(), deviceKind: kind, sectionId: sid, offsetY: Math.round(offsetY), at: Date.now() };
     lastPresence.current = Date.now();
-    void putEntities([{ id: `presence-${deviceId()}`, kind: "presence", notebookId, parentId: "", data, hlc: "", deleted: 0, dirty: 1 }]);
+    // Stamped after the stored row, so a clock that stepped back since can't make the server keep the old place.
+    const id = `presence-${deviceId()}`;
+    void db.entities.get(id).then((prev) => putEntities([{ id, kind: "presence", notebookId, parentId: "", data, hlc: prev?.hlc ?? "", deleted: 0, dirty: 1 }]));
   }, [controller, kind, notebookId]);
 
   useEffect(() => {
@@ -698,8 +700,9 @@ function Editor({ notebookId }: { notebookId: string }) {
           if (saveTimer.current) clearTimeout(saveTimer.current);
           saveTimer.current = setTimeout(savePosition, 300);
         }
-        // Only the device being written on reports where it is; a following Mac stays quiet.
-        if (performance.now() - followingScroll.current < 1500) return;
+        // Only the iPad reports where it is; nothing reads a computer's presence. Each report wakes every
+        // device's sync, so a following Mac or PC echoing its own scroll slowed the others down.
+        if (!isIpad) return;
         if (presenceTimer.current) clearTimeout(presenceTimer.current);
         const wait = Math.max(0, 800 - (Date.now() - lastPresence.current));
         presenceTimer.current = setTimeout(publishPresence, wait);
@@ -713,7 +716,7 @@ function Editor({ notebookId }: { notebookId: string }) {
       if (presenceTimer.current) clearTimeout(presenceTimer.current);
     };
     // the column changing (pages folded or opened) moves pages without a scroll event: look again
-  }, [notebookId, publishPresence, savePosition, sections?.length, items]);
+  }, [notebookId, publishPresence, savePosition, sections?.length, items, isIpad]);
 
   const presences = useLiveQuery(() => db.entities.where("kind").equals("presence").toArray(), []) as PresenceEntity[] | undefined;
   const ipad = useMemo(() => {
@@ -742,16 +745,32 @@ function Editor({ notebookId }: { notebookId: string }) {
     };
   }, [isIpad]);
 
+  // Where the iPad is while this device follows it; a zoom refit lands here rather than on the line it
+  // saved before the follow scroll began.
+  const followTarget = useRef<{ sectionId: string; offsetY: number } | null>(null);
+  const followWasOn = useRef(follow);
+  const followingIpad = !isIpad && follow && ipad?.notebookId === notebookId;
   useEffect(() => {
-    if (!follow || !ipad || ipad.notebookId !== notebookId || !ipad.data.sectionId || controller.isDrawing()) return;
+    if (!followingIpad) return;
+    setSyncFollowing(true);
+    return () => setSyncFollowing(false);
+  }, [followingIpad]);
+  useEffect(() => {
+    // Turning Follow on is a request to go there now, not input to wait out.
+    if (follow && !followWasOn.current) lastInput.current = -Infinity;
+    followWasOn.current = follow;
+    followTarget.current = null;
+    if (!follow || !ipad || ipad.notebookId !== notebookId || !ipad.data.sectionId) return;
     if (performance.now() - lastInput.current < FOLLOW_IDLE_MS) return;
+    followTarget.current = { sectionId: ipad.data.sectionId, offsetY: ipad.data.offsetY };
+    if (controller.isDrawing()) return;
     const el = els.current.get(ipad.data.sectionId);
     if (!el) return;
     const delta = el.getBoundingClientRect().top + ipad.data.offsetY * controller.zoom - TOOLBAR_H;
     if (Math.abs(delta) < 4) return;
-    followingScroll.current = performance.now();
     window.scrollBy({ top: delta, behavior: "smooth" });
-  }, [follow, ipad, notebookId, controller, idleAt]);
+    // The iPad's page may arrive (or the column change) after its presence; look again when it does.
+  }, [follow, ipad, notebookId, controller, idleAt, sections, items]);
 
   // The Mac refits its zoom when the side panel or tool sidebar changes the visible strip, keeping
   // the line at the top of the screen in place.
@@ -766,7 +785,11 @@ function Editor({ notebookId }: { notebookId: string }) {
       clearTimeout(timer);
       window.removeEventListener("transitionend", end);
       flushSync(() => setZoom(fit));
-      if (entry) window.scrollBy(0, entry[1].getBoundingClientRect().top + offset * fit - TOOLBAR_H);
+      // Remote ink can switch the panel mode, and so the zoom, just as a follow scroll starts.
+      const target = performance.now() - lastInput.current >= FOLLOW_IDLE_MS ? followTarget.current : null;
+      const followEl = target && els.current.get(target.sectionId);
+      if (target && followEl) window.scrollBy(0, followEl.getBoundingClientRect().top + target.offsetY * fit - TOOLBAR_H);
+      else if (entry) window.scrollBy(0, entry[1].getBoundingClientRect().top + offset * fit - TOOLBAR_H);
     };
     const end = (event: TransitionEvent) => { if (event.propertyName === "width") finish(); };
     window.addEventListener("transitionend", end);

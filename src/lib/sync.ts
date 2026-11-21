@@ -18,9 +18,19 @@ let realtimeStatus: RealtimeStatus = 'connecting';
 let stopRealtime: (() => void) | undefined;
 let stopWakeListeners: (() => void) | undefined;
 const REALTIME_RECOVERY_MS = 30000;
+// A device following the iPad can't wait half a minute when a notification goes missing (Neon resets
+// its realtime pipeline on any catalog change, and a subscription can look live through it).
+const FOLLOW_RECOVERY_MS = 5000;
+let following = false;
 function pollDelay() {
   const configured = typeof document === 'undefined' || document.visibilityState === 'visible' ? config.visiblePollMs : config.hiddenPollMs;
-  return realtimeStatus === 'live' ? Math.max(REALTIME_RECOVERY_MS, configured) : configured;
+  return realtimeStatus === 'live' ? Math.max(following ? FOLLOW_RECOVERY_MS : REALTIME_RECOVERY_MS, configured) : configured;
+}
+/** Set while this device is following the iPad's place in an open notebook. */
+export function setSyncFollowing(value: boolean) {
+  if (following === value) return;
+  following = value;
+  if (started) schedule(pollDelay());
 }
 let debounceMs = DEFAULT_DEBOUNCE_MS;
 let config = { ...DEFAULT_SYNC_CONFIG };

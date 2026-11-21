@@ -15,7 +15,7 @@ it('avoids downloading accepted payloads twice while retaining conflict winners 
     const counting: Sql = { query: async (text, params) => {
       const rows = await sql.query(text, params);
       // Ignore the test adapter's schema initialization.
-      if (/^\s*(select|with locked|insert into events)/i.test(text)) {
+      if (/^\s*(select|with locked|insert into events)/i.test(text) && !/schema_state/.test(text)) {
         queries++;
         const size = Buffer.byteLength(JSON.stringify(rows));
         bytes += size;

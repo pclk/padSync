@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { neon } from "@neondatabase/serverless";
 import { DEFAULT_SYNC_CONFIG } from "@/lib/sync-policy";
 
@@ -47,6 +48,9 @@ export function setSqlForTests(sql: Sql | null) {
 
 export async function migrate(sql: Sql) {
   // Cold starts pay for this, so on Neon it is one HTTP round trip rather than one per statement.
+  // Schema statements only run when their text changed since the last run: re-adding constraints
+  // (and even a skipped ADD COLUMN IF NOT EXISTS) writes the catalog, and every catalog write resets
+  // Neon Realtime's pipeline, so each cold start left the other devices' live sync deaf for a while.
   const ddl = [
     `create table if not exists notebook_pdfs (id text primary key, owner text not null, notebook_id text not null, object_key text not null unique, name text not null, size integer not null, page_count integer not null, sha256 text not null, upload_id text not null, ready boolean not null default false, created_at timestamptz not null default now())`,
     `create table if not exists sync_config (id integer primary key check(id=1), debounce_ms integer not null check(debounce_ms between 100 and 10000))`,
@@ -173,6 +177,9 @@ export async function migrate(sql: Sql) {
     `create index if not exists chat_threads_list_idx on chat_threads(deleted_at, archived, last_message_at desc)`,
     `create index if not exists jobs_queue_idx on jobs (status, created_at)`,
     `create index if not exists jobs_section_idx on jobs (section_id, created_at)`,
+  ];
+  // Housekeeping is plain DML, so it runs on every cold start.
+  const housekeeping = [
     // Jobs finished before image/context were dropped on completion (see jobs.ts).
     `update jobs set image = null, context = '', files = null where status in ('done', 'error', 'cancelled') and (image is not null or context <> '' or files is not null)`,
     // Retain replay bytes only for the latest turn of a live thread.
@@ -187,6 +194,14 @@ export async function migrate(sql: Sql) {
     `update jobs set status = 'cancelled', finished_at = now(), updated_at = now(), files = null where status = 'uploading' and updated_at < now() - interval '1 day'`,
     `delete from job_inputs where job_id not in (select id from jobs where status in ('uploading', 'queued', 'running'))`,
   ];
-  if (sql.batch) await sql.batch(ddl);
-  else for (const text of ddl) await sql.query(text);
+  const hash = createHash("sha256").update(ddl.join("\0")).digest("hex");
+  const applied = await sql.query<{ hash: string }>(`select hash from schema_state where id = 1`).catch(() => []);
+  const texts = applied[0]?.hash === hash ? housekeeping : [
+    ...ddl,
+    `create table if not exists schema_state (id integer primary key check (id = 1), hash text not null)`,
+    `insert into schema_state values (1, '${hash}') on conflict (id) do update set hash = excluded.hash`,
+    ...housekeeping,
+  ];
+  if (sql.batch) await sql.batch(texts);
+  else for (const text of texts) await sql.query(text);
 }

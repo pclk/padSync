@@ -49,8 +49,10 @@ export function startRealtime(onNotify: () => void, onStatus: (status: RealtimeS
   function renewAt(expiresAt: number) {
     later(() => { void renew(); }, Math.max(1000, expiresAt - Date.now() - 10000));
   }
+  let renewing = false;
   async function renew() {
     const current = generation;
+    renewing = true;
     try {
       const next = await capability();
       if (current !== generation || !active()) return;
@@ -58,6 +60,7 @@ export function startRealtime(onNotify: () => void, onStatus: (status: RealtimeS
       await subscription!.renew(next.query);
       if (current === generation) renewAt(next.query.expiresAt);
     } catch { if (current === generation) failed(); }
+    finally { renewing = false; }
   }
   async function connect() {
     clear();
@@ -79,6 +82,8 @@ export function startRealtime(onNotify: () => void, onStatus: (status: RealtimeS
       subscription.onChange(snapshot => {
         if (current !== generation || !active()) return;
         if (snapshot.status === 'error' || snapshot.status === 'closed') { failed(snapshot.status === 'error' ? `subscription error: ${snapshot.error?.code ?? "unknown"}` : 'subscription closed'); return; }
+        // Stale means the capability ran out before the renewal timer (a slow device clock): renew now.
+        if (snapshot.status === 'stale') { publish('connecting'); if (!renewing) void renew(); return; }
         if (snapshot.status !== 'live') { publish('connecting'); return; }
         const wasLive = status === 'live';
         publish('live'); failures = 0;

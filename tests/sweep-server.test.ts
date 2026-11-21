@@ -154,10 +154,13 @@ describe("migrations", () => {
         for (const t of texts) await sql.query(t);
       },
     };
+    await sql.query("delete from schema_state"); // the first run below migrates, the second finds it current
     await migrate(batching);
     await migrate(batching);
     expect(batches).toHaveLength(2);
     expect(batches[0].length).toBeGreaterThan(5);
-    expect(singles).toBe(0);
+    // The schema is current by then: only housekeeping, no DDL (see migrate-no-ddl.test.ts).
+    expect(batches[1].filter((t) => /^\s*(alter|create)\b/i.test(t))).toEqual([]);
+    expect(singles).toBe(2); // one schema check per run, in front of its batch
   });
 });
