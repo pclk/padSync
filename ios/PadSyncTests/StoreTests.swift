@@ -81,6 +81,30 @@ struct StoreTests {
     }
 }
 
+struct LatestNotebookTests {
+    func row(_ id: String, _ kind: Entity.Kind, notebook: String, hlc: String, deleted: Bool = false) -> Entity {
+        Entity(id: id, kind: kind, notebookId: notebook, parentId: "", data: .object([:]), hlc: hlc, deleted: deleted, dirty: false)
+    }
+
+    @Test func picksTheNotebookWithTheNewestEditAnywhereInIt() throws {
+        let db = try AppDatabase.inMemory()
+        let rows = [
+            row("a", .notebook, notebook: "a", hlc: "1000000000003-0000-mac"), // renamed last, but...
+            row("b", .notebook, notebook: "b", hlc: "1000000000001-0000-mac"),
+            row("b-ink", .stroke, notebook: "b", hlc: "1000000000005-0000-mac"), // ...b has newer ink
+            row("a-look", .presence, notebook: "a", hlc: "1000000000009-0000-ipad"), // looking isn't editing
+            row("c", .notebook, notebook: "c", hlc: "1000000000008-0000-mac", deleted: true),
+        ]
+        _ = try db.applySync(sent: .init(since: 0, entities: [], events: []), changes: rows, cursor: 1)
+        #expect(try db.writer.read { try AppDatabase.latestNotebookId($0) } == "b")
+    }
+
+    @Test func noNotebooksMeansNothingToOpen() throws {
+        let db = try AppDatabase.inMemory()
+        #expect(try db.writer.read { try AppDatabase.latestNotebookId($0) } == nil)
+    }
+}
+
 /// Answers /api/sync from a script and records what was sent.
 final class StubTransport: SyncTransport, @unchecked Sendable {
     var responses: [(Int, [String: Any])]

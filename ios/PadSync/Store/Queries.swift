@@ -32,4 +32,15 @@ extension AppDatabase {
             .removeDuplicates()
             .values(in: writer)
     }
+
+    /// The live notebook edited most recently on any device: the newest clock stamp among its rows,
+    /// presence aside (lastEditedTimes in src/lib/store.ts, the library's "Recently edited").
+    static func latestNotebookId(_ db: Database) throws -> String? {
+        try String.fetchOne(db, sql: """
+            SELECT n.id FROM entity n
+            WHERE n.kind = 'notebook' AND n.deleted = 0
+            ORDER BY (SELECT max(e.hlc) FROM entity e WHERE e.notebookId = n.id AND e.kind != 'presence') DESC
+            LIMIT 1
+            """)
+    }
 }

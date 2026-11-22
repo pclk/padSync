@@ -76,6 +76,11 @@ final class AppDatabase: Sendable {
                 t.column("value", .blob).notNull()
             }
         }
+        // Answers "which notebook was edited last" from each notebook's newest row
+        // ([notebookId+hlc] in src/lib/db.ts).
+        m.registerMigration("v2") { db in
+            try db.create(index: "entity_notebook_hlc", on: "entity", columns: ["notebookId", "hlc"])
+        }
         return m
     }
 

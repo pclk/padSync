@@ -32,6 +32,7 @@ final class AppModel {
     let sync: SyncEngine
     @ObservationIgnored private let realtime = Realtime()
     @ObservationIgnored private var foreground = true
+    @ObservationIgnored private var backgroundedAt: Date?
     @ObservationIgnored private let cookieWatcher = CookieWatcher()
 
     init() {
@@ -56,6 +57,35 @@ final class AppModel {
         if let i = args.firstIndex(of: "-openNotebook"), i + 1 < args.count { openNotebook = NotebookRoute(id: args[i + 1]) }
         #endif
         updateRealtime()
+        // Unit tests run inside the app: keep them on the web screens.
+        if openNotebook == nil, ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {
+            openLatestNotebook(since: .now)
+        }
+    }
+
+    /// How long the app must have been away before coming back reopens the latest notebook.
+    static let reopenAfter: TimeInterval = 10 * 60
+
+    /// Opens the notebook edited last on any device. It waits briefly for the first pull, so
+    /// writing on the Mac a minute ago counts, then decides from whatever the store has.
+    private func openLatestNotebook(since requested: Date) {
+        Task { @MainActor [weak self] in
+            let deadline = Date.now.addingTimeInterval(1.5)
+            while let self, Date.now < deadline, !self.pulled(since: requested) {
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            guard let self, self.openNotebook == nil,
+                  let id = try? await self.database.writer.read({ try AppDatabase.latestNotebookId($0) }) else { return }
+            var instant = Transaction()
+            instant.disablesAnimations = true
+            withTransaction(instant) { self.openNotebook = NotebookRoute(id: id) }
+        }
+    }
+
+    /// A pull finished after `date`, or the server can't be reached and waiting won't help.
+    private func pulled(since date: Date) -> Bool {
+        if let at = sync.lastSyncedAt, at >= date { return true }
+        return [.offline, .needsLogin, .localOnly, .error].contains(sync.status)
     }
 
     /// Realtime runs only while a notebook shows: the web screens run their own.
@@ -69,8 +99,13 @@ final class AppModel {
             foreground = true
             updateRealtime()
             sync.wake(reason: "foreground")
+            if let away = backgroundedAt, Date.now.timeIntervalSince(away) >= Self.reopenAfter, openNotebook == nil {
+                openLatestNotebook(since: .now)
+            }
+            backgroundedAt = nil
         case .background:
             foreground = false
+            backgroundedAt = .now
             updateRealtime()
             // Push what's left before iOS suspends the app.
             // The request times out after 15 s, inside the ~30 s iOS allows.
