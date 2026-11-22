@@ -6,7 +6,12 @@ import { DEFAULT_PEN, EASINGS, strokePen, type PenParams } from "./pen-feel";
 // Stroke geometry lives in section-local coordinates (1 unit = 1 CSS px at zoom 1).
 // The outline polygon is computed once per (id, hlc) and cached as a Path2D.
 
-type PenFields = Pick<StrokeData, "tool" | "size" | "input" | "smoothing" | "sensitivity" | "pen">;
+type PenFields = Pick<StrokeData, "tool" | "size" | "input" | "smoothing" | "sensitivity" | "pen" | "pk">;
+
+/** A stroke from the iPad app. PencilKit has already smoothed it, and older ones carry only a few
+ *  points per curve, so the web's Pencil clean-up (trims, stop collapsing, streamline lag, tap
+ *  dots) would shorten it: an "=" drew as ":". It is drawn as recorded instead. */
+export const isNativeStroke = (d: Pick<StrokeData, "pk">) => typeof d.pk === "string" && d.pk.length > 0;
 
 export function strokeOptions(d: PenFields, last: boolean): StrokeOptions {
   if (d.tool === "highlighter") {
@@ -18,7 +23,7 @@ export function strokeOptions(d: PenFields, last: boolean): StrokeOptions {
     const p = strokePen(d);
     return {
       size: d.size,
-      streamline: p.streamline,
+      streamline: isNativeStroke(d) ? 0 : p.streamline,
       smoothing: p.smoothing,
       thinning: p.thinning,
       easing: EASINGS[p.easing],
@@ -48,6 +53,15 @@ export function strokeOptions(d: PenFields, last: boolean): StrokeOptions {
  * samples are joined by curves (interpolateGaps), and positions are smoothed along the stroke
  * (smoothPositions), each by the stroke's own pen parameters.
  */
+/** perfect-freehand input for any stroke: an iPad app stroke as recorded (gaps joined by curves),
+ *  anything else through toInput. */
+export function strokeInput(d: StrokeData): number[][] {
+  if (!isNativeStroke(d)) return toInput(d.pts, d.input, strokePen(d));
+  const out: number[][] = [];
+  for (let i = 0; i < d.pts.length; i += STROKE_STRIDE) out.push([d.pts[i], d.pts[i + 1], d.pts[i + 2]]);
+  return interpolateGaps(out, strokePen(d).maxPointGap);
+}
+
 export function toInput(pts: number[], input?: string, p: PenParams = DEFAULT_PEN): number[][] {
   const pen = input === "pen";
   if (pen && p.dropLiftOff) pts = withoutLiftOff(pts);
@@ -98,7 +112,7 @@ export function dotRadius(d: StrokeData): number {
 /** Centre of a stroke drawn as a dot: a single point, or a short Pencil tap (tapDotSize). */
 export function dotCentre(d: StrokeData): [number, number] | null {
   if (d.pts.length === STROKE_STRIDE) return [d.pts[0], d.pts[1]];
-  if (d.tool === "highlighter" || d.input !== "pen") return null;
+  if (d.tool === "highlighter" || d.input !== "pen" || isNativeStroke(d)) return null;
   const p = strokePen(d);
   return tapDot(p.dropLiftOff ? withoutLiftOff(d.pts) : d.pts, p.tapDotSize);
 }
@@ -110,7 +124,7 @@ export function strokePath(d: StrokeData, last = true): Path2D {
     p.arc(dot[0], dot[1], dotRadius(d), 0, Math.PI * 2);
     return p;
   }
-  return outlineToPath(getStroke(toInput(d.pts, d.input, strokePen(d)), strokeOptions(d, last)));
+  return outlineToPath(getStroke(strokeInput(d), strokeOptions(d, last)));
 }
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -122,7 +136,7 @@ export function strokeSvgPath(d: StrokeData): string {
     const [x, y, r] = [dot[0], dot[1], dotRadius(d)].map(r1);
     return `M${r1(x - r)} ${y}a${r} ${r} 0 1 0 ${r1(2 * r)} 0a${r} ${r} 0 1 0 ${r1(-2 * r)} 0Z`;
   }
-  const outline = getStroke(toInput(d.pts, d.input, strokePen(d)), strokeOptions(d, true));
+  const outline = getStroke(strokeInput(d), strokeOptions(d, true));
   const n = outline.length;
   if (n < 2) return "";
   // Quadratic curves through midpoints, exactly as outlineToPath.

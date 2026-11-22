@@ -15,6 +15,10 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate {
     private var sections: [Entity] = []
     private var heights: [String: CGFloat] = [:]
     private var tops: [CGFloat] = []
+    /// Each section's top at the last layout, to keep the page still when sections above resize.
+    private var laidOut: [String: CGFloat] = [:]
+    /// Sections whose height came from a mounted view (with its ink), not the estimate.
+    private var measured: Set<String> = []
     private(set) var views: [String: SectionView] = [:]
     private var observation: Task<Void, Never>?
     private var restored = false
@@ -44,6 +48,8 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate {
     /// The prompt fan a held finger points into, and where it pressed.
     private var heldFan: (press: CGPoint, far: CGFloat)?
     private var dragStart: PKDrawing?
+    /// The selected ink, floating above the page while it's dragged.
+    private var dragFloat: UIImageView?
     private let lassoAsk = FanPress()
     private let lassoEdit = FanPress()
     private let lassoColors = FanPress()
@@ -77,6 +83,8 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate {
         scrollView.alwaysBounceVertical = true
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.delaysContentTouches = false
+        // Tapping the status bar area mustn't fling you to the first page.
+        scrollView.scrollsToTop = false
         scrollView.frame = view.bounds
         scrollView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         view.addSubview(scrollView)
@@ -202,6 +210,10 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate {
     private static let addButtonHeight: CGFloat = 60
 
     private func layoutColumn() {
+        // What's on screen now, to hold in place: the section under a line 30% down the viewport.
+        let zoom = scrollView.zoomScale
+        let probe = (scrollView.contentOffset.y + scrollView.bounds.height * 0.3) / zoom
+        let anchor = sections.map(\.id).filter { laidOut[$0] != nil }.last { laidOut[$0]! <= probe }
         var y: CGFloat = Self.gap
         tops = sections.enumerated().map { i, s in
             defer { y += (heights[s.id] ?? SectionView.baseHeight(s, index: i)) + Self.gap }
@@ -212,7 +224,6 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate {
                                  width: addSize.width, height: Self.addButtonHeight)
         addButton.isHidden = sections.isEmpty
         if !sections.isEmpty { y += Self.addButtonHeight + Self.gap }
-        let zoom = scrollView.zoomScale
         // The column carries the zoom transform, so place it by bounds and center, never frame.
         column.bounds = CGRect(x: 0, y: 0, width: SectionView.pageWidth, height: max(y, 1))
         column.center = CGPoint(x: SectionView.pageWidth * zoom / 2, y: max(y, 1) * zoom / 2)
@@ -221,6 +232,13 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate {
         for (i, s) in sections.enumerated() {
             views[s.id]?.frame.origin = CGPoint(x: 0, y: tops[i])
         }
+        // A section above the screen changed height (its ink loaded, or it was re-created while
+        // scrolling): scroll by the same amount, so the page under your hand doesn't move.
+        if restored, let anchor, let old = laidOut[anchor], let i = sections.firstIndex(where: { $0.id == anchor }) {
+            let shift = (tops[i] - old) * zoom
+            if abs(shift) > 0.01 { scrollView.contentOffset.y += shift }
+        }
+        laidOut = Dictionary(uniqueKeysWithValues: zip(sections.map(\.id), tops))
         mountVisible()
     }
 
@@ -245,11 +263,17 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate {
                 let v = SectionView(section: s, index: i, context: context)
                 v.onHeightChange = { [weak self, weak v] in
                     guard let self, let v else { return }
+                    self.measured.insert(v.section.id)
+                    guard self.heights[v.section.id] != v.height else { return }
                     self.heights[v.section.id] = v.height
                     self.layoutColumn()
                 }
-                if heights[s.id] != v.height { resized = true }
-                heights[s.id] = v.height
+                // A section measured before keeps that height while its ink loads again; only an
+                // estimate is replaced by the new view's.
+                if !measured.contains(s.id) {
+                    if heights[s.id] != v.height { resized = true }
+                    heights[s.id] = v.height
+                }
                 v.frame.origin = CGPoint(x: 0, y: top)
                 column.addSubview(v)
                 views[s.id] = v
@@ -298,8 +322,50 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate {
                 self.addLoop(Array(loop.dropFirst()))
                 self.endLoop(cancel: false)
                 if args(contains: "-demoAsk") { self.lassoAsk.onTap() }
+            case "scrollCheck":
+                self.scrollCheck()
             default:
                 break
+            }
+        }
+    }
+
+    /// Scrolls down the notebook in steps (and back up now and then) and prints whenever the page
+    /// on screen moved by anything other than the scroll: the "teleporting" check.
+    private func scrollCheck() {
+        var step = 0, jumps = 0, worst: CGFloat = 0
+        var watched: (id: String, y: CGFloat)?
+        func screenY(_ id: String) -> CGFloat? {
+            sections.firstIndex { $0.id == id }.map { tops[$0] * scrollView.zoomScale - scrollView.contentOffset.y }
+        }
+        Task { [weak self] in
+            while let self {
+                try? await Task.sleep(for: .milliseconds(80))
+                // Anything that moved the page since the last step (ink loading, a re-render).
+                if let w = watched, let y = screenY(w.id), abs(y - w.y) > 1 {
+                    jumps += 1
+                    worst = max(worst, abs(y - w.y))
+                    print("padSync scrollCheck: step \(step) page moved \(Int(y - w.y)) pt between steps")
+                }
+                step += 1
+                if step > 400 || self.scrollView.contentOffset.y > self.scrollView.contentSize.height - 2 * self.scrollView.bounds.height {
+                    print("padSync scrollCheck: done, \(step) steps, \(jumps) jumps, worst \(Int(worst)) pt")
+                    return
+                }
+                let delta: CGFloat = step % 12 == 0 ? -700 : 160
+                let before = self.currentSection().flatMap { c in screenY(c.id).map { (c.id, $0) } }
+                let from = self.scrollView.contentOffset.y
+                self.scrollView.contentOffset.y = max(0, from + delta)
+                // The scroll itself: the page should move by exactly the scroll, no more.
+                if let (id, y0) = before, let y1 = screenY(id) {
+                    let off = y1 - (y0 - (max(0, from + delta) - from))
+                    if abs(off) > 1 {
+                        jumps += 1
+                        worst = max(worst, abs(off))
+                        print("padSync scrollCheck: step \(step) page moved \(Int(off)) pt while scrolling")
+                    }
+                }
+                if let id = self.currentSection()?.id, let y = screenY(id) { watched = (id, y) }
             }
         }
     }
@@ -328,7 +394,8 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate {
             let zoom = scrollView.zoomScale
             reading = CGPoint(x: scrollView.contentOffset.x / zoom, y: scrollView.contentOffset.y / zoom)
         }
-        mountVisible()
+        // Mid-pinch, sections mount once the zoom ends (scrollViewDidEndZooming).
+        if !scrollView.isZooming { mountVisible() }
         placeLassoCircle()
         guard restored else { return }
         let current = currentSection()?.id
@@ -503,6 +570,8 @@ extension NotebookViewController: UIPencilInteractionDelegate {
     }
 
     private func pencilAction(_ action: UIPencilPreferredAction, at point: CGPoint?) {
+        // Turned off in the tool circle's panel.
+        guard PencilGestures.enabled else { return }
         switch action {
         case .ignore:
             break
@@ -932,16 +1001,23 @@ extension NotebookViewController {
 
     /// Writes a drawing change with an undo step that puts `before` back.
     private func commit(_ drawing: PKDrawing, in v: SectionView, before: PKDrawing, name: String) {
-        let id = v.section.id
+        commit([(v.section.id, before, drawing)], name: name)
+    }
+
+    /// Writes changes to one or more sections as a single undo step.
+    private func commit(_ changes: [(id: String, before: PKDrawing, after: PKDrawing)], name: String) {
+        let ids = changes.map(\.id)
+        let befores = changes.map(\.before)
         view.window?.undoManager?.registerUndo(withTarget: self) { vc in
             MainActor.assumeIsolated {
-                guard let v = vc.views[id] else { return }
                 vc.clearSelection()
-                vc.commit(before, in: v, before: v.canvas.drawing, name: name)
+                let back = zip(ids, befores).compactMap { id, before in vc.views[id].map { (id, $0.canvas.drawing, before) } }
+                guard !back.isEmpty else { return }
+                vc.commit(back, name: name)
             }
         }
         view.window?.undoManager?.setActionName(name)
-        v.setDrawing(drawing, save: true)
+        for c in changes { views[c.id]?.setDrawing(c.after, save: true) }
     }
 
     private func refreshSelection(in v: SectionView) {
@@ -953,38 +1029,76 @@ extension NotebookViewController {
         placeLassoCircle()
     }
 
-    /// Dragging the selection box moves the ink with it; letting go writes the move.
+    /// Dragging the selection box moves the ink with it, into another section too: while dragging,
+    /// the ink floats above the page; letting go writes the move into the section under the
+    /// selection's centre.
     private func dragSelection(_ v: SectionView, by d: CGPoint, state: UIGestureRecognizer.State) {
         guard let sel = context.selection, sel.sectionId == v.section.id else { return }
+        let rect = sel.box.insetBy(dx: -8, dy: -8)
         switch state {
         case .began:
-            dragStart = v.canvas.drawing
+            let start = v.canvas.drawing
+            dragStart = start
             for f in [lassoAsk, lassoEdit, lassoColors] { f.close() }
             overlay.lassoCircle?.isHidden = true
-        case .changed, .ended:
+            let picked = PKDrawing(strokes: start.strokes.filter { sel.keys.contains(StrokeCodec.key($0)) })
+            var image: UIImage?
+            let scale = min(4, traitCollection.displayScale * scrollView.zoomScale)
+            UITraitCollection(userInterfaceStyle: .light).performAsCurrent { image = picked.image(from: rect, scale: scale) }
+            let float = UIImageView(image: image)
+            float.frame = rect.offsetBy(dx: v.frame.minX, dy: v.frame.minY)
+            float.layer.borderColor = UIColor.systemBlue.withAlphaComponent(0.6).cgColor
+            float.layer.borderWidth = 1
+            float.isUserInteractionEnabled = false
+            column.addSubview(float)
+            dragFloat?.removeFromSuperview()
+            dragFloat = float
+            v.setDrawing(PKDrawing(strokes: start.strokes.filter { !sel.keys.contains(StrokeCodec.key($0)) }), save: false)
+            // Still tracking the drag; the floating copy shows where it is.
+            v.selectionView.alpha = 0
+        case .changed:
+            dragFloat?.frame = rect.offsetBy(dx: v.frame.minX + d.x, dy: v.frame.minY + d.y)
+        case .ended:
             guard let start = dragStart else { return }
-            let t = CGAffineTransform(translationX: d.x, y: d.y)
-            let moved = PKDrawing(strokes: start.strokes.map { stroke in
-                guard sel.keys.contains(StrokeCodec.key(stroke)) else { return stroke }
+            endDrag(v)
+            v.setDrawing(start, save: false)
+            let centre = CGPoint(x: v.frame.minX + sel.box.midX + d.x, y: v.frame.minY + sel.box.midY + d.y)
+            let target = views.values.first { $0.frame.contains(centre) } ?? v
+            let shift = CGAffineTransform(translationX: d.x + v.frame.minX - target.frame.minX, y: d.y + v.frame.minY - target.frame.minY)
+            let moved = start.strokes.filter { sel.keys.contains(StrokeCodec.key($0)) }.map { stroke in
                 var st = stroke
-                st.transform = stroke.transform.concatenating(t)
+                st.transform = stroke.transform.concatenating(shift)
                 return st
-            })
-            v.selectionView.frame = sel.box.offsetBy(dx: d.x, dy: d.y).insetBy(dx: -8, dy: -8)
-            if state == .changed {
-                v.setDrawing(moved, save: false)
-            } else {
-                dragStart = nil
-                v.setDrawing(start, save: false)
-                commit(moved, in: v, before: start, name: "Move")
-                refreshSelection(in: v)
             }
+            if target === v {
+                let after = PKDrawing(strokes: start.strokes.map { stroke in
+                    guard sel.keys.contains(StrokeCodec.key(stroke)) else { return stroke }
+                    var st = stroke
+                    st.transform = stroke.transform.concatenating(shift)
+                    return st
+                })
+                commit(after, in: v, before: start, name: "Move")
+            } else {
+                let rest = PKDrawing(strokes: start.strokes.filter { !sel.keys.contains(StrokeCodec.key($0)) })
+                let into = target.canvas.drawing
+                commit([(v.section.id, start, rest), (target.section.id, into, PKDrawing(strokes: into.strokes + moved))], name: "Move")
+                context.selection?.sectionId = target.section.id
+                v.showSelection()
+            }
+            refreshSelection(in: target)
         default:
             if let start = dragStart { v.setDrawing(start, save: false) }
-            dragStart = nil
+            endDrag(v)
             v.showSelection()
             placeLassoCircle()
         }
+    }
+
+    private func endDrag(_ v: SectionView) {
+        dragFloat?.removeFromSuperview()
+        dragFloat = nil
+        dragStart = nil
+        v.selectionView.alpha = 1
     }
 
     // MARK: Prompts

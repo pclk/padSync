@@ -93,6 +93,9 @@ export interface StrokeData {
   sensitivity?: number;
   /** Pen parameters the stroke was drawn with that differ from the defaults (see pen-feel.ts). */
   pen?: Partial<Record<string, number | boolean | string>>;
+  /** Drawn in the iPad app: the PencilKit stroke (base64), kept so the app gets it back exactly.
+   *  Its `pts` are samples along PencilKit's already smooth curve (isNativeStroke). */
+  pk?: string;
 }
 
 export const STROKE_STRIDE = 6;

@@ -93,10 +93,17 @@ enum StrokeCodec {
         // A lasso Bigger or Smaller scales the transform; line widths scale with it.
         let t = stroke.transform
         let scale = sqrt(abs(Double(t.a * t.d - t.b * t.c)))
-        // Points on the curve, one per control point; their positions include any lasso move.
+        // Points along the curve every 2 pt, ending exactly at the end, like the web's own Pencil
+        // samples. One per control point was too sparse: the web's smoothing and tap detection
+        // shortened quick strokes (an "=" drew as ":"). Positions include any lasso move.
         var pts: [JSONValue] = []
         var impliedSizes: [Double] = []
-        for p in stroke.path.interpolatedPoints(by: .parametricStep(1)) {
+        var samples = Array(stroke.path.interpolatedPoints(by: .distance(2)))
+        if stroke.path.count > 1 {
+            let end = stroke.path.interpolatedPoint(at: CGFloat(stroke.path.count - 1))
+            if let last = samples.last, hypot(last.location.x - end.location.x, last.location.y - end.location.y) > 0.25 { samples.append(end) }
+        }
+        for p in samples {
             let at = p.location.applying(stroke.transform)
             let pressure = p.force > 0 ? min(1, Double(p.force / maxForce)) : 0.5
             pts += [.double(round2(at.x)), .double(round2(at.y)), .double(round3(pressure)),
