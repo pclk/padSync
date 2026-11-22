@@ -113,43 +113,25 @@ export function Toolbar(p: Props) {
   };
   const tools: ToolControls = { tool, colors, color, sizes, size, showColors, showSizes, penMenuOpen, pick, setColor, setSize };
 
-  // The top bar keeps navigation and status; the drawing tools sit at the left edge: a floating
-  // rail on the iPad, within thumb reach while the other hand holds the Pencil, and a docked
-  // sidebar on the Mac that collapses to an icon strip.
+  // No top bar, so the page runs full height: on the Mac the docked sidebar carries navigation,
+  // zoom, sync and the view toggles above and below the tools; the iPad's floating rail gets a
+  // small pill in the corner with the way back, sync and the panel.
+  const nav: NavControls = {
+    title: p.title,
+    zoom: p.zoom,
+    onZoomReset: p.onZoomReset,
+    layout: p.layout,
+    panelOpen: p.panelOpen,
+    onTogglePanel: p.onTogglePanel,
+    questionsOnly: p.questionsOnly,
+    onToggleQuestions: p.onToggleQuestions,
+  };
   return (
     <>
-      <header className="toolbar fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-1.5 border-b border-slate-200/80 bg-white/90 px-2 backdrop-blur-md sm:gap-2 sm:px-3">
-        <Link href="/" className="btn btn-ghost px-2" aria-label="Library">
-          <Icon name="back" className="text-lg" /><span className="hidden sm:inline">Library</span>
-        </Link>
-        <span aria-hidden="true" className="h-5 w-px bg-slate-200" />
-        <div className="mr-auto min-w-0 max-w-[40ch] truncate px-1 text-sm font-semibold text-slate-900">{p.title}</div>
-
-        <button className="btn btn-ghost btn-sm tabular-nums text-slate-500" onClick={p.onZoomReset} title="Reset zoom">
-          {Math.round(p.zoom * 100)}%
-        </button>
-        {p.notebookId && <Link href={`/import?notebookId=${encodeURIComponent(p.notebookId)}`} className="btn btn-ghost btn-sm"><Icon name="sparkles" className="text-brand-600" /><span className="hidden md:inline">AI & PDFs</span></Link>}
-        {p.layout && <div role="group" aria-label="Layout" className="segmented hidden sm:inline-flex">
-          {(["auto", "drawing", "chat"] as const).map(mode => <button key={mode} aria-pressed={p.layout!.mode === mode} onClick={() => p.layout!.setMode(mode)}>{mode === "auto" ? "Auto" : mode === "drawing" ? "Drawing" : "Chat"}{mode === "auto" && p.layout!.mode === "auto" && <span aria-label={p.layout!.effective} title={p.layout!.effective} className={`inline-block h-1.5 w-1.5 rounded-full ${p.layout!.effective === "drawing" ? "bg-brand-500" : "bg-emerald-500"}`} />}</button>)}
-        </div>}
-        <SyncBadge />
-        {p.onToggleQuestions && (
-          <button className="btn btn-ghost px-2.5" aria-pressed={p.questionsOnly} onClick={p.onToggleQuestions} title="Show only question pages; the rest fold into bars">
-            <Icon name="list" className="text-lg" /><span className="hidden lg:inline">Questions only</span>
-          </button>
-        )}
-        <button
-          className="btn btn-ghost px-2.5"
-          aria-pressed={p.panelOpen}
-          onClick={p.onTogglePanel}
-          title="Toggle side panel"
-        >
-          <Icon name="panel" className="text-lg" /><span className="hidden lg:inline">Panel</span>
-        </button>
-      </header>
+      {p.variant !== "sidebar" && <FloatingNav {...nav} />}
 
       {p.variant === "sidebar" ? (
-        <ToolSidebar {...tools} open={p.sidebarOpen ?? true} onToggle={p.onToggleSidebar} canUndo={p.canUndo} canRedo={p.canRedo} onUndo={p.onUndo} onRedo={p.onRedo} />
+        <ToolSidebar {...tools} {...nav} open={p.sidebarOpen ?? true} onToggle={p.onToggleSidebar} canUndo={p.canUndo} canRedo={p.canRedo} onUndo={p.onUndo} onRedo={p.onRedo} />
       ) : rail.style === "circle" ? (
         <ToolCircle
           {...tools}
@@ -479,19 +461,28 @@ function PromptButton({ prompts, onPrompt, onEmpty }: { prompts: ChatPrompt[]; o
  * The Mac's tools, docked under the header so they never cover the page. Expanded it names each
  * tool and shows colours and sizes; collapsed it keeps the tools and undo/redo as icons.
  */
-function ToolSidebar({ tool, colors, color, sizes, size, showColors, showSizes, penMenuOpen, pick, setColor, setSize, canUndo, canRedo, onUndo, onRedo, open, onToggle }: ToolControls & HistoryControls & { open: boolean; onToggle?: () => void }) {
+function ToolSidebar({ tool, colors, color, sizes, size, showColors, showSizes, penMenuOpen, pick, setColor, setSize, canUndo, canRedo, onUndo, onRedo, open, onToggle, ...nav }: ToolControls & HistoryControls & NavControls & { open: boolean; onToggle?: () => void }) {
   return (
     <aside
-      className="tool-sidebar fixed bottom-0 left-0 top-14 z-40 flex flex-col gap-2 overflow-y-auto overflow-x-hidden border-r border-slate-200/80 bg-white/95 p-1.5 backdrop-blur-md transition-[width] duration-250 motion-reduce:transition-none"
+      className="tool-sidebar fixed bottom-0 left-0 top-0 z-40 flex flex-col gap-2 overflow-y-auto overflow-x-hidden border-r border-slate-200/80 bg-white/95 p-1.5 backdrop-blur-md transition-[width] duration-250 motion-reduce:transition-none"
       style={{ width: open ? SIDEBAR_W.expanded : SIDEBAR_W.collapsed }}
       data-state={open ? "expanded" : "collapsed"}
       aria-label="Drawing tools"
     >
-      <div className={`flex items-center ${open ? "justify-between pl-2" : "justify-center"}`}>
-        {open && <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Tools</span>}
-        <button className="icon-btn h-9 w-9 text-lg" onClick={onToggle} aria-expanded={open} aria-label={open ? "Collapse tools" : "Expand tools"} title={open ? "Collapse tools (\\)" : "Expand tools (\\)"}>
+      <div className={`flex items-center ${open ? "justify-between" : "flex-col gap-1"}`}>
+        <Link href="/" className={`icon-btn h-9 shrink-0 text-lg ${open ? "w-auto gap-1 px-2 text-sm font-medium" : "w-9"}`} aria-label="Library" title="Library">
+          <Icon name="back" className="text-lg" />{open && <span>Library</span>}
+        </Link>
+        <button className="icon-btn h-9 w-9 text-lg" onClick={onToggle} aria-expanded={open} aria-label={open ? "Collapse tools" : "Expand tools"} title={open ? "Collapse sidebar (\\)" : "Expand sidebar (\\)"}>
           <Icon name="sidebar" />
         </button>
+      </div>
+      {open && <div className="truncate px-2 text-sm font-semibold text-slate-900" title={nav.title}>{nav.title}</div>}
+      <div className={`flex items-center gap-1 ${open ? "justify-between px-1" : "flex-col"}`}>
+        <button className={`btn btn-ghost btn-sm tabular-nums text-slate-500 ${open ? "" : "px-0 text-[11px]"}`} onClick={nav.onZoomReset} title="Reset zoom">
+          {Math.round(nav.zoom * 100)}%
+        </button>
+        <SyncBadge align="start" side showLabel={open} />
       </div>
 
       <div className="flex flex-col gap-0.5">
@@ -550,6 +541,65 @@ function ToolSidebar({ tool, colors, color, sizes, size, showColors, showSizes, 
           <Icon name="redo" />
         </button>
       </div>
+
+      <div className={`mt-auto flex flex-col gap-1 border-t border-slate-100 pt-2 ${open ? "" : "items-center"}`}>
+        {nav.layout && (open ? (
+          <div role="group" aria-label="Layout" className="segmented w-full [&>button]:flex-1">
+            {(["auto", "drawing", "chat"] as const).map((mode) => <button key={mode} aria-pressed={nav.layout!.mode === mode} onClick={() => nav.layout!.setMode(mode)}>{mode === "auto" ? "Auto" : mode === "drawing" ? "Drawing" : "Chat"}{mode === "auto" && nav.layout!.mode === "auto" && <span aria-label={nav.layout!.effective} title={nav.layout!.effective} className={`inline-block h-1.5 w-1.5 rounded-full ${nav.layout!.effective === "drawing" ? "bg-brand-500" : "bg-emerald-500"}`} />}</button>)}
+          </div>
+        ) : (
+          <button
+            className="icon-btn h-10 w-10 text-[11px] font-semibold"
+            onClick={() => nav.layout!.setMode(nav.layout!.mode === "auto" ? "drawing" : nav.layout!.mode === "drawing" ? "chat" : "auto")}
+            title={`Layout: ${nav.layout.mode} (click to change)`}
+            aria-label={`Layout: ${nav.layout.mode}`}
+          >
+            {nav.layout.mode === "auto" ? "Auto" : nav.layout.mode === "drawing" ? "Draw" : "Chat"}
+          </button>
+        ))}
+        {nav.onToggleQuestions && (
+          <button className={`btn btn-ghost ${open ? "justify-start px-2.5" : "h-10 w-10 px-0"}`} aria-pressed={nav.questionsOnly} onClick={nav.onToggleQuestions} title="Show only question pages; the rest fold into bars">
+            <Icon name="list" className="text-lg" />{open && <span>Questions only</span>}
+          </button>
+        )}
+        <button className={`btn btn-ghost ${open ? "justify-start px-2.5" : "h-10 w-10 px-0"}`} aria-pressed={nav.panelOpen} onClick={nav.onTogglePanel} title="Toggle side panel">
+          <Icon name="panel" className="text-lg" />{open && <span>Panel</span>}
+        </button>
+      </div>
     </aside>
+  );
+}
+
+interface NavControls {
+  title: string;
+  zoom: number;
+  onZoomReset: () => void;
+  layout?: Props["layout"];
+  panelOpen: boolean;
+  onTogglePanel: () => void;
+  questionsOnly?: boolean;
+  onToggleQuestions?: () => void;
+}
+
+/** The iPad web app's way back, sync and side panel: a small pill floating in the top corner. */
+function FloatingNav(nav: NavControls) {
+  return (
+    <nav aria-label="Notebook" className="fixed left-1/2 top-3 z-40 flex -translate-x-1/2 items-center gap-1 rounded-full border border-slate-200/80 bg-white/90 p-1 shadow-lift backdrop-blur-md">
+      <Link href="/" className="icon-btn h-10 w-10 text-lg" aria-label="Library" title="Library">
+        <Icon name="back" />
+      </Link>
+      <button className="btn btn-ghost btn-sm tabular-nums text-slate-500" onClick={nav.onZoomReset} title="Reset zoom">
+        {Math.round(nav.zoom * 100)}%
+      </button>
+      <SyncBadge align="start" />
+      {nav.onToggleQuestions && (
+        <button className="icon-btn h-10 w-10 text-lg" aria-pressed={nav.questionsOnly} onClick={nav.onToggleQuestions} title="Show only question pages; the rest fold into bars" aria-label="Questions only">
+          <Icon name="list" />
+        </button>
+      )}
+      <button className="icon-btn h-10 w-10 text-lg" aria-pressed={nav.panelOpen} onClick={nav.onTogglePanel} title="Toggle side panel" aria-label="Toggle side panel">
+        <Icon name="panel" />
+      </button>
+    </nav>
   );
 }

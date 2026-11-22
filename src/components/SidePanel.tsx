@@ -100,7 +100,7 @@ export function SidePanel(p: Props) {
   return (
     <aside
       style={{ width: p.width ?? 360 }}
-      className="side-panel fixed bottom-0 right-0 top-14 z-30 flex flex-col overflow-hidden border-l border-slate-200 bg-white text-sm transition-[width] duration-250 motion-reduce:transition-none"
+      className="side-panel fixed bottom-0 right-0 top-0 z-30 flex flex-col overflow-hidden border-l border-slate-200 bg-white text-sm transition-[width] duration-250 motion-reduce:transition-none"
     >
       <div
         className="flex shrink-0 items-center border-b border-slate-200 px-3 py-2"

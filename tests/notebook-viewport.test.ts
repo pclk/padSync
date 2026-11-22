@@ -276,6 +276,21 @@ describe("toolbar markup per device", () => {
     // Tools and undo/redo stay one click away while collapsed.
     for (const label of ["Pen", "Highlighter", "Eraser", "Lasso", "Text", "Undo", "Redo"]) expect(closed).toContain(`aria-label="${label}"`);
   });
+
+  it("has no top bar: the Mac's sidebar holds the way back, title, zoom, layout and panel", async () => {
+    const layout = { mode: "auto" as const, effective: "drawing" as const, setMode() {} };
+    const open = await render({ variant: "sidebar", sidebarOpen: true, title: "MA1301 Pack 4", layout, onToggleQuestions() {} });
+    expect(open).not.toContain("<header");
+    expect(open).not.toContain("AI &amp; PDFs");
+    for (const text of [">Library</span>", ">MA1301 Pack 4</div>", ">25%<", ">Auto", ">Questions only</span>", ">Panel</span>"]) expect(open).toContain(text);
+    const closed = await render({ variant: "sidebar", sidebarOpen: false, layout });
+    for (const label of ["Library", "Layout: auto"]) expect(closed).toContain(`aria-label="${label}"`);
+    expect(closed).toContain('title="Toggle side panel"');
+    // The iPad's rail gets a floating pill instead.
+    const ipad = await render({});
+    expect(ipad).not.toContain("<header");
+    expect(ipad).toContain('aria-label="Notebook"');
+  });
 });
 
 describe("rail dock insets", () => {

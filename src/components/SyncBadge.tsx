@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { useSyncStatus } from "@/lib/hooks";
 import { retrySyncNow } from "@/lib/sync";
 import { announcedView, describeSync, syncAnnouncement, type SyncView } from "@/lib/sync-status";
@@ -10,10 +10,13 @@ import { Icon } from "./Icons";
 // Self-contained: it subscribes to the sync engine and ticks its own countdown, so a status change
 // re-renders only this badge, never the toolbar or the editor around it.
 
-export function SyncBadge({ align = "end" }: { align?: "start" | "end" }) {
+/** `side`: the details open beside the badge, fixed, so a scrolling sidebar doesn't clip them.
+ *  `showLabel`: always name the state, not only on wide screens. */
+export function SyncBadge({ align = "end", side = false, showLabel = false }: { align?: "start" | "end"; side?: boolean; showLabel?: boolean }) {
   const state = useSyncStatus();
   const [tick, setTick] = useState(() => Date.now());
   const [open, setOpen] = useState(false);
+  const [place, setPlace] = useState<CSSProperties | undefined>(undefined);
   const wrap = useRef<HTMLDivElement>(null);
   const popoverId = useId();
   const now = Math.max(tick, state.at);
@@ -55,10 +58,10 @@ export function SyncBadge({ align = "end" }: { align?: "start" | "end" }) {
         aria-expanded={open}
         aria-controls={popoverId}
         data-sync-view={d.view}
-        onClick={() => { setTick(Date.now()); setOpen(o => !o); }}
+        onClick={() => { setTick(Date.now()); if (side) setPlace(sidePlace(wrap.current)); setOpen(o => !o); }}
       >
         <Icon name={d.icon} className={`text-sm ${d.tone} ${d.view === "syncing" ? "motion-safe:animate-spin" : ""}`} />
-        <span className="hidden tabular-nums lg:inline">{d.label}</span>
+        <span className={`tabular-nums ${showLabel ? "" : "hidden lg:inline"}`}>{d.label}</span>
       </button>
       <span role="status" aria-live="polite" className="sr-only">
         {announced ? syncAnnouncement(announced) : ""}
@@ -68,7 +71,8 @@ export function SyncBadge({ align = "end" }: { align?: "start" | "end" }) {
           id={popoverId}
           role="dialog"
           aria-label="Sync status"
-          className={`card absolute top-full z-50 mt-2 w-72 p-3 text-sm shadow-lift ${align === "end" ? "right-0" : "left-0"}`}
+          className={`card z-50 w-72 p-3 text-sm shadow-lift ${side ? "fixed" : `absolute top-full mt-2 ${align === "end" ? "right-0" : "left-0"}`}`}
+          style={side ? place : undefined}
         >
           <div className="flex items-center gap-2 font-semibold text-slate-900">
             <Icon name={d.icon} className={d.tone} />
@@ -91,4 +95,11 @@ export function SyncBadge({ align = "end" }: { align?: "start" | "end" }) {
       )}
     </div>
   );
+}
+
+/** Beside the badge, to its right, kept on screen. */
+function sidePlace(el: HTMLElement | null): CSSProperties | undefined {
+  if (!el) return undefined;
+  const r = el.getBoundingClientRect();
+  return { left: r.right + 8, top: Math.max(8, Math.min(r.top, window.innerHeight - 220)) };
 }
