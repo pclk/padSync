@@ -2,7 +2,7 @@
 import PdfImport, { dragHasFiles, type PdfImportHandle } from "./PdfImport";
 import { forgetPdf, sweepStoredPdfs } from "@/lib/pdf";
 
-import { useEffect, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type DragEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import {
   folderOf, folderPath, formatEdited, isWithin, itemName, movable, parentFolder, rangeIds, selectNotebooks, sortFolders,
   type LibraryItem, type LibrarySort,
@@ -22,6 +22,7 @@ import { Dialog } from "./Dialog";
 import { NotebookThumb } from "./NotebookThumb";
 import { deferredAction } from "@/lib/deferred";
 import { openNotebookNative } from "@/lib/native";
+import { NATIVE_INBOX_EVENT, nativeStore } from "@/lib/native-store";
 import { useMarquee, type MarqueeMode } from "./useMarquee";
 
 /** How long the "Undo" toast stays; a notebook delete is only written after it. */
@@ -37,6 +38,7 @@ type View = "grid" | "list";
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+const noSubscribe = () => () => {};
 const readStore = (key: string) => { try { return sessionStorage.getItem(key); } catch { return null; } };
 const readLocal = (key: string) => { try { return localStorage.getItem(key); } catch { return null; } };
 
@@ -49,6 +51,44 @@ export default function Library() {
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
   const searchInput = useRef<HTMLInputElement>(null);
+  // In the iPad app, search also looks through handwriting the app has read (HandwritingIndex).
+  const inApp = useSyncExternalStore(noSubscribe, () => !!nativeStore(), () => false);
+  const [ink, setInk] = useState<{ term: string; hits: Map<string, string> }>();
+  const inkTerm = query.trim();
+  useEffect(() => {
+    const store = nativeStore();
+    if (!store || !inkTerm) return;
+    let live = true;
+    const t = setTimeout(() => {
+      store.searchInk(inkTerm).then((hits) => {
+        if (live) setInk({ term: inkTerm.toLocaleLowerCase(), hits: new Map(hits.map((h) => [h.notebookId, h.line])) });
+      }).catch(() => {});
+    }, 150);
+    return () => { live = false; clearTimeout(t); };
+  }, [inkTerm]);
+  // PDFs shared to the iPad app from other apps import as notebooks at the top level.
+  useEffect(() => {
+    const store = nativeStore();
+    if (!store) return;
+    let taking = false;
+    const take = async () => {
+      if (taking) return;
+      taking = true;
+      try {
+        const waiting = await store.inbox();
+        if (!waiting.length || !pdf.current) return;
+        pdf.current.importFiles(waiting.map((f) => new File([Uint8Array.from(atob(f.base64), (c) => c.charCodeAt(0))], f.name, { type: "application/pdf" })), "");
+        await store.clearInbox(waiting.map((f) => f.id));
+      } catch {
+        // Left in the inbox for next time.
+      } finally {
+        taking = false;
+      }
+    };
+    void take();
+    window.addEventListener(NATIVE_INBOX_EVENT, take);
+    return () => window.removeEventListener(NATIVE_INBOX_EVENT, take);
+  }, []);
   const mainRef = useRef<HTMLElement>(null);
   const pdf = useRef<PdfImportHandle>(null);
   const [error, setError] = useState("");
@@ -148,7 +188,8 @@ export default function Library() {
   const searching = !!term;
   // A search looks through every folder; otherwise the library shows the open folder.
   const scope = searching ? live ?? [] : (live ?? []).filter((n) => folderOf(n, byId) === current);
-  const sorted = selectNotebooks(scope, query, sort, edited);
+  const inkHits = ink?.term === term ? ink.hits : undefined;
+  const sorted = selectNotebooks(scope, query, sort, edited, inkHits && new Set(inkHits.keys()));
   const folderList = (folders ?? []).filter((f) => (searching ? f.data.name.toLocaleLowerCase().includes(term) : folderOf(f, byId) === current));
   const shownFolders = sort === "newest" || sort === "oldest"
     ? [...folderList].sort((a, b) => (sort === "newest" ? b.data.createdAt - a.data.createdAt : a.data.createdAt - b.data.createdAt) || a.id.localeCompare(b.id))
@@ -570,6 +611,8 @@ export default function Library() {
       ? plural(n ?? 0, "item")
       : <>{counts === undefined ? "…" : plural(n ?? 0, "section")} · <span title={`Created ${new Date(item.data.createdAt).toLocaleDateString()}`}>{edited === undefined ? "…" : formatEdited(edited.get(item.id) ?? item.data.createdAt, now)}</span></>;
     const at = searching ? where(item) : "";
+    const inkLine = !isFolder ? inkHits?.get(item.id) : undefined;
+    const found = inkLine && <span className="block truncate text-xs italic text-brand-700" title="Found in the handwriting">✎ {inkLine}</span>;
     const check = (
       <button type="button" role="checkbox" aria-checked={isSel} aria-label={`Select ${name}`} onClick={() => toggleOne(item)}
         className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs transition-opacity ${isSel ? "border-brand-600 bg-brand-600 text-on-accent" : "border-slate-300 bg-white text-transparent hover:border-brand-500"} ${selecting || isSel ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"}`}>
@@ -611,6 +654,7 @@ export default function Library() {
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-medium text-slate-900" title={name}>{name}</span>
             {at && <span className="block truncate text-xs text-slate-500">In {at}</span>}
+            {found}
           </span>
           <span className="hidden shrink-0 text-xs text-slate-500 sm:block">{meta}</span>
         </>)}
@@ -643,6 +687,7 @@ export default function Library() {
             <div className="truncate font-medium text-slate-900" title={name}>{name}</div>
             {at && <div className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-slate-500"><Icon name="folder" className="shrink-0" /><span className="truncate">{at}</span></div>}
             <div className="mt-0.5 text-xs text-slate-500">{meta}</div>
+            {found && <div className="mt-0.5">{found}</div>}
           </div>
         </>)}
         <div className="absolute left-5 top-5">{check}</div>
@@ -704,7 +749,7 @@ export default function Library() {
               <label className="relative min-w-0 flex-1 sm:w-64 sm:flex-none">
                 <span className="sr-only">Search notebooks</span>
                 <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input ref={searchInput} type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={path.length ? "Search all notebooks…" : "Search by title…"} className="field pl-9" />
+                <input ref={searchInput} type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={inApp ? "Search titles and handwriting…" : path.length ? "Search all notebooks…" : "Search by title…"} className="field pl-9" />
               </label>
               <label>
                 <span className="sr-only">Sort by</span>

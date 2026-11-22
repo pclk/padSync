@@ -21,6 +21,10 @@ describe("library selection", () => {
     expect(selectNotebooks(notebooks, "[1]", "newest").map(n => n.id)).toEqual(["c"]);
     expect(selectNotebooks(notebooks, "missing", "newest")).toEqual([]);
   });
+  it("also shows notebooks found another way, such as their handwriting in the iPad app", () => {
+    expect(selectNotebooks(notebooks, "eigen", "title", undefined, new Set(["b"])).map(n => n.id)).toEqual(["b"]);
+    expect(selectNotebooks(notebooks, "alg", "title", undefined, new Set(["b"])).map(n => n.id)).toEqual(["a", "b"]);
+  });
   it("sorts every supported order with stable ties without mutating the source", () => {
     expect(selectNotebooks(notebooks, "", "newest").map(n => n.id)).toEqual(["a", "c", "b"]);
     expect(selectNotebooks(notebooks, "", "oldest").map(n => n.id)).toEqual(["b", "a", "c"]);

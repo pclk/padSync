@@ -32,4 +32,26 @@ extension AppDatabase {
             .removeDuplicates()
             .values(in: writer)
     }
+
+    /// The live notebook edited most recently on any device: the newest clock stamp among its rows,
+    /// presence aside (lastEditedTimes in src/lib/store.ts, the library's "Recently edited").
+    static func latestNotebookId(_ db: Database) throws -> String? {
+        try recentNotebooks(db, limit: 1).first?.id
+    }
+
+    /// Live notebooks by when they were last edited, newest first.
+    static func recentNotebooks(_ db: Database, limit: Int) throws -> [(id: String, title: String, edited: Date)] {
+        try Row.fetchAll(db, sql: """
+            SELECT * FROM (
+                SELECT n.id, n.data,
+                       (SELECT max(e.hlc) FROM entity e WHERE e.notebookId = n.id AND e.kind != 'presence') AS newest
+                FROM entity n WHERE n.kind = 'notebook' AND n.deleted = 0
+            ) ORDER BY newest DESC LIMIT ?
+            """, arguments: [limit]).map { row in
+            let data = (try? JSONValue.parse(row["data"] as Data)) ?? .null
+            let stamp: String = row["newest"] ?? ""
+            let ms = HLC.decode(stamp)?.0 ?? data["createdAt"]?.int ?? 0
+            return (row["id"], data["title"]?.string ?? "Untitled notebook", Date(timeIntervalSince1970: Double(ms) / 1000))
+        }
+    }
 }

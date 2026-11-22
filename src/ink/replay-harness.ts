@@ -2,10 +2,9 @@ import { getStroke } from "perfect-freehand";
 import { STROKE_STRIDE, type StrokeData } from "@/lib/types";
 import { InkController, type ToolState } from "./controller";
 import type { PenParams } from "./pen-feel";
-import { strokePen } from "./pen-feel";
 import { recordingDuration, type PencilRecording, type RecordedEvent } from "./recording";
 import { PencilReplayer, diffStrokes, type ReplayedStroke } from "./replay";
-import { dotCentre, strokeOptions, strokeSvgPath, toInput } from "./render";
+import { dotCentre, strokeInput, strokeOptions, strokeSvgPath } from "./render";
 
 // The programmatic replay harness: runs a recording through the real InkController (headless: no
 // page, no store, no canvas) and the real render pipeline (toInput → perfect-freehand outline),
@@ -163,7 +162,7 @@ export function strokeMetrics(s: ReplayedStroke, index: number, includeSvg = fal
   }
   const xs = raw.map((p) => p[0]);
   const ys = raw.map((p) => p[1]);
-  const processed = toInput(d.pts, d.input, strokePen(d));
+  const processed = strokeInput(d);
   const dev = deviation(processed, raw);
   const dot = dotCentre(d);
   const first = processed[0] ?? raw[0];

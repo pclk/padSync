@@ -17,6 +17,8 @@ struct PromptSender {
     let database: AppDatabase
     /// A section's image at a scale: the mounted view's, or one made off screen.
     let render: (Entity, Int, CGFloat) async -> (png: Data, width: Int, height: Int)?
+    /// The words in the ink the scope covers, read on the iPad (HandwritingReader.file), or nil.
+    var handwriting: (ChatPrompt.Context) async -> JSONValue? = { _ in nil }
     var client = ChatClient()
 
     struct Selection {
@@ -48,6 +50,7 @@ struct PromptSender {
         let scope: ChatPrompt.Context = prompt.context == .chat ? (selection != nil ? .selection : .section) : prompt.context
         if scope == .selection && selection == nil { throw Failure.nothingSelected }
         var (files, context) = try await bundle(scope: scope, selection: selection)
+        if scope != .none, let note = await handwriting(scope) { files.append(note) }
         if let audio {
             let b64 = audio.base64EncodedString()
             let size = files.reduce(0) { $0 + (($1["text"]?.string ?? $1["base64"]?.string ?? "").utf8.count) }

@@ -107,6 +107,7 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
         canvas.isScrollEnabled = false
         canvas.contentInsetAdjustmentBehavior = .never
         canvas.drawingPolicy = Tools.drawingPolicy
+        canvas.scrollsToTop = false
         canvas.delegate = self
         addSubview(canvas)
         selectionView.isHidden = true

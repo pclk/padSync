@@ -18,6 +18,7 @@ targets:
     type: application
     platform: iOS
     sources:
+      - path: Shared
       - path: PadSync
         excludes:
           - Renderer
@@ -27,6 +28,13 @@ targets:
         buildPhase: resources
     dependencies:
       - package: GRDB
+      - target: PadSyncWidget
+      - target: PadSyncShare
+    entitlements:
+      path: PadSync/PadSync.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - $(PADSYNC_APP_GROUP)
     settings:
       base:
         PRODUCT_NAME: padSync
@@ -45,6 +53,12 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         PadSyncHost: $(PADSYNC_HOST)
+        PadSyncAppGroup: $(PADSYNC_APP_GROUP)
+        # padsync://notebook/<id>, from the widget.
+        CFBundleURLTypes:
+          - CFBundleURLName: $(PADSYNC_BUNDLE_ID)
+            CFBundleURLSchemes:
+              - padsync
         # Lets the web app's service worker run, so the web screens open offline. Navigation is
         # limited to these domains; github.com is the sign-in page.
         WKAppBoundDomains:
@@ -61,6 +75,71 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         ITSAppUsesNonExemptEncryption: false
         NSMicrophoneUsageDescription: Voice prompts record a short message to send to the chat.
+  # Home Screen widget: the notebooks edited last, each opening in the editor.
+  PadSyncWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Shared
+      - path: PadSyncWidget
+    entitlements:
+      path: PadSyncWidget/PadSyncWidget.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - $(PADSYNC_APP_GROUP)
+    settings:
+      base:
+        PRODUCT_NAME: PadSyncWidget
+        PRODUCT_BUNDLE_IDENTIFIER: $(PADSYNC_BUNDLE_ID).widget
+        TARGETED_DEVICE_FAMILY: "2"
+        SWIFT_VERSION: "6.0"
+        MARKETING_VERSION: 0.1.0
+        CURRENT_PROJECT_VERSION: 1
+        CODE_SIGN_STYLE: Automatic
+    info:
+      path: PadSyncWidget/Info.plist
+      properties:
+        CFBundleDisplayName: padSync
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        PadSyncAppGroup: $(PADSYNC_APP_GROUP)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+  # "padSync" in the Share sheet: PDFs go to an inbox the library imports from.
+  PadSyncShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Shared
+      - path: PadSyncShare
+    entitlements:
+      path: PadSyncShare/PadSyncShare.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - $(PADSYNC_APP_GROUP)
+    settings:
+      base:
+        PRODUCT_NAME: PadSyncShare
+        PRODUCT_BUNDLE_IDENTIFIER: $(PADSYNC_BUNDLE_ID).share
+        TARGETED_DEVICE_FAMILY: "2"
+        SWIFT_VERSION: "6.0"
+        MARKETING_VERSION: 0.1.0
+        CURRENT_PROJECT_VERSION: 1
+        CODE_SIGN_STYLE: Automatic
+    info:
+      path: PadSyncShare/Info.plist
+      properties:
+        CFBundleDisplayName: padSync
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        PadSyncAppGroup: $(PADSYNC_APP_GROUP)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActivationRule: >-
+              SUBQUERY (extensionItems, $extensionItem, SUBQUERY ($extensionItem.attachments, $attachment,
+              ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.adobe.pdf").@count >= 1).@count >= 1
   PadSyncTests:
     type: bundle.unit-test
     platform: iOS

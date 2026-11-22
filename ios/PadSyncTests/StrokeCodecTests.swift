@@ -45,6 +45,20 @@ struct StrokeCodecTests {
         #expect(back.transform == .identity)
     }
 
+    @Test func nativeStrokesAreSampledDenselyToTheirEnd() throws {
+        // A quick 18 pt bar, as PencilKit keeps it: three control points.
+        let points = [100, 109, 118].map { x in
+            PKStrokePoint(location: CGPoint(x: x, y: 50), timeOffset: 0, size: CGSize(width: 2, height: 2), opacity: 1, force: 1, azimuth: 0, altitude: 1.2)
+        }
+        let bar = PKStroke(ink: PKInk(.pen, color: .black), path: PKStrokePath(controlPoints: points, creationDate: .now))
+        let data = StrokeCodec.data(for: bar, device: "ipad1")
+        let pts = try #require(data["pts"]?.array).compactMap(\.double)
+        // One sample every 2 pt, not one per control point, so the web doesn't read it as a tap.
+        #expect(pts.count / 6 >= 9)
+        let end = bar.path.interpolatedPoint(at: 2).location
+        #expect(abs(pts[pts.count - 6] - end.x) < 0.01 && abs(pts[pts.count - 5] - end.y) < 0.01)
+    }
+
     @Test func aWebLassoMoveTranslatesTheOriginal() throws {
         let drawn = try #require(StrokeCodec.stroke(id: "s1", data: web))
         var data = StrokeCodec.data(for: drawn, device: "ipad1")

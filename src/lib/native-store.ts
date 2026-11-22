@@ -2,7 +2,7 @@
 // own SQLite store (ios/PadSync/Web/StoreBridge.swift) instead of waiting for the server to carry
 // native ink into Dexie. The app sets `window.padsyncNative.store` and answers on the
 // `padsyncStore` message handler; each postMessage returns a promise with the reply.
-// Nothing uses this yet: it is the adapter the library will switch to.
+// The library uses it for handwriting search; the rest is the adapter the library will switch to.
 
 import type { Entity, EntityKind } from "./types";
 
@@ -14,11 +14,27 @@ interface NativeWindow {
 }
 
 export const NATIVE_CHANGE_EVENT = "padsync-native-change";
+/** The app has PDFs shared to it (the Share sheet) waiting to be imported. */
+export const NATIVE_INBOX_EVENT = "padsync-inbox";
+
+/** A PDF shared to the app, as base64. */
+export interface InboxFile {
+  id: string;
+  name: string;
+  base64: string;
+}
 
 export interface ListOptions {
   kind?: EntityKind;
   parentId?: string;
   includeDeleted?: boolean;
+}
+
+/** A notebook whose handwriting contains the search, and the line it was found on. */
+export interface InkHit {
+  notebookId: string;
+  sectionId: string;
+  line: string;
 }
 
 export interface NativeStore {
@@ -27,6 +43,12 @@ export interface NativeStore {
   notebooks(): Promise<Entity<"notebook">[]>;
   /** The app stamps a fresh hlc, marks the rows dirty and syncs them; resolves to what it stored. */
   put(entities: Entity[]): Promise<Entity[]>;
+  /** Notebooks whose ink (read on the iPad by HandwritingIndex) contains the query, one hit each. */
+  searchInk(query: string): Promise<InkHit[]>;
+  /** PDFs shared to the app and not yet imported. */
+  inbox(): Promise<InboxFile[]>;
+  /** Forgets shared PDFs once their import has started. */
+  clearInbox(ids: string[]): Promise<void>;
   /** Calls back whenever the native store changes (local writes or sync). Returns an unsubscribe. */
   onChange(callback: () => void): () => void;
 }
@@ -50,6 +72,15 @@ export function nativeStore(win: unknown = typeof window === "undefined" ? undef
     async put(entities) {
       if (entities.length === 0) return [];
       return (await call({ op: "put", entities })) as Entity[];
+    },
+    async searchInk(query) {
+      return (await call({ op: "searchInk", query })) as InkHit[];
+    },
+    async inbox() {
+      return (await call({ op: "inbox" })) as InboxFile[];
+    },
+    async clearInbox(ids) {
+      if (ids.length) await call({ op: "clearInbox", ids });
     },
     onChange(callback) {
       const listener = () => callback();

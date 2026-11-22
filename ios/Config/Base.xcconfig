@@ -7,4 +7,7 @@ PADSYNC_HOST = p.siew.dev
 // A free Apple ID can't register an id someone else already has, so keep this unique.
 PADSYNC_BUNDLE_ID = com.weiheng.padsync
 
+// Shared by the app, its widget and its Share extension.
+PADSYNC_APP_GROUP = group.$(PADSYNC_BUNDLE_ID)
+
 #include? "Local.xcconfig"

@@ -337,6 +337,16 @@ final class ControlsOverlay: UIView {
     }
 }
 
+/// Whether the Pencil's double tap and squeeze do anything in the notebook. This iPad only.
+enum PencilGestures {
+    private static let key = "padsync.pencilGestures"
+
+    static var enabled: Bool {
+        get { UserDefaults.standard.object(forKey: key) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: key) }
+    }
+}
+
 /// The current tool's colours and sizes, from a tap on the tool circle (CirclePanel in
 /// ToolCircle.tsx), with undo, redo, the page menu, moving the circles and the way back to the
 /// library (there's no top bar).
@@ -420,6 +430,24 @@ final class CirclePanel: UIView {
             row.addArrangedSubview(b)
         }
         stack.addArrangedSubview(row)
+
+        let gestures = UIStackView()
+        gestures.alignment = .center
+        gestures.spacing = 8
+        let gesturesLabel = UILabel()
+        gesturesLabel.text = "Pencil double tap and squeeze"
+        gesturesLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        gesturesLabel.textColor = UIColor(hex: "#334155")
+        gesturesLabel.numberOfLines = 2
+        let toggle = UISwitch()
+        toggle.isOn = PencilGestures.enabled
+        toggle.accessibilityLabel = "Pencil double tap and squeeze"
+        toggle.addAction(UIAction { [weak toggle] _ in PencilGestures.enabled = toggle?.isOn ?? true }, for: .valueChanged)
+        gestures.addArrangedSubview(gesturesLabel)
+        gestures.addArrangedSubview(toggle)
+        gestures.isLayoutMarginsRelativeArrangement = true
+        gestures.layoutMargins = UIEdgeInsets(top: 0, left: 6, bottom: 0, right: 2)
+        stack.addArrangedSubview(gestures)
 
         let footer = UIStackView()
         footer.alignment = .center
