@@ -137,10 +137,14 @@ struct GestureLogicTests {
         var got: [GestureKind] = []
         let clock = Clock()
         let l = logic([.fingerHold], emitted: { got.append($0) }, clock: clock)
+        var ring: [Bool] = []
+        l.onHold = { started, _ in ring.append(started) }
         l.start(finger(1), now: 0, onPage: true)
         #expect(clock.pending.count == 1)
         clock.pending.removeFirst().1()
         #expect(got == [.fingerHold])
+        // The ring goes as soon as the hold fires, not when the finger lifts.
+        #expect(ring == [true, false])
         l.end([], now: 1)
 
         l.start(finger(1), now: 2, onPage: true)

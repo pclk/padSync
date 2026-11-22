@@ -82,6 +82,8 @@ final class GestureLogic {
                 c.holdTimer = schedule(t.holdMs / 1000) { [weak self, weak c] in
                     guard let self, let c else { return }
                     c.holdTimer = nil
+                    // The ring has filled: it goes whether or not the hold counts.
+                    self.onHold(false, c.first)
                     guard self.contact === c, !c.moved, c.most == 1, !c.pencil else { return }
                     c.held = true
                     self.emit(.fingerHold, c.first)
