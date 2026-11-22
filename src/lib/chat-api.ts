@@ -73,7 +73,10 @@ export const getThread = (
       ),
   );
 export const sendTurn = (id: string, input: NewTurn) =>
-  call<{ turn: Turn }>(path(id) + "/turns", "POST", input);
+  call<{ turn: Turn; serverTime?: number }>(path(id) + "/turns", "POST", input);
+/** Adds this device's latency stamps to a turn's trace (src/lib/chat-trace.ts). */
+export const addTrace = (jobId: string, trace: Record<string, number>) =>
+  call<{ ok: true }>(`/api/jobs/${encodeURIComponent(jobId)}/trace`, "POST", { trace });
 export const regenerateTurn = (id: string, turn: number) =>
   call<{ turn: Turn }>(path(id) + `/turns/${turn}/regenerate`, "POST");
 export const forkThread = (id: string, uptoTurn: number, title?: string) =>

@@ -15,7 +15,7 @@ export async function POST(req: NextRequest, c: Context) {
   try {
     const turn = await chat.createTurn(auth.sql, (await c.params).id, p.data);
     return turn
-      ? json({ turn }, 201)
+      ? json({ turn, serverTime: Date.now() }, 201)
       : json({ error: "Thread not found" }, 404);
   } catch (e) {
     if (

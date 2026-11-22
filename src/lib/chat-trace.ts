@@ -3,8 +3,9 @@
 // ("server."), and the Mac bridge ("bridge."). Device and bridge clocks are shifted onto the
 // server's with offsets measured from round trips, so stages that cross machines line up.
 //
-// The device's stamps from before the turn exists travel with the turn; the ones after
-// (response, first words seen, reply seen) stay in this browser.
+// The device's stamps from before the turn exists travel with the turn; the ones after (response,
+// first words seen, reply seen) are kept in this browser and sent to the turn's trace as they happen,
+// so a report has them on any device.
 
 import type { ThreadSummary, Turn } from "./chat-types";
 
@@ -31,7 +32,8 @@ const local = new Map<string, Trace>();
 /** This browser's own stamps for a turn (see the header). */
 export function localMarks(jobId: string): Trace {
   let marks = local.get(jobId);
-  if (!marks) {
+  // Read again while empty: the tab that sent the turn may have stamped it since this one looked.
+  if (!marks || !Object.keys(marks).length) {
     try {
       marks = JSON.parse(localStorage.getItem(KEY + jobId) ?? "{}") as Trace;
     } catch {
@@ -42,16 +44,17 @@ export function localMarks(jobId: string): Trace {
   return marks;
 }
 
-/** Stamps `key` once (the first time is the one that counts). */
-export function markLocal(jobId: string, key: string, at = Date.now()) {
+/** Stamps `key` once (the first time is the one that counts); true when this call did. */
+export function markLocal(jobId: string, key: string, at = Date.now()): boolean {
   const marks = localMarks(jobId);
-  if (marks[key] !== undefined) return;
+  if (marks[key] !== undefined) return false;
   marks[key] = at;
   try {
     localStorage.setItem(KEY + jobId, JSON.stringify(marks));
   } catch {
     // Storage full or blocked: the trace still works until reload.
   }
+  return true;
 }
 
 export interface Stage {

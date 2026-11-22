@@ -251,6 +251,15 @@ export async function getJob(sql: Sql, id: string): Promise<Job | null> {
   return rows[0] ? toJob(rows[0], true) : null;
 }
 
+/**
+ * Merges the device's latency stamps (src/lib/chat-trace.ts) into a job's trace. The first stamp of
+ * each name wins, as on the device, so a retry or a second tab can't move one.
+ */
+export async function addClientTrace(sql: Sql, id: string, trace: Record<string, number>): Promise<boolean> {
+  const rows = await sql.query(`update jobs set trace = $2::jsonb || trace where id = $1 returning id`, [id, JSON.stringify(trace)]);
+  return rows.length > 0;
+}
+
 /** Cancels a queued or running job. Returns the job, or null if it was already finished/missing. */
 export async function cancelJob(sql: Sql, id: string): Promise<Job | null> {
   const rows = await sql.query<Row>(

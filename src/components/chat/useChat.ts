@@ -121,6 +121,8 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
     listPoll.current?.refresh();
     detailPoll.current?.refresh();
   };
+  /** Keeps this device's stamps with the turn too, so its latency report is complete anywhere. */
+  const reportMarks = (jobId: string, trace: Record<string, number>) => void api.addTrace(jobId, trace).catch(() => {});
   // The iPad app sends its prompts to the chat a computer shows (src/lib/chat-handoff.ts): say
   // which one this is, and jump to a chat the iPad just asked in, so its reply shows here live.
   const desktop = deviceKind() === "desktop";
@@ -226,8 +228,8 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
           // Latency trace: when this device first showed words, and the finished reply, of turns it sent.
           for (const t of data.turns) {
             if (localMarks(t.jobId)["client.response"] === undefined) continue;
-            if (t.output) markLocal(t.jobId, "client.first_output_seen", seenAt);
-            if (["done", "error", "cancelled"].includes(t.status)) markLocal(t.jobId, "client.done_seen", seenAt);
+            if (t.output && markLocal(t.jobId, "client.first_output_seen", seenAt)) reportMarks(t.jobId, { "client.first_output_seen": seenAt });
+            if (["done", "error", "cancelled"].includes(t.status) && markLocal(t.jobId, "client.done_seen", seenAt)) reportMarks(t.jobId, { "client.done_seen": seenAt });
           }
           if (!live || selected.current !== id) return;
           setThread(data.thread);
@@ -446,7 +448,8 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
       const target = thread ?? (await create());
       const tools = toolsOf(target.options);
       const clock = clientClock();
-      const trace = { ...marks, "client.sent": Date.now(), ...(clock ? { "client.clock_offset": clock.offset, "client.clock_rtt": clock.rtt } : {}) };
+      const sentAt = Date.now();
+      const trace = { ...marks, "client.sent": sentAt, ...(clock ? { "client.clock_offset": clock.offset, "client.clock_rtt": clock.rtt } : {}) };
       const sent = await api.sendTurn(target.id, {
         trace,
         question: text,
@@ -460,7 +463,15 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
           allowEdits: (bundle?.options.allowEdits ?? true) || tools.allowCode,
         },
       });
-      markLocal(sent.turn.jobId, "client.response");
+      const responseAt = Date.now();
+      if (sent.serverTime) noteServerTime(sent.serverTime, sentAt, responseAt);
+      markLocal(sent.turn.jobId, "client.response", responseAt);
+      // A new chat's first message goes before any poll has measured the clock; its own round trip just did.
+      const measured = clientClock();
+      reportMarks(sent.turn.jobId, {
+        "client.response": responseAt,
+        ...(!clock && measured ? { "client.clock_offset": measured.offset, "client.clock_rtt": measured.rtt } : {}),
+      });
       // Known at once, so polling treats the reply as running even if a fetch already in flight
       // (one that started before the turn existed) comes back without it.
       if (selected.current === target.id) {

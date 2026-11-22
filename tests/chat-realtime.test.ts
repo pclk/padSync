@@ -127,3 +127,22 @@ describe("polling with realtime", () => {
     vi.useRealTimers();
   });
 });
+
+describe("device stamps kept with the turn", () => {
+  it("merge into the trace, first stamp wins, and need a session", async () => {
+    configureAuthEnv();
+    const { sql } = await freshDb();
+    const { POST: traceRoute } = await import("@/app/api/jobs/[id]/trace/route");
+    const t = (await chat.createThread(sql, { notebookId: "nb", title: "", agent: "claude", options: {} }))!;
+    const turn = (await chat.createTurn(sql, t.id, { question: "q", files: [], uploads: [], trace: { "client.sent": 1 } }))!;
+    const post = (trace: unknown, session: string | false = sessionCookie()) =>
+      traceRoute(req(`/api/jobs/${turn.jobId}/trace`, { body: { trace }, session }), params({ id: turn.jobId }));
+    expect((await post({ "client.response": 5, "client.clock_offset": -400 })).status).toBe(200);
+    expect((await post({ "client.response": 9, "client.done_seen": 12 })).status).toBe(200);
+    expect((await post({ "bridge.claimed": 3 })).status).toBe(400);
+    expect((await post({ "client.done_seen": 1 }, false)).status).toBe(401);
+    const [row] = await chat.getTurns(sql, t.id);
+    expect(row.trace).toMatchObject({ "client.sent": 1, "client.response": 5, "client.clock_offset": -400, "client.done_seen": 12 });
+    expect(row.trace).not.toHaveProperty("bridge.claimed");
+  });
+});
