@@ -15,7 +15,7 @@ it("emoji and math italic survive several streaming polls", () => {
       } as Turn,
     ]);
     expect(turns[0].output).toBe(output);
-    expect(pollCursor(turns)).toBe(`1:${Array.from(output).length}`);
+    expect(pollCursor(turns)).toBe(`1:${Array.from(output).length}:0`);
   }
 });
 it("upload specs reject unsupported types", () => {

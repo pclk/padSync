@@ -98,11 +98,15 @@ export async function getTurns(
   from = "",
   jobId?: string,
 ) {
+  // "turn:outputLength[:thinkingLength]" per turn the device already has.
   const offsets: Record<string, number> = {};
+  const thinkingOffsets: Record<string, number> = {};
   for (const pair of from.split(",")) {
-    const [n, len] = pair.split(":").map(Number);
+    const [n, len, tlen] = pair.split(":").map(Number);
     if (Number.isInteger(n) && Number.isInteger(len) && len >= 0)
       offsets[n] = len;
+    if (Number.isInteger(n) && Number.isInteger(tlen) && tlen >= 0)
+      thinkingOffsets[n] = tlen;
   }
   // Unfinished turns come back on every poll, whatever `since` says: `since` is the server's clock
   // and updated_at the database's, and one missed change used to hide new text until the bridge's
@@ -111,11 +115,13 @@ export async function getTurns(
     `select id as "jobId", turn,question,chat_context as context,attachments,trace,agent,options,status,
  substring(output from (case when status='running' then least(length(output),coalesce(($3::jsonb->>turn::text)::int,0)) else 0 end)+1) as output,
  case when status='running' then least(length(output),coalesce(($3::jsonb->>turn::text)::int,0)) else 0 end as "outputOffset",
+ substring(thinking from (case when status='running' then least(length(thinking),coalesce(($5::jsonb->>turn::text)::int,0)) else 0 end)+1) as thinking,
+ case when status='running' then least(length(thinking),coalesce(($5::jsonb->>turn::text)::int,0)) else 0 end as "thinkingOffset",
  error,created_at as "createdAt",updated_at as "updatedAt",finished_at as "finishedAt",
  coalesce((select jsonb_agg(jsonb_build_object('path',f->>'path','mime',f->>'mime','size',length(coalesce(f->>'text',f->>'base64','')))) from jsonb_array_elements(result_files) f),'[]'::jsonb) as "resultFiles"
  from jobs where thread_id=$1 and ($4::text is null or id=$4)
    and ($2::timestamptz is null or updated_at>$2::timestamptz or status in ('uploading','queued','running')) order by turn`,
-    [key, since ?? null, JSON.stringify(offsets), jobId ?? null],
+    [key, since ?? null, JSON.stringify(offsets), jobId ?? null, JSON.stringify(thinkingOffsets)],
   );
 }
 export const newTurnSchema = z.object({
@@ -245,7 +251,7 @@ export async function forkThread(
 ) {
   const key2 = id();
   await sql.query(
-    `with t as (insert into chat_threads(id,notebook_id,title,agent,options,forked_from,next_turn) select $2,notebook_id,coalesce($4,title),agent,options,jsonb_build_object('threadId',id,'turn',$3::int),coalesce((select max(turn) from jobs where thread_id=$1 and turn<=$3 and status='done'),0) from chat_threads where id=$1 and deleted_at is null returning id) insert into jobs(id,kind,thread_id,turn,notebook_id,agent,question,options,status,output,chat_context,attachments,result_files,finished_at,transcribed) select $2||'_'||turn,'chat',t.id,turn,notebook_id,agent,question,options,'done',output,chat_context,attachments,result_files,finished_at,transcribed from jobs cross join t where thread_id=$1 and turn<=$3 and status='done'`,
+    `with t as (insert into chat_threads(id,notebook_id,title,agent,options,forked_from,next_turn) select $2,notebook_id,coalesce($4,title),agent,options,jsonb_build_object('threadId',id,'turn',$3::int),coalesce((select max(turn) from jobs where thread_id=$1 and turn<=$3 and status='done'),0) from chat_threads where id=$1 and deleted_at is null returning id) insert into jobs(id,kind,thread_id,turn,notebook_id,agent,question,options,status,output,thinking,chat_context,attachments,result_files,finished_at,transcribed) select $2||'_'||turn,'chat',t.id,turn,notebook_id,agent,question,options,'done',output,thinking,chat_context,attachments,result_files,finished_at,transcribed from jobs cross join t where thread_id=$1 and turn<=$3 and status='done'`,
     [key, key2, n, title ?? null],
   );
   return getThread(sql, key2);

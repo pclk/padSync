@@ -36,6 +36,44 @@ function useCopied(): [boolean, (text: string) => void] {
   ];
 }
 
+/** Seconds from the agent starting to its answer beginning (bridge stamps, one clock); null if unknown. */
+export function thoughtSeconds(trace: Turn["trace"]): number | null {
+  const start = trace?.["bridge.agent_spawn"];
+  const answer = trace?.["bridge.answer_start"];
+  return start !== undefined && answer !== undefined && answer > start ? Math.max(1, Math.round((answer - start) / 1000)) : null;
+}
+
+/**
+ * The agent's thinking: streams in grey while it thinks, then folds into a "Thought for N s" line
+ * above the answer that opens to reread it.
+ */
+function Thinking({ turn: t, live }: { turn: Turn; live: boolean }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  // Follow the newest thinking while it streams.
+  useEffect(() => {
+    if (live && box.current) box.current.scrollTop = box.current.scrollHeight;
+  }, [live, t.thinking]);
+  if (!t.thinking) return null;
+  const text = <div className="prose-pad chat-prose chat-thinking-text break-words" dangerouslySetInnerHTML={{ __html: renderMarkdown(t.thinking) }} />;
+  if (live)
+    return (
+      <div ref={box} className="max-h-56 overflow-y-auto border-l-2 border-slate-200 pl-3">
+        {text}
+      </div>
+    );
+  const secs = thoughtSeconds(t.trace);
+  return (
+    <div>
+      <button className="-ml-1 flex items-center gap-1 rounded-lg px-1 py-0.5 text-xs text-slate-500 hover:text-slate-800" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Icon name={open ? "chevronDown" : "chevronRight"} />
+        {secs ? `Thought for ${secs} s` : "Thinking"}
+      </button>
+      {open && <div className="mt-1 border-l-2 border-slate-200 pl-3">{text}</div>}
+    </div>
+  );
+}
+
 export function Message({
   turn: t,
   notebookId,
@@ -260,6 +298,7 @@ export function Message({
             )}
           </div>
           {status}
+          <Thinking turn={t} live={active && !t.output} />
           {t.output && (
             <div
               ref={body}

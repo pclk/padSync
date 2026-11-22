@@ -146,3 +146,13 @@ describe("device stamps kept with the turn", () => {
     expect(row.trace).not.toHaveProperty("bridge.claimed");
   });
 });
+
+describe("Thought for N s", () => {
+  it("runs from the agent starting to its answer beginning, on the bridge's clock", async () => {
+    const { thoughtSeconds } = await import("@/components/chat/Message");
+    expect(thoughtSeconds({ "bridge.agent_spawn": 1000, "bridge.answer_start": 7400 })).toBe(6);
+    expect(thoughtSeconds({ "bridge.agent_spawn": 1000, "bridge.answer_start": 1200 })).toBe(1);
+    expect(thoughtSeconds({ "bridge.agent_spawn": 1000 })).toBeNull();
+    expect(thoughtSeconds(undefined)).toBeNull();
+  });
+});

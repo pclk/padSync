@@ -233,6 +233,12 @@ replies are announced through `aria-live="polite"`.
   otherwise. The bridge watches queued jobs (`POST /api/bridge/live`) and claims a new one at once,
   polling every 10 s as a backup and heartbeat. Both use `bridge/live-query.ts` and fall back to
   plain polling whenever Realtime is off or disconnected.
+- Thinking: the bridge asks for thinking summaries (Claude `--thinking-display summarized`, when
+  its CLI accepts the flag, checked at start; Codex `model_reasoning_summary="detailed"`) and keeps
+  them, plus any text written before a tool call, in the turn's `thinking`, apart from the answer.
+  It streams like the answer (`thinking`/`thinkingAppend` updates, a third length in the poll
+  cursor). The chat shows it in grey while the agent thinks, then folds it into "Thought for N s"
+  above the answer (from `bridge.agent_spawn` to `bridge.answer_start`).
 - Thread list: every 30 s, and right after any action on this device. Nothing runs while the tab
   is hidden.
 - One request per tick. Never run several fetches for the same thread at once (skip a tick if the

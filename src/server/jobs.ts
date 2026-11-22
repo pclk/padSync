@@ -20,6 +20,7 @@ export type JobKind = (typeof JOB_KINDS)[number];
  *  heartbeats every few seconds (an empty update), but network outages can also make a live bridge appear stale. */
 export const STALE_AFTER_S = 600;
 export const MAX_OUTPUT = 200_000;
+export const MAX_THINKING = 100_000;
 const MAX_IMAGE = 3_000_000; // data URL chars; keeps requests under Vercel's 4.5 MB limit
 // Only the bridge reads image, context and files, and only while running, so all are dropped when a job
 // finishes or is cancelled: otherwise every ask keeps a multi-MB PNG in Postgres forever.
@@ -132,12 +133,16 @@ export const jobUpdateSchema = z
     sessionId: z.string().min(1).max(200).optional(),
     append: z.string().max(MAX_OUTPUT).optional(),
     output: z.string().max(MAX_OUTPUT).optional(),
+    /** The agent's thinking so far (replaces it), or more of it. */
+    thinking: z.string().max(MAX_THINKING).optional(),
+    thinkingAppend: z.string().max(MAX_THINKING).optional(),
     status: z.enum(["done", "error"]).optional(),
     error: z.string().max(4000).optional(),
     /** What the agent wrote to out/, sent with the final update. */
     files: resultFilesSchema.optional(),
   })
   .refine((u) => !(u.append !== undefined && u.output !== undefined), "send append or output, not both")
+  .refine((u) => !(u.thinkingAppend !== undefined && u.thinking !== undefined), "send thinkingAppend or thinking, not both")
   .refine((u) => u.files === undefined || u.status === "done", "files come with the final done update");
 
 export interface Job {
@@ -290,7 +295,7 @@ export const BRIDGE_FEATURES = ["import", "chat", "voice"] as const;
 export async function claimJob(sql: Sql, deviceId: string, agents: readonly Agent[], features: readonly string[] = []): Promise<ClaimedJob | null> {
   if (!agents.length) return null;
   const rows = await sql.query<Row>(
-    `update jobs set status = 'running', claimed_by = $1, claimed_at = now(), updated_at = now(), output = '', error = null,
+    `update jobs set status = 'running', claimed_by = $1, claimed_at = now(), updated_at = now(), output = '', thinking = '', error = null,
        trace = trace || jsonb_build_object('server.claimed', ${NOW_MS})
      where id = (
        select j.id from jobs j
@@ -327,6 +332,7 @@ export async function updateJob(sql: Sql, id: string, deviceId: string, u: z.inf
               then jsonb_build_object('server.first_output', ${NOW_MS}) else '{}'::jsonb end
          || case when $5::text is not null then jsonb_build_object('server.finished', ${NOW_MS}) else '{}'::jsonb end,
        output = left(case when $3::text is not null then $3::text else output || coalesce($4::text, '') end, $7),
+       thinking = left(case when $12::text is not null then $12::text else thinking || coalesce($13::text, '') end, ${MAX_THINKING}),
        status = coalesce($5::text, status),
        error = coalesce($6::text, error),
        updated_at = now(),
@@ -352,7 +358,7 @@ export async function updateJob(sql: Sql, id: string, deviceId: string, u: z.inf
        on conflict do nothing
      ), d as (delete from job_inputs where job_id in (select id from u) and $5::text is not null)
      select status from u`,
-    [id, deviceId, u.output ?? null, u.append ?? null, u.status ?? null, u.error ?? null, MAX_OUTPUT, u.files ? JSON.stringify(u.files) : null, u.sessionId ?? null, u.question ?? null, u.trace ? JSON.stringify(u.trace) : null],
+    [id, deviceId, u.output ?? null, u.append ?? null, u.status ?? null, u.error ?? null, MAX_OUTPUT, u.files ? JSON.stringify(u.files) : null, u.sessionId ?? null, u.question ?? null, u.trace ? JSON.stringify(u.trace) : null, u.thinking ?? null, u.thinkingAppend ?? null],
   );
   if (rows[0]) return { ok: true, status: rows[0].status };
   const cur = await sql.query<{ status: JobStatus }>(`select status from jobs where id = $1 and claimed_by = $2`, [id, deviceId]);

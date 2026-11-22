@@ -39,8 +39,8 @@ describe("parsing real agent output", () => {
     expect(parseClaudeLine(JSON.stringify({ type: "result", subtype: "success", is_error: true, result: "Invalid API key" }))).toEqual({ error: "Invalid API key" });
   });
 
-  it("claude: ignores tool_use blocks and non-JSON lines", () => {
-    expect(parseClaudeLine(JSON.stringify({ type: "assistant", message: { content: [{ type: "tool_use", name: "Read" }] } }))).toBeNull();
+  it("claude: a tool_use block marks a tool call; non-JSON lines are ignored", () => {
+    expect(parseClaudeLine(JSON.stringify({ type: "assistant", message: { content: [{ type: "tool_use", name: "Read" }] } }))).toEqual({ tool: true });
     expect(parseClaudeLine("not json")).toBeNull();
     expect(parseClaudeLine("{broken")).toBeNull();
   });
@@ -169,6 +169,38 @@ describe("runAgent (with fake agent processes)", () => {
     const r = await runAgent({ cwd, prompt: "hello", command, timeoutMs: 10_000, onText: (t) => seen.push(t) });
     expect(seen).toEqual(["thinking"]);
     expect(r).toEqual({ status: "done", output: "echo:hello" });
+  });
+
+  it("keeps thinking apart from the answer and moves a preamble before a tool into it", async () => {
+    const ev = (event: unknown) => line({ type: "stream_event", event });
+    const { cwd, command } = await fake(`
+      ${ev({ type: "content_block_delta", index: 0, delta: { type: "thinking_delta", thinking: "Checking " } })}
+      ${ev({ type: "content_block_delta", index: 0, delta: { type: "thinking_delta", thinking: "the sign." } })}
+      ${line({ type: "assistant", message: { content: [{ type: "thinking", thinking: "Checking the sign." }] } })}
+      ${ev({ type: "content_block_delta", index: 1, delta: { type: "text_delta", text: "Let me read your notes." } })}
+      ${line({ type: "assistant", message: { content: [{ type: "text", text: "Let me read your notes." }] } })}
+      ${ev({ type: "content_block_start", index: 2, content_block: { type: "tool_use", name: "Read" } })}
+      ${ev({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "It is 9/2." } })}
+      ${line({ type: "result", subtype: "success", is_error: false, result: "It is 9/2." })}`);
+    const texts: string[] = [];
+    const thoughts: string[] = [];
+    const r = await runAgent({ cwd, prompt: "", command, timeoutMs: 10_000, onText: (t) => texts.push(t), onThinking: (t) => thoughts.push(t) });
+    expect(thoughts).toEqual(["Checking ", "Checking the sign.", "Checking the sign.", "Checking the sign.\n\nLet me read your notes."]);
+    expect(texts).toEqual(["Let me read your notes.", "Let me read your notes.", "", "It is 9/2."]);
+    expect(r).toEqual({ status: "done", output: "It is 9/2.", thinking: "Checking the sign.\n\nLet me read your notes." });
+  });
+
+  it("codex: reasoning summaries are thinking, tool items mark tool calls", () => {
+    expect(parseCodexLine(JSON.stringify({ type: "item.completed", item: { type: "reasoning", text: "**Verifying the count**" } }))).toEqual({ thinking: "**Verifying the count**" });
+    expect(parseCodexLine(JSON.stringify({ type: "item.started", item: { type: "command_execution", command: "cat notebook.md" } }))).toEqual({ tool: true });
+    expect(parseCodexLine(JSON.stringify({ type: "item.completed", item: { type: "reasoning", text: "" } }))).toBeNull();
+  });
+
+  it("asks for thinking summaries: Claude only when its CLI has the flag, Codex always", () => {
+    const flag = (c: AgentCommand) => c.args.join(" ");
+    expect(flag(agentCommand("claude", { claudeThinking: true }, false))).toContain("--thinking-display summarized");
+    expect(flag(agentCommand("claude", {}, false))).not.toContain("--thinking-display");
+    expect(flag(agentCommand("codex", {}, false))).toContain('model_reasoning_summary="detailed" -c hide_agent_reasoning=false');
   });
 
   it("streams partial text and finishes on the result, before the CLI exits", async () => {

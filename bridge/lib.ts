@@ -2,7 +2,7 @@
 // Runs on Node >= 22.18 with native TypeScript type stripping (no build step), so this file uses
 // only erasable syntax.
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { constants as fsc } from "node:fs";
 import { chmod, lstat, mkdir, mkdtemp, open, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
@@ -484,6 +484,12 @@ export interface AgentUpdate {
   text?: string;
   /** More of the text block being written (Claude with --include-partial-messages). */
   delta?: string;
+  /** A finished block of thinking (a summary), which replaces its deltas. */
+  thinking?: string;
+  /** More of the thinking block being written. */
+  thinkingDelta?: string;
+  /** The agent started using a tool, so the answer text before it was a preamble: it moves to thinking. */
+  tool?: boolean;
   /** The answer is complete; the CLI may still be saving its session before it exits. */
   complete?: boolean;
   /** Authoritative final answer (replaces streamed text). */
@@ -497,13 +503,21 @@ export function parseClaudeLine(line: string): AgentUpdate | null {
   const ev = safeJson(line);
   if (!ev) return null;
   if (ev.type === "assistant") {
-    const parts = (ev.message?.content ?? []).filter((c: { type?: string }) => c?.type === "text").map((c: { text?: string }) => c.text ?? "");
-    const text = parts.join("");
-    return text ? { text } : null;
+    const blocks: { type?: string; text?: string; thinking?: string }[] = ev.message?.content ?? [];
+    const text = blocks.filter((c) => c?.type === "text").map((c) => c.text ?? "").join("");
+    const thinking = blocks.filter((c) => c?.type === "thinking").map((c) => c.thinking ?? "").join("\n\n");
+    const tool = blocks.some((c) => c?.type === "tool_use");
+    const u: AgentUpdate = { ...(thinking ? { thinking } : {}), ...(text ? { text } : {}), ...(tool ? { tool } : {}) };
+    return Object.keys(u).length ? u : null;
   }
   if (ev.type === "stream_event") {
-    const d = ev.event?.delta;
-    return ev.event?.type === "content_block_delta" && d?.type === "text_delta" && typeof d.text === "string" && d.text ? { delta: d.text } : null;
+    const e = ev.event;
+    const d = e?.delta;
+    if (e?.type === "content_block_start" && e.content_block?.type === "tool_use") return { tool: true };
+    if (e?.type !== "content_block_delta") return null;
+    if (d?.type === "text_delta" && typeof d.text === "string" && d.text) return { delta: d.text };
+    if (d?.type === "thinking_delta" && typeof d.thinking === "string" && d.thinking) return { thinkingDelta: d.thinking };
+    return null;
   }
   if (ev.type === "result") {
     if (ev.is_error || (typeof ev.subtype === "string" && ev.subtype !== "success")) {
@@ -514,6 +528,8 @@ export function parseClaudeLine(line: string): AgentUpdate | null {
   return null;
 }
 
+const CODEX_TOOL_ITEMS = new Set(["command_execution", "mcp_tool_call", "web_search", "file_change"]);
+
 /** `codex exec --json` */
 export function parseCodexLine(line: string): AgentUpdate | null {
   const ev = safeJson(line);
@@ -521,6 +537,11 @@ export function parseCodexLine(line: string): AgentUpdate | null {
   if (ev.type === "item.completed" && ev.item?.type === "agent_message" && typeof ev.item.text === "string") {
     return { text: ev.item.text };
   }
+  // Reasoning summaries (model_reasoning_summary="detailed"), each finished section at a time.
+  if (ev.type === "item.completed" && ev.item?.type === "reasoning" && typeof ev.item.text === "string" && ev.item.text) {
+    return { thinking: ev.item.text };
+  }
+  if ((ev.type === "item.started" || ev.type === "item.completed") && CODEX_TOOL_ITEMS.has(ev.item?.type)) return { tool: true };
   // item.completed with item.type "error" is a non-fatal warning (e.g. config notices).
   if (ev.type === "turn.completed") return { complete: true };
   if (ev.type === "turn.failed") return { error: ev.error?.message ?? "Codex turn failed" };
@@ -577,7 +598,18 @@ export const CLAUDE_SANDBOX_SETTINGS = JSON.stringify({ sandbox: { enabled: true
  * `images`: true for a legacy job's section.png, or the relative paths Codex should get attached.
  * Edits stay inside the job folder: Claude via acceptEdits (cwd only), Codex via workspace-write.
  */
-export function agentCommand(agent: Agent, cfg: Pick<BridgeConfig, "claudeBin" | "codexBin">, images: boolean | string[], options?: JobOptions): AgentCommand {
+/**
+ * Whether this Claude Code accepts --thinking-display (undocumented, so it may go away). --version
+ * ignores unknown flags, but a known one still checks its value: a bad value is refused and the
+ * allowed choices listed.
+ */
+export function claudeThinkingSupported(bin = "claude"): boolean {
+  const r = spawnSync(bin, ["--thinking-display", "padsync-probe", "--version"], { encoding: "utf8", timeout: 15_000 });
+  return /summarized/.test(`${r.stderr ?? ""}${r.stdout ?? ""}`);
+}
+
+/** `claudeThinking`: pass --thinking-display summarized (see claudeThinkingSupported). */
+export function agentCommand(agent: Agent, cfg: Pick<BridgeConfig, "claudeBin" | "codexBin"> & { claudeThinking?: boolean }, images: boolean | string[], options?: JobOptions): AgentCommand {
   const o = cleanOptions(agent, options);
   if (agent === "claude") {
     const web = o.webSearch ? ["WebSearch", "WebFetch"] : [];
@@ -596,6 +628,8 @@ export function agentCommand(agent: Agent, cfg: Pick<BridgeConfig, "claudeBin" |
         // Partial messages stream the answer as it is written, not a whole message at a time.
         "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
         ...(inline.length ? ["--input-format", "stream-json"] : []),
+        // Thinking otherwise arrives empty (only a token count); summaries show the reasoning.
+        ...(cfg.claudeThinking ? ["--thinking-display", "summarized"] : []),
         ...(o.model ? ["--model", o.model] : []),
         ...(o.effort ? ["--effort", o.effort] : []),
         ...(o.allowEdits ? ["--permission-mode", "acceptEdits"] : []),
@@ -615,6 +649,8 @@ export function agentCommand(agent: Agent, cfg: Pick<BridgeConfig, "claudeBin" |
   const args = [...(o.webSearch ? ["--search"] : []), "exec", "--ignore-user-config", "--json", "--skip-git-repo-check", "--sandbox", sandbox, "--output-last-message", "final.md"];
   if (o.model) args.push("--model", o.model);
   if (o.effort) args.push("-c", `model_reasoning_effort="${o.effort}"`);
+  // Reasoning summaries come through as "reasoning" items (Codex ignores config keys it doesn't know).
+  args.push("-c", 'model_reasoning_summary="detailed"', "-c", "hide_agent_reasoning=false");
   for (const img of images === true ? [IMAGE_FILE] : images || []) args.push("--image", img);
   return { bin: cfg.codexBin ?? "codex", args, parse: parseCodexLine, finalFile: "final.md" };
 }
@@ -625,6 +661,8 @@ export interface RunOptions {
   command: AgentCommand;
   timeoutMs: number;
   onText: (fullText: string) => void;
+  /** The thinking so far: summaries, and answer text that turned out to precede a tool. */
+  onThinking?: (fullThinking: string) => void;
   /** The agent's first line of output: it has started up (latency traces). */
   onFirstLine?: () => void;
   signal?: AbortSignal;
@@ -634,9 +672,13 @@ export interface RunOptions {
 export interface RunResult {
   status: "done" | "error" | "cancelled";
   output: string;
+  thinking?: string;
   error?: string;
   sessionId?: string;
 }
+
+/** Server-side cap on a job's thinking (src/server/jobs.ts MAX_THINKING). */
+export const MAX_THINKING = 100_000;
 
 /** The agent inherits the user's environment minus padSync's own credentials. */
 export function agentEnv(env: Env = process.env): Env {
@@ -680,7 +722,17 @@ export async function runAgent(opts: RunOptions): Promise<RunResult> {
     let streamed = "";
     let partial = "";
     let lastText: string | undefined;
-    const visible = () => cap(streamed && partial ? `${streamed}\n\n${partial}` : streamed || partial);
+    const join = (a: string, b: string) => (a && b ? `${a}\n\n${b}` : a || b);
+    const visible = () => cap(join(streamed, partial));
+    // Thinking kept apart from the answer: finished blocks (and preambles), and the one being written.
+    let thoughts = "";
+    let thinkingPartial = "";
+    const thinkingText = () => join(thoughts, thinkingPartial).slice(0, MAX_THINKING).replace(/[\uD800-\uDBFF]$/, "");
+    const commitThinking = () => {
+      if (!thinkingPartial) return;
+      thoughts = join(thoughts, thinkingPartial);
+      thinkingPartial = "";
+    };
     let final: string | undefined;
     let error: string | undefined;
     let stderr = "";
@@ -705,7 +757,8 @@ export async function runAgent(opts: RunOptions): Promise<RunResult> {
       clearTimeout(killTimer);
       if (stopReason) killTree("SIGKILL");
       opts.signal?.removeEventListener("abort", onAbort);
-      resolve({ ...r, ...(sessionId ? { sessionId } : {}) });
+      const thinking = thinkingText();
+      resolve({ ...r, ...(thinking ? { thinking } : {}), ...(sessionId ? { sessionId } : {}) });
     };
     const stop = (reason: "cancelled" | "timeout") => {
       if (stopReason) return;
@@ -737,6 +790,17 @@ export async function runAgent(opts: RunOptions): Promise<RunResult> {
       sessionId = parseSessionId(line) ?? sessionId;
       const u = command.parse(line);
       if (!u) return;
+      if (u.thinkingDelta) {
+        thinkingPartial += u.thinkingDelta;
+        opts.onThinking?.(thinkingText());
+      }
+      if (u.thinking) {
+        // The finished block replaces its deltas.
+        thinkingPartial = "";
+        thoughts = join(thoughts, u.thinking);
+        opts.onThinking?.(thinkingText());
+      }
+      if (!u.thinkingDelta && !u.thinking) commitThinking();
       if (u.delta) {
         partial += u.delta;
         opts.onText(visible());
@@ -746,6 +810,14 @@ export async function runAgent(opts: RunOptions): Promise<RunResult> {
         partial = "";
         lastText = u.text;
         opts.onText(streamed);
+      }
+      if (u.tool && visible()) {
+        // Text written before using a tool was a preamble ("Let me look at…"), not the answer.
+        thoughts = join(thoughts, visible());
+        streamed = "";
+        partial = "";
+        opts.onThinking?.(thinkingText());
+        opts.onText("");
       }
       if (u.final !== undefined) final = cap(u.final);
       if (u.error) error = u.error;
@@ -895,7 +967,7 @@ export class BridgeApi {
     return this.call<{ data: string }>("GET", `/api/bridge/jobs/${encodeURIComponent(jobId)}/inputs?path=${encodeURIComponent(path)}&part=${part}`, undefined, { ...opts, timeoutMs: 120_000 });
   }
 
-  update(jobId: string, u: { trace?: Record<string, number>; question?: string; sessionId?: string; output?: string; append?: string; status?: "done" | "error"; error?: string; files?: JobFile[] }, opts?: { signal?: AbortSignal; timeoutMs?: number }) {
+  update(jobId: string, u: { trace?: Record<string, number>; question?: string; sessionId?: string; output?: string; append?: string; thinking?: string; thinkingAppend?: string; status?: "done" | "error"; error?: string; files?: JobFile[] }, opts?: { signal?: AbortSignal; timeoutMs?: number }) {
     return this.call<{ status: string; cancelled: boolean }>("POST", `/api/bridge/jobs/${encodeURIComponent(jobId)}`, { ...u, ...(u.output === undefined ? {} : { output: u.output.slice(0, MAX_OUTPUT).replace(/[\uD800-\uDBFF]$/, "") }) }, opts);
   }
 }

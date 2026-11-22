@@ -104,6 +104,10 @@ export function mergeTurns(prev: Turn[], incoming: Turn[]): Turn[] {
       (!old || t.outputOffset > Array.from(old.output).length)
     )
       continue;
+    // Thinking streams the same way; a delta past what this device has waits for the full text.
+    const tOffset = t.thinkingOffset ?? 0;
+    const known = Array.from(old?.thinking ?? "");
+    const thinking = tOffset > known.length ? (old?.thinking ?? "") : known.slice(0, tOffset).join("") + (t.thinking ?? "");
     map.set(t.turn, {
       ...t,
       output:
@@ -111,6 +115,8 @@ export function mergeTurns(prev: Turn[], incoming: Turn[]): Turn[] {
           ? Array.from(old!.output).slice(0, t.outputOffset).join("")
           : "") + t.output,
       outputOffset: 0,
+      thinking,
+      thinkingOffset: 0,
     });
   }
   return [...map.values()].sort((a, b) => a.turn - b.turn);
@@ -118,7 +124,7 @@ export function mergeTurns(prev: Turn[], incoming: Turn[]): Turn[] {
 
 /** Streaming offsets use Unicode code points, matching PostgreSQL length/substring. */
 export function pollCursor(turns: Turn[]): string {
-  return turns.map((t) => `${t.turn}:${Array.from(t.output).length}`).join(",");
+  return turns.map((t) => `${t.turn}:${Array.from(t.output).length}:${Array.from(t.thinking ?? "").length}`).join(",");
 }
 export const editTurn = (threadId: string, turn: number, question: string) =>
   call<{ thread: ThreadSummary }>(

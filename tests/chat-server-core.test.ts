@@ -2,7 +2,7 @@ import { beforeEach, expect, it } from "vitest";
 import { freshDb } from "./helpers/env";
 import type { Sql } from "@/server/db";
 import * as c from "@/server/chat";
-import { claimJob, updateJob } from "@/server/jobs";
+import { claimJob, jobUpdateSchema, updateJob } from "@/server/jobs";
 let sql: Sql;
 beforeEach(async () => {
   ({ sql } = await freshDb());
@@ -69,6 +69,21 @@ it("since/from polls return changed turns and delta output; captures final sessi
       )
     )[0].agent_session,
   ).toEqual({ agent: "claude", sessionId: "session" });
+});
+it("thinking streams beside the answer, as deltas past the device's cursor", async () => {
+  const t = (await thread())!;
+  const a = (await turn(t.id))!;
+  await claimJob(sql, "b", ["claude"], ["chat"]);
+  await updateJob(sql, a.jobId, "b", { thinking: "Checking" });
+  await updateJob(sql, a.jobId, "b", { thinkingAppend: " the sign.", append: "It" });
+  const [r] = await c.getTurns(sql, t.id, undefined, "1:0:8");
+  expect([r.thinking, r.thinkingOffset, r.output]).toEqual([" the sign.", 8, "It"]);
+  // A device that doesn't send a thinking length gets all of it.
+  expect((await c.getTurns(sql, t.id, undefined, "1:2"))[0].thinking).toBe("Checking the sign.");
+  await updateJob(sql, a.jobId, "b", { status: "done", output: "It is 9/2.", thinking: "Checking the sign." });
+  const [done] = await c.getTurns(sql, t.id, undefined, "1:10:18");
+  expect([done.thinking, done.thinkingOffset]).toEqual(["Checking the sign.", 0]);
+  expect(jobUpdateSchema.safeParse({ thinking: "a", thinkingAppend: "b" }).success).toBe(false);
 });
 it("remembers which Codex login a session belongs to", async () => {
   const t = (await c.createThread(sql, { notebookId: "nb", title: "", agent: "codex", options: { account: "codex_work" } }))!;

@@ -172,6 +172,8 @@ export async function migrate(sql: Sql) {
     `alter table jobs add column if not exists transcribed boolean not null default false`,
     // Latency stamps from the device, server and bridge (src/lib/chat-trace.ts).
     `alter table jobs add column if not exists trace jsonb not null default '{}'::jsonb`,
+    // The agent's thinking (summaries) and any text it wrote before using a tool, kept apart from the answer.
+    `alter table jobs add column if not exists thinking text not null default ''`,
     `create unique index if not exists jobs_thread_turn_idx on jobs(thread_id, turn) where thread_id is not null`,
     `create index if not exists jobs_thread_updated_idx on jobs(thread_id, updated_at)`,
     `create index if not exists chat_threads_list_idx on chat_threads(deleted_at, archived, last_message_at desc)`,

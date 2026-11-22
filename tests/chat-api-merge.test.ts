@@ -41,3 +41,12 @@ it("Maps signed-out, unconfigured database and offline errors", async () => {
     vi.unstubAllGlobals();
   }
 });
+
+it("merges streamed thinking deltas and keeps it when a delta runs past what it has", () => {
+  const base = { turn: 1, jobId: "j", question: "q", context: null, attachments: [], agent: "claude", options: {}, error: null, createdAt: "", finishedAt: null, resultFiles: [], output: "", outputOffset: 0, status: "running" } as unknown as Turn;
+  let turns = mergeTurns([], [{ ...base, updatedAt: "1", thinking: "Check", thinkingOffset: 0 }]);
+  turns = mergeTurns(turns, [{ ...base, updatedAt: "2", thinking: "ing", thinkingOffset: 5 }]);
+  expect(turns[0].thinking).toBe("Checking");
+  turns = mergeTurns(turns, [{ ...base, updatedAt: "3", thinking: "zzz", thinkingOffset: 50 }]);
+  expect(turns[0].thinking).toBe("Checking");
+});

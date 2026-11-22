@@ -93,6 +93,9 @@ export interface Turn {
   /** Reply text starting at `outputOffset` (0 unless the request asked for a delta). */
   output: string;
   outputOffset: number;
+  /** The agent's thinking, and text it wrote before using a tool, from `thinkingOffset` on. */
+  thinking?: string;
+  thinkingOffset?: number;
   error: string | null;
   createdAt: string;
   updatedAt: string;

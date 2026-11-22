@@ -23,6 +23,7 @@ import {
   LAUNCHD_LABEL,
   agentCommand,
   agentEnv,
+  claudeThinkingSupported,
   attachedImages,
   buildAgentPrompt,
   buildBundlePrompt,
@@ -154,6 +155,9 @@ function reportStopped(api: BridgeApi, jobId: string, output = "") {
     .catch((e) => log(`could not report job ${jobId} as stopped: ${(e as Error).message}`));
 }
 
+/** This Claude Code can show its thinking (bridge/lib.ts claudeThinkingSupported); checked at start. */
+let claudeThinking = false;
+
 /** The latest discovered catalog; handleJob maps a job's account to its CODEX_HOME with it. */
 let catalog: Catalog = { accounts: [], homes: {} };
 
@@ -205,6 +209,9 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob, tra
   if (shutdown.signal.aborted) abort.abort();
   let latest = "";
   let sent = "";
+  // The thinking travels beside the answer, the same way.
+  let latestThinking = "";
+  let sentThinking = "";
   // After a failed update the server may or may not have its text, so the next one resends it all.
   let synced = true;
   let lastContact = Date.now();
@@ -213,13 +220,19 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob, tra
   const flush = async () => {
     if (abort.signal.aborted) return;
     const changed = latest !== sent;
-    if (!changed && Date.now() - lastContact < HEARTBEAT_MS) return;
+    const thought = latestThinking !== sentThinking;
+    if (!changed && !thought && Date.now() - lastContact < HEARTBEAT_MS) return;
     const out = latest;
-    const body = !changed ? {} : synced && sent && out.startsWith(sent) ? { append: out.slice(sent.length) } : { output: out };
+    const th = latestThinking;
+    const body = {
+      ...(!changed ? {} : synced && sent && out.startsWith(sent) ? { append: out.slice(sent.length) } : { output: out }),
+      ...(!thought ? {} : synced && sentThinking && th.startsWith(sentThinking) ? { thinkingAppend: th.slice(sentThinking.length) } : { thinking: th }),
+    };
     try {
       // Cancelled with the job, so a hung progress request can't hold up stopping it.
       const r = await update(body, { signal: abort.signal });
       sent = out;
+      sentThinking = th;
       synced = true;
       lastContact = Date.now();
       if (r.cancelled) {
@@ -274,7 +287,7 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob, tra
       const historyPrompt = () => `The conversation so far:\n<conversation>\n${chatHistory(job.history ?? [])}\n</conversation>\n\n`;
       // An import's lecture notes are long and read selectively, so only chats and asks inline them.
       const basePrompt = isImport ? buildImportPrompt(job.question, d, job.agent, runOpts) : bundle ? buildBundlePrompt(job.question, d, job.agent, runOpts, inlineTexts(job.files)) : buildAgentPrompt(job.question, d, job.agent);
-      const command = agentCommand(job.agent, cfg, bundle ? attachedImages(d.files) : !!d.image, runOpts);
+      const command = agentCommand(job.agent, { ...cfg, claudeThinking }, bundle ? attachedImages(d.files) : !!d.image, runOpts);
       const run = (resume: boolean, prefix: string) => {
         mark("agent_spawn");
         return runAgent({
@@ -284,7 +297,13 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob, tra
         timeoutMs: isImport ? IMPORT_TIMEOUT_MS : JOB_TIMEOUT_MS,
         onText: (t) => {
           mark("first_text");
+          // When the answer itself began (it restarts after a preamble moves to thinking): the chat's "Thought for".
+          if (t && !latest) trace["bridge.answer_start"] = Date.now();
           latest = t;
+        },
+        onThinking: (t) => {
+          mark("first_thinking");
+          latestThinking = t;
         },
         onFirstLine: () => mark("agent_first_event"),
         signal: abort.signal,
@@ -294,6 +313,7 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob, tra
       const result = job.kind === 'chat'
         ? await runChatWithFallback(!!session, async (resume, history) => {
           latest = '';
+          latestThinking = '';
           return run(resume, history ? historyPrompt() : '');
         })
         : await run(false, '');
@@ -315,11 +335,12 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob, tra
       if (shutdown.signal.aborted) await reportStopped(api, job.id, result.output);
       return;
     }
-    if (result.status !== "done") await update({ output: result.output, status: "error", error: result.error });
-    else if (!files.length) await update({ output: result.output, status: "done", sessionId: result.sessionId });
+    const thinking = result.thinking ?? "";
+    if (result.status !== "done") await update({ output: result.output, thinking, status: "error", error: result.error });
+    else if (!files.length) await update({ output: result.output, thinking, status: "done", sessionId: result.sessionId });
     else {
       // Keep the answer even if padSync refuses the files (e.g. an older server).
-      await update({ output: result.output, status: "done", sessionId: result.sessionId, files }).catch((e) => {
+      await update({ output: result.output, thinking, status: "done", sessionId: result.sessionId, files }).catch((e) => {
         if (!(e instanceof ApiError) || e.status !== 400) throw e;
         log(`job ${job.id}: server refused the returned files: ${e.message}`);
         return update({ output: `${result.output}\n\n_The files the agent wrote could not be returned: ${e.message}_`, status: "done", sessionId: result.sessionId });
@@ -352,6 +373,8 @@ async function run() {
     return !!v;
   });
   if (!agents.length) throw new Error("neither claude nor codex is on PATH");
+  claudeThinking = agents.includes("claude") && claudeThinkingSupported(cfg.claudeBin);
+  if (agents.includes("claude")) log(claudeThinking ? "claude: thinking summaries on" : "claude: this version can't show thinking (no --thinking-display)");
   const api = new BridgeApi(cfg);
   const info = { hostname: hostname(), version: VERSION };
   // Load the speech model now, so the first voice message is as quick as the rest.
