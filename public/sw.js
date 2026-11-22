@@ -22,6 +22,12 @@ self.addEventListener("activate", event => {
   })());
 });
 
+// "Reload" on the page's update bar (src/components/UpdatePrompt.tsx): take over now, without
+// waiting for every tab to close. The page reloads on the new build once this worker controls it.
+self.addEventListener("message", event => {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
+});
+
 self.addEventListener("fetch", event => {
   const req = event.request;
   const url = new URL(req.url);

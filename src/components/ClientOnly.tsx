@@ -18,6 +18,7 @@ const views = {
   "pencil-test": dynamic(() => import("./PencilTestView"), { ssr: false }),
 };
 // Browser-only too: it reads its settings from localStorage, so server HTML would never match.
+import { UpdatePrompt } from "./UpdatePrompt";
 const SyncDebugOverlay = dynamic(() => import("./SyncDebugOverlay").then((m) => m.SyncDebugOverlay), { ssr: false });
 
 export function ClientOnly({ view }: { view: keyof typeof views }) {
@@ -36,6 +37,7 @@ export function ClientOnly({ view }: { view: keyof typeof views }) {
     <Suspense fallback={null}>
       <View />
       <SyncDebugOverlay />
+      <UpdatePrompt />
     </Suspense>
   );
 }

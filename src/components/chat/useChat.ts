@@ -461,6 +461,12 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
         },
       });
       markLocal(sent.turn.jobId, "client.response");
+      // Known at once, so polling treats the reply as running even if a fetch already in flight
+      // (one that started before the turn existed) comes back without it.
+      if (selected.current === target.id) {
+        turnsRef.current = api.mergeTurns(turnsRef.current, [sent.turn]);
+        setTurns((old) => api.mergeTurns(old, [sent.turn]));
+      }
       await api.uploadTurnInputs(sent.turn.jobId, inputs, onProgress);
       // Clears the box only if it still holds what was sent: not a draft typed during a slow
       // upload, nor one a toolbar prompt (which sends its own text) found there.
