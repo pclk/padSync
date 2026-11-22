@@ -1,0 +1,7 @@
+// Copy to Local.xcconfig. Your team id is shown in Xcode → Settings → Accounts → (your Apple ID)
+// → the "Personal Team" row, or run `security find-identity -v -p codesigning` after Xcode
+// has created your development certificate (the id in parentheses).
+DEVELOPMENT_TEAM = ABCDE12345
+
+// Uncomment if Xcode says the bundle id is taken.
+// PADSYNC_BUNDLE_ID = com.yourname.padsync

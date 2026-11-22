@@ -31,6 +31,9 @@ import { priceFor, type Price } from "@/lib/chat-cost";
 import { MAX_BUNDLE_BYTES } from "@/lib/context";
 import { clientClock, localMarks, markLocal, noteServerTime } from "@/lib/chat-trace";
 import { voiceFile } from "./useVoice";
+import { useLiveQuery } from "dexie-react-hooks";
+import { deviceKind } from "@/lib/db";
+import { latestChatPing, publishChatFocus } from "@/lib/chat-handoff";
 import type { ThreadListProps } from "./ThreadList";
 import type { ContextHandle } from "./ContextPicker";
 
@@ -115,6 +118,26 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
     listPoll.current?.refresh();
     detailPoll.current?.refresh();
   };
+  // The iPad app sends its prompts to the chat a computer shows (src/lib/chat-handoff.ts): say
+  // which one this is, and jump to a chat the iPad just asked in, so its reply shows here live.
+  const desktop = deviceKind() === "desktop";
+  useEffect(() => {
+    if (!desktop || !p.visible || !tabVisible || !id || !p.notebookId) return;
+    void publishChatFocus(p.notebookId, id);
+    const timer = setInterval(() => void publishChatFocus(p.notebookId, id), 10 * 60_000);
+    return () => clearInterval(timer);
+  }, [desktop, p.visible, tabVisible, id, p.notebookId]);
+  const ping = useLiveQuery(() => (desktop && p.notebookId ? latestChatPing(p.notebookId) : undefined), [desktop, p.notebookId]);
+  // Pings from before this panel opened are history, not a new ask.
+  const seenPing = useRef<number | null>(null);
+  useEffect(() => {
+    seenPing.current ??= Date.now() - 60_000;
+    if (!ping || ping.data.at <= seenPing.current) return;
+    seenPing.current = ping.data.at;
+    if (ping.data.chatThreadId !== selected.current) select(ping.data.chatThreadId);
+    else refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ping]);
   useEffect(() => {
     const timer = setTimeout(() => setQuery(search), 250);
     return () => clearTimeout(timer);

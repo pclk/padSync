@@ -12,6 +12,7 @@ import { ACCEPT, checkLimits, formatBytes, move, needsCode } from "@/lib/attachm
 import { useStoredState } from "@/lib/hooks";
 import { addFiles, clearAttachments, getDraft, listAttachments, removeAttachment, reorderAttachments, setDraft, type StoredAttachment } from "@/lib/import-drafts";
 import { abortSend, getSendState, isSending, setCurrentJob, startSend, subscribeSend, type SendProgress } from "@/lib/import-send";
+import { openNotebookNative } from "@/lib/native";
 import { GOALS } from "@/lib/payload";
 import { listNotebooks } from "@/lib/store";
 import { applyImport } from "@/lib/import-application";
@@ -285,7 +286,7 @@ export default function AiImportView() {
           jobId={jobId}
           imported={imported}
           onImported={(id, title) => setImported({ id, title })}
-          open={(id) => router.push(`/notebook?id=${id}`)}
+          open={(id) => { if (!openNotebookNative(id)) router.push(`/notebook?id=${id}`); }}
         />
       </Step>
     </main>
@@ -718,7 +719,7 @@ function Review(p: {
           {error && <p className="mt-2 text-xs text-rose-700">{error}</p>}
           {p.imported ? (
             <p className="mt-3 text-emerald-700">
-              Imported <Link className="underline" href={`/notebook?id=${p.imported.id}`}>{p.imported.title}</Link>.
+              Imported <Link className="underline" href={`/notebook?id=${p.imported.id}`} onClick={(e) => { if (p.imported && openNotebookNative(p.imported.id)) e.preventDefault(); }}>{p.imported.title}</Link>.
             </p>
           ) : (
             result.ok && (

@@ -1,0 +1,87 @@
+# XcodeGen spec. Run `xcodegen` in ios/ to (re)create PadSync.xcodeproj; the project itself is
+# not committed. See ios/README.md.
+name: PadSync
+options:
+  bundleIdPrefix: com.weiheng
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+packages:
+  GRDB:
+    url: https://github.com/groue/GRDB.swift
+    exactVersion: 7.12.0
+configFiles:
+  Debug: Config/Base.xcconfig
+  Release: Config/Base.xcconfig
+targets:
+  PadSync:
+    type: application
+    platform: iOS
+    sources:
+      - path: PadSync
+        excludes:
+          - Renderer
+      # The bundled block renderer keeps its folder layout (KaTeX fonts are referenced as fonts/…).
+      - path: PadSync/Renderer
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - package: GRDB
+    settings:
+      base:
+        PRODUCT_NAME: padSync
+        PRODUCT_BUNDLE_IDENTIFIER: $(PADSYNC_BUNDLE_ID)
+        TARGETED_DEVICE_FAMILY: "2"
+        SWIFT_VERSION: "6.0"
+        MARKETING_VERSION: 0.1.0
+        CURRENT_PROJECT_VERSION: 1
+        CODE_SIGN_STYLE: Automatic
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_USER_SCRIPT_SANDBOXING: YES
+    info:
+      path: PadSync/Info.plist
+      properties:
+        CFBundleDisplayName: padSync
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        PadSyncHost: $(PADSYNC_HOST)
+        # Lets the web app's service worker run, so the web screens open offline. Navigation is
+        # limited to these domains; github.com is the sign-in page.
+        WKAppBoundDomains:
+          - $(PADSYNC_HOST)
+          - github.com
+        UILaunchScreen: {}
+        # All four, and no UIRequiresFullScreen, so Split View and Stage Manager can size the window.
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        ITSAppUsesNonExemptEncryption: false
+        NSMicrophoneUsageDescription: Voice prompts record a short message to send to the chat.
+  PadSyncTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: PadSyncTests
+    dependencies:
+      - target: PadSync
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/padSync.app/padSync
+        BUNDLE_LOADER: $(TEST_HOST)
+schemes:
+  PadSync:
+    build:
+      targets:
+        PadSync: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - PadSyncTests
