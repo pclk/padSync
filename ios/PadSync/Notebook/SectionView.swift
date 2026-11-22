@@ -8,31 +8,21 @@ final class EditorContext {
     let notebookId: String
     let database: AppDatabase
     let sync: SyncEngine
-    let toolPicker: PKToolPicker
     /// Canvases with the Pencil down; sync holds off while any is.
     var inking = Set<ObjectIdentifier>()
+    /// The current tool, colours and sizes (the web's `padsync.tool`).
+    var tool: ToolState
     /// The text tool: taps add and edit text boxes instead of the canvas taking input.
-    var textMode = false
-    /// The last tool, colour and width, saved so the next launch starts with them.
-    private(set) var toolState: Tools.State
-    private let defaults: UserDefaults
+    var textMode: Bool { tool.kind == .text }
+    /// The selection a section shows (its dashed box), and how it reports a drag of it.
+    var selection: InkSelection?
+    var onSelectionDrag: (SectionView, CGPoint, UIGestureRecognizer.State) -> Void = { _, _, _ in }
 
-    init(notebookId: String, database: AppDatabase, sync: SyncEngine, toolPicker: PKToolPicker,
-         toolState: Tools.State = Tools.load(), defaults: UserDefaults = .standard) {
+    init(notebookId: String, database: AppDatabase, sync: SyncEngine, tool: ToolState = ToolState()) {
         self.notebookId = notebookId
         self.database = database
         self.sync = sync
-        self.toolPicker = toolPicker
-        self.toolState = toolState
-        self.defaults = defaults
-    }
-
-    /// Remembers the picker's selection, and `tool` (a canvas's tool as a stroke starts) as its ink.
-    func rememberTool(_ tool: PKTool? = nil) {
-        let next = Tools.recording(toolState, selected: toolPicker.selectedToolItemIdentifier, tool: tool)
-        guard next != toolState else { return }
-        toolState = next
-        Tools.save(next, to: defaults)
+        self.tool = tool
     }
 }
 
@@ -62,6 +52,11 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
     private var editor: TextBoxEditor?
     private let textTap = UITapGestureRecognizer()
     let canvas = PKCanvasView()
+    let selectionView = SelectionBoxView()
+    /// Whether the ink, blocks and PDF page have loaded, for drawing the section off screen.
+    private(set) var strokesLoaded = false
+    private var blocksSettled = false
+    private var pdfSettled = false
 
     /// Live strokes as last written or read: id → hlc. Matching the store means nothing to redraw.
     private var known: [String: String] = [:]
@@ -114,13 +109,17 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
         canvas.drawingPolicy = Tools.drawingPolicy
         canvas.delegate = self
         addSubview(canvas)
-        context.toolPicker.addObserver(canvas)
-        context.toolPicker.setVisible(true, forFirstResponder: canvas)
+        selectionView.isHidden = true
+        selectionView.onDrag = { [weak self] d, state in
+            guard let self else { return }
+            self.context.onSelectionDrag(self, d, state)
+        }
+        addSubview(selectionView)
 
         textTap.addTarget(self, action: #selector(addTextBox(_:)))
         textTap.delegate = self
         addGestureRecognizer(textTap)
-        setTextMode(context.textMode)
+        applyTool()
 
         apply(section: section)
         observe()
@@ -134,7 +133,6 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
         pdfTask?.cancel()
         blocksTask?.cancel()
         editor?.resignFirstResponder()
-        context.toolPicker.removeObserver(canvas)
         context.inking.remove(ObjectIdentifier(canvas))
     }
 
@@ -172,6 +170,7 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
         guard BlockRenderer.hasContent(section) else {
             blocksView.image = nil
             contentHeight = 0
+            blocksSettled = true
             return
         }
         let section = section, index = index
@@ -182,8 +181,10 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
                 self.blocksView.image = rendered.image
                 self.contentHeight = rendered.contentHeight
                 self.titleLabel.isHidden = true
+                self.blocksSettled = true
                 self.relayout()
             } catch {
+                self?.blocksSettled = true
                 print("padSync: block render failed for \(section.id): \(error)")
             }
         }
@@ -218,7 +219,10 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
     /// Renders the page for the notebook's zoom, at most once per pixel density.
     func renderPDF(zoom: CGFloat, displayScale: CGFloat) {
         guard let pdf = section.data["pdf"], let documentId = pdf["documentId"]?.string, let page = pdf["page"]?.int,
-              let pageHeight = pdf["height"]?.double else { return }
+              let pageHeight = pdf["height"]?.double else {
+            pdfSettled = true
+            return
+        }
         // Quarter steps between half and full screen density per page point, like pdfDensity.
         let scale = min(displayScale * 2, max(displayScale / 2, (displayScale * zoom * 4).rounded(.up) / 4))
         guard scale != renderedScale else { return }
@@ -237,6 +241,7 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
             } catch {
                 guard !Task.isCancelled else { return }
                 self?.renderedScale = 0
+                self?.pdfSettled = true
                 self?.pdfStatus.text = "PDF page \(page) · \(error.localizedDescription)"
             }
         }
@@ -245,6 +250,7 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
     private func showPDF(_ image: UIImage) {
         pdfView.image = image
         pdfStatus.text = nil
+        pdfSettled = true
     }
 
     // MARK: Store → canvas
@@ -338,6 +344,7 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
             applying = false
         }
         pendingRemote = false
+        strokesLoaded = true
         relayout()
     }
 
@@ -351,8 +358,6 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
 
     func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
         context.inking.insert(ObjectIdentifier(canvasView))
-        if !canvasView.isFirstResponder { canvasView.becomeFirstResponder() }
-        context.rememberTool(canvasView.tool)
     }
 
     func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
@@ -427,6 +432,70 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
         }
     }
 
+    // MARK: Tools and selection
+
+    /// Puts the current tool on the canvas: ink tools draw, the lasso and text tools take the
+    /// Pencil away from PencilKit.
+    func applyTool() {
+        let tool = Tools.canvasTool(for: context.tool)
+        if let tool { canvas.tool = tool }
+        canvas.drawingGestureRecognizer.isEnabled = tool != nil
+        setTextMode(context.textMode)
+        showSelection()
+    }
+
+    /// The dashed box when the selection is in this section.
+    func showSelection() {
+        guard let sel = context.selection, sel.sectionId == section.id else {
+            selectionView.isHidden = true
+            return
+        }
+        selectionView.frame = sel.box.insetBy(dx: -8, dy: -8)
+        selectionView.isHidden = false
+        bringSubviewToFront(selectionView)
+    }
+
+    /// Replaces the canvas's strokes. `save` writes the change (with the usual diff); without it
+    /// the canvas only shows it, as during a drag.
+    func setDrawing(_ drawing: PKDrawing, save: Bool) {
+        applying = true
+        canvas.drawing = drawing
+        applying = false
+        if save { canvasViewDrawingDidChange(canvas) }
+    }
+
+    /// Waits (up to `timeout`) for the ink, blocks and PDF page, for drawing off screen.
+    func settle(timeout: TimeInterval = 5) async {
+        renderPDF(zoom: 1, displayScale: 2)
+        let end = Date.now.addingTimeInterval(timeout)
+        while Date.now < end, !(strokesLoaded && blocksSettled && pdfSettled) {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+    }
+
+    /// The section as shown (paper, PDF, blocks, text boxes and ink, no selection box) at `scale`
+    /// pixels per page unit. Composed from its parts so it works off screen too.
+    func snapshot(scale: CGFloat) -> UIImage {
+        let size = bounds.size
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale
+        format.opaque = true
+        let hidden = selectionView.isHidden
+        selectionView.isHidden = true
+        canvas.isHidden = true
+        defer {
+            canvas.isHidden = false
+            selectionView.isHidden = hidden
+        }
+        let ink = canvas.drawing.image(from: CGRect(origin: .zero, size: size), scale: scale)
+        return UIGraphicsImageRenderer(size: size, format: format).image { ctx in
+            UIColor.white.setFill()
+            ctx.fill(CGRect(origin: .zero, size: size))
+            layer.render(in: ctx.cgContext)
+            ink.draw(in: CGRect(origin: .zero, size: size))
+        }
+    }
+
     // MARK: Text boxes
 
     /// Text boxes sit above the canvas but take touches only with the text tool, when the canvas
@@ -495,7 +564,6 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
             editor.removeFromSuperview()
             self.editor = nil
             self.finishEdit(box.id, text: text)
-            self.canvas.becomeFirstResponder()
         }
         self.editor = editor
         addSubview(editor)

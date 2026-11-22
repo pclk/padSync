@@ -6,7 +6,7 @@ import UIKit
 /// sections near the viewport exist as views. Reports where the iPad is (presence), so a Mac
 /// following it keeps up, and remembers the place per notebook.
 @MainActor
-final class NotebookViewController: UIViewController, UIScrollViewDelegate, PKToolPickerObserver {
+final class NotebookViewController: UIViewController, UIScrollViewDelegate {
     static let gap: CGFloat = 24
 
     let context: EditorContext
@@ -28,11 +28,29 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate, PKTo
     private var reading = CGPoint.zero
     private var scrollToSection: String?
     private let addButton = UIButton(configuration: .plain())
-    /// Tells the bar the text tool turned off (picking a pen in the tool picker does that).
-    var onTextModeChange: (Bool) -> Void = { _ in }
-    /// Tells the bar which section is current (index, count), for the section menu.
-    var onSectionPositionChange: (Int, Int) -> Void = { _, _ in }
-    private var lastPosition: (Int, Int)?
+    /// Which section is current (index, count), for the page menu.
+    private(set) var position = (index: 0, count: 0)
+    /// Back to the library.
+    var onClose: () -> Void = {}
+    var notebookTitle: () -> String = { "" }
+    private(set) var overlay: ControlsOverlay!
+    let watcher = TouchWatcher()
+    private let settings = DeviceSettingsStore.shared
+    private var previousKind = ToolKind.pen
+    // The lasso being drawn (overlay coordinates), by a held finger or the Pencil.
+    private var loopPoints: [CGPoint] = []
+    private var lassoing = false
+    private let pencilLasso = PencilLassoRecognizer()
+    /// The prompt fan a held finger points into, and where it pressed.
+    private var heldFan: (press: CGPoint, far: CGFloat)?
+    private var dragStart: PKDrawing?
+    private let lassoAsk = FanPress()
+    private let lassoEdit = FanPress()
+    private let lassoColors = FanPress()
+    private let recorder = VoiceRecorder()
+    private var recorderBar: RecorderBar?
+    private let pencilFan = FanPress()
+    private let gestureFan = FanPress()
 
     init(context: EditorContext) {
         self.context = context
@@ -77,19 +95,12 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate, PKTo
         addButton.accessibilityLabel = "Add a blank page"
         column.addSubview(addButton)
 
-        // Two fingers tap to undo, three to redo (the web's defaults in Settings → Touch gestures).
-        let undo = UITapGestureRecognizer(target: self, action: #selector(undoTap))
-        undo.numberOfTouchesRequired = 2
-        let redo = UITapGestureRecognizer(target: self, action: #selector(redoTap))
-        redo.numberOfTouchesRequired = 3
-        undo.require(toFail: redo)
-        for g in [undo, redo] {
-            g.allowedTouchTypes = [UITouch.TouchType.direct.rawValue as NSNumber]
-            scrollView.addGestureRecognizer(g)
-        }
-
+        // Pencil never scrolls; fingers scroll and pinch, and their taps and holds are gestures.
+        scrollView.panGestureRecognizer.allowedTouchTypes = [UITouch.TouchType.direct.rawValue as NSNumber]
+        context.tool = settings.settings.tool
         context.sync.isInking = { [weak context] in !(context?.inking.isEmpty ?? true) }
-        context.toolPicker.addObserver(self)
+        context.onSelectionDrag = { [weak self] v, d, state in self?.dragSelection(v, by: d, state: state) }
+        setUpControls()
         view.addInteraction(pencil)
         observeSections()
     }
@@ -123,10 +134,7 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate, PKTo
         scrollView.contentOffset = ZoomFit.offset(reading: anchor, zoom: zoom, viewport: scrollView.bounds.size,
                                                   contentHeight: column.bounds.height)
         mountVisible()
-        // The picker docks or floats with the new size class; keep it on the current canvas.
-        if !context.textMode, let first = views.values.first(where: { $0.canvas.isFirstResponder }) {
-            context.toolPicker.setVisible(true, forFirstResponder: first.canvas)
-        }
+        placeLassoCircle()
     }
 
     override func viewDidDisappear(_ animated: Bool) {
@@ -247,31 +255,49 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate, PKTo
         }
         // A mounted section can be taller than its estimate; move the ones below (and the add button).
         if resized { layoutColumn() }
-        // The tool picker shows while a canvas is first responder; that needs the view in a window.
-        // With the text tool a text box editor may hold focus, so leave it.
-        if view.window != nil, !context.textMode, !views.values.contains(where: { $0.canvas.isFirstResponder }),
-           let id = currentSection()?.id, let v = views[id] {
-            v.canvas.becomeFirstResponder()
-        }
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         mountVisible()
         #if DEBUG
-        // `-askDemo`: after launch, an Ask AI lasso around the top of the screen, for checking the
-        // ask sheet in the simulator (which can't draw).
-        if ProcessInfo.processInfo.arguments.contains("-askDemo") {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
-                guard let self else { return }
-                self.setAskMode(true)
-                let r = self.view.bounds.insetBy(dx: 40, dy: 40)
-                let loop = [CGPoint(x: r.minX, y: r.minY), CGPoint(x: r.maxX, y: r.minY), CGPoint(x: r.maxX, y: r.minY + 420), CGPoint(x: r.minX, y: r.minY + 420)]
-                self.askLasso?.onFinish(loop)
-            }
-        }
+        // `-demo panel|toolFan|promptFan|lasso`: shows a control after launch, for checking it in
+        // the simulator, which can't tap or draw.
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "-demo"), i + 1 < args.count { demo(args[i + 1]) }
         #endif
     }
+
+    #if DEBUG
+    private func demo(_ what: String) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            guard let self else { return }
+            switch what {
+            case "panel":
+                self.overlay.toolCircle.press?.onTap()
+            case "toolFan":
+                self.overlay.toolCircle.press?.began(at: self.overlay.toolCircle.center)
+                self.overlay.toolCircle.press?.moved(to: CGPoint(x: self.overlay.toolCircle.center.x + 80, y: self.overlay.toolCircle.center.y + 10))
+            case "promptFan":
+                self.overlay.promptCircle.press?.onTap()
+            case "lasso":
+                let r = self.view.bounds.insetBy(dx: 120, dy: 160)
+                let loop = (0..<64).map { i -> CGPoint in
+                    let a = CGFloat(i) / 64 * 2 * .pi
+                    return CGPoint(x: r.midX + r.width / 2 * cos(a), y: r.minY + 180 + 160 * sin(a))
+                }
+                self.beginLoop(at: loop[0], lens: false)
+                self.addLoop(Array(loop.dropFirst()))
+                self.endLoop(cancel: false)
+                if args(contains: "-demoAsk") { self.lassoAsk.onTap() }
+            default:
+                break
+            }
+        }
+    }
+
+    private func args(contains flag: String) -> Bool { ProcessInfo.processInfo.arguments.contains(flag) }
+    #endif
 
     // MARK: Scrolling and zoom
 
@@ -279,6 +305,9 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate, PKTo
 
     func scrollViewDidZoom(_ scrollView: UIScrollView) {
         centerColumn()
+        placeLassoCircle()
+        // A pinch that starts zooming isn't a tap.
+        watcher.logic.consume()
     }
 
     func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
@@ -292,6 +321,7 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate, PKTo
             reading = CGPoint(x: scrollView.contentOffset.x / zoom, y: scrollView.contentOffset.y / zoom)
         }
         mountVisible()
+        placeLassoCircle()
         guard restored else { return }
         let current = currentSection()?.id
         if current != lastSectionId {
@@ -361,11 +391,7 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate, PKTo
 
     private func reportPosition() {
         guard let id = currentSection()?.id, let i = sections.firstIndex(where: { $0.id == id }) else { return }
-        let position = (i, sections.count)
-        if lastPosition.map({ $0 != position }) ?? true {
-            lastPosition = position
-            onSectionPositionChange(i, sections.count)
-        }
+        position = (i, sections.count)
     }
 
     /// Writes section rows, with an undo step on the window's undo manager (the same one the
@@ -438,98 +464,649 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate, PKTo
         write([Sections.setDeleted(row, false)], undoName: "Delete page")
     }
 
-    // MARK: Ask AI
+    // MARK: Undo
 
-    /// Called with what an Ask AI lasso caught; the bar shows the ask sheet for it.
-    var onAsk: (AskCapture) -> Void = { _ in }
-    var onAskModeChange: (Bool) -> Void = { _ in }
-    private var askLasso: AskLassoView?
-
-    /// Ask AI: a lasso drawn over the page picks what to ask about. Scrolling and ink pause until
-    /// it's drawn or Ask AI is turned off.
-    func setAskMode(_ on: Bool) {
-        guard on != (askLasso != nil) else { return }
-        if on {
-            let lasso = AskLassoView(frame: scrollView.frame)
-            lasso.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            lasso.onFinish = { [weak self] loop in
-                guard let self else { return }
-                let capture = self.capture(loop: loop, from: lasso)
-                self.setAskMode(false)
-                if let capture { self.onAsk(capture) }
-            }
-            view.addSubview(lasso)
-            askLasso = lasso
-        } else {
-            askLasso?.removeFromSuperview()
-            askLasso = nil
-        }
-        onAskModeChange(on)
+    // PencilKit registers its undo steps with the window's undo manager.
+    @objc func undoTap() {
+        clearSelection()
+        view.window?.undoManager?.undo()
     }
 
-    /// The section the loop was mostly drawn on, the strokes it encloses (or, with none, the area
-    /// inside it, so a printed question can be asked about too) and the picture of it.
-    private func capture(loop: [CGPoint], from lasso: UIView) -> AskCapture? {
-        let candidates = views.values.map { v in (v, loop.map { lasso.convert($0, to: v) }) }
-        guard let (v, poly) = candidates.max(by: { a, b in
-            a.1.filter(a.0.bounds.contains).count < b.1.filter(b.0.bounds.contains).count
-        }), poly.contains(where: v.bounds.contains) else { return nil }
-        let picked = AskSelection.enclosed(v.canvas.drawing.strokes, by: poly)
-        let area = poly.reduce(CGRect.null) { $0.union(CGRect(origin: $1, size: .zero)) }.intersection(v.bounds)
-        guard let box = AskSelection.box(picked) ?? (area.isNull ? nil : area),
-              let png = AskSelection.png(of: v, box: box), let image = UIImage(data: png) else { return nil }
-        let data = v.section.data
-        let pdf = data["pdf"].flatMap { p in p["name"]?.string.map { (name: $0, page: Int(p["page"]?.int ?? 1)) } }
-        return AskCapture(notebookId: context.notebookId, sectionId: v.section.id, sectionTitle: data["title"]?.string,
-                          index: v.index, pdf: pdf, png: png, pixelSize: CGSize(width: image.size.width * image.scale, height: image.size.height * image.scale))
-    }
-
-    // MARK: Text tool
-
-    func setTextMode(_ on: Bool) {
-        guard on != context.textMode else { return }
-        context.textMode = on
-        updatePencilInteraction()
-        views.values.forEach { $0.setTextMode(on) }
-        onTextModeChange(on)
-        if !on { mountVisible() }
-    }
-
-    func toolPickerSelectedToolItemDidChange(_ toolPicker: PKToolPicker) {
-        setTextMode(false)
-        context.rememberTool()
+    @objc func redoTap() {
+        clearSelection()
+        view.window?.undoManager?.redo()
     }
 
     // MARK: Apple Pencil
 
-    /// The tool picker answers double tap and squeeze while it shows. With the text tool it's
-    /// hidden, so either gesture (unless set to "ignore" in Settings) goes back to ink instead.
-    private lazy var pencil: UIPencilInteraction = {
-        let interaction = UIPencilInteraction(delegate: self)
-        interaction.isEnabled = false
-        return interaction
-    }()
-
-    private func updatePencilInteraction() {
-        pencil.isEnabled = context.textMode
-    }
-
-    // MARK: Undo
-
-    // PencilKit registers its undo steps with the window's undo manager.
-    @objc func undoTap() { view.window?.undoManager?.undo() }
-    @objc func redoTap() { view.window?.undoManager?.redo() }
+    /// Double tap and squeeze do what Settings → Apple Pencil says: switch to the previous tool or
+    /// the eraser, or show the tools (the tool fan around the Pencil for squeeze).
+    private lazy var pencil = UIPencilInteraction(delegate: self)
 }
 
 extension NotebookViewController: UIPencilInteractionDelegate {
     func pencilInteraction(_ interaction: UIPencilInteraction, didReceiveTap tap: UIPencilInteraction.Tap) {
-        guard context.textMode, Tools.leavesTextTool(for: UIPencilInteraction.preferredTapAction) else { return }
-        setTextMode(false)
+        pencilAction(UIPencilInteraction.preferredTapAction, at: tap.hoverPose?.location)
     }
 
     func pencilInteraction(_ interaction: UIPencilInteraction, didReceiveSqueeze squeeze: UIPencilInteraction.Squeeze) {
-        guard squeeze.phase == .ended, context.textMode,
-              Tools.leavesTextTool(for: UIPencilInteraction.preferredSqueezeAction) else { return }
-        setTextMode(false)
+        guard squeeze.phase == .ended else { return }
+        pencilAction(UIPencilInteraction.preferredSqueezeAction, at: squeeze.hoverPose?.location)
+    }
+
+    private func pencilAction(_ action: UIPencilPreferredAction, at point: CGPoint?) {
+        switch action {
+        case .ignore:
+            break
+        case .switchEraser:
+            setKind(context.tool.kind == .eraser ? previousKind : .eraser)
+        case .switchPrevious:
+            setKind(previousKind)
+        default:
+            // Palettes: the tool fan where the Pencil hovers, else around the tool circle.
+            let at = point ?? overlay.toolCircle.center
+            let current = context.tool.kind
+            let items = settings.settings.rail.tools.map { FanItem(key: $0.rawValue, label: $0.label, symbol: $0.symbol, current: $0 == current) }
+            pencilFan.setFan(FanState(items: items, center: at, viewport: overlay.bounds.size, sticky: true))
+        }
+    }
+}
+
+
+
+// MARK: - Controls
+
+extension NotebookViewController {
+    private func setUpControls() {
+        let actions = ControlsActions(
+            tool: { [unowned self] in self.context.tool },
+            setTool: { [unowned self] in self.setTool($0) },
+            undo: { [unowned self] in self.undoTap() },
+            redo: { [unowned self] in self.redoTap() },
+            canUndo: { [unowned self] in self.view.window?.undoManager?.canUndo ?? false },
+            canRedo: { [unowned self] in self.view.window?.undoManager?.canRedo ?? false },
+            prompts: { [unowned self] in self.settings.settings.prompts },
+            sendPrompt: { [unowned self] in self.sendPrompt($0, fromSelection: false) },
+            close: { [unowned self] in self.onClose() },
+            syncStatus: { [unowned self] in self.syncLabel },
+            pageMenu: { [unowned self] in self.pageMenu() })
+        let overlay = ControlsOverlay(actions: actions, rail: settings.settings.rail)
+        overlay.frame = view.bounds
+        overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(overlay)
+        self.overlay = overlay
+        overlay.onRailChange = { [weak self] in self?.settings.setRail($0) }
+        settings.onChange = { [weak self] s in self?.overlay.setRail(s.rail) }
+        Task { [weak self] in await self?.settings.refresh() }
+
+        for press in [pencilFan, gestureFan, lassoAsk, lassoEdit, lassoColors] {
+            press.present = { [weak self, weak press] f in self?.overlay.show(f, for: press) }
+        }
+        pencilFan.onPick = { [weak self] item in ToolKind(rawValue: item.key).map { self?.setKind($0) } }
+        gestureFan.onPick = { [weak self] item in self?.pickPrompt(item.key, fromSelection: false) }
+        lassoAsk.open = { [weak self] in self?.lassoPromptFan(sticky: false) }
+        lassoAsk.onPick = { [weak self] item in self?.pickPrompt(item.key, fromSelection: true) }
+        lassoAsk.onTap = { [weak self] in
+            guard let self else { return }
+            self.lassoAsk.setFan(self.lassoAsk.fan == nil ? self.lassoPromptFan(sticky: true) : nil)
+        }
+        lassoEdit.open = { [weak self] in self?.lassoEditFan(sticky: false) }
+        lassoEdit.onPick = { [weak self] item in LassoAction(rawValue: item.key).map { self?.lassoAction($0) } }
+        lassoEdit.onTap = { [weak self] in
+            guard let self else { return }
+            self.lassoEdit.setFan(self.lassoEdit.fan == nil ? self.lassoEditFan(sticky: true) : nil)
+        }
+        lassoColors.onPick = { [weak self] item in self?.recolorSelection(item.key) }
+
+        // Finger gestures, as set in the web's Settings → Touch gestures.
+        scrollView.addGestureRecognizer(watcher)
+        watcher.isOnPage = { [weak self] p in
+            guard let self else { return false }
+            let hit = self.scrollView.hitTest(p, with: nil)
+            let control = hit is SelectionBoxView || hit is TextBoxView || hit?.superview is TextBoxView || hit is TextBoxEditor
+            return !control && self.overlay.isOnPage(self.scrollView.convert(p, to: self.overlay))
+        }
+        let logic = watcher.logic
+        logic.isBound = { [weak self] g in self?.settings.settings.gestures[g] != GestureAction.none }
+        logic.tuning = { [weak self] in self?.settings.settings.tuning ?? GestureTuning() }
+        logic.onHold = { [weak self] started, at in
+            guard let self else { return }
+            if started {
+                let action = self.settings.settings.gestures[.fingerHold]
+                let label = action == .lassoHold ? "Hold to lasso" : "Hold: \(action.label)"
+                self.overlay.holdRing.start(at: self.scrollView.convert(at.point, to: self.overlay), label: label,
+                                            seconds: self.settings.settings.tuning.holdMs / 1000)
+            } else {
+                self.overlay.holdRing.stop()
+            }
+        }
+        logic.onPageTap = { [weak self] in self?.clearSelection() }
+        logic.emit = { [weak self] g, at in self?.gesture(g, at: at) }
+        watcher.onHeldMove = { [weak self] touch, event in self?.heldMove(touch, event: event) }
+        watcher.onHeldEnd = { [weak self] touch, lifted in self?.heldEnd(touch, lifted: lifted) }
+
+        // The lasso tool: the Pencil draws a loop instead of ink.
+        pencilLasso.allowedTouchTypes = [UITouch.TouchType.pencil.rawValue as NSNumber]
+        pencilLasso.isEnabled = context.tool.kind == .lasso
+        pencilLasso.onBegin = { [weak self] p in
+            guard let self else { return }
+            self.beginLoop(at: self.scrollView.convert(p, to: self.overlay), lens: false)
+        }
+        pencilLasso.onMove = { [weak self] ps in
+            guard let self else { return }
+            self.addLoop(ps.map { self.scrollView.convert($0, to: self.overlay) })
+        }
+        pencilLasso.onEnd = { [weak self] cancelled in self?.endLoop(cancel: cancelled) }
+        scrollView.addGestureRecognizer(pencilLasso)
+    }
+
+    private var syncLabel: String {
+        switch context.sync.status {
+        case .idle: "Starting"
+        case .syncing: "Syncing"
+        case .synced: "Synced"
+        case .offline: "Offline"
+        case .localOnly: "Local only"
+        case .needsLogin: "Signed out"
+        case .error: "Sync error"
+        }
+    }
+
+    // MARK: Tools
+
+    func setTool(_ t: ToolState) {
+        let old = context.tool
+        guard t != old else { return }
+        if t.kind != old.kind { previousKind = old.kind }
+        context.tool = t
+        if t.kind != .lasso && t.kind != old.kind { clearSelection() }
+        pencilLasso.isEnabled = t.kind == .lasso
+        views.values.forEach { $0.applyTool() }
+        overlay.refreshTool()
+        settings.setTool(t)
+    }
+
+    func setKind(_ k: ToolKind) {
+        var t = context.tool
+        t.kind = k
+        setTool(t)
+        note(k.label)
+    }
+
+    private func note(_ text: String, seconds: TimeInterval = 0.9) {
+        guard settings.settings.tuning.showNote || seconds > 1 else { return }
+        overlay.note.show(text, seconds: seconds)
+    }
+
+    // MARK: Gestures
+
+    private func gesture(_ g: GestureKind, at: GestureAt) {
+        let action = settings.settings.gestures[g]
+        let p = scrollView.convert(at.point, to: overlay)
+        switch action {
+        case .none:
+            break
+        case .lassoHold:
+            guard g == .fingerHold, let id = at.id, let touch = watcher.touch(id) else { return }
+            holdFinger(touch)
+            beginLoop(at: p, lens: true)
+            note("Lasso")
+        case .promptMenu:
+            if g == .fingerHold, let id = at.id, let touch = watcher.touch(id) {
+                guard let f = overlay.promptFan(at: p, sticky: false) else { return }
+                holdFinger(touch)
+                heldFan = (p, 0)
+                gestureFan.setFan(f)
+            } else if let f = overlay.promptFan(at: p, sticky: true) {
+                gestureFan.setFan(f)
+            }
+        case .undo:
+            undoTap()
+            note("Undo")
+        case .redo:
+            redoTap()
+            note("Redo")
+        case .previousTool:
+            setKind(previousKind)
+        case .tool(let k):
+            setKind(k)
+        case .resetZoom:
+            scrollView.setZoomScale(ZoomFit.fit(width: view.bounds.width), animated: true)
+            note("Reset zoom")
+        case .togglePanel:
+            note("The side panel is on the Mac")
+        }
+    }
+
+    /// The held finger now lassoes or points: the page stops scrolling under it.
+    private func holdFinger(_ touch: UITouch) {
+        watcher.heldFinger = touch
+        scrollView.panGestureRecognizer.isEnabled = false
+        scrollView.pinchGestureRecognizer?.isEnabled = false
+    }
+
+    private func releaseFinger() {
+        scrollView.panGestureRecognizer.isEnabled = true
+        scrollView.pinchGestureRecognizer?.isEnabled = true
+    }
+
+    private func heldMove(_ touch: UITouch, event: UIEvent) {
+        if lassoing {
+            addLoop((event.coalescedTouches(for: touch) ?? [touch]).map { $0.location(in: overlay) })
+        } else if let held = heldFan, let f = gestureFan.fan {
+            let p = touch.location(in: overlay)
+            let dx = p.x - held.press.x, dy = p.y - held.press.y
+            heldFan = (held.press, max(held.far, hypot(dx, dy)))
+            let next = f.pointing(dx: dx, dy: dy)
+            if next.hot != f.hot { gestureFan.setFan(next) }
+        }
+    }
+
+    private func heldEnd(_ touch: UITouch, lifted: Bool) {
+        releaseFinger()
+        if lassoing { endLoop(cancel: !lifted) }
+        if let held = heldFan {
+            heldFan = nil
+            guard var f = gestureFan.fan else { return }
+            if lifted, f.hot >= 0 {
+                gestureFan.close()
+                pickPrompt(f.items[f.hot].key, fromSelection: false)
+            } else if lifted, held.far <= settings.settings.tuning.slop {
+                f.sticky = true
+                gestureFan.setFan(f)
+            } else {
+                gestureFan.close()
+            }
+        }
+    }
+
+    // MARK: Lasso
+
+    private func beginLoop(at p: CGPoint, lens: Bool) {
+        clearSelection()
+        lassoing = true
+        loopPoints = [p]
+        let l = settings.settings.lasso
+        if lens, l.lens, let snap = scrollView.snapshotView(afterScreenUpdates: false) {
+            let lensView = LassoLensView(snapshot: snap, size: CGFloat(l.lensSize), zoom: CGFloat(l.lensZoom))
+            overlay.addSubview(lensView)
+            overlay.lens = lensView
+        }
+        drawLoop()
+    }
+
+    private func addLoop(_ ps: [CGPoint]) {
+        guard lassoing else { return }
+        loopPoints += ps
+        drawLoop()
+    }
+
+    private func drawLoop() {
+        let path = UIBezierPath()
+        if let first = loopPoints.first {
+            path.move(to: first)
+            loopPoints.dropFirst().forEach { path.addLine(to: $0) }
+        }
+        overlay.loop.path = path.cgPath
+        if let last = loopPoints.last { overlay.lens?.move(to: last, loop: loopPoints, in: overlay.bounds.size) }
+    }
+
+    private func endLoop(cancel: Bool) {
+        guard lassoing else { return }
+        lassoing = false
+        overlay.lens?.removeFromSuperview()
+        overlay.lens = nil
+        overlay.loop.path = nil
+        let loop = loopPoints
+        loopPoints = []
+        guard !cancel, loop.count >= 3 else { return }
+        select(loop: loop)
+    }
+
+    /// Selects the strokes the loop picks in the section it was mostly drawn on.
+    private func select(loop: [CGPoint]) {
+        let candidates = views.values.map { v in (v, loop.map { overlay.convert($0, to: v) }) }
+        guard let (v, poly) = candidates.max(by: { a, b in
+            a.1.filter(a.0.bounds.contains).count < b.1.filter(b.0.bounds.contains).count
+        }), poly.contains(where: v.bounds.contains) else { return }
+        let strokes = v.canvas.drawing.strokes
+        let picked = LassoGeometry.pick(strokes.map(LassoGeometry.shape), drawn: poly, mode: settings.settings.lasso.mode)
+        guard !picked.isEmpty else { return }
+        let chosen = picked.map { strokes[$0] }
+        guard let box = AskSelection.box(chosen) else { return }
+        context.selection = InkSelection(sectionId: v.section.id, keys: Set(chosen.map(StrokeCodec.key)), box: box)
+        v.showSelection()
+        showLassoCircle()
+        note("\(chosen.count) stroke\(chosen.count == 1 ? "" : "s") selected")
+    }
+
+    func clearSelection() {
+        guard context.selection != nil else { return }
+        let id = context.selection?.sectionId
+        context.selection = nil
+        if let id { views[id]?.showSelection() }
+        overlay.lassoCircle?.removeFromSuperview()
+        overlay.lassoCircle = nil
+        for f in [lassoAsk, lassoEdit, lassoColors] { f.close() }
+    }
+
+    private func showLassoCircle() {
+        overlay.lassoCircle?.removeFromSuperview()
+        let circle = LassoCircleView(settings: settings.settings.lasso)
+        circle.ask.press = lassoAsk
+        circle.edit.press = lassoEdit
+        circle.ask.space = overlay
+        circle.edit.space = overlay
+        overlay.insertSubview(circle, belowSubview: overlay.note)
+        overlay.lassoCircle = circle
+        placeLassoCircle()
+    }
+
+    /// Just above the selection, or below it when there's no room above (LassoCircle.tsx).
+    private func placeLassoCircle() {
+        guard let circle = overlay?.lassoCircle else { return }
+        guard let sel = context.selection, let v = views[sel.sectionId] else {
+            circle.isHidden = true
+            return
+        }
+        circle.isHidden = false
+        let r = v.convert(sel.box, to: overlay)
+        let d = circle.bounds.height, w = circle.bounds.width, gap: CGFloat = 14
+        let x = min(overlay.bounds.width - w / 2 - 8, max(w / 2 + 8, r.midX))
+        let above = r.minY - gap - d / 2
+        let y = above - d / 2 >= overlay.safeAreaInsets.top + 8 ? above : min(overlay.bounds.height - d / 2 - 8, r.maxY + gap + d / 2)
+        circle.center = CGPoint(x: x, y: y)
+    }
+
+    private func lassoPromptFan(sticky: Bool) -> FanState? {
+        guard let circle = overlay.lassoCircle else { return nil }
+        let prompts = settings.settings.prompts
+        guard !prompts.isEmpty else {
+            note("No prompts: add some in the web app's toolbar settings → Prompts", seconds: 2)
+            return nil
+        }
+        return FanState(items: prompts.map { FanItem(key: $0.id, label: $0.label, symbol: $0.symbol) },
+                        center: circle.askCenter(in: overlay), viewport: overlay.bounds.size, sticky: sticky)
+    }
+
+    private func lassoEditFan(sticky: Bool) -> FanState? {
+        guard let circle = overlay.lassoCircle else { return nil }
+        let edits = settings.settings.lasso.visible.filter { $0 != .ask }
+        guard !edits.isEmpty else { return nil }
+        return FanState(items: edits.map { FanItem(key: $0.rawValue, label: $0.label, symbol: $0.symbol) },
+                        center: circle.editCenter(in: overlay), viewport: overlay.bounds.size, sticky: sticky)
+    }
+
+    private func lassoAction(_ a: LassoAction) {
+        switch a {
+        case .delete:
+            editSelection(name: "Delete") { _ in nil }
+            clearSelection()
+        case .duplicate:
+            duplicateSelection()
+        case .recolor:
+            guard let circle = overlay.lassoCircle else { return }
+            let items = ToolState.penColors.map { FanItem(key: $0, label: ToolState.penColorNames[$0] ?? $0, symbol: "circle.fill", color: $0) }
+            lassoColors.setFan(FanState(items: items, center: circle.editCenter(in: overlay), viewport: overlay.bounds.size, sticky: true))
+        case .bigger, .smaller:
+            guard let sel = context.selection else { return }
+            let step = settings.settings.lasso.step / 100
+            let s = CGFloat(a == .bigger ? 1 + step : 1 - step)
+            let c = CGPoint(x: sel.box.midX, y: sel.box.midY)
+            let scale = CGAffineTransform(translationX: -c.x, y: -c.y).concatenating(CGAffineTransform(scaleX: s, y: s)).concatenating(CGAffineTransform(translationX: c.x, y: c.y))
+            editSelection(name: a.label) { stroke in
+                var st = stroke
+                st.transform = stroke.transform.concatenating(scale)
+                return st
+            }
+        case .ask:
+            lassoAsk.setFan(lassoPromptFan(sticky: true))
+        }
+    }
+
+    private func recolorSelection(_ hex: String) {
+        guard let color = UIColor(hex: hex) else { return }
+        editSelection(name: "Colour") { stroke in
+            var st = stroke
+            st.ink = PKInk(stroke.ink.inkType, color: color)
+            return st
+        }
+    }
+
+    /// Changes (or, returning nil, removes) each selected stroke, as one undo step.
+    private func editSelection(name: String, _ change: (PKStroke) -> PKStroke?) {
+        guard let sel = context.selection, let v = views[sel.sectionId] else { return }
+        let before = v.canvas.drawing
+        var strokes: [PKStroke] = []
+        for stroke in before.strokes {
+            if sel.keys.contains(StrokeCodec.key(stroke)) {
+                if let next = change(stroke) { strokes.append(next) }
+            } else {
+                strokes.append(stroke)
+            }
+        }
+        commit(PKDrawing(strokes: strokes), in: v, before: before, name: name)
+        refreshSelection(in: v)
+    }
+
+    private func duplicateSelection() {
+        guard let sel = context.selection, let v = views[sel.sectionId] else { return }
+        let before = v.canvas.drawing
+        let shift = CGAffineTransform(translationX: 24, y: 24)
+        let copies = before.strokes.filter { sel.keys.contains(StrokeCodec.key($0)) }.map {
+            PKStroke(ink: $0.ink, path: $0.path, transform: $0.transform.concatenating(shift), mask: $0.mask, randomSeed: UInt32.random(in: 1...UInt32.max))
+        }
+        commit(PKDrawing(strokes: before.strokes + copies), in: v, before: before, name: "Duplicate")
+        // The copies become the selection, to drag into place.
+        context.selection?.keys = Set(copies.map(StrokeCodec.key))
+        refreshSelection(in: v)
+    }
+
+    /// Writes a drawing change with an undo step that puts `before` back.
+    private func commit(_ drawing: PKDrawing, in v: SectionView, before: PKDrawing, name: String) {
+        let id = v.section.id
+        view.window?.undoManager?.registerUndo(withTarget: self) { vc in
+            MainActor.assumeIsolated {
+                guard let v = vc.views[id] else { return }
+                vc.clearSelection()
+                vc.commit(before, in: v, before: v.canvas.drawing, name: name)
+            }
+        }
+        view.window?.undoManager?.setActionName(name)
+        v.setDrawing(drawing, save: true)
+    }
+
+    private func refreshSelection(in v: SectionView) {
+        guard let sel = context.selection else { return }
+        let chosen = v.canvas.drawing.strokes.filter { sel.keys.contains(StrokeCodec.key($0)) }
+        guard let box = AskSelection.box(chosen) else { return clearSelection() }
+        context.selection?.box = box
+        v.showSelection()
+        placeLassoCircle()
+    }
+
+    /// Dragging the selection box moves the ink with it; letting go writes the move.
+    private func dragSelection(_ v: SectionView, by d: CGPoint, state: UIGestureRecognizer.State) {
+        guard let sel = context.selection, sel.sectionId == v.section.id else { return }
+        switch state {
+        case .began:
+            dragStart = v.canvas.drawing
+            for f in [lassoAsk, lassoEdit, lassoColors] { f.close() }
+            overlay.lassoCircle?.isHidden = true
+        case .changed, .ended:
+            guard let start = dragStart else { return }
+            let t = CGAffineTransform(translationX: d.x, y: d.y)
+            let moved = PKDrawing(strokes: start.strokes.map { stroke in
+                guard sel.keys.contains(StrokeCodec.key(stroke)) else { return stroke }
+                var st = stroke
+                st.transform = stroke.transform.concatenating(t)
+                return st
+            })
+            v.selectionView.frame = sel.box.offsetBy(dx: d.x, dy: d.y).insetBy(dx: -8, dy: -8)
+            if state == .changed {
+                v.setDrawing(moved, save: false)
+            } else {
+                dragStart = nil
+                v.setDrawing(start, save: false)
+                commit(moved, in: v, before: start, name: "Move")
+                refreshSelection(in: v)
+            }
+        default:
+            if let start = dragStart { v.setDrawing(start, save: false) }
+            dragStart = nil
+            v.showSelection()
+            placeLassoCircle()
+        }
+    }
+
+    // MARK: Prompts
+
+    private func pickPrompt(_ id: String, fromSelection: Bool) {
+        guard var p = settings.settings.prompts.first(where: { $0.id == id }) else { return }
+        // From the lasso, "as set in the chat" means the selection (LassoCircle's onPrompt).
+        if fromSelection && p.context == .chat { p.context = .selection }
+        sendPrompt(p, fromSelection: fromSelection)
+    }
+
+    private func sendPrompt(_ p: ChatPrompt, fromSelection: Bool) {
+        if p.voice {
+            startRecording(p, fromSelection: fromSelection)
+        } else if !p.send {
+            let alert = UIAlertController(title: p.label, message: nil, preferredStyle: .alert)
+            alert.addTextField { $0.text = p.text }
+            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+            alert.addAction(UIAlertAction(title: "Send", style: .default) { [weak self, weak alert] _ in
+                let text = alert?.textFields?.first?.text ?? ""
+                guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                self?.deliver(p, text: text, audio: nil, fromSelection: fromSelection)
+            })
+            present(alert, animated: true)
+        } else {
+            deliver(p, text: nil, audio: nil, fromSelection: fromSelection)
+        }
+    }
+
+    private func startRecording(_ p: ChatPrompt, fromSelection: Bool) {
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await recorder.start()
+            } catch {
+                note(error.localizedDescription, seconds: 3)
+                return
+            }
+            let bar = RecorderBar(title: p.label)
+            bar.center = CGPoint(x: overlay.bounds.midX, y: overlay.bounds.height - overlay.safeAreaInsets.bottom - 56)
+            bar.onCancel = { [weak self, weak bar] in
+                self?.recorder.cancel()
+                bar?.removeFromSuperview()
+            }
+            bar.onSend = { [weak self, weak bar] in
+                bar?.removeFromSuperview()
+                guard let self, let audio = self.recorder.finish() else { return }
+                self.deliver(p, text: nil, audio: audio, fromSelection: fromSelection)
+            }
+            overlay.addSubview(bar)
+            recorderBar = bar
+        }
+    }
+
+    private func deliver(_ p: ChatPrompt, text: String?, audio: Data?, fromSelection: Bool) {
+        let selection = fromSelection ? selectionCrop() : nil
+        let sender = PromptSender(notebookId: context.notebookId, title: notebookTitle(), sections: sections,
+                                  currentSectionId: currentSection()?.id, database: context.database,
+                                  render: { [weak self] s, i, scale in await self?.renderSection(s, index: i, scale: scale) })
+        note("Sending: \(p.label)…", seconds: 30)
+        Task {
+            do {
+                let done = try await sender.send(p, text: text, selection: selection, audio: audio)
+                context.sync.requestSync(reason: "chat")
+                note(done, seconds: 1.5)
+            } catch {
+                note(error.localizedDescription, seconds: 3)
+            }
+        }
+    }
+
+    /// The selection as a picture: the section at 2× cropped to the box plus a margin.
+    private func selectionCrop() -> PromptSender.Selection? {
+        guard let sel = context.selection, let v = views[sel.sectionId] else { return nil }
+        let scale = AskSelection.scale(for: v.bounds.size)
+        guard let full = v.snapshot(scale: scale).cgImage else { return nil }
+        let crop = AskSelection.cropRect(box: sel.box, section: v.bounds.size, scale: scale)
+        guard let part = full.cropping(to: crop), let png = UIImage(cgImage: part).pngData() else { return nil }
+        return PromptSender.Selection(sectionId: sel.sectionId, png: png, width: part.width, height: part.height)
+    }
+
+    /// A section's picture for a bundle: the mounted view, or one built off screen for it.
+    private func renderSection(_ s: Entity, index: Int, scale: CGFloat) async -> (png: Data, width: Int, height: Int)? {
+        let v = views[s.id] ?? SectionView(section: s, index: index, context: context)
+        await v.settle(timeout: views[s.id] == nil ? 5 : 2)
+        let image = v.snapshot(scale: min(scale, AskSelection.scale(for: v.bounds.size, asked: scale)))
+        if views[s.id] !== v { v.teardown() }
+        guard let cg = image.cgImage, let png = image.pngData() else { return nil }
+        return (png, cg.width, cg.height)
+    }
+
+    // MARK: Page menu
+
+    private func pageMenu() -> UIMenu {
+        let (i, count) = position
+        let page = UIMenu(title: count > 0 ? "Page \(i + 1) of \(count)" : "Page", options: .displayInline, children: [
+            UIAction(title: "Blank page after", image: UIImage(systemName: "plus.rectangle.portrait")) { [weak self] _ in self?.addSectionAfterCurrent() },
+            UIAction(title: "Move up", image: UIImage(systemName: "arrow.up"), attributes: i <= 0 ? .disabled : []) { [weak self] _ in self?.moveCurrentSection(by: -1) },
+            UIAction(title: "Move down", image: UIImage(systemName: "arrow.down"), attributes: i >= count - 1 ? .disabled : []) { [weak self] _ in self?.moveCurrentSection(by: 1) },
+        ])
+        let delete = UIAction(title: "Delete page…", image: UIImage(systemName: "trash"),
+                              attributes: Sections.canDelete(count: count) ? .destructive : [.destructive, .disabled]) { [weak self] _ in
+            self?.confirmDelete()
+        }
+        return UIMenu(children: [page, delete])
+    }
+
+    private func confirmDelete() {
+        let alert = UIAlertController(title: "Delete this page?", message: "Its ink is kept, and two-finger tap undoes it.", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Delete page", style: .destructive) { [weak self] _ in
+            self?.overlay.closePanel()
+            if self?.deleteCurrentSection() != nil { self?.note("Page deleted", seconds: 1.5) }
+        })
+        present(alert, animated: true)
+    }
+}
+
+/// The lasso tool's Pencil: draws the loop instead of ink. A press on the selection box is the
+/// box's (a drag), not a new loop.
+@MainActor
+final class PencilLassoRecognizer: UIGestureRecognizer {
+    var onBegin: (CGPoint) -> Void = { _ in }
+    var onMove: ([CGPoint]) -> Void = { _ in }
+    var onEnd: (Bool) -> Void = { _ in }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        guard state == .possible, let t = touches.first, !(t.view is SelectionBoxView) else {
+            if state == .possible { state = .failed }
+            return
+        }
+        onBegin(t.location(in: view))
+        state = .began
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
+        guard let t = touches.first, state == .began || state == .changed else { return }
+        onMove((event.coalescedTouches(for: t) ?? [t]).map { $0.location(in: view) })
+        state = .changed
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+        guard state == .began || state == .changed else { return }
+        onEnd(false)
+        state = .ended
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
+        guard state == .began || state == .changed else { return }
+        onEnd(true)
+        state = .cancelled
     }
 }

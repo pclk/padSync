@@ -60,6 +60,7 @@ targets:
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         ITSAppUsesNonExemptEncryption: false
+        NSMicrophoneUsageDescription: Voice prompts record a short message to send to the chat.
   PadSyncTests:
     type: bundle.unit-test
     platform: iOS

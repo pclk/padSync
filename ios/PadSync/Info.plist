@@ -22,6 +22,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Voice prompts record a short message to send to the chat.</string>
 	<key>PadSyncHost</key>
 	<string>$(PADSYNC_HOST)</string>
 	<key>UIApplicationSceneManifest</key>

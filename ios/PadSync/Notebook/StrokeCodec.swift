@@ -90,6 +90,9 @@ enum StrokeCodec {
 
     static func data(for stroke: PKStroke, device: String) -> JSONValue {
         let highlighter = stroke.ink.inkType == .marker
+        // A lasso Bigger or Smaller scales the transform; line widths scale with it.
+        let t = stroke.transform
+        let scale = sqrt(abs(Double(t.a * t.d - t.b * t.c)))
         // Points on the curve, one per control point; their positions include any lasso move.
         var pts: [JSONValue] = []
         var impliedSizes: [Double] = []
@@ -98,7 +101,7 @@ enum StrokeCodec {
             let pressure = p.force > 0 ? min(1, Double(p.force / maxForce)) : 0.5
             pts += [.double(round2(at.x)), .double(round2(at.y)), .double(round3(pressure)),
                     .double(round3(p.altitude)), .double(round3(p.azimuth)), .int(Int64((p.timeOffset * 1000).rounded()))]
-            let width = width(forPointSize: Double(p.size.width), marker: highlighter)
+            let width = width(forPointSize: Double(p.size.width), marker: highlighter) * scale
             impliedSizes.append(highlighter ? width : width / (2 * (0.5 - defaultThinning * (0.5 - pressure))))
         }
         if pts.isEmpty, let p = stroke.path.first {

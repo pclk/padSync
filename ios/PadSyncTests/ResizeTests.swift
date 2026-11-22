@@ -14,7 +14,7 @@ struct ResizeTests {
                    hlc: "", deleted: false, dirty: false)
         }
         _ = try db.save(sections)
-        let vc = NotebookViewController(context: EditorContext(notebookId: "n", database: db, sync: SyncEngine(db: db), toolPicker: PKToolPicker()))
+        let vc = NotebookViewController(context: EditorContext(notebookId: "n", database: db, sync: SyncEngine(db: db)))
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 1376, height: 1032))
         window.rootViewController = vc
         window.isHidden = false

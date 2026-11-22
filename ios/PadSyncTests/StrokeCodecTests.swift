@@ -75,3 +75,16 @@ struct StrokeCodecTests {
         #expect(UIColor(hex: "red") == nil)
     }
 }
+
+extension StrokeCodecTests {
+    @Test func scalingAStrokeScalesItsStoredWidth() throws {
+        var stroke = try #require(StrokeCodec.stroke(id: "s1", data: web))
+        let size = StrokeCodec.data(for: stroke, device: "d")["size"]?.double ?? 0
+        stroke.transform = CGAffineTransform(scaleX: 2, y: 2)
+        let scaled = StrokeCodec.data(for: stroke, device: "d")
+        #expect(abs((scaled["size"]?.double ?? 0) - 2 * size) < 0.02)
+        // The original keeps the scale, so it reopens at the new size.
+        let back = try #require(StrokeCodec.stroke(id: "x", data: scaled))
+        #expect(back.transform == CGAffineTransform(scaleX: 2, y: 2))
+    }
+}

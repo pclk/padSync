@@ -135,3 +135,27 @@ with a free Apple ID. The Mac side stays the web app.
 - Service workers in WKWebView need App-Bound Domains (`WKAppBoundDomains` in Info.plist).
 - GitHub sign-in inside WKWebView can't use passkeys; fall back to `ASWebAuthenticationSession`
   if that matters.
+
+## The web's controls, natively (2026-11-22)
+
+The top bar, Apple's tool picker and the Ask AI sheet are gone. The notebook is full screen with
+native ports of the iPad web app's controls, driven by the iPad's own settings (the server's
+`device.ipad` backup of `padsync.rail`, `prompts`, `gestures`, `gestureTuning`, `lasso`, `tool`):
+
+- **Tool circle and prompt circle** (ToolCircle.tsx): docked or placed where they were dragged.
+  Hold or drag to fan out, flick to pick; tap the tool circle for colours, sizes, undo/redo, the
+  page menu, moving the circles, and the way back to the library.
+- **Finger gestures** (touch-gestures.ts): taps of 2/3/4 fingers, double taps, press and hold with
+  the filling ring. Hold to lasso draws a loop with the lens; the lasso tool does the same with
+  the Pencil.
+- **Lasso circle** (LassoCircle.tsx): Ask AI fans out the prompts; ⋯ has delete, duplicate,
+  colour, bigger, smaller. Drag the dashed box to move ink. Each edit is one undo step.
+- **Prompts** go to the chat the Mac's side panel has open on the notebook (`chatfocus-` rows),
+  else the notebook's newest chat, else a new one. The bundle is built by the web's own
+  `buildBundle`, bundled into the app's renderer. After sending, a `chatping-` row tells the Mac
+  to open that chat so the reply streams there (src/lib/chat-handoff.ts; needs the web deployed).
+  Voice prompts record an .m4a; "send: false" prompts open a text box first.
+- Pencil double tap and squeeze follow Settings → Apple Pencil (previous tool, eraser, or the
+  tool fan where the Pencil hovers).
+- Settings are edited in the web app (the iPad web app's toolbar settings and Settings page);
+  the app reads them when a notebook opens and writes back the tool and moved circles.

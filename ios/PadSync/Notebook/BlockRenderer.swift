@@ -90,6 +90,23 @@ final class BlockRenderer: NSObject, WKNavigationDelegate {
         return rendered
     }
 
+    /// Builds an Ask AI bundle with the web's `buildBundle` (ios/renderer/main.tsx), in turn with
+    /// the renders: `{files, sectionIds, skipped, bytes, tokens, error?}`.
+    func bundle(input: JSONValue, scope: String, sectionId: String) async throws -> JSONValue {
+        let previous = queue
+        let task = Task { () throws -> JSONValue in
+            await previous?.value
+            let web = try await self.prepare()
+            let json = String(decoding: input.serialized(), as: UTF8.self)
+            let result = try await web.callAsyncJavaScript("return JSON.stringify(padsyncBundle(JSON.parse(input), scope, sectionId))",
+                                                            arguments: ["input": json, "scope": scope, "sectionId": sectionId], contentWorld: .page)
+            guard let text = result as? String else { throw CocoaError(.coderReadCorrupt) }
+            return try JSONValue.parse(Data(text.utf8))
+        }
+        queue = Task { _ = try? await task.value }
+        return try await task.value
+    }
+
     private func renderNow(_ section: Entity, index: Int) async throws -> Rendered {
         let web = try await prepare()
         let entity = String(decoding: JSONValue.object(["id": .string(section.id), "kind": .string("section"), "hlc": .string(section.hlc), "data": section.data]).serialized(), as: UTF8.self)

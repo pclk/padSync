@@ -101,7 +101,7 @@ struct InkMergeTests {
                              data: .object(["order": .double(0), "template": .string("lines"), "minHeight": .double(1032)]),
                              hlc: "", deleted: false, dirty: false)
         _ = try db.save([section, strokeRow("a", 1)])
-        let vc = NotebookViewController(context: EditorContext(notebookId: "n", database: db, sync: SyncEngine(db: db), toolPicker: PKToolPicker()))
+        let vc = NotebookViewController(context: EditorContext(notebookId: "n", database: db, sync: SyncEngine(db: db)))
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 1376, height: 1032))
         window.rootViewController = vc
         window.isHidden = false

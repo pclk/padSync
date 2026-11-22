@@ -2,6 +2,7 @@ import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { Blocks, MarginColumn, SectionHeader } from "@/components/SectionContent";
 import { PAGE_WIDTH, type SectionEntity } from "@/lib/types";
+import { DEFAULT_CONTEXT, buildBundle, type BundleInput, type ContextOptions } from "@/lib/context";
 
 // The iPad app's block renderer: an offscreen WKWebView loads this page from the app bundle,
 // calls `padsyncRender` with a section and snapshots the result behind the PencilKit canvas.
@@ -43,3 +44,17 @@ async function padsyncRender(section: SectionEntity, index: number) {
 }
 
 Object.assign(window, { padsyncRender });
+
+/** The web's own Ask AI bundle builder (src/lib/context.ts), so a prompt sent from the app carries
+ *  exactly the files the web would send. `scope` is a prompt's context (section, selection,
+ *  notebook); renders and the selection crop come from the app. */
+function padsyncBundle(input: BundleInput, scope: "section" | "selection" | "notebook", sectionId: string) {
+  const o: ContextOptions = {
+    ...DEFAULT_CONTEXT,
+    scope: scope === "selection" ? "selection" : scope === "notebook" ? "all" : "sections",
+    sectionIds: scope === "section" ? [sectionId] : [],
+  };
+  return buildBundle(input, o);
+}
+
+Object.assign(window, { padsyncBundle });

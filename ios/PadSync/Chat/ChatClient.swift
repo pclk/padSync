@@ -84,6 +84,24 @@ struct ChatClient {
         return (thread.id, try await sendTurn(thread: thread.id, question: question, bundle: bundle))
     }
 
+    /// Any chat endpoint as JSON, for the fields the app passes through untouched (thread options).
+    func json(_ path: String, method: String = "GET", body: JSONValue? = nil) async throws -> JSONValue {
+        var req = await Server.request(path)
+        req.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        req.httpMethod = method
+        if let body {
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = body.serialized()
+        }
+        let (data, status) = try await transport(req)
+        guard (200..<300).contains(status) else {
+            if status == 401 { throw Failure.signedOut }
+            if status == 503 { throw Failure.unavailable }
+            throw Failure.server((try? JSONDecoder().decode(ErrorBody.self, from: data))?.error ?? "HTTP \(status)")
+        }
+        return try JSONValue.parse(data)
+    }
+
     private struct ErrorBody: Decodable { let error: String? }
 
     private func call<T: Decodable>(_: T.Type, _ path: String, body: (some Encodable)? = Optional<Int>.none) async throws -> T {
