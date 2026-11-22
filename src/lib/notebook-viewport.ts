@@ -7,7 +7,8 @@ export const MIN_ZOOM = 0.25;
 export const MAX_ZOOM = 3;
 export const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 
-export const TOOLBAR_H = 56;
+/** The notebook has no top bar (its controls live in the tool sidebar or rail), so nothing covers the top. */
+export const TOOLBAR_H = 0;
 /** The iPad's floating tool rail: 12 px from the edge + 44 px buttons + padding and border, and a little air. */
 export const RAIL_INSET = 76;
 /** The Mac's docked tool sidebar. */
