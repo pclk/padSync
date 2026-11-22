@@ -48,12 +48,16 @@ import {
 } from "./lib.ts";
 import { discoverCatalog, type Catalog } from "./catalog.ts";
 import { Speech, uvVersion } from "./speech.ts";
+import type { LiveStatus } from "./live-query.ts";
 
 const VERSION = "0.5.0";
 const POLL_MS = 3000;
 // For a while after a job, poll faster: a follow-up question in the same chat is likely.
 const FOLLOW_UP_POLL_MS = 1000;
 const FOLLOW_UP_MS = 5 * 60_000;
+// With the live query connected a new job wakes the bridge at once, so polling is a backup. A claim
+// is also the bridge's heartbeat, and padSync calls a bridge silent for 30 s offline.
+const LIVE_POLL_MS = 10_000;
 const MAX_BACKOFF_MS = 60_000;
 // How often new text goes to padSync while the agent writes (only the new part is sent).
 const FLUSH_MS = 250;
@@ -123,6 +127,20 @@ async function status() {
     console.log(`auth    ok (device "${me.device.name}")`);
   } catch (e) {
     console.log(`auth    FAILED: ${(e as Error).message}`);
+  }
+}
+
+/**
+ * Watches padSync's queued jobs over Neon Realtime and calls `onChange` when they change. Falls back
+ * to polling alone when Realtime isn't configured or its client can't load on this Mac.
+ */
+async function watchJobs(api: BridgeApi, origin: string, onChange: () => void, onStatus: (s: LiveStatus) => void) {
+  try {
+    const { watchLive } = await import("./live-query.ts");
+    return watchLive({ capability: (signal) => api.live({ signal }), onChange, onStatus, origin });
+  } catch (e) {
+    log(`realtime: unavailable (${(e as Error).message}), polling only`);
+    return () => {};
   }
 }
 
@@ -383,10 +401,44 @@ async function run() {
     );
   };
 
+  // A change to the queued jobs ends the wait between polls early. One that lands while a claim is
+  // in flight (which may have looked before the job was queued) makes the next wait end at once.
+  let live = false;
+  let woken = false;
+  let endNap: (() => void) | null = null;
+  const nap = (ms: number) =>
+    new Promise<void>((resolve) => {
+      if (woken || shutdown.signal.aborted) return resolve();
+      const timer = setTimeout(done, ms);
+      endNap = done;
+      function done() {
+        clearTimeout(timer);
+        endNap = null;
+        resolve();
+      }
+    });
+  const stopWatching = await watchJobs(
+    api,
+    cfg.server,
+    () => {
+      woken = true;
+      endNap?.();
+    },
+    (s) => {
+      if ((s === "live") !== live) log(s === "live" ? "realtime: live, new jobs start at once" : `realtime: ${s}, polling every ${POLL_MS / 1000}s`);
+      live = s === "live";
+    },
+  );
+  shutdown.signal.addEventListener("abort", () => {
+    stopWatching();
+    endNap?.();
+  });
+
   let backoff = POLL_MS;
   let lastJobAt = 0;
   while (!shutdown.signal.aborted) {
     if (Date.now() - catalogAt > CATALOG_MS) await refreshCatalog();
+    woken = false;
     try {
       const claimSent = Date.now();
       active = api.claim(agents, info, features).then(async ({ job, serverTime }) => {
@@ -415,7 +467,7 @@ async function run() {
       backoff = Math.min(backoff * 2, MAX_BACKOFF_MS);
       continue;
     }
-    await sleep(Date.now() - lastJobAt < FOLLOW_UP_MS ? FOLLOW_UP_POLL_MS : POLL_MS);
+    await nap(live ? LIVE_POLL_MS : Date.now() - lastJobAt < FOLLOW_UP_MS ? FOLLOW_UP_POLL_MS : POLL_MS);
   }
 }
 

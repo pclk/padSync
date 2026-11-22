@@ -86,6 +86,7 @@ it("reports a job claimed during shutdown before exiting", async () => {
   const server = createServer(async (req, res) => {
     for await (const chunk of req) void chunk;
     if (req.url === "/api/bridge/catalog") return void res.writeHead(200, { "content-type": "application/json" }).end('{"ok":true}');
+    if (req.url === "/api/bridge/live") return void res.writeHead(200, { "content-type": "application/json" }).end('{"enabled":false}');
     if (req.url === "/api/bridge/claim") {
       claimed(); // Model a committed claim whose response has not reached the bridge.
       setTimeout(() => res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ job: {
@@ -135,6 +136,7 @@ setTimeout(() => {}, 60000);
     for await (const chunk of req) body += chunk;
     const json = (o: unknown) => res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(o));
     if (req.url === "/api/bridge/catalog") return json({ ok: true });
+    if (req.url === "/api/bridge/live") return json({ enabled: false });
     if (req.url === "/api/bridge/claim") {
       return json({ job: claims++ ? null : { id: "j1", agent: "claude", question: "Q", context: "ctx", image: null } });
     }

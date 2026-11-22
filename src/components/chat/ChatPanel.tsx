@@ -60,8 +60,9 @@ export function ChatPanel(
                     navigator.clipboard.writeText(
                       latencyReport(thread, turns, {
                         device: navigator.userAgent,
-                        pollMs: { active: pollDelay("thread", true), idle: pollDelay("thread", false) },
-                        bridgePollMs: 3000, // bridge/padsync-bridge.ts POLL_MS
+                        pollMs: { active: pollDelay("thread", true, c.realtime()), idle: pollDelay("thread", false, c.realtime()) },
+                        bridgePollMs: 3000, // bridge/padsync-bridge.ts POLL_MS (10 s once its own live query connects)
+                        realtime: c.realtime(),
                       }),
                     ),
                   ),

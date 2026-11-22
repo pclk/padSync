@@ -227,6 +227,12 @@ replies are announced through `aria-live="polite"`.
 - Open thread: every 0.6 s while any turn is queued or running, using `since` and `from`, so each
   poll moves only the new text; unfinished turns come back whatever `since` says. Otherwise every
   15 s with `since`, which usually returns no turns.
+- Realtime push (when `NEON_REALTIME_URL`/`NEON_REALTIME_SECRET` are set): the open chat watches a
+  Neon live query on its turns (`POST /api/chat/threads/:id/live`, ids, statuses and times only)
+  and fetches as soon as one changes; polling then slows to 3 s while a reply runs and 30 s
+  otherwise. The bridge watches queued jobs (`POST /api/bridge/live`) and claims a new one at once,
+  polling every 10 s as a backup and heartbeat. Both use `bridge/live-query.ts` and fall back to
+  plain polling whenever Realtime is off or disconnected.
 - Thread list: every 30 s, and right after any action on this device. Nothing runs while the tab
   is hidden.
 - One request per tick. Never run several fetches for the same thread at once (skip a tick if the

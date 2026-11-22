@@ -136,7 +136,7 @@ const VOICE = /^voice-message\./;
 export function latencyReport(
   thread: Pick<ThreadSummary, "id" | "title">,
   turns: Turn[],
-  env: { device: string; pollMs: { active: number; idle: number }; bridgePollMs: number; now?: Date },
+  env: { device: string; pollMs: { active: number; idle: number }; bridgePollMs: number; realtime?: boolean; now?: Date },
 ) {
   const offset = clientClock()?.offset ?? 0;
   const rows = turns.map((t) => ({ t, mine: localMarks(t.jobId), ...timeline(t.trace ?? {}, localMarks(t.jobId), offset) }));
@@ -146,7 +146,7 @@ export function latencyReport(
     ``,
     `- Chat: "${thread.title || "Untitled"}" (${thread.id}), ${turns.length} turns, ${traced.length} with timings`,
     `- Generated: ${(env.now ?? new Date()).toISOString()} on ${env.device}`,
-    `- Device polls the thread every ${env.pollMs.active} ms while a reply is running (${env.pollMs.idle} ms otherwise); the bridge polls for jobs every ${env.bridgePollMs} ms when idle`,
+    `- Device polls the thread every ${env.pollMs.active} ms while a reply is running (${env.pollMs.idle} ms otherwise); the bridge polls for jobs every ${env.bridgePollMs} ms when idle${env.realtime ? "; realtime push is connected, so changes reach the device as they happen and polling is a backup" : ""}`,
     `- Times are on the server's clock; device and bridge clocks are aligned from round trips (± half the round trip shown per turn)`,
   ];
   if (traced.length) {

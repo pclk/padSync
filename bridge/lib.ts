@@ -8,6 +8,7 @@ import { chmod, lstat, mkdir, mkdtemp, open, readFile, readdir, realpath, rm, wr
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import { ACCOUNT_RE, type CatalogAccount } from "./catalog.ts";
+import type { LiveCapability } from "./live-query.ts";
 
 export type Agent = "claude" | "codex";
 export const AGENTS: Agent[] = ["claude", "codex"];
@@ -880,6 +881,11 @@ export class BridgeApi {
     return this.call<{ job: ClaimedJob | null; serverTime?: number }>("POST", "/api/bridge/claim", { agents, info, features: features ?? ["import", "chat"] });
   }
 
+  /** A sealed live query on queued jobs (src/lib/live-query.ts), so a new one is claimed at once. */
+  live(opts?: { signal?: AbortSignal }) {
+    return this.call<LiveCapability>("POST", "/api/bridge/live", {}, opts);
+  }
+
   /** What this Mac can run, for padSync's model picker (bridge/catalog.ts). */
   catalog(accounts: CatalogAccount[]) {
     return this.call<{ ok: true }>("POST", "/api/bridge/catalog", { accounts });
@@ -889,7 +895,7 @@ export class BridgeApi {
     return this.call<{ data: string }>("GET", `/api/bridge/jobs/${encodeURIComponent(jobId)}/inputs?path=${encodeURIComponent(path)}&part=${part}`, undefined, { ...opts, timeoutMs: 120_000 });
   }
 
-  update(jobId: string, u: { trace?: Record<string, number>; question?: string; sessionId?: string; output?: string; status?: "done" | "error"; error?: string; files?: JobFile[] }, opts?: { signal?: AbortSignal; timeoutMs?: number }) {
+  update(jobId: string, u: { trace?: Record<string, number>; question?: string; sessionId?: string; output?: string; append?: string; status?: "done" | "error"; error?: string; files?: JobFile[] }, opts?: { signal?: AbortSignal; timeoutMs?: number }) {
     return this.call<{ status: string; cancelled: boolean }>("POST", `/api/bridge/jobs/${encodeURIComponent(jobId)}`, { ...u, ...(u.output === undefined ? {} : { output: u.output.slice(0, MAX_OUTPUT).replace(/[\uD800-\uDBFF]$/, "") }) }, opts);
   }
 }

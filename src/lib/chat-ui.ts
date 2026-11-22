@@ -87,8 +87,9 @@ export function exportMarkdown(thread: ThreadSummary, turns: Turn[]) {
       .join("\n\n")
   );
 }
-export const pollDelay = (kind: "list" | "thread", active: boolean) =>
-  kind === "list" ? 30_000 : active ? 600 : 15_000;
+/** With a live query (src/lib/live-query.ts) waking the open chat, polling is only a backup. */
+export const pollDelay = (kind: "list" | "thread", active: boolean, live = false) =>
+  kind === "list" ? 30_000 : live ? (active ? 3000 : 30_000) : active ? 600 : 15_000;
 /** A completion-scheduled timer owns one request; visibility changes invalidate scheduled work. */
 export function createPollScheduler(
   request: () => Promise<unknown>,
@@ -100,10 +101,17 @@ export function createPollScheduler(
   },
 ) {
   let stopped = false,
-    inFlight = false;
+    inFlight = false,
+    // A refresh asked for while a request was in flight: run again as soon as it ends, since
+    // whatever prompted it may have happened after that request read its data.
+    again = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const tick = async () => {
-    if (stopped || inFlight || !visible()) return;
+    if (stopped || !visible()) return;
+    if (inFlight) {
+      again = true;
+      return;
+    }
     inFlight = true;
     try {
       await request();
@@ -112,7 +120,8 @@ export function createPollScheduler(
       if (!stopped && visible())
         timer = timers.set(() => {
           void tick();
-        }, delay());
+        }, again ? 0 : delay());
+      again = false;
     }
   };
   return {

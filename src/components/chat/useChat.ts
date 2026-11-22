@@ -30,6 +30,7 @@ import {
 import { priceFor, type Price } from "@/lib/chat-cost";
 import { MAX_BUNDLE_BYTES } from "@/lib/context";
 import { clientClock, localMarks, markLocal, noteServerTime } from "@/lib/chat-trace";
+import { watchLive } from "@/lib/live-query";
 import { voiceFile } from "./useVoice";
 import { useLiveQuery } from "dexie-react-hooks";
 import { deviceKind } from "@/lib/db";
@@ -83,6 +84,8 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
   const [pending, setPending] = useState<ThreadSummary | null>(null);
   const [bridge, setBridge] = useState<string | null>(null);
   const [tabVisible, setTabVisible] = useState(true);
+  /** The open chat's live query is connected: changes arrive as they happen, so polling slows. */
+  const realtimeLive = useRef(false);
   const turnsRef = useRef(turns);
   useEffect(() => {
     turnsRef.current = turns;
@@ -251,6 +254,7 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
           turnsRef.current.some((t) =>
             ["queued", "running", "uploading"].includes(t.status),
           ),
+          realtimeLive.current,
         ),
       () => p.visible && tabVisible,
     );
@@ -259,6 +263,20 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
     return () => {
       live = false;
       scheduler.stop();
+    };
+  }, [id, p.visible, tabVisible]);
+  useEffect(() => {
+    if (!id || !p.visible || !tabVisible) return;
+    const stop = watchLive({
+      capability: () => api.liveThread(id),
+      onChange: () => detailPoll.current?.refresh(),
+      onStatus: (s) => {
+        realtimeLive.current = s === "live";
+      },
+    });
+    return () => {
+      stop();
+      realtimeLive.current = false;
     };
   }, [id, p.visible, tabVisible]);
   const run = (fn: () => Promise<unknown>) => {
@@ -560,5 +578,7 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
     action,
     send,
     refresh,
+    /** Whether the open chat's live query is connected right now. */
+    realtime: () => realtimeLive.current,
   };
 }

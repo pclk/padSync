@@ -9,6 +9,7 @@ import type {
   Turn,
 } from "./chat-types";
 import type { PricingResponse } from "./chat-cost";
+import type { LiveCapability } from "./live-query";
 async function call<T>(
   path: string,
   method = "GET",
@@ -80,6 +81,8 @@ export const forkThread = (id: string, uptoTurn: number, title?: string) =>
     uptoTurn,
     title,
   });
+/** A sealed live query on the thread's turns (src/lib/live-query.ts). */
+export const liveThread = (id: string) => call<LiveCapability>(path(id) + "/live", "POST");
 export const getCatalog = () => call<CatalogResponse>("/api/chat/catalog");
 export const getPricing = () => call<PricingResponse>("/api/chat/pricing");
 /** Preferences synced to every device of the signed-in user (src/server/prefs.ts). */
