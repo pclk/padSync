@@ -50,6 +50,14 @@ final class SyncEngine {
         didSet { if active != oldValue, started { schedule(after: pollDelay, reason: "activity") } }
     }
 
+    /// While realtime notifications are live they wake sync, and polling only recovers missed ones.
+    var realtimeLive = false {
+        didSet { if oldValue, !realtimeLive, started { schedule(after: pollDelay, reason: "realtime lost") } }
+    }
+
+    /// Called on every wake, so realtime can reconnect when the network comes back.
+    @ObservationIgnored var onWake: (String) -> Void = { _ in }
+
     /// True while the Pencil is down; a sync waits (at most 3 s) for the stroke to end.
     @ObservationIgnored var isInking: () -> Bool = { false }
 
@@ -99,6 +107,7 @@ final class SyncEngine {
 
     /// Back online, back in the foreground, or just signed in: skip any backoff.
     func wake(reason: String) {
+        onWake(reason)
         retryAt = .distantPast
         configCheckedAt = .distantPast
         requestSync(after: 0, reason: reason)
@@ -109,8 +118,14 @@ final class SyncEngine {
         schedule(after: delay ?? Double(config.debounceMs) / 1000, reason: reason)
     }
 
-    private var pollDelay: TimeInterval {
-        Double(active ? config.visiblePollMs : config.hiddenPollMs) / 1000
+    /// The poll while realtime is live: 5 s with a notebook open (Neon can drop a notification while
+    /// looking live; FOLLOW_RECOVERY_MS in sync.ts), 30 s otherwise (REALTIME_RECOVERY_MS).
+    static let realtimeRecovery: (active: TimeInterval, hidden: TimeInterval) = (5, 30)
+
+    var pollDelay: TimeInterval {
+        let configured = Double(active ? config.visiblePollMs : config.hiddenPollMs) / 1000
+        guard realtimeLive else { return configured }
+        return max(active ? Self.realtimeRecovery.active : Self.realtimeRecovery.hidden, configured)
     }
 
     /// A later request never postpones an earlier deadline, which bounds latency while writing.

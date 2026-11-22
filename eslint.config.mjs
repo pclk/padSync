@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The iPad app's generated bundles (scripts/build-ios-renderer.mjs) and Xcode output.
+    "ios/PadSync/Renderer/**",
+    "ios/build/**",
   ]),
 ]);
 

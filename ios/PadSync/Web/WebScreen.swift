@@ -6,6 +6,9 @@ import WebKit
 /// web one: the web app posts `openNotebook` when it sees the app (src/lib/native.ts), and any
 /// navigation to /notebook that still gets through is turned around here.
 struct WebScreen: UIViewRepresentable {
+    let database: AppDatabase
+    /// Called after the web app writes to the native store, to push the write.
+    let onStoreWrite: () -> Void
     let onOpenNotebook: (String) -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -20,8 +23,11 @@ struct WebScreen: UIViewRepresentable {
         let scripts = config.userContentController
         scripts.add(WeakMessageHandler(context.coordinator), name: "padsync")
         scripts.addUserScript(WKUserScript(source: Self.bridgeScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        let store = StoreBridgeHandler(db: database, onWrite: onStoreWrite)
+        scripts.addScriptMessageHandler(store, contentWorld: .page, name: StoreBridge.handlerName)
 
         let web = WKWebView(frame: .zero, configuration: config)
+        store.web = web
         web.navigationDelegate = context.coordinator
         web.uiDelegate = context.coordinator
         web.isInspectable = true // Safari → Develop → (iPad) to debug the web half
@@ -36,10 +42,10 @@ struct WebScreen: UIViewRepresentable {
 
     func updateUIView(_ container: WebContainer, context: Context) {}
 
-    /// Tells the web app it runs inside the native app.
-    /// Also reports the page's background colour on load and whenever the theme changes.
+    /// Tells the web app it runs inside the native app, and that the native store answers on
+    /// `padsyncStore` (`store: true`, see StoreBridge). Also reports the page's background colour on load and whenever the theme changes.
     static let bridgeScript = """
-    window.padsyncNative = Object.freeze({ version: 1 });
+    window.padsyncNative = Object.freeze({ version: 2, store: true });
     (function () {
       var last = null;
       function report() {

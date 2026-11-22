@@ -45,6 +45,8 @@ xcrun devicectl device install app --device '<iPad name>' build/Build/Products/D
 | `Config/Base.xcconfig` | `PADSYNC_HOST` (deployment), `PADSYNC_BUNDLE_ID` |
 | `PadSync/Web/WebScreen.swift` | WKWebView; sends `/notebook?id=…` to the native editor |
 | `PadSync/Notebook/` | native editor (phase 1: PencilKit scratch canvas) |
+| `PadSync/Chat/` | Ask AI: lasso, the selection bundle, chat API client, answer sheet |
+| `PadSync/Renderer/` | bundled block renderer, built from `renderer/` by `node scripts/build-ios-renderer.mjs` (commit the output) |
 | `PadSync/Server.swift` | server URL, web sign-in cookie for native requests |
 | `scripts/make-icon.swift` | renders the app icon (same as `src/app/icon.tsx`) |
 

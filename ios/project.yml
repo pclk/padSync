@@ -19,6 +19,12 @@ targets:
     platform: iOS
     sources:
       - path: PadSync
+        excludes:
+          - Renderer
+      # The bundled block renderer keeps its folder layout (KaTeX fonts are referenced as fonts/…).
+      - path: PadSync/Renderer
+        type: folder
+        buildPhase: resources
     dependencies:
       - package: GRDB
     settings:
@@ -45,9 +51,12 @@ targets:
           - $(PADSYNC_HOST)
           - github.com
         UILaunchScreen: {}
+        # All four, and no UIRequiresFullScreen, so Split View and Stage Manager can size the window.
         UISupportedInterfaceOrientations~ipad:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         ITSAppUsesNonExemptEncryption: false
