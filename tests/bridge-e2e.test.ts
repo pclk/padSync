@@ -26,6 +26,13 @@ if (process.argv.includes("--version")) { console.log("9.9.9 (Fake Claude)"); pr
 const fs = await import("node:fs");
 let prompt = "";
 for await (const c of process.stdin) prompt += c;
+// With images the prompt is one stream-json user message (--input-format stream-json).
+let images = 0;
+if (process.argv.includes("--input-format")) {
+  const content = JSON.parse(prompt).message.content;
+  images = content.filter((c) => c.type === "image" && c.source.data).length;
+  prompt = content.filter((c) => c.type === "text").map((c) => c.text).join("");
+}
 const sawImage = fs.existsSync("section.png") && fs.readFileSync("section.png").subarray(1, 4).toString() === "PNG";
 const sawContext = fs.existsSync("context.md") && fs.readFileSync("context.md", "utf8").includes("Evaluate");
 const byPath = prompt.includes("\`" + process.cwd() + "/section.png\`") && !prompt.includes("base64");
@@ -41,9 +48,10 @@ if (fs.existsSync("notebook.json")) {
   fs.writeFileSync("out/notes.md", "# Summary");
   fs.symlinkSync("/etc/hosts", "out/link.md");
   const tools = process.argv[process.argv.indexOf("--tools") + 1];
-  const listed = prompt.includes("\`" + process.cwd() + "/notebook.md\`") && !prompt.includes("Edited") && !prompt.includes("Evaluate");
+  const listed = prompt.includes("\`" + process.cwd() + "/notebook.md\`") && !prompt.includes("Edited");
+  const inline = prompt.includes('<file path="notebook.md">') && prompt.includes("Evaluate");
   if (prompt.includes("HANG")) await new Promise((r) => setTimeout(r, 60000));
-  out({ type: "result", subtype: "success", is_error: false, result: "tools=" + tools + " listed=" + listed + " mode=" + process.argv[process.argv.indexOf("--permission-mode") + 1] });
+  out({ type: "result", subtype: "success", is_error: false, result: "tools=" + tools + " listed=" + listed + " mode=" + process.argv[process.argv.indexOf("--permission-mode") + 1] + " inline=" + inline + " images=" + images });
   process.exit(0);
 }
 out({ type: "assistant", message: { content: [{ type: "text", text: "Checking line 3" }] } });
@@ -247,7 +255,7 @@ describe("bridge end to end", () => {
       const { b, sections } = files();
       const id = await askBundle("Rename Q1", b.files);
       const done = await waitFor(() => job(id), (j) => j.status === "done");
-      expect(done.output).toContain("tools=Read,Glob,Grep,Write,Edit listed=true mode=acceptEdits");
+      expect(done.output).toContain("tools=Read,Glob,Grep,Write,Edit listed=true mode=acceptEdits inline=true images=1");
       expect(done.output).toContain("link.md (not a regular file)");
       expect(done.resultFiles.map((f) => f.path).sort()).toEqual(["notebook.json", "notes.md"]);
       const nb = done.resultFiles.find((f) => f.path === "notebook.json")!;

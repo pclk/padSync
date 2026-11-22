@@ -129,10 +129,11 @@ and `history` (earlier done turns: question + output, newest last).
 
 1. **Resume** when `agent_session.agent === job.agent`:
    Claude: `claude -p --resume <sessionId> …`; Codex: `codex exec resume <sessionId> --json …`.
-   The prompt then holds only the new message and the paths of this turn's files.
-2. **Otherwise, or when resume fails** with an unknown or expired session: write `history.md`
-   (earlier turns, newest kept, cut at 60k characters with a note), say in the prompt that it is
-   the conversation so far, and start a fresh session. Retry once, not more.
+   The prompt then holds only the new message and this turn's files: their paths, the Markdown
+   inline and the images attached (no tool round trips to read them).
+2. **Otherwise, or when resume fails** with an unknown or expired session: put the earlier turns
+   in the prompt as the conversation so far (newest kept, cut at 60k characters with a note) and
+   start a fresh session. Retry once, not more.
 3. Capture the session id from the stream (Claude: `session_id` on the `system`/`init` and
    `result` events; Codex: `thread_id` on `thread.started`) and send it in the final update as
    `sessionId`. The server stores it in `chat_threads.agent_session`.
@@ -223,8 +224,9 @@ replies are announced through `aria-live="polite"`.
 ### Polling and usage (keep Neon and Vercel costs flat)
 
 - Poll only while the panel is visible and the tab is visible.
-- Open thread: every 1.5 s while any turn is queued or running, using `since` and `from`, so each
-  poll moves only the new text. Otherwise every 15 s with `since`, which usually returns no turns.
+- Open thread: every 0.6 s while any turn is queued or running, using `since` and `from`, so each
+  poll moves only the new text; unfinished turns come back whatever `since` says. Otherwise every
+  15 s with `since`, which usually returns no turns.
 - Thread list: every 30 s, and right after any action on this device. Nothing runs while the tab
   is hidden.
 - One request per tick. Never run several fetches for the same thread at once (skip a tick if the
@@ -242,7 +244,7 @@ Server and bridge (pglite and existing helpers):
 - Regenerate only on the last turn; fork copies done turns ≤ N and never `agent_session`.
 - Title from the first question.
 - Bridge: resume arguments for both agents; session id parsed from sample stream lines; fallback to
-  `history.md` when resume fails; history cut at 60k characters, newest kept.
+  the history in the prompt when resume fails; history cut at 60k characters, newest kept.
 
 Client (pure modules, no DOM library needed):
 - `layout-mode` reducer: auto drawing↔chat with `idleMs`, `minDrawingMs` hysteresis, a manual pick

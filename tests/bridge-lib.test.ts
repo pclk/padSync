@@ -24,7 +24,14 @@ const fixture = async (name: string) => (await readFile(join(__dirname, "fixture
 describe("parsing real agent output", () => {
   it("claude stream-json: streams assistant text and takes the result as final", async () => {
     const updates = (await fixture("claude-stream.jsonl")).map(parseClaudeLine).filter(Boolean);
-    expect(updates).toEqual([{ text: "pong" }, { final: "pong" }]);
+    expect(updates).toEqual([{ text: "pong" }, { final: "pong", complete: true }]);
+  });
+
+  it("claude --include-partial-messages: text deltas stream; other stream events are ignored", () => {
+    const ev = (event: unknown) => JSON.stringify({ type: "stream_event", event });
+    expect(parseClaudeLine(ev({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "po" } }))).toEqual({ delta: "po" });
+    expect(parseClaudeLine(ev({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: "{" } }))).toBeNull();
+    expect(parseClaudeLine(ev({ type: "message_start", message: {} }))).toBeNull();
   });
 
   it("claude: error results become errors", () => {
@@ -40,7 +47,7 @@ describe("parsing real agent output", () => {
 
   it("codex exec --json: agent messages stream; config warnings are not fatal", async () => {
     const updates = (await fixture("codex-exec.jsonl")).map(parseCodexLine).filter(Boolean);
-    expect(updates).toEqual([{ text: "pong" }]);
+    expect(updates).toEqual([{ text: "pong" }, { complete: true }]);
   });
 
   it("codex: turn.failed and top-level errors are fatal", () => {
@@ -162,6 +169,47 @@ describe("runAgent (with fake agent processes)", () => {
     const r = await runAgent({ cwd, prompt: "hello", command, timeoutMs: 10_000, onText: (t) => seen.push(t) });
     expect(seen).toEqual(["thinking"]);
     expect(r).toEqual({ status: "done", output: "echo:hello" });
+  });
+
+  it("streams partial text and finishes on the result, before the CLI exits", async () => {
+    const delta = (text: string) => line({ type: "stream_event", event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } } });
+    const { cwd, command } = await fake(`
+      ${delta("Let me ")}${delta("check.")}
+      ${line({ type: "assistant", message: { content: [{ type: "text", text: "Let me check." }] } })}
+      ${delta("The answer")}
+      ${line({ type: "system", subtype: "init", session_id: "s1" })}
+      ${line({ type: "result", subtype: "success", is_error: false, result: "The answer is 9/2." })}
+      setTimeout(() => {}, 20000); // still saving its session`);
+    const seen: string[] = [];
+    const started = Date.now();
+    const r = await runAgent({ cwd, prompt: "", command, timeoutMs: 30_000, onText: (t) => seen.push(t) });
+    expect(Date.now() - started).toBeLessThan(5000);
+    expect(seen).toEqual(["Let me ", "Let me check.", "Let me check.", "Let me check.\n\nThe answer"]);
+    expect(r).toEqual({ status: "done", output: "The answer is 9/2.", sessionId: "s1" });
+  });
+
+  it("finishes a Codex turn on turn.completed with its last message", async () => {
+    const { cwd, command } = await fake(`
+      ${line({ type: "item.completed", item: { type: "agent_message", text: "Checking." } })}
+      ${line({ type: "item.completed", item: { type: "agent_message", text: "It is 9/2." } })}
+      ${line({ type: "turn.completed" })}
+      setTimeout(() => {}, 20000);`, parseCodexLine, "final.md");
+    const started = Date.now();
+    const r = await runAgent({ cwd, prompt: "", command, timeoutMs: 30_000, onText: () => {} });
+    expect(Date.now() - started).toBeLessThan(5000);
+    expect(r).toEqual({ status: "done", output: "It is 9/2." });
+  });
+
+  it("sends inline images as one stream-json message, and names any too big to attach", async () => {
+    const { agentInput, MAX_INLINE_IMAGE } = await import("../bridge/lib");
+    const cwd = await mkdtemp(join(tmpdir(), "padsync-in-"));
+    await writeFile(join(cwd, "a.png"), Buffer.from("png"));
+    await writeFile(join(cwd, "big.jpg"), Buffer.alloc(MAX_INLINE_IMAGE + 1));
+    expect(await agentInput(cwd, "plain")).toBe("plain");
+    const msg = JSON.parse(await agentInput(cwd, "Q", ["a.png", "big.jpg"]));
+    expect(msg.message.content[0]).toEqual({ type: "image", source: { type: "base64", media_type: "image/png", data: Buffer.from("png").toString("base64") } });
+    expect(msg.message.content).toHaveLength(2);
+    expect(msg.message.content[1].text).toMatch(/^Q\n\n\(Not attached after all.*big\.jpg/);
   });
 
   it("reports a non-zero exit with stderr", async () => {

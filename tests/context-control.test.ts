@@ -8,6 +8,8 @@ import {
   agentCommand,
   attachedImages,
   buildBundlePrompt,
+  inlineTexts,
+  INLINE_TEXT_CHARS,
   collectOutFiles,
   prepareJobDir,
   removeJobDir,
@@ -430,7 +432,7 @@ describe("bridge: job dir for bundles", () => {
     expect(await collectOutFiles(join(root, "missing"))).toEqual({ files: [], skipped: [] });
   });
 
-  it("prompt lists absolute paths, never content, and describes out/ only when editing", () => {
+  it("prompt lists absolute paths, includes only the given texts, and describes out/ only when editing", () => {
     const b = build();
     const d = { dir: "/t/padsync-job-1", out: "/t/padsync-job-1/out", files: b.files.map(({ path, mime }) => ({ path, mime })) };
     const p = buildBundlePrompt("Fix Q1", d, "claude", { allowEdits: true });
@@ -440,7 +442,15 @@ describe("bridge: job dir for bundles", () => {
     expect(p).not.toContain("SECRET");
     expect(p).not.toContain("IBP");
     expect(buildBundlePrompt("Q", d, "claude", {})).toContain("Do not create or modify any files.");
-    expect(buildBundlePrompt("Q", d, "codex", {})).toContain("(also attached)");
+    expect(buildBundlePrompt("Q", d, "codex", {})).toContain("renders/02-q1.png`: a render of a section: printed content plus my handwriting (attached to this message)");
+    // Markdown goes in the prompt (sparing the agent a read); notebook.json, which repeats it, doesn't.
+    const inline = inlineTexts(b.files.map((f) => ({ ...f })));
+    expect(inline.map((f) => f.path)).toEqual(["README.md", "notebook.md"]);
+    const withText = buildBundlePrompt("Q", d, "claude", {}, inline);
+    expect(withText).toContain('<file path="notebook.md">\n' + file(b, "notebook.md")!.text);
+    expect(withText).toContain("notebook.md`: the chosen sections: printed content, my typed notes, and possibly reference solutions I have NOT seen (included below)");
+    expect(withText.indexOf("<file")).toBeLessThan(withText.indexOf("My question:"));
+    expect(inlineTexts([{ path: "a.md", mime: "text/markdown", text: "x".repeat(INLINE_TEXT_CHARS + 1) }])).toEqual([]);
   });
 
   it("edit and code flags: Claude gets write tools in acceptEdits, Bash only with code; Codex gets workspace-write", () => {

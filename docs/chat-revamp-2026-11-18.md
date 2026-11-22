@@ -24,7 +24,7 @@ sends nothing and the picker shows its built-in list.
 `ChatOptions.account` (and `jobOptionsSchema.account`) names the login. For a Codex job the bridge
 looks it up among the homes it found and runs Codex with `CODEX_HOME` set to it; an unknown account
 fails the turn with a message instead of quietly using another login's limits. The thread's saved
-session records the account, and a turn on another account starts fresh from `history.md`
+session records the account, and a turn on another account starts fresh with the history in its prompt
 (a Codex session lives in one `CODEX_HOME`).
 
 ## UI

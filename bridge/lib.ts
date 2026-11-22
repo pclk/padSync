@@ -125,9 +125,10 @@ export function decodePngDataUrl(dataUrl: string): Buffer {
   return Buffer.from(m[1], "base64");
 }
 
-// Inputs never go into the prompt itself: the bridge writes them to a private per-job directory
-// (the agent's cwd) and the prompt only names their absolute paths. File names are fixed, so
-// nothing from the job ever becomes part of a path.
+// The bridge writes inputs to a private per-job directory (the agent's cwd) and the prompt names
+// their absolute paths. A bundle prompt also carries the Markdown files and images inline, so the
+// agent answers without spending tool round trips (seconds each) on opening them. File names are
+// fixed, so nothing from the job ever becomes part of a path.
 
 export const JOB_DIR_PREFIX = "padsync-job-";
 export const IMAGE_FILE = "section.png";
@@ -360,18 +361,40 @@ const FILE_ROLES: [RegExp, string][] = [
   [/^assets\//, "an image embedded in a section"],
 ];
 
-/** Prompt for a bundle job: names the files by absolute path; never includes their content. */
-export function buildBundlePrompt(question: string, d: Pick<JobDir, "dir" | "files" | "out">, agent: Agent, options: JobOptions = {}) {
-  const attached = new Set(agent === "codex" ? attachedImages(d.files) : []);
+/** Most text a bundle prompt carries inline; files past it are only named. */
+export const INLINE_TEXT_CHARS = 100_000;
+
+/** The Markdown files of a bundle that go into the prompt (notebook.json repeats notebook.md). */
+export function inlineTexts(files: JobFile[] = []): { path: string; text: string }[] {
+  const out: { path: string; text: string }[] = [];
+  let total = 0;
+  for (const f of files) {
+    if (f.mime !== "text/markdown" || f.text === undefined || total + f.text.length > INLINE_TEXT_CHARS) continue;
+    total += f.text.length;
+    out.push({ path: f.path, text: f.text });
+  }
+  return out;
+}
+
+/**
+ * Prompt for a bundle job: names every file by absolute path and includes the `inline` texts. The
+ * images from attachedImages travel with the message (Codex --image, Claude stream-json input).
+ */
+export function buildBundlePrompt(question: string, d: Pick<JobDir, "dir" | "files" | "out">, agent: Agent, options: JobOptions = {}, inline: { path: string; text: string }[] = []) {
+  const attached = new Set(attachedImages(d.files));
+  const included = new Set(inline.map((f) => f.path));
   const list = (d.files ?? []).map((f) => {
     const role = FILE_ROLES.find(([re]) => re.test(f.path))?.[1] ?? "input";
-    return "- `" + join(d.dir, f.path) + "`: " + role + (attached.has(f.path) ? " (also attached)" : "");
+    return "- `" + join(d.dir, f.path) + "`: " + role + (attached.has(f.path) ? " (attached to this message)" : included.has(f.path) ? " (included below)" : "");
   });
   const edits = options.allowEdits && d.out;
   return [
     "You are helping me (a university student) with work from my iPad notebook in padSync.",
     `The material is in files in your working directory \`${d.dir}\`:\n${list.join("\n")}\n` +
-      "Use your file tools to read what you need before answering. The files are not repeated in this message.",
+      (attached.size || included.size
+        ? "The files marked as attached or included are already in this message: answer from them directly, without opening them again. Use your file tools only for the others, and only if you need them."
+        : "Use your file tools to read what you need before answering. The files are not repeated in this message."),
+    ...inline.map((f) => `<file path="${f.path}">\n${f.text.replace(/<\/file>/g, "<\\/file>")}\n</file>`),
     `My question:\n${question}`,
     [
       "Guidelines:",
@@ -456,8 +479,12 @@ export function buildAgentPrompt(question: string, files: Omit<JobDir, "dir">, a
 // Agent output parsing. Both CLIs emit one JSON object per line.
 
 export interface AgentUpdate {
-  /** Text to append to the visible answer. */
+  /** A finished block of text, appended to the visible answer (it replaces the block's deltas). */
   text?: string;
+  /** More of the text block being written (Claude with --include-partial-messages). */
+  delta?: string;
+  /** The answer is complete; the CLI may still be saving its session before it exits. */
+  complete?: boolean;
   /** Authoritative final answer (replaces streamed text). */
   final?: string;
   /** Fatal error reported by the agent. */
@@ -473,11 +500,15 @@ export function parseClaudeLine(line: string): AgentUpdate | null {
     const text = parts.join("");
     return text ? { text } : null;
   }
+  if (ev.type === "stream_event") {
+    const d = ev.event?.delta;
+    return ev.event?.type === "content_block_delta" && d?.type === "text_delta" && typeof d.text === "string" && d.text ? { delta: d.text } : null;
+  }
   if (ev.type === "result") {
     if (ev.is_error || (typeof ev.subtype === "string" && ev.subtype !== "success")) {
       return { error: typeof ev.result === "string" && ev.result ? ev.result : `Claude Code stopped: ${ev.subtype ?? "error"}` };
     }
-    return typeof ev.result === "string" ? { final: ev.result } : null;
+    return typeof ev.result === "string" ? { final: ev.result, complete: true } : { complete: true };
   }
   return null;
 }
@@ -490,6 +521,7 @@ export function parseCodexLine(line: string): AgentUpdate | null {
     return { text: ev.item.text };
   }
   // item.completed with item.type "error" is a non-fatal warning (e.g. config notices).
+  if (ev.type === "turn.completed") return { complete: true };
   if (ev.type === "turn.failed") return { error: ev.error?.message ?? "Codex turn failed" };
   if (ev.type === "error") return { error: ev.message ?? "Codex error" };
   return null;
@@ -514,6 +546,8 @@ export interface AgentCommand {
   parse: (line: string) => AgentUpdate | null;
   /** File the agent writes its final message to, if any (relative to cwd). */
   finalFile?: string;
+  /** Images (relative to cwd) sent inside the prompt message: Claude's stream-json input. */
+  inlineImages?: string[];
 }
 
 const MODEL_RE = /^[A-Za-z0-9][A-Za-z0-9._:[\]-]{0,79}$/;
@@ -553,11 +587,14 @@ export function agentCommand(agent: Agent, cfg: Pick<BridgeConfig, "claudeBin" |
     // and anything outside would need a prompt, which print mode denies.
     const allowed = tools.filter((t) => !edit.includes(t));
     const denied = ["Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch"].filter((t) => !tools.includes(t));
+    const inline = Array.isArray(images) ? images : [];
     return {
       bin: cfg.claudeBin ?? "claude",
       // Restrict built-in tools and ignore ambient MCP servers. Prompt arrives on stdin.
       args: [
-        "-p", "--output-format", "stream-json", "--verbose",
+        // Partial messages stream the answer as it is written, not a whole message at a time.
+        "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
+        ...(inline.length ? ["--input-format", "stream-json"] : []),
         ...(o.model ? ["--model", o.model] : []),
         ...(o.effort ? ["--effort", o.effort] : []),
         ...(o.allowEdits ? ["--permission-mode", "acceptEdits"] : []),
@@ -567,11 +604,14 @@ export function agentCommand(agent: Agent, cfg: Pick<BridgeConfig, "claudeBin" |
         "--disallowedTools", ...denied,
       ],
       parse: parseClaudeLine,
+      ...(inline.length ? { inlineImages: inline } : {}),
     };
   }
   // --search is a top-level codex flag, so it goes before `exec`.
   const sandbox = o.allowEdits ? "workspace-write" : "read-only";
-  const args = [...(o.webSearch ? ["--search"] : []), "exec", "--json", "--skip-git-repo-check", "--sandbox", sandbox, "--output-last-message", "final.md"];
+  // --ignore-user-config: the job runs without the user's plugins, MCP servers and notify hooks
+  // (about a second of start-up); auth still comes from CODEX_HOME, and the model is passed below.
+  const args = [...(o.webSearch ? ["--search"] : []), "exec", "--ignore-user-config", "--json", "--skip-git-repo-check", "--sandbox", sandbox, "--output-last-message", "final.md"];
   if (o.model) args.push("--model", o.model);
   if (o.effort) args.push("-c", `model_reasoning_effort="${o.effort}"`);
   for (const img of images === true ? [IMAGE_FILE] : images || []) args.push("--image", img);
@@ -602,20 +642,52 @@ export function agentEnv(env: Env = process.env): Env {
   return Object.fromEntries(Object.entries(env).filter(([k]) => !k.startsWith("PADSYNC_")));
 }
 
-export function runAgent(opts: RunOptions): Promise<RunResult> {
+/** The API's limit is 5 MB of base64 per image; a bigger one stays on disk for the Read tool. */
+export const MAX_INLINE_IMAGE = 3_700_000;
+
+/** The prompt for stdin: plain text, or one stream-json user message carrying `images` too. */
+export async function agentInput(cwd: string, prompt: string, images: string[] = []): Promise<string> {
+  if (!images.length) return prompt;
+  const content: unknown[] = [];
+  const left: string[] = [];
+  for (const path of images) {
+    const data = await readFile(safeJoin(cwd, path)).catch(() => null);
+    if (!data || data.length > MAX_INLINE_IMAGE) {
+      left.push(path);
+      continue;
+    }
+    content.push({ type: "image", source: { type: "base64", media_type: MIME_BY_EXT[extname(path).toLowerCase()] ?? "image/png", data: data.toString("base64") } });
+  }
+  const note = left.length ? `\n\n(Not attached after all, open with your file tools: ${left.map((p) => "`" + join(cwd, p) + "`").join(", ")}.)` : "";
+  content.push({ type: "text", text: prompt + note });
+  return JSON.stringify({ type: "user", message: { role: "user", content } }) + "\n";
+}
+
+/** After an early finish, how long the CLI may take to save its session and exit before it is stopped. */
+const LINGER_MS = 30_000;
+
+export async function runAgent(opts: RunOptions): Promise<RunResult> {
   const { command } = opts;
-  if (opts.signal?.aborted) return Promise.resolve({ status: "cancelled", output: "" });
+  if (opts.signal?.aborted) return { status: "cancelled", output: "" };
   const cap = (text: string) => text.slice(0, MAX_OUTPUT).replace(/[\uD800-\uDBFF]$/, "");
+  const input = await agentInput(opts.cwd, opts.prompt, command.inlineImages);
+  if (opts.signal?.aborted) return { status: "cancelled", output: "" };
   return new Promise((resolve) => {
     const child = spawn(command.bin, command.args, { cwd: opts.cwd, env: (opts.env ?? agentEnv()) as NodeJS.ProcessEnv, stdio: ["pipe", "pipe", "pipe"], detached: process.platform !== "win32" });
     let sessionId: string | undefined;
+    // Finished text blocks, and the deltas of the one being written.
     let streamed = "";
+    let partial = "";
+    let lastText: string | undefined;
+    const visible = () => cap(streamed && partial ? `${streamed}\n\n${partial}` : streamed || partial);
     let final: string | undefined;
     let error: string | undefined;
     let stderr = "";
     let buffer = "";
     let settled = false;
     let killTimer: ReturnType<typeof setTimeout> | undefined;
+    let lingerTimer: ReturnType<typeof setTimeout> | undefined;
+    let exited = false;
     const killTree = (signal: NodeJS.Signals) => {
       if (!child.pid || child.pid < 1) return;
       try {
@@ -641,6 +713,15 @@ export function runAgent(opts: RunOptions): Promise<RunResult> {
       killTimer = setTimeout(() => killTree("SIGKILL"), 3000);
       killTimer.unref();
     };
+    // The answer is complete: report it now rather than after the CLI has saved its session and
+    // exited (0.3-1 s later). The process finishes on its own, and is stopped if it lingers.
+    const complete = () => {
+      if (settled) return;
+      finish({ status: "done", output: final ?? (lastText !== undefined ? cap(lastText) : visible()) });
+      if (exited) return;
+      lingerTimer = setTimeout(() => killTree("SIGTERM"), LINGER_MS);
+      lingerTimer.unref();
+    };
     const onAbort = () => stop("cancelled");
     const timer = setTimeout(() => stop("timeout"), opts.timeoutMs);
     if (opts.signal?.aborted) stop("cancelled");
@@ -655,12 +736,19 @@ export function runAgent(opts: RunOptions): Promise<RunResult> {
       sessionId = parseSessionId(line) ?? sessionId;
       const u = command.parse(line);
       if (!u) return;
+      if (u.delta) {
+        partial += u.delta;
+        opts.onText(visible());
+      }
       if (u.text) {
         streamed = cap(streamed ? `${streamed}\n\n${u.text}` : u.text);
+        partial = "";
+        lastText = u.text;
         opts.onText(streamed);
       }
       if (u.final !== undefined) final = cap(u.final);
       if (u.error) error = u.error;
+      if (u.complete && !error) complete();
     };
 
     child.stdout.setEncoding("utf8");
@@ -676,11 +764,14 @@ export function runAgent(opts: RunOptions): Promise<RunResult> {
     child.stderr.on("data", (c: string) => {
       stderr = (stderr + c).slice(-4000);
     });
-    child.on("error", (e) => finish({ status: "error", output: streamed, error: `could not start ${command.bin}: ${e.message}` }));
+    child.on("error", (e) => finish({ status: "error", output: visible(), error: `could not start ${command.bin}: ${e.message}` }));
     child.on("close", async (code) => {
+      exited = true;
+      clearTimeout(lingerTimer);
+      if (settled) return;
       if (buffer) handle(buffer);
-      if (stopReason === "cancelled") return finish({ status: "cancelled", output: streamed });
-      if (stopReason === "timeout") return finish({ status: "error", output: streamed, error: `timed out after ${Math.round(opts.timeoutMs / 1000)}s` });
+      if (stopReason === "cancelled") return finish({ status: "cancelled", output: visible() });
+      if (stopReason === "timeout") return finish({ status: "error", output: visible(), error: `timed out after ${Math.round(opts.timeoutMs / 1000)}s` });
       if (command.finalFile) {
         const path = safeJoin(opts.cwd, command.finalFile);
         const st = await lstat(path).catch(() => null);
@@ -688,7 +779,7 @@ export function runAgent(opts: RunOptions): Promise<RunResult> {
         const fromFile = bytes?.toString("utf8") ?? "";
         if (fromFile.trim()) final = cap(fromFile.trim());
       }
-      const output = final ?? streamed;
+      const output = final ?? visible();
       if (error || code !== 0) {
         return finish({ status: "error", output, error: error ?? `${command.bin} exited with code ${code}: ${lastLine(stderr)}` });
       }
@@ -696,7 +787,7 @@ export function runAgent(opts: RunOptions): Promise<RunResult> {
     });
 
     child.stdin.on("error", () => {}); // agent may exit before reading stdin
-    child.stdin.end(opts.prompt);
+    child.stdin.end(input);
   });
 }
 

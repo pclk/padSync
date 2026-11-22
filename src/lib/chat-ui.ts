@@ -88,7 +88,7 @@ export function exportMarkdown(thread: ThreadSummary, turns: Turn[]) {
   );
 }
 export const pollDelay = (kind: "list" | "thread", active: boolean) =>
-  kind === "list" ? 30_000 : active ? 1500 : 15_000;
+  kind === "list" ? 30_000 : active ? 600 : 15_000;
 /** A completion-scheduled timer owns one request; visibility changes invalidate scheduled work. */
 export function createPollScheduler(
   request: () => Promise<unknown>,

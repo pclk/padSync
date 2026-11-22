@@ -31,6 +31,7 @@ import {
   collectOutFiles,
   configPath,
   fetchUploads,
+  inlineTexts,
   launchdPlist,
   loadConfig,
   maskToken,
@@ -48,10 +49,14 @@ import {
 import { discoverCatalog, type Catalog } from "./catalog.ts";
 import { Speech, uvVersion } from "./speech.ts";
 
-const VERSION = "0.4.0";
+const VERSION = "0.5.0";
 const POLL_MS = 3000;
+// For a while after a job, poll faster: a follow-up question in the same chat is likely.
+const FOLLOW_UP_POLL_MS = 1000;
+const FOLLOW_UP_MS = 5 * 60_000;
 const MAX_BACKOFF_MS = 60_000;
-const FLUSH_MS = 1000;
+// How often new text goes to padSync while the agent writes (only the new part is sent).
+const FLUSH_MS = 250;
 // Even with no new text, check in this often: it is how a silent agent learns it was cancelled,
 // and it keeps the job from looking stale (and being reclaimed) during long thinking.
 const HEARTBEAT_MS = 5000;
@@ -182,6 +187,8 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob, tra
   if (shutdown.signal.aborted) abort.abort();
   let latest = "";
   let sent = "";
+  // After a failed update the server may or may not have its text, so the next one resends it all.
+  let synced = true;
   let lastContact = Date.now();
   let flushing: Promise<void> | null = null;
 
@@ -190,16 +197,19 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob, tra
     const changed = latest !== sent;
     if (!changed && Date.now() - lastContact < HEARTBEAT_MS) return;
     const out = latest;
+    const body = !changed ? {} : synced && sent && out.startsWith(sent) ? { append: out.slice(sent.length) } : { output: out };
     try {
       // Cancelled with the job, so a hung progress request can't hold up stopping it.
-      const r = await update(changed ? { output: out } : {}, { signal: abort.signal });
+      const r = await update(body, { signal: abort.signal });
       sent = out;
+      synced = true;
       lastContact = Date.now();
       if (r.cancelled) {
         log(`job ${job.id} cancelled by user`);
         abort.abort();
       }
     } catch (e) {
+      synced = false;
       if (e instanceof ApiError && (e.status === 409 || e.status === 401)) abort.abort(); // reclaimed, finished elsewhere, or token revoked
       else log(`progress update failed: ${(e as Error).message}`);
     }
@@ -239,16 +249,13 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob, tra
       // Only bundle jobs have an out/ to write to; a legacy job stays read-only whatever it asks.
       const runOpts = bundle ? o : { ...o, allowEdits: false, allowCode: false };
       let session = job.thread?.agent_session;
-      // A Codex session lives in one CODEX_HOME, so another account starts over from history.md.
+      // A Codex session lives in one CODEX_HOME, so another account starts over from the history.
       const sameLogin = job.agent !== "codex" || (session?.account ?? undefined) === o.account;
       if (session?.agent !== job.agent || !sameLogin) session = null;
-      const historyPath = join(d.dir, '.padsync-chat', 'history.md');
-      const historyPrompt = async () => {
-        await mkdir(dirname(historyPath), { recursive: true, mode: 0o700 });
-        await writeFile(historyPath, chatHistory(job.history ?? []), { mode: 0o600 });
-        return `Read ${historyPath} for the conversation so far.\n\n`;
-      };
-      const basePrompt = isImport ? buildImportPrompt(job.question, d, job.agent, runOpts) : bundle ? buildBundlePrompt(job.question, d, job.agent, runOpts) : buildAgentPrompt(job.question, d, job.agent);
+      // In the prompt rather than a file, which would cost the agent a tool round trip to read.
+      const historyPrompt = () => `The conversation so far:\n<conversation>\n${chatHistory(job.history ?? [])}\n</conversation>\n\n`;
+      // An import's lecture notes are long and read selectively, so only chats and asks inline them.
+      const basePrompt = isImport ? buildImportPrompt(job.question, d, job.agent, runOpts) : bundle ? buildBundlePrompt(job.question, d, job.agent, runOpts, inlineTexts(job.files)) : buildAgentPrompt(job.question, d, job.agent);
       const command = agentCommand(job.agent, cfg, bundle ? attachedImages(d.files) : !!d.image, runOpts);
       const run = (resume: boolean, prefix: string) => {
         mark("agent_spawn");
@@ -269,7 +276,7 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob, tra
       const result = job.kind === 'chat'
         ? await runChatWithFallback(!!session, async (resume, history) => {
           latest = '';
-          return run(resume, history ? await historyPrompt() : '');
+          return run(resume, history ? historyPrompt() : '');
         })
         : await run(false, '');
       mark("agent_exit");
@@ -377,6 +384,7 @@ async function run() {
   };
 
   let backoff = POLL_MS;
+  let lastJobAt = 0;
   while (!shutdown.signal.aborted) {
     if (Date.now() - catalogAt > CATALOG_MS) await refreshCatalog();
     try {
@@ -393,7 +401,10 @@ async function run() {
       });
       const hadJob = await active.finally(() => (active = null));
       backoff = POLL_MS;
-      if (hadJob) continue; // check for the next job immediately
+      if (hadJob) {
+        lastJobAt = Date.now();
+        continue; // check for the next job immediately
+      }
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
         log("device token was rejected (revoked or wrong server). Create a new one in padSync → Settings, then run setup again.");
@@ -404,7 +415,7 @@ async function run() {
       backoff = Math.min(backoff * 2, MAX_BACKOFF_MS);
       continue;
     }
-    await sleep(POLL_MS);
+    await sleep(Date.now() - lastJobAt < FOLLOW_UP_MS ? FOLLOW_UP_POLL_MS : POLL_MS);
   }
 }
 

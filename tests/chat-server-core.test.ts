@@ -57,8 +57,10 @@ it("since/from polls return changed turns and delta output; captures final sessi
   await claimJob(sql, "b", ["claude"], ["chat"]);
   await updateJob(sql, a.jobId, "b", { output: "abcdef" });
   expect((await c.getTurns(sql, t.id, undefined, "1:3"))[0].output).toBe("def");
-  expect(await c.getTurns(sql, t.id, "2099-01-01")).toEqual([]);
+  // A running turn comes back whatever `since` says; a finished one only when it changed.
+  expect((await c.getTurns(sql, t.id, "2099-01-01", "1:6")).map((x) => x.output)).toEqual([""]);
   await updateJob(sql, a.jobId, "b", { status: "done", sessionId: "session" });
+  expect(await c.getTurns(sql, t.id, "2099-01-01")).toEqual([]);
   expect(
     (
       await sql.query<{ agent_session: unknown }>(

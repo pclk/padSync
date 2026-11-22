@@ -104,13 +104,17 @@ export async function getTurns(
     if (Number.isInteger(n) && Number.isInteger(len) && len >= 0)
       offsets[n] = len;
   }
+  // Unfinished turns come back on every poll, whatever `since` says: `since` is the server's clock
+  // and updated_at the database's, and one missed change used to hide new text until the bridge's
+  // next update. The offsets keep this to the text the device doesn't have yet.
   return sql.query<Turn>(
     `select id as "jobId", turn,question,chat_context as context,attachments,trace,agent,options,status,
  substring(output from (case when status='running' then least(length(output),coalesce(($3::jsonb->>turn::text)::int,0)) else 0 end)+1) as output,
  case when status='running' then least(length(output),coalesce(($3::jsonb->>turn::text)::int,0)) else 0 end as "outputOffset",
  error,created_at as "createdAt",updated_at as "updatedAt",finished_at as "finishedAt",
  coalesce((select jsonb_agg(jsonb_build_object('path',f->>'path','mime',f->>'mime','size',length(coalesce(f->>'text',f->>'base64','')))) from jsonb_array_elements(result_files) f),'[]'::jsonb) as "resultFiles"
- from jobs where thread_id=$1 and ($4::text is null or id=$4) and ($2::timestamptz is null or updated_at>$2::timestamptz) order by turn`,
+ from jobs where thread_id=$1 and ($4::text is null or id=$4)
+   and ($2::timestamptz is null or updated_at>$2::timestamptz or status in ('uploading','queued','running')) order by turn`,
     [key, since ?? null, JSON.stringify(offsets), jobId ?? null],
   );
 }

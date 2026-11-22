@@ -163,7 +163,7 @@ describe("Chat UI helpers", () => {
 describe("Chat poll scheduler", () => {
   afterEach(() => vi.useRealTimers());
   it("uses active, idle and list intervals", () => {
-    expect(pollDelay("thread", true)).toBe(1500);
+    expect(pollDelay("thread", true)).toBe(600);
     expect(pollDelay("thread", false)).toBe(15000);
     expect(pollDelay("list", true)).toBe(30000);
   });
