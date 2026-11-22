@@ -10,6 +10,10 @@ import WebKit
 /// - `get { id }` → the entity or null
 /// - `list { notebookId, kind?, parentId?, includeDeleted? }` → entities, in id order
 /// - `notebooks {}` → every notebook entity (including deleted, as Dexie's `kind` index gives them)
+/// - `searchInk { query }` → `[{ notebookId, sectionId, line }]`, notebooks whose handwriting
+///   (read on the iPad, HandwritingIndex) contains the query, one hit each
+/// - `inbox {}` → `[{ id, name, base64 }]`, PDFs shared to padSync (PadSyncShare) not yet imported
+/// - `clearInbox { ids }` → removes those once the library has started importing them
 /// - `put { entities }` → stores them with a fresh hlc, dirty, and asks for a sync; replies with
 ///   what was written
 ///
@@ -55,6 +59,16 @@ enum StoreBridge {
                 return e
             }
             return (try db.save(entities).map(dexie), !entities.isEmpty)
+        case "inbox":
+            return (Inbox.list().map { ["id": $0.id, "name": $0.name, "base64": $0.base64] }, false)
+        case "clearInbox":
+            guard let ids = body["ids"] as? [String] else { throw BridgeError(message: "clearInbox needs ids") }
+            Inbox.remove(ids)
+            return (NSNull(), false)
+        case "searchInk":
+            guard let query = body["query"] as? String else { throw BridgeError(message: "searchInk needs query") }
+            let hits = try db.writer.read { db in try HandwritingIndex.search(db, query: query) }
+            return (hits.map { ["notebookId": $0.notebookId, "sectionId": $0.sectionId, "line": $0.line] }, false)
         default:
             throw BridgeError(message: "unknown op \(op)")
         }
@@ -69,6 +83,37 @@ enum StoreBridge {
 
     /// Fired on the page after a commit that touched entities. Debounced by the observer.
     static let changeScript = "window.dispatchEvent(new CustomEvent('padsync-native-change'))"
+    /// Fired when shared PDFs are waiting (`inbox`).
+    static let inboxScript = "window.dispatchEvent(new CustomEvent('padsync-inbox'))"
+}
+
+/// PDFs the Share extension saved to the App Group, named `<ms>-<original name>`.
+enum Inbox {
+    static let waiting = Notification.Name("padsync.inbox")
+
+    static func files(in folder: URL? = AppGroup.inbox) -> [URL] {
+        guard let folder else { return [] }
+        return ((try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? [])
+            .filter { $0.pathExtension.lowercased() == "pdf" }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    }
+
+    static func list(in folder: URL? = AppGroup.inbox) -> [(id: String, name: String, base64: String)] {
+        files(in: folder).compactMap { url in
+            guard let data = try? Data(contentsOf: url) else { return nil }
+            let id = url.lastPathComponent
+            let name = id.firstIndex(of: "-").map { String(id[id.index(after: $0)...]) } ?? id
+            return (id, name, data.base64EncodedString())
+        }
+    }
+
+    static func remove(_ ids: [String], in folder: URL? = AppGroup.inbox) {
+        guard let folder else { return }
+        // Only plain names from list(), never a path.
+        for id in ids where !id.contains("/") && !id.hasPrefix(".") {
+            try? FileManager.default.removeItem(at: folder.appendingPathComponent(id))
+        }
+    }
 }
 
 /// Answers `padsyncStore` messages from one web view and tells it when the store changes.
@@ -84,6 +129,9 @@ final class StoreBridgeHandler: NSObject, WKScriptMessageHandlerWithReply {
         self.db = db
         self.onWrite = onWrite
         super.init()
+        NotificationCenter.default.addObserver(forName: Inbox.waiting, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { _ = self?.web?.evaluateJavaScript(StoreBridge.inboxScript) }
+        }
         observer = DatabaseRegionObservation(tracking: Table(Entity.databaseTableName))
             .start(in: db.writer, onError: { _ in }, onChange: { [weak self] _ in
                 Task { @MainActor in self?.storeChanged() }

@@ -81,6 +81,15 @@ final class AppDatabase: Sendable {
         m.registerMigration("v2") { db in
             try db.create(index: "entity_notebook_hlc", on: "entity", columns: ["notebookId", "hlc"])
         }
+        // The words in each section's ink, read on this iPad for search (HandwritingIndex). Never synced.
+        m.registerMigration("v3") { db in
+            try db.create(table: "inkText") { t in
+                t.primaryKey("sectionId", .text)
+                t.column("notebookId", .text).notNull()
+                t.column("text", .text).notNull()
+                t.column("stamp", .text).notNull()
+            }
+        }
         return m
     }
 

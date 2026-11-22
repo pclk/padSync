@@ -42,6 +42,23 @@ describe("nativeStore", () => {
     ]);
   });
 
+  it("searches the handwriting the app has read", async () => {
+    const hit = { notebookId: "nb", sectionId: "s1", line: "Eigenvalues of A" };
+    const { win, sent } = fakeApp(() => [hit]);
+    expect(await nativeStore(win)!.searchInk("eigen")).toEqual([hit]);
+    expect(sent).toEqual([{ op: "searchInk", query: "eigen" }]);
+  });
+
+  it("reads and clears PDFs shared to the app", async () => {
+    const file = { id: "1-notes.pdf", name: "notes.pdf", base64: "JVBERg==" };
+    const { win, sent } = fakeApp((m) => (m.op === "inbox" ? [file] : null));
+    const store = nativeStore(win)!;
+    expect(await store.inbox()).toEqual([file]);
+    await store.clearInbox([]);
+    await store.clearInbox(["1-notes.pdf"]);
+    expect(sent).toEqual([{ op: "inbox" }, { op: "clearInbox", ids: ["1-notes.pdf"] }]);
+  });
+
   it("passes the app's errors through", async () => {
     const { win } = fakeApp(() => { throw new Error("unknown op"); });
     await expect(nativeStore(win)!.notebooks()).rejects.toThrow("unknown op");

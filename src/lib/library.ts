@@ -2,11 +2,12 @@ import type { FolderEntity, NotebookEntity } from "./types";
 
 export type LibrarySort = "recent" | "newest" | "oldest" | "title";
 
-/** Keep search literal and deterministic; never mutate the live query result. */
-export function selectNotebooks(notebooks: NotebookEntity[], query: string, sort: LibrarySort, edited?: Map<string, number>) {
+/** Keep search literal and deterministic; never mutate the live query result. `alsoMatching` are
+ *  notebooks the search found another way (their handwriting, in the iPad app). */
+export function selectNotebooks(notebooks: NotebookEntity[], query: string, sort: LibrarySort, edited?: Map<string, number>, alsoMatching?: ReadonlySet<string>) {
   const term = query.trim().toLocaleLowerCase();
   const editedAt = (nb: NotebookEntity) => edited?.get(nb.id) ?? nb.data.createdAt;
-  return notebooks.filter((nb) => nb.data.title.toLocaleLowerCase().includes(term)).sort((a, b) => {
+  return notebooks.filter((nb) => nb.data.title.toLocaleLowerCase().includes(term) || !!alsoMatching?.has(nb.id)).sort((a, b) => {
     const order = sort === "title"
       ? a.data.title.localeCompare(b.data.title)
       : sort === "recent" ? editedAt(b) - editedAt(a)
