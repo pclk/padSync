@@ -3,6 +3,8 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import { useEffect, useRef, useState } from "react";
 import { copySectionImage, sectionSource, sectionStats } from "@/lib/export";
+import { notebookPdf } from "@/lib/pdf-export";
+import { downloadFile } from "@/lib/download";
 import { renderMarkdown } from "@/lib/markdown";
 import { useShowCopyButtons } from "@/lib/settings";
 import {
@@ -85,6 +87,18 @@ export function SidePanel(p: Props) {
       },
       (e) => flash(`Copy failed: ${(e as Error).message}`),
     );
+  };
+
+  const [exporting, setExporting] = useState<string | null>(null);
+  const exportPdf = () => {
+    if (exporting) return;
+    setExporting("Preparing…");
+    notebookPdf(p.sections, p.sectionEl, (done, total) => setExporting(`Rendering ${done} / ${total}…`))
+      .then(
+        (pdf) => downloadFile(`${(p.notebookTitle || "notebook").replace(/[\\/:*?"<>|]/g, "_")}.pdf`, pdf, "application/pdf"),
+        (e) => flash(`Export failed: ${(e as Error).message}`),
+      )
+      .finally(() => setExporting(null));
   };
 
   const copySource = async () => {
@@ -190,6 +204,13 @@ export function SidePanel(p: Props) {
                 </button>
               </div>
             )}
+            <button
+              className="btn btn-secondary mb-4 w-full"
+              onClick={exportPdf}
+              disabled={!!exporting}
+            >
+              {exporting ?? "Export notebook as PDF"}
+            </button>
             <EarlierQuestions
               key={current.id}
               sectionId={current.id}
