@@ -26,7 +26,7 @@ export interface JobOptions {
   allowEdits?: boolean;
   /** Claude also gets Bash, in Claude Code's sandbox. */
   allowCode?: boolean;
-  /** Which login runs it: a Codex home from bridge/catalog.ts ("codex_work"); ignored for Claude. */
+  /** Named login from the bridge catalog, such as "claude_work" or "codex_personal". */
   account?: string;
 }
 
@@ -587,7 +587,7 @@ export function cleanOptions(agent: Agent, o: JobOptions = {}): JobOptions {
     webSearch: o.webSearch === true,
     allowEdits: o.allowEdits === true,
     allowCode: o.allowEdits === true && o.allowCode === true,
-    account: agent === "codex" && typeof o.account === "string" && ACCOUNT_RE.test(o.account) ? o.account : undefined,
+    account: typeof o.account === "string" && ACCOUNT_RE.test(o.account) ? o.account : undefined,
   };
 }
 

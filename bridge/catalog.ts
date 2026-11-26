@@ -1,6 +1,6 @@
-// What this Mac can run: the Claude Code login and every Codex home (~/.codex, ~/.codex_work, …),
+// What this Mac can run: the Claude Code logins and every Codex home (~/.codex, ~/.codex_work, …),
 // each with the models its own CLI cache lists. The bridge sends this to padSync so the model
-// picker shows real choices, and maps a job's `account` back to a CODEX_HOME. Only labels, model
+// picker shows real choices, and maps a job's `account` back to its local profile. Only labels, model
 // metadata and the account email/plan are read; tokens never leave auth.json.
 
 import { readdir, readFile, stat } from "node:fs/promises";
@@ -21,7 +21,7 @@ export interface CatalogModel {
 }
 
 export interface CatalogAccount {
-  /** "claude", or a Codex home's name without the dot ("codex", "codex_work"). */
+  /** Profile name without the leading dot, such as "claude_work" or "codex". */
   id: string;
   agent: Agent;
   label: string;
@@ -36,6 +36,7 @@ export interface Catalog {
   accounts: CatalogAccount[];
   /** account id → CODEX_HOME. Stays on this Mac. */
   homes: Record<string, string>;
+  claudeWorkHome?: string;
 }
 
 export const ACCOUNT_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/;
@@ -152,20 +153,28 @@ export async function codexHomes(home: string, extra: Record<string, string> = {
 export async function discoverCatalog(opts: { home?: string; agents: Agent[]; codexHomes?: Record<string, string> }): Promise<Catalog> {
   const home = opts.home ?? homedir();
   const accounts: CatalogAccount[] = [];
+  let claudeWorkHome: string | undefined;
   if (opts.agents.includes("claude")) {
-    const dir = join(home, ".claude", "cache", "model-catalog");
-    const files = (await Promise.all((await readdir(dir).catch(() => [] as string[])).filter((f) => f.endsWith(".json")).map((f) => readJson(join(dir, f))))).filter((f): f is Json => !!f);
-    const settings = await readJson(join(home, ".claude", "settings.json"));
-    const oauth = (await readJson(join(home, ".claude.json")))?.oauthAccount as Json | undefined;
-    const models = claudeModels(files);
-    accounts.push({
-      id: "claude",
-      agent: "claude",
-      label: "Claude",
-      detail: str(oauth?.emailAddress, 120),
-      defaultModel: str(settings?.model, 80),
-      models: models.length ? models : CLAUDE_FALLBACK,
-    });
+    for (const work of [false, true]) {
+      const profile = join(home, work ? ".claude_work" : ".claude");
+      if (work) {
+        if (!(await stat(join(profile, ".claude.json")).catch(() => null))?.isFile()) continue;
+        claudeWorkHome = profile;
+      }
+      const dir = join(profile, "cache", "model-catalog");
+      const files = (await Promise.all((await readdir(dir).catch(() => [] as string[])).filter((f) => f.endsWith(".json")).map((f) => readJson(join(dir, f))))).filter((f): f is Json => !!f);
+      const settings = await readJson(join(profile, "settings.json"));
+      const oauth = (await readJson(join(work ? profile : home, ".claude.json")))?.oauthAccount as Json | undefined;
+      const models = claudeModels(files);
+      accounts.push({
+        id: work ? "claude_work" : "claude",
+        agent: "claude",
+        label: work ? "Claude · Work" : "Claude · Personal",
+        detail: str(oauth?.emailAddress, 120),
+        defaultModel: str(settings?.model, 80),
+        models: models.length ? models : CLAUDE_FALLBACK,
+      });
+    }
   }
   const homes = opts.agents.includes("codex") ? await codexHomes(home, opts.codexHomes) : {};
   for (const [id, dir] of Object.entries(homes)) {
@@ -181,5 +190,5 @@ export async function discoverCatalog(opts: { home?: string; agents: Agent[]; co
       models: codexModels(await readJson(join(dir, "models_cache.json"))),
     });
   }
-  return { accounts, homes };
+  return { accounts, homes, claudeWorkHome };
 }

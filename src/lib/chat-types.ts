@@ -10,7 +10,7 @@ export interface ChatOptions {
   webSearch?: boolean;
   allowEdits?: boolean;
   allowCode?: boolean;
-  /** Which login on the Mac runs it (a Codex home such as "codex_work"); unset = the CLI default. */
+  /** Which login on the Mac runs it, such as "claude_work" or "codex_work". */
   account?: string;
 }
 

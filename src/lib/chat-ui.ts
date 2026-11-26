@@ -234,7 +234,7 @@ export function accountFor(
   const mine = accounts.filter((a) => a.agent === s.agent);
   return (
     mine.find((a) => a.id === s.options.account) ??
-    (s.agent === "codex" && s.options.account
+    (s.options.account
       ? undefined
       : (mine.find((a) => a.id === s.agent) ?? mine[0]))
   );
@@ -266,7 +266,7 @@ export function chooseModel(
     options: {
       ...options,
       model: model.id,
-      account: account.agent === "codex" ? account.id : undefined,
+      account: account.agent === "claude" && account.id === "claude" ? undefined : account.id,
       effort: keepEffort ? options.effort : undefined,
     },
   };

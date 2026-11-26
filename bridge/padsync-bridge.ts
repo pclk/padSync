@@ -158,7 +158,7 @@ function reportStopped(api: BridgeApi, jobId: string, output = "") {
 /** This Claude Code can show its thinking (bridge/lib.ts claudeThinkingSupported); checked at start. */
 let claudeThinking = false;
 
-/** The latest discovered catalog; handleJob maps a job's account to its CODEX_HOME with it. */
+/** The latest discovered catalog; handleJob maps a job's account to its local profile with it. */
 let catalog: Catalog = { accounts: [], homes: {} };
 
 /** Transcribes voice messages; null when they are turned off or uv is missing. */
@@ -195,14 +195,16 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob, tra
   const o = cleanOptions(job.agent, isImport ? { ...job.options, allowEdits: true } : job.options);
   const how = [isImport && "import", o.model, o.effort && `effort ${o.effort}`, o.webSearch && "web search", o.allowEdits && "edits", o.allowCode && "code", (job.files?.length || job.uploads?.length) && `${(job.files?.length ?? 0) + (job.uploads?.length ?? 0)} files`].filter(Boolean).join(", ");
   log(`job ${job.id} (${job.agent}${how ? `: ${how}` : ""}): ${job.question.slice(0, 80)}`);
-  // A Codex job runs under the login it names; one this Mac doesn't have fails instead of silently
-  // using another account's limits.
-  const codexHome = job.agent === "codex" && o.account ? catalog.homes[o.account] : undefined;
-  if (job.agent === "codex" && o.account && !codexHome) {
-    log(`job ${job.id}: unknown Codex account ${o.account}`);
-    await update({ status: "error", error: `Codex account "${o.account}" isn't set up on this Mac. Pick another model.` }).catch(() => {});
+  const profileHome = job.agent === "claude"
+    ? (o.account === "claude_work" ? catalog.claudeWorkHome : undefined)
+    : (o.account && Object.hasOwn(catalog.homes, o.account) ? catalog.homes[o.account] : undefined);
+  if (o.account && !profileHome) {
+    await update({ status: "error", error: `Account "${o.account}" isn't set up for ${job.agent} on this Mac. Pick another model.` }).catch(() => {});
     return;
   }
+  const env = agentEnv();
+  if (job.agent === "claude") env.CLAUDE_CONFIG_DIR = profileHome;
+  else if (profileHome) env.CODEX_HOME = profileHome;
   const abort = new AbortController();
   const onShutdown = () => abort.abort();
   shutdown.signal.addEventListener("abort", onShutdown);
@@ -280,8 +282,8 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob, tra
       // Only bundle jobs have an out/ to write to; a legacy job stays read-only whatever it asks.
       const runOpts = bundle ? o : { ...o, allowEdits: false, allowCode: false };
       let session = job.thread?.agent_session;
-      // A Codex session lives in one CODEX_HOME, so another account starts over from the history.
-      const sameLogin = job.agent !== "codex" || (session?.account ?? undefined) === o.account;
+      // A CLI session belongs to one login, so another account starts over from the history.
+      const sameLogin = (session?.account ?? undefined) === o.account;
       if (session?.agent !== job.agent || !sameLogin) session = null;
       // In the prompt rather than a file, which would cost the agent a tool round trip to read.
       const historyPrompt = () => `The conversation so far:\n<conversation>\n${chatHistory(job.history ?? [])}\n</conversation>\n\n`;
@@ -307,7 +309,7 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob, tra
         },
         onFirstLine: () => mark("agent_first_event"),
         signal: abort.signal,
-        ...(codexHome ? { env: { ...agentEnv(), CODEX_HOME: codexHome } as unknown as NodeJS.ProcessEnv } : {}),
+        env: env as NodeJS.ProcessEnv,
         });
       };
       const result = job.kind === 'chat'

@@ -71,6 +71,22 @@ describe("bridge catalog discovery", () => {
     expect(JSON.stringify(c)).not.toContain("SECRET");
   });
 
+  it("discovers Claude Work separately and preserves its selection", async () => {
+    const discover = () => discoverCatalog({ home, agents: ["claude"] });
+    expect((await discover()).accounts.map(a => a.id)).toEqual(["claude"]);
+    const dir = join(home, ".claude_work");
+    await mkdir(dir);
+    await writeFile(join(dir, ".claude.json"), JSON.stringify({ oauthAccount: { emailAddress: "work@example.com" } }));
+    const { accounts, claudeWorkHome } = await discover();
+    expect(claudeWorkHome).toBe(dir);
+    const work = accounts[1];
+    expect(work).toMatchObject({ id: "claude_work", detail: "work@example.com" });
+    const selected = chooseModel({}, work, work.models[0]);
+    expect(accountFor(accounts, selected)).toBe(work);
+    expect(accountFor(accounts.slice(0, 1), selected)).toBeUndefined();
+    expect(chooseModel(selected.options, accounts[0], accounts[0].models[0]).options.account).toBeUndefined();
+  });
+
   it("reads Claude Code's cached catalog, the CLI surface first, else a built-in list", () => {
     const file = (surface: string, at: number, id: string) => ({ fetchedAt: at, catalog: { surface, config: { models: [{ id, name: id.toUpperCase(), section: "main", runtime: { effort_levels: ["low", "high"], default_effort: "low", max_input_tokens: 1000 } }, { id: "old-1", name: "Old", section: "overflow" }] } } });
     const models = claudeModels([file("ccd", 2, "desktop"), file("cc", 1, "cli")]);
@@ -87,10 +103,10 @@ describe("bridge catalog discovery", () => {
     expect(codexModels({ models: "nope" } as never)).toEqual([]);
   });
 
-  it("passes a well-formed account to Codex only", () => {
+  it("preserves named logins for both CLIs", () => {
     expect(cleanOptions("codex", { account: "codex_work" }).account).toBe("codex_work");
     expect(cleanOptions("codex", { account: "../etc" }).account).toBeUndefined();
-    expect(cleanOptions("claude", { account: "codex_work" }).account).toBeUndefined();
+    expect(cleanOptions("claude", { account: "claude_work" }).account).toBe("claude_work");
   });
 });
 
@@ -154,7 +170,7 @@ describe("chat UI decisions", () => {
     expect(describeModel(accounts, { agent: "codex", options: { model: "custom-x", account: "gone" } }).label).toBe("custom-x");
   });
 
-  it("switching models keeps a supported effort, drops others, and sets the account for Codex only", () => {
+  it("switching models keeps a supported effort, drops others, and selects the requested login", () => {
     const opts = { effort: "max", webSearch: false };
     expect(chooseModel(opts, accounts[0], accounts[0].models[0])).toEqual({ agent: "claude", options: { effort: "max", webSearch: false, model: "claude-opus-5-5", account: undefined } });
     expect(chooseModel(opts, accounts[2], accounts[2].models[0]).options).toMatchObject({ account: "codex_work", model: "gpt-a", effort: undefined });
