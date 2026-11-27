@@ -5,12 +5,12 @@ import { strokeBox, unionBox } from "@/ink/geometry";
 import { renderMarkdown } from "@/lib/markdown";
 import { buildPdf, sectionPages, type PdfPage } from "@/lib/pdf-export";
 import { liveChildren, liveSections } from "@/lib/store";
-import { PAGE_WIDTH, type SectionEntity, type StrokeEntity, type TextBoxEntity } from "@/lib/types";
+import { PAGE_WIDTH, type ImageEntity, type SectionEntity, type StrokeEntity, type TextBoxEntity } from "@/lib/types";
 import { Blocks, MarginColumn, SectionHeader } from "./SectionContent";
 
 // A read-only copy of SectionView's page markup, so notebooks that are not open can be exported.
 // Ink and PDF pages are painted by sectionPng from the database, so they are left out here.
-function PrintSection({ section, index, minHeight, texts }: { section: SectionEntity; index: number; minHeight: number; texts: TextBoxEntity[] }) {
+function PrintSection({ section, index, minHeight, texts, images }: { section: SectionEntity; index: number; minHeight: number; texts: TextBoxEntity[]; images: ImageEntity[] }) {
   const margin = section.data.margin;
   const marginPx = margin ? Math.round(PAGE_WIDTH * (margin.width ?? 0.3)) : 0;
   return (
@@ -20,6 +20,10 @@ function PrintSection({ section, index, minHeight, texts }: { section: SectionEn
         {!section.data.pdf && <SectionHeader section={section} index={index} />}
         <Blocks blocks={section.data.blocks} />
       </div>
+      {images.map((im) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img key={im.id} src={im.data.src} alt="" className="absolute" style={{ left: im.data.x, top: im.data.y, width: im.data.w, height: im.data.h }} />
+      ))}
       {texts.map((tb) => (
         <div
           key={tb.id}
@@ -50,10 +54,12 @@ export async function notebooksPdf(notebookIds: string[], onProgress?: (done: nu
           const texts = await liveChildren<TextBoxEntity>(s.id, "textbox");
           const inkBottom = unionBox(strokes.map(strokeBox))?.maxY ?? 0;
           const textBottom = texts.reduce((m, t) => Math.max(m, t.data.y + 200), 0);
-          return { s, texts, minHeight: Math.ceil(Math.max(s.data.minHeight, s.data.pdf?.height ?? 0, inkBottom + 48, textBottom)) };
+          const images = await liveChildren<ImageEntity>(s.id, "image");
+          const imageBottom = images.reduce((m, t) => Math.max(m, t.data.y + t.data.h + 48), 0);
+          return { s, texts, images, minHeight: Math.ceil(Math.max(s.data.minHeight, s.data.pdf?.height ?? 0, inkBottom + 48, textBottom, imageBottom)) };
         }),
       );
-      flushSync(() => root.render(<>{pages.map((p, i) => <PrintSection key={p.s.id} section={p.s} index={i} minHeight={p.minHeight} texts={p.texts} />)}</>));
+      flushSync(() => root.render(<>{pages.map((p, i) => <PrintSection key={p.s.id} section={p.s} index={i} minHeight={p.minHeight} texts={p.texts} images={p.images} />)}</>));
       // Let images and fonts load before the pages are captured.
       await Promise.all([...host.querySelectorAll("img")].map((img) => img.decode().catch(() => undefined)));
       await document.fonts.ready;

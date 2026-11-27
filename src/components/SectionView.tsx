@@ -10,7 +10,7 @@ import { paintStrokes } from "@/ink/render";
 import { paintDelta, planTiles, sameVersions, tileScale } from "@/ink/tiles";
 import { renderMarkdown } from "@/lib/markdown";
 import { liveChildren, logEvent, putEntities, setDeleted, updateData } from "@/lib/store";
-import { PAGE_WIDTH, type SectionEntity, type StrokeEntity, type TextBoxData, type TextBoxEntity } from "@/lib/types";
+import { PAGE_WIDTH, type ImageEntity, type SectionEntity, type StrokeEntity, type TextBoxData, type TextBoxEntity } from "@/lib/types";
 
 import { PdfBackground } from "./PdfBackground";
 import { Blocks, MarginColumn, SectionHeader } from "./SectionContent";
@@ -35,10 +35,13 @@ export const SectionView = memo(function SectionView(p: Props) {
   const { section, controller } = p;
   const strokes = useLiveQuery(() => liveChildren<StrokeEntity>(section.id, "stroke"), [section.id], [] as StrokeEntity[]);
   const textboxes = useLiveQuery(() => liveChildren<TextBoxEntity>(section.id, "textbox"), [section.id], [] as TextBoxEntity[]);
+  const images = useLiveQuery(() => liveChildren<ImageEntity>(section.id, "image"), [section.id], [] as ImageEntity[]);
   const strokesRef = useRef(strokes);
+  const imagesRef = useRef(images);
   useLayoutEffect(() => {
     strokesRef.current = strokes;
-  }, [strokes]);
+    imagesRef.current = images;
+  }, [strokes, images]);
 
   const surfaceRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -55,8 +58,9 @@ export const SectionView = memo(function SectionView(p: Props) {
 
   const inkBottom = useMemo(() => unionBox(strokes.map(strokeBox))?.maxY ?? 0, [strokes]);
   const textBottom = textboxes.reduce((m, t) => Math.max(m, t.data.y + 120), 0);
+  const imageBottom = images.reduce((m, t) => Math.max(m, t.data.y + t.data.h), 0);
   // Sections grow as you write near the bottom, so there is always room below your ink.
-  const height = Math.ceil(Math.max(section.data.minHeight, contentH + 80, inkBottom + 360, textBottom + 200));
+  const height = Math.ceil(Math.max(section.data.minHeight, contentH + 80, inkBottom + 360, textBottom + 200, imageBottom + 200));
 
   const handle = useMemo<SectionHandle>(
     () => ({
@@ -65,6 +69,7 @@ export const SectionView = memo(function SectionView(p: Props) {
         return surfaceRef.current!;
       },
       strokes: () => strokesRef.current,
+      images: () => imagesRef.current,
     }),
     [section.id],
   );
@@ -100,6 +105,20 @@ export const SectionView = memo(function SectionView(p: Props) {
         {!section.data.pdf && <SectionHeader section={section} index={p.index} />}
         <Blocks blocks={section.data.blocks} />
       </div>
+
+      {/* Pictures sit under the ink, so they can be written on. */}
+      {images.map((im) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={im.id}
+          src={im.data.src}
+          alt=""
+          draggable={false}
+          data-page-image={im.id}
+          className="pointer-events-none absolute select-none"
+          style={{ left: im.data.x, top: im.data.y, width: im.data.w, height: im.data.h, visibility: p.draggingIds?.has(im.id) ? "hidden" : undefined }}
+        />
+      ))}
 
       {tiles.map((t) => (
         <InkTile key={t.top} top={t.top} height={t.h} strokes={t.strokes} zoom={p.zoom} hidden={p.draggingIds} controller={controller} />

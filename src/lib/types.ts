@@ -11,7 +11,7 @@ export const SCHEMA_VERSION = 2;
 export const PAGE_WIDTH = 1376; // iPad Pro 13" (M4) landscape width in CSS px
 export const SCREEN_HEIGHT = 1032; // landscape height, used for default section sizes
 
-export type EntityKind = "notebook" | "section" | "stroke" | "textbox" | "presence" | "folder";
+export type EntityKind = "notebook" | "section" | "stroke" | "textbox" | "image" | "presence" | "folder";
 
 export interface Entity<K extends EntityKind = EntityKind, D = unknown> {
   id: string;
@@ -109,6 +109,16 @@ export interface TextBoxData {
   color: string;
 }
 
+/** A picture placed on a page like ink, under it: section-local page units. `src` is a data: URL
+ *  (src/lib/page-images.ts keeps it small enough to sync). */
+export interface ImageData {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  src: string;
+}
+
 export interface PresenceData {
   device: string;
   deviceKind: DeviceKind;
@@ -129,6 +139,7 @@ export type NotebookEntity = Entity<"notebook", NotebookData>;
 export type SectionEntity = Entity<"section", SectionData>;
 export type StrokeEntity = Entity<"stroke", StrokeData>;
 export type TextBoxEntity = Entity<"textbox", TextBoxData>;
+export type ImageEntity = Entity<"image", ImageData>;
 export type PresenceEntity = Entity<"presence", PresenceData>;
 export type FolderEntity = Entity<"folder", FolderData>;
 

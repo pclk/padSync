@@ -75,6 +75,8 @@ final class SyncEngine {
     @ObservationIgnored private var pathMonitor: NWPathMonitor?
 
     static let entityBatch = 100 // strokes are a few KB; stay under Vercel's 4.5 MB body limit
+    /// Pasted images ride in their rows: a push also stops once its rows pass this size.
+    static let pushBytes = 2_500_000
     static let eventBatch = 500
     static let inkHoldMax: TimeInterval = 3
 
@@ -188,7 +190,13 @@ final class SyncEngine {
 
     /// One push+pull round trip; true when there's more to do.
     func syncOnce() async throws -> Bool {
-        let batch = try db.pendingBatch(entityLimit: Self.entityBatch, eventLimit: Self.eventBatch)
+        var batch = try db.pendingBatch(entityLimit: Self.entityBatch, eventLimit: Self.eventBatch)
+        let read = batch.entities.count
+        var used = 0
+        batch.entities = Array(batch.entities.prefix { e in
+            used += e.data.serialized().count
+            return used <= Self.pushBytes || e.id == batch.entities.first?.id
+        })
         if status != .synced || !batch.isEmpty { status = .syncing }
         let body = try JSONSerialization.data(withJSONObject: [
             "since": batch.since,
@@ -218,9 +226,10 @@ final class SyncEngine {
         }
         let remote = changes.compactMap(Entity.init(wire:))
         let db = db
-        _ = try await Task.detached { try db.applySync(sent: batch, changes: remote, cursor: cursor) }.value
+        let sent = batch
+        _ = try await Task.detached { try db.applySync(sent: sent, changes: remote, cursor: cursor) }.value
         status = .synced
         lastSyncedAt = .now
-        return (json["more"] as? Bool ?? false) || batch.entities.count == Self.entityBatch || batch.events.count == Self.eventBatch
+        return (json["more"] as? Bool ?? false) || read == Self.entityBatch || batch.entities.count < read || batch.events.count == Self.eventBatch
     }
 }

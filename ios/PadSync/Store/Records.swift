@@ -5,7 +5,7 @@ import GRDB
 /// `Entity` in src/lib/types.ts; conflicts resolve per entity, highest hlc wins.
 struct Entity: Sendable, Hashable, Identifiable {
     enum Kind: String, Sendable {
-        case notebook, section, stroke, textbox, presence, folder
+        case notebook, section, stroke, textbox, image, presence, folder
     }
 
     var id: String

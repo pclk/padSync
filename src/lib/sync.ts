@@ -40,6 +40,8 @@ let heldForInk: string | null = null;
 let stopInkWake: (() => void) | undefined;
 // Strokes are a few KB each; keep requests well under Vercel's 4.5 MB body limit.
 const ENTITY_BATCH = 100;
+/** Pasted images ride in their rows: a push also stops once its rows pass this size. */
+const PUSH_BYTES = 2_500_000;
 const EVENT_BATCH = 500;
 
 let status: SyncStatus = "idle";
@@ -256,11 +258,12 @@ export async function syncOnce(context = { trigger: "manual", queueMs: 0, timerL
       setStatus("offline");
       return false;
     }
-    const [dirty, events, since] = await Promise.all([
+    const [unsized, events, since] = await Promise.all([
       db.entities.where("dirty").equals(1).limit(ENTITY_BATCH).toArray(),
       db.events.where("synced").equals(0).limit(EVENT_BATCH).toArray(),
       getMeta<number>("cursor").then((c) => c ?? 0),
     ]);
+    const dirty = withinBytes(unsized, PUSH_BYTES);
     updateSyncDebugRequest(trace, { readMs: debugNow() - phaseStart, pushed: dirty.length, events: events.length, since, phase: 'Encode request' });
     if (status !== "synced" || dirty.length || events.length) setStatus("syncing");
     phaseStart = debugNow();
@@ -333,7 +336,7 @@ export async function syncOnce(context = { trigger: "manual", queueMs: 0, timerL
     if (applied.some(e => e.kind === "stroke" || e.kind === "textbox" || e.kind === "section")) emitRemoteActivity(applied);
     completed = true;
     setStatus("synced");
-    return body.more || dirty.length === ENTITY_BATCH || events.length === EVENT_BATCH;
+    return body.more || unsized.length === ENTITY_BATCH || dirty.length < unsized.length || events.length === EVENT_BATCH;
   } catch (error) {
     updateSyncDebugRequest(trace, { phase: `Error during ${trace?.phase ?? 'sync'} (${error instanceof Error ? error.name : 'unknown'})` });
     throw error;
@@ -365,10 +368,22 @@ export function emitRemoteActivity(applied: Omit<Entity, "dirty">[], ownDevice =
   for (const e of applied) {
     const wall = Number(e.hlc.split("-")[0]);
     if (!Number.isFinite(wall) || wall < at - 120_000 || wall > at || hlcDevice(e.hlc) === ownDevice) continue;
-    const kind = e.kind === 'textbox' ? 'text' : e.kind === 'stroke' ? 'stroke' : e.kind === 'section' ? 'section' : null;
+    const kind = e.kind === 'textbox' ? 'text' : e.kind === 'stroke' || e.kind === 'image' ? 'stroke' : e.kind === 'section' ? 'section' : null;
     if (!kind) continue;
     const kinds = notebooks.get(e.notebookId) ?? new Set<ActivityKind>();
     kinds.add(kind); notebooks.set(e.notebookId, kinds);
   }
   for (const [notebookId, kinds] of notebooks) emitActivity({notebookId, source:'remote', kinds:[...kinds], at});
+}
+
+/** The leading rows whose JSON fits in `max` bytes; always at least the first. */
+export function withinBytes<T>(rows: T[], max: number): T[] {
+  let used = 0;
+  const out: T[] = [];
+  for (const r of rows) {
+    used += JSON.stringify(r).length;
+    if (out.length && used > max) break;
+    out.push(r);
+  }
+  return out;
 }

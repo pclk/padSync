@@ -127,6 +127,28 @@ struct RailLayout: Equatable, Sendable {
     var extra: [String: JSONValue] = [:]
 
     var visible: [String] { order.filter { !hidden.contains($0) } }
+
+    /// The tools in the wheel's order, shown or not (the panel's Edit tools list).
+    var toolOrder: [ToolKind] { order.compactMap(ToolKind.init(rawValue:)) }
+
+    /// `item` swapped with the tool before (-1) or after (1) it, as the web's toolbar settings do.
+    func movingTool(_ item: ToolKind, by step: Int) -> RailLayout {
+        let tools = toolOrder
+        guard let i = tools.firstIndex(of: item), tools.indices.contains(i + step),
+              let a = order.firstIndex(of: item.rawValue), let b = order.firstIndex(of: tools[i + step].rawValue) else { return self }
+        var next = self
+        next.order.swapAt(a, b)
+        return next
+    }
+
+    /// `item` shown or hidden in the wheel; the pen always shows.
+    func showingTool(_ item: ToolKind, _ shown: Bool) -> RailLayout {
+        guard item != .pen else { return self }
+        var next = self
+        next.hidden.removeAll { $0 == item.rawValue }
+        if !shown { next.hidden.append(item.rawValue) }
+        return next
+    }
     /// The circle's fan: the tools it shows, in its order.
     var tools: [ToolKind] { visible.compactMap(ToolKind.init(rawValue:)) }
     var showsPrompts: Bool { visible.contains("prompts") }
@@ -339,12 +361,14 @@ struct GestureTuning: Equatable, Sendable {
 // MARK: Lasso (src/lib/lasso-settings.ts)
 
 enum LassoAction: String, CaseIterable, Sendable {
-    case delete, duplicate, recolor, bigger, smaller, ask
+    case delete, duplicate, copy, copyImage, recolor, bigger, smaller, ask
 
     var label: String {
         switch self {
         case .delete: "Delete"
         case .duplicate: "Duplicate"
+        case .copy: "Copy"
+        case .copyImage: "Copy image"
         case .recolor: "Colour"
         case .bigger: "Bigger"
         case .smaller: "Smaller"
@@ -356,6 +380,8 @@ enum LassoAction: String, CaseIterable, Sendable {
         switch self {
         case .delete: "trash"
         case .duplicate: "plus.square.on.square"
+        case .copy: "doc.on.doc"
+        case .copyImage: "photo.on.rectangle"
         case .recolor: "paintpalette"
         case .bigger: "plus"
         case .smaller: "minus"

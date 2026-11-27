@@ -21,6 +21,20 @@ enum LassoGeometry {
         return out
     }
 
+    /// The pictures a loop picks (`lassoImages` in src/lib/page-images.ts): "touch" takes any it
+    /// crosses or that holds it, "enclose" those whose centre it circles.
+    static func pickImages(_ frames: [(id: String, frame: CGRect)], drawn: [CGPoint], mode: LassoSettings.Mode) -> [String] {
+        let poly = thin(drawn)
+        guard poly.count >= 3 else { return [] }
+        return frames.filter { f in
+            let r = f.frame
+            if contains(poly, CGPoint(x: r.midX, y: r.midY)) { return true }
+            guard mode == .touch else { return false }
+            let corners = [r.origin, CGPoint(x: r.maxX, y: r.minY), CGPoint(x: r.maxX, y: r.maxY), CGPoint(x: r.minX, y: r.maxY)]
+            return corners.contains { contains(poly, $0) } || poly.contains(where: r.contains)
+        }.map(\.id)
+    }
+
     static func contains(_ poly: [CGPoint], _ p: CGPoint) -> Bool {
         var inside = false
         var j = poly.count - 1
@@ -101,6 +115,24 @@ struct InkSelection: Equatable {
     var sectionId: String
     var keys: Set<StrokeCodec.Key>
     var box: CGRect
+    /// The rectangle a rectangle lasso drew (section coordinates): it stays selected with or
+    /// without ink in it, and can be copied as a picture.
+    var area: CGRect?
+    /// Pictures on the page that are selected too (image entity ids).
+    var images: Set<String> = []
+}
+
+/// Whether the lasso draws a rectangle instead of a free loop. This iPad only.
+enum LassoShape {
+    private static let key = "padsync.lassoRectangle"
+
+    static var rectangle: Bool {
+        get { UserDefaults.standard.bool(forKey: key) }
+        set { UserDefaults.standard.set(newValue, forKey: key) }
+    }
+
+    /// The lasso tool's icon for the current shape.
+    static var symbol: String { rectangle ? "rectangle.dashed" : ToolKind.lasso.symbol }
 }
 
 /// The dashed box around a selection, inside its section, so it scrolls and zooms with the

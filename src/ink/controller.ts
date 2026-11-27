@@ -2,7 +2,8 @@ import { emitActivity, setInking, whenIdle } from "@/lib/activity";
 import { renderFlag } from "@/lib/render-flags";
 import { db, deviceId } from "@/lib/db";
 import { logEvent, moveStrokes, newEntity, putEntities, setDeleted } from "@/lib/store";
-import { PAGE_WIDTH, STROKE_STRIDE, type StrokeData, type StrokeEntity } from "@/lib/types";
+import { imageBox, imageElement, lassoImages, placeImage } from "@/lib/page-images";
+import { PAGE_WIDTH, STROKE_STRIDE, type ImageData, type ImageEntity, type StrokeData, type StrokeEntity } from "@/lib/types";
 import { isStrayDot, type Contact } from "./filters";
 import { dataBox, hitStrokes, lassoStrokes, strokeBox, unionBox, type Box, type LassoMode } from "./geometry";
 import { penOverrides, withOverrides, type PenParams } from "./pen-feel";
@@ -59,10 +60,13 @@ export interface SectionHandle {
   id: string;
   el: HTMLElement;
   strokes: () => StrokeEntity[];
+  /** Pictures on the page (src/lib/page-images.ts); none where the page has no images. */
+  images?: () => ImageEntity[];
 }
 
 export interface Selection {
   sectionId: string;
+  /** Strokes and pictures. */
   ids: Set<string>;
   box: Box;
 }
@@ -71,7 +75,7 @@ type Gesture =
   | { type: "ink"; sec: SectionHandle; rect: DOMRect; data: StrokeData; predicted: number[]; t0: number; contact: Contact; pointerId: number }
   | { type: "erase"; sec: SectionHandle; rect: DOMRect; last: [number, number]; erased: Set<string>; at: [number, number]; pointerId: number }
   | { type: "lasso"; sec: SectionHandle; rect: DOMRect; poly: number[][]; pointerId: number }
-  | { type: "drag"; sec: SectionHandle; rect: DOMRect; start: [number, number]; dx: number; dy: number; strokes: StrokeEntity[]; pointerId: number };
+  | { type: "drag"; sec: SectionHandle; rect: DOMRect; start: [number, number]; dx: number; dy: number; strokes: StrokeEntity[]; images: ImageEntity[]; pointerId: number };
 
 interface Pending {
   data: StrokeData;
@@ -384,7 +388,8 @@ export class InkController {
   private startDrag(sec: SectionHandle, rect: DOMRect, x: number, y: number, pointerId: number) {
     const sel = this.selection!;
     const strokes = sec.strokes().filter((s) => sel.ids.has(s.id));
-    this.setGesture({ type: "drag", sec, rect, start: [x, y], dx: 0, dy: 0, strokes, pointerId });
+    const images = (sec.images?.() ?? []).filter((s) => sel.ids.has(s.id));
+    this.setGesture({ type: "drag", sec, rect, start: [x, y], dx: 0, dy: 0, strokes, images, pointerId });
     this.cb.onDragging(sel.ids);
     this.requestFrame();
   }
@@ -502,7 +507,8 @@ export class InkController {
     const sel = this.selection;
     if (!sel || sel.sectionId !== sec.id || !this.persist) return;
     const originals = sec.strokes().filter((s) => sel.ids.has(s.id));
-    if (!originals.length) return;
+    const pictures = (sec.images?.() ?? []).filter((s) => sel.ids.has(s.id));
+    if (!originals.length && !pictures.length) return;
     const height = sec.el.getBoundingClientRect().height / this.zoom;
     const [dx, dy] = clampMove(sel.box, DUPLICATE_OFFSET, DUPLICATE_OFFSET, height);
     // Strokes paint in t0 order, so the copies take times just up to now, in their originals'
@@ -511,8 +517,9 @@ export class InkController {
     const copies = originals
       .sort((a, b) => a.data.t0 - b.data.t0)
       .map((s, i, all) => newEntity<"stroke", StrokeData>("stroke", this.notebookId, sec.id, { ...s.data, t0: now - (all.length - 1 - i), pts: shiftPts(s.data.pts, dx, dy) }));
-    await putEntities(copies);
-    const ids = copies.map((s) => s.id);
+    const pictureCopies = pictures.map((s) => newEntity<"image", ImageData>("image", this.notebookId, sec.id, { ...s.data, x: s.data.x + dx, y: s.data.y + dy }));
+    await putEntities([...pictureCopies, ...copies]);
+    const ids = [...copies, ...pictureCopies].map((s) => s.id);
     const copySel = { sectionId: sec.id, ids: new Set(ids), box: shift(sel.box, dx, dy) };
     this.setSelection(copySel);
     emitActivity({ notebookId: this.notebookId, source: "local", kinds: ["stroke"], at: Date.now() });
@@ -526,6 +533,28 @@ export class InkController {
       redo: () => setDeleted(ids, false),
     });
     void logEvent(this.notebookId, sec.id, "lasso_duplicate", { from: [...sel.ids], ids, dx, dy });
+  }
+
+  /**
+   * Puts a picture (an encoded clipboard image) on the page centred on (x, y), selected so it can
+   * be moved or resized straight away. One undoable step.
+   */
+  async pasteImage(sec: SectionHandle, x: number, y: number, picture: { src: string; width: number; height: number }) {
+    if (!this.persist) return;
+    const row = newEntity<"image", ImageData>("image", this.notebookId, sec.id, { ...placeImage(picture.width, picture.height, x, y), src: picture.src });
+    await putEntities([row]);
+    const pasted = { sectionId: sec.id, ids: new Set([row.id]), box: imageBox(row.data) };
+    this.setSelection(pasted);
+    emitActivity({ notebookId: this.notebookId, source: "local", kinds: ["stroke"], at: Date.now() });
+    this.undo.push({
+      label: "paste",
+      undo: async () => {
+        if (this.selection?.ids === pasted.ids) this.setSelection(null);
+        await setDeleted([row.id], true);
+      },
+      redo: () => setDeleted([row.id], false),
+    });
+    void logEvent(this.notebookId, sec.id, "image_paste", { id: row.id, w: row.data.w, h: row.data.h });
   }
 
   /** Gives the selected strokes one colour, as one undoable step. */
@@ -549,14 +578,18 @@ export class InkController {
     const scaled = { minX: cx + (sel.box.minX - cx) * k, maxX: cx + (sel.box.maxX - cx) * k, minY: cy + (sel.box.minY - cy) * k, maxY: cy + (sel.box.maxY - cy) * k };
     const dx = scaled.minX < 0 ? -scaled.minX : scaled.maxX > PAGE_WIDTH ? Math.max(-scaled.minX, PAGE_WIDTH - scaled.maxX) : 0;
     const dy = scaled.minY < 0 ? -scaled.minY : 0;
-    return this.restyleSelection(k > 1 ? "enlarge" : "shrink", (d) => {
-      const pts = d.pts.slice();
-      for (let i = 0; i < pts.length; i += STROKE_STRIDE) {
-        pts[i] = cx + (pts[i] - cx) * k + dx;
-        pts[i + 1] = cy + (pts[i + 1] - cy) * k + dy;
-      }
-      return { pts, size: d.size * k };
-    });
+    return this.restyleSelection(
+      k > 1 ? "enlarge" : "shrink",
+      (d) => {
+        const pts = d.pts.slice();
+        for (let i = 0; i < pts.length; i += STROKE_STRIDE) {
+          pts[i] = cx + (pts[i] - cx) * k + dx;
+          pts[i + 1] = cy + (pts[i + 1] - cy) * k + dy;
+        }
+        return { pts, size: d.size * k };
+      },
+      (d) => ({ x: cx + (d.x - cx) * k + dx, y: cy + (d.y - cy) * k + dy, w: d.w * k, h: d.h * k }),
+    );
   }
 
   /**
@@ -564,16 +597,21 @@ export class InkController {
    * step. Undo and redo touch only those fields, and only on strokes that still hold what the step
    * left: an edit made since (a move synced from the Mac, say) is kept, not rolled back.
    */
-  private async restyleSelection(label: string, patchOf: (d: StrokeData) => Partial<StrokeData>) {
+  private async restyleSelection(label: string, patchOf: (d: StrokeData) => Partial<StrokeData>, imagePatchOf?: (d: ImageData) => Partial<ImageData>) {
     const sel = this.selection;
     if (!sel || !this.persist) return;
-    const rows = (await db.entities.bulkGet([...sel.ids])).filter((r): r is StrokeEntity => !!r && !r.deleted);
+    // Pictures change only with their own patch (a recolour leaves them be).
+    const rows = (await db.entities.bulkGet([...sel.ids])).filter(
+      (r): r is StrokeEntity | ImageEntity => !!r && !r.deleted && (r.kind === "stroke" || (r.kind === "image" && !!imagePatchOf)),
+    );
     if (!rows.length) return;
-    const after = new Map(rows.map((r) => [r.id, patchOf(r.data)]));
-    const before = new Map(rows.map((r) => [r.id, pick(r.data, Object.keys(after.get(r.id)!) as (keyof StrokeData)[])]));
-    const apply = async (from: Map<string, Partial<StrokeData>>, to: Map<string, Partial<StrokeData>>) => {
-      const now = (await db.entities.bulkGet([...to.keys()])).filter((r): r is StrokeEntity => !!r && holds((r as StrokeEntity).data, from.get(r.id)!));
-      if (now.length) await putEntities(now.map((r) => ({ ...r, data: { ...r.data, ...to.get(r.id)! } })));
+    type Fields = Record<string, unknown>;
+    const patch = (r: StrokeEntity | ImageEntity): Fields => (r.kind === "image" ? imagePatchOf!(r.data) : patchOf(r.data));
+    const after = new Map(rows.map((r) => [r.id, patch(r)]));
+    const before = new Map(rows.map((r) => [r.id, pick(r.data as unknown as Fields, Object.keys(after.get(r.id)!))]));
+    const apply = async (from: Map<string, Fields>, to: Map<string, Fields>) => {
+      const now = (await db.entities.bulkGet([...to.keys()])).filter((r) => !!r && holds(r.data as Fields, from.get(r.id)!));
+      if (now.length) await putEntities(now.map((r) => ({ ...r!, data: { ...(r!.data as Fields), ...to.get(r!.id)! } })));
       await this.refreshSelectionBox();
     };
     await apply(before, after);
@@ -582,12 +620,12 @@ export class InkController {
     void logEvent(this.notebookId, sel.sectionId, `lasso_${label}`, { ids: [...sel.ids] });
   }
 
-  /** Fits the selection box to its strokes as stored now, after an edit, undo or redo moved them. */
+  /** Fits the selection box to its strokes and pictures as stored now, after an edit, undo or redo moved them. */
   private async refreshSelectionBox() {
     const sel = this.selection;
     if (!sel) return;
-    const rows = (await db.entities.bulkGet([...sel.ids])).filter((r): r is StrokeEntity => !!r && !r.deleted);
-    const box = unionBox(rows.map((r) => dataBox(r.data)));
+    const rows = (await db.entities.bulkGet([...sel.ids])).filter((r): r is StrokeEntity | ImageEntity => !!r && !r.deleted && (r.kind === "stroke" || r.kind === "image"));
+    const box = unionBox(rows.map((r) => (r.kind === "image" ? imageBox(r.data) : dataBox(r.data))));
     // Only if it is still the same selection once the rows have been read.
     if (box && this.selection === sel) this.setSelection({ ...sel, box });
   }
@@ -656,26 +694,29 @@ export class InkController {
 
   private commitLasso(g: Extract<Gesture, { type: "lasso" }>) {
     const picked = lassoStrokes(g.sec.strokes(), g.poly, this.lassoMode);
-    if (!picked.length) return;
-    const box = unionBox(picked.map(strokeBox))!;
-    this.setSelection({ sectionId: g.sec.id, ids: new Set(picked.map((s) => s.id)), box });
+    const pictures = lassoImages(g.sec.images?.() ?? [], g.poly, this.lassoMode);
+    if (!picked.length && !pictures.length) return;
+    const box = unionBox([...picked.map(strokeBox), ...pictures.map((p) => imageBox(p.data))])!;
+    this.setSelection({ sectionId: g.sec.id, ids: new Set([...picked, ...pictures].map((s) => s.id)), box });
   }
 
   private async commitDrag(g: Extract<Gesture, { type: "drag" }>) {
-    const { dx, dy, strokes } = g;
+    const { dx, dy, strokes, images } = g;
     const sel = this.selection;
     if ((Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) || !this.persist) {
       this.cb.onDragging(null);
       return;
     }
     await moveStrokes(strokes, dx, dy);
+    if (images.length) await moveImages(images, dx, dy);
     this.cb.onDragging(null);
     if (sel) this.setSelection({ ...sel, box: shift(sel.box, dx, dy) });
-    const ids = strokes.map((s) => s.id);
+    const ids = [...strokes, ...images].map((s) => s.id);
     // The selection box follows the ink back and forth, if those strokes are still selected.
     const current = async (ddx: number, ddy: number) => {
-      const rows = (await db.entities.bulkGet(ids)).filter(Boolean) as StrokeEntity[];
-      await moveStrokes(rows, ddx, ddy);
+      const rows = (await db.entities.bulkGet(ids)).filter(Boolean) as (StrokeEntity | ImageEntity)[];
+      await moveStrokes(rows.filter((r): r is StrokeEntity => r.kind === "stroke"), ddx, ddy);
+      await moveImages(rows.filter((r): r is ImageEntity => r.kind === "image"), ddx, ddy);
       await this.refreshSelectionBox();
     };
     emitActivity({ notebookId: this.notebookId, source: "local", kinds: ["stroke"], at: Date.now() });
@@ -752,6 +793,10 @@ export class InkController {
     } else if (g?.type === "drag") {
       toSection(g.rect);
       ctx.translate(g.dx, g.dy);
+      for (const p of g.images) {
+        const img = imageElement(p.data.src);
+        if (img.complete) ctx.drawImage(img, p.data.x, p.data.y, p.data.w, p.data.h);
+      }
       for (const s of g.strokes) paintStroke(ctx, s.data, cachedPath(s));
     }
 
@@ -792,15 +837,19 @@ function inBox(b: Box, x: number, y: number, pad: number) {
 /** How far a duplicate lands from its original, down and to the right (page units). */
 const DUPLICATE_OFFSET = 24;
 
-function pick<T extends object>(o: T, keys: (keyof T)[]): Partial<T> {
-  const out: Partial<T> = {};
+function pick(o: Record<string, unknown>, keys: string[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
   for (const k of keys) out[k] = o[k];
   return out;
 }
 
 /** Whether `d` still has every field as in `fields`. */
-function holds(d: StrokeData, fields: Partial<StrokeData>) {
-  return (Object.keys(fields) as (keyof StrokeData)[]).every((k) => JSON.stringify(d[k]) === JSON.stringify(fields[k]));
+function holds(d: Record<string, unknown>, fields: Record<string, unknown>) {
+  return Object.keys(fields).every((k) => JSON.stringify(d[k]) === JSON.stringify(fields[k]));
+}
+
+async function moveImages(images: ImageEntity[], dx: number, dy: number) {
+  if (images.length) await putEntities(images.map((p) => ({ ...p, data: { ...p.data, x: p.data.x + dx, y: p.data.y + dy } })));
 }
 
 function shiftPts(src: number[], dx: number, dy: number) {

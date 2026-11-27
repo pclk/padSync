@@ -193,7 +193,7 @@ final class ControlsOverlay: UIView {
     func refreshTool() {
         let tool = actions.tool()
         let d = rail.diameter(.tools)
-        toolIcon.image = UIImage(systemName: tool.kind.symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: (d * 0.4).rounded(), weight: .medium))
+        toolIcon.image = UIImage(systemName: tool.kind == .lasso ? LassoShape.symbol : tool.kind.symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: (d * 0.4).rounded(), weight: .medium))
         toolIcon.frame = toolCircle.bounds
         toolCircle.accessibilityLabel = ToolCircleSwipe.colors
             ? "Tools: hold and drag towards a colour to change it, tap to choose a tool"
@@ -212,7 +212,15 @@ final class ControlsOverlay: UIView {
     private func toolFan(sticky: Bool) -> FanState? {
         closePanel()
         let current = actions.tool().kind
-        var items = rail.tools.map { FanItem(key: $0.rawValue, label: $0.label, symbol: $0.symbol, current: $0 == current) }
+        let rect = LassoShape.rectangle
+        var items: [FanItem] = []
+        for t in rail.tools {
+            items.append(FanItem(key: t.rawValue, label: t.label, symbol: t.symbol, current: t == current && !(t == .lasso && rect)))
+            // The rectangle lasso sits beside the lasso, a tool of its own.
+            if t == .lasso {
+                items.append(FanItem(key: Self.rectLassoKey, label: "Rectangle", symbol: "rectangle.dashed", current: current == .lasso && rect))
+            }
+        }
         // A tap opens this fan instead of the panel, so the panel is one more item.
         if sticky && ToolCircleSwipe.colors {
             items.append(FanItem(key: Self.panelKey, label: "Sizes and more", symbol: "slider.horizontal.3"))
@@ -221,6 +229,7 @@ final class ControlsOverlay: UIView {
     }
 
     private static let panelKey = "panel"
+    private static let rectLassoKey = "lassoRect"
 
     /// The current tool's colours, or nil when it has none to show.
     private func colorFan() -> FanState? {
@@ -252,8 +261,13 @@ final class ControlsOverlay: UIView {
 
     private func pickTool(_ key: String) {
         if key == Self.panelKey { return togglePanel() }
-        guard let kind = ToolKind(rawValue: key) else { return }
+        let rect = key == Self.rectLassoKey
+        guard let kind = rect ? .lasso : ToolKind(rawValue: key) else { return }
         var t = actions.tool()
+        if kind == .lasso {
+            LassoShape.rectangle = rect
+            refreshTool()
+        }
         t.kind = kind
         actions.setTool(t)
     }
@@ -301,6 +315,12 @@ final class ControlsOverlay: UIView {
         if panel != nil { return closePanel() }
         closeFans()
         let p = CirclePanel(actions: actions, rail: rail)
+        p.onRail = { [weak self] next in
+            guard let self else { return }
+            self.setRail(next)
+            self.onRailChange(next)
+            self.refreshTool()
+        }
         p.onClose = { [weak self] in self?.closePanel() }
         p.onArrange = { [weak self] in
             self?.closePanel()
@@ -401,7 +421,11 @@ enum ToolCircleSwipe {
 @MainActor
 final class CirclePanel: UIView {
     private let actions: ControlsActions
-    private let rail: RailLayout
+    private var rail: RailLayout
+    /// The wheel's tools changed (Edit tools).
+    var onRail: (RailLayout) -> Void = { _ in }
+    private let toolsEditor = UIStackView()
+    private let editToggle = UIButton(type: .system)
     var onClose: () -> Void = {}
     var onArrange: () -> Void = {}
     var onToolChange: () -> Void = {}
@@ -510,6 +534,22 @@ final class CirclePanel: UIView {
             stack.addArrangedSubview(row)
         }
 
+        var edit = UIButton.Configuration.plain()
+        edit.title = "Edit tools"
+        edit.image = UIImage(systemName: "chevron.down", withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold))
+        edit.imagePlacement = .trailing
+        edit.imagePadding = 6
+        edit.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6)
+        editToggle.configuration = edit
+        editToggle.contentHorizontalAlignment = .leading
+        editToggle.accessibilityHint = "Shows, hides and reorders the tools in the wheel"
+        editToggle.addAction(UIAction { [weak self] _ in self?.toggleToolsEditor() }, for: .primaryActionTriggered)
+        stack.addArrangedSubview(editToggle)
+        toolsEditor.axis = .vertical
+        toolsEditor.spacing = 0
+        toolsEditor.isHidden = true
+        stack.addArrangedSubview(toolsEditor)
+
         let spanLabel = UILabel()
         spanLabel.text = "Prompts send"
         spanLabel.font = .systemFont(ofSize: 13, weight: .medium)
@@ -549,6 +589,72 @@ final class CirclePanel: UIView {
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
+
+    private func toggleToolsEditor() {
+        toolsEditor.isHidden.toggle()
+        editToggle.configuration?.image = UIImage(systemName: toolsEditor.isHidden ? "chevron.down" : "chevron.up",
+                                                  withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold))
+        if !toolsEditor.isHidden { buildToolsEditor() }
+        // The panel's height changed: place it again.
+        superview?.setNeedsLayout()
+    }
+
+    /// One row per tool in the wheel's order: up, down, and shown (the web's Toolbar settings).
+    private func buildToolsEditor() {
+        toolsEditor.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        let tools = rail.toolOrder
+        for (i, tool) in tools.enumerated() {
+            let shown = !rail.hidden.contains(tool.rawValue)
+            let icon = UIImageView(image: UIImage(systemName: tool.symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .medium)))
+            icon.tintColor = UIColor(hex: shown ? "#334155" : "#94a3b8")
+            icon.contentMode = .center
+            icon.widthAnchor.constraint(equalToConstant: 28).isActive = true
+            let label = UILabel()
+            label.text = tool.label
+            label.font = .systemFont(ofSize: 13, weight: .medium)
+            label.textColor = UIColor(hex: shown ? "#334155" : "#94a3b8")
+            label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+            label.setContentHuggingPriority(.defaultLow, for: .horizontal)
+            let row = UIStackView(arrangedSubviews: [icon, label])
+            row.alignment = .center
+            row.spacing = 4
+            for (step, symbol, name) in [(-1, "chevron.up", "up"), (1, "chevron.down", "down")] {
+                let b = UIButton(type: .system)
+                b.setImage(UIImage(systemName: symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)), for: .normal)
+                b.isEnabled = tools.indices.contains(i + step)
+                b.accessibilityLabel = "Move \(tool.label) \(name)"
+                b.addAction(UIAction { [weak self] _ in self?.changeRail(self?.rail.movingTool(tool, by: step)) }, for: .primaryActionTriggered)
+                b.widthAnchor.constraint(equalToConstant: 36).isActive = true
+                b.heightAnchor.constraint(equalToConstant: 40).isActive = true
+                row.addArrangedSubview(b)
+            }
+            let toggle = UISwitch()
+            toggle.isOn = shown
+            toggle.isEnabled = tool != .pen
+            // The rectangle lasso shows and hides with the lasso.
+            toggle.accessibilityLabel = tool == .pen ? "The pen always shows" : tool == .lasso ? "Show Lasso and Rectangle" : "Show \(tool.label)"
+            toggle.setContentCompressionResistancePriority(.required, for: .horizontal)
+            toggle.addAction(UIAction { [weak self, weak toggle] _ in
+                self?.changeRail(self?.rail.showingTool(tool, toggle?.isOn ?? shown))
+            }, for: .valueChanged)
+            row.addArrangedSubview(toggle)
+            row.isLayoutMarginsRelativeArrangement = true
+            row.layoutMargins = UIEdgeInsets(top: 0, left: 2, bottom: 0, right: 2)
+            toolsEditor.addArrangedSubview(row)
+        }
+    }
+
+    #if DEBUG
+    /// Opens Edit tools, for the simulator's `-demo editTools`.
+    func showToolsEditor() { if toolsEditor.isHidden { toggleToolsEditor() } }
+    #endif
+
+    private func changeRail(_ next: RailLayout?) {
+        guard let next, next != rail else { return }
+        rail = next
+        onRail(next)
+        buildToolsEditor()
+    }
 
     func refresh() {
         let tool = actions.tool()

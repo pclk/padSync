@@ -31,6 +31,8 @@ import { LassoCircle } from "./LassoCircle";
 import { DEFAULT_RAIL, normalizeRail, railFloats, railThickness, type RailLayout } from "@/lib/rail-layout";
 import { Icon } from "./Icons";
 import { viewFromRects } from "@/lib/section-span";
+import { encodeImage } from "@/lib/page-images";
+import { toLocal } from "@/ink/samples";
 
 const emitLocalText = (notebookId: string) => emitActivity({ notebookId, source: "local", kinds: ["text"], at: Date.now() });
 
@@ -601,6 +603,51 @@ function Editor({ notebookId }: { notebookId: string }) {
     };
   }, [controller, measureZoom, commitZoom, note, holdRing, setPromptFan, lasso.lens, lasso.lensSize, lasso.lensZoom]);
 
+  // --- pasting a picture ---------------------------------------------------------------------
+  // ⌘V with an image on the clipboard, then a click (or tap) on the page puts it there, under the
+  // ink, selected so it can be moved or resized (src/lib/page-images.ts).
+  const [pasting, setPasting] = useState<{ src: string; width: number; height: number } | null>(null);
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.tagName === "TEXTAREA" || t.tagName === "INPUT" || t.isContentEditable) return;
+      const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
+      if (!file) return;
+      e.preventDefault();
+      void encodeImage(file).then((pic) => {
+        if (pic) setPasting(pic);
+        else note("That image is too large to paste");
+      });
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [note]);
+  useEffect(() => {
+    if (!pasting) return;
+    const onDown = (e: PointerEvent) => {
+      if ((e.target as HTMLElement).closest("[data-paste-bar]")) return;
+      for (const [sid, el] of els.current) {
+        const r = el.getBoundingClientRect();
+        if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) continue;
+        const sec = controller.sectionById(sid);
+        if (!sec) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const [x, y] = toLocal(e.clientX, e.clientY, r, controller.zoom);
+        setPasting(null);
+        void controller.pasteImage(sec, x, y, pasting);
+        return;
+      }
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setPasting(null);
+    window.addEventListener("pointerdown", onDown, true);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onDown, true);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [pasting, controller]);
+
   // --- keyboard (Mac) ---------------------------------------------------------------------
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -976,6 +1023,16 @@ function Editor({ notebookId }: { notebookId: string }) {
       </div>
 
       <canvas ref={liveRef} className="pointer-events-none fixed left-0 top-0 z-30" />
+      {pasting && (
+        <div data-paste-bar className="fixed left-1/2 top-4 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full bg-brand-600 py-2 pl-4 pr-2 text-sm font-medium text-white shadow-lift" role="status">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={pasting.src} alt="" className="h-7 max-w-12 rounded object-contain" />
+          Click where to paste the image
+          <button className="rounded-full px-2 py-1 hover:bg-white/15" aria-label="Cancel pasting" onClick={() => setPasting(null)}>
+            <Icon name="x" />
+          </button>
+        </div>
+      )}
       <HoldRing store={holdRing} holdMs={tuning.holdMs} label={gestures.fingerHold === "lassoHold" ? "Hold to lasso" : `Hold: ${actionLabel(gestures.fingerHold)}`} />
       {lasso.circle && selection && !dragging && (
         <LassoCircle

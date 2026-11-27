@@ -16,6 +16,8 @@ final class EditorContext {
     var textMode: Bool { tool.kind == .text }
     /// The selection a section shows (its dashed box), and how it reports a drag of it.
     var selection: InkSelection?
+    /// Waiting for a tap to paste copied ink: the Pencil doesn't draw meanwhile.
+    var pasting = false
     var onSelectionDrag: (SectionView, CGPoint, UIGestureRecognizer.State) -> Void = { _, _, _ in }
 
     init(notebookId: String, database: AppDatabase, sync: SyncEngine, tool: ToolState = ToolState()) {
@@ -89,6 +91,15 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
     private var erased: [StrokeCodec.Key: Entity] = [:]
     private var entities: [String: Entity] = [:]
     private var textboxes: [Entity] = []
+    /// Pictures on the page (kind "image", src/lib/page-images.ts), under the ink.
+    private(set) var images: [Entity] = []
+    private let imageLayer = UIView()
+    private var imageViews: [String: UIImageView] = [:]
+    /// The src each view shows, by its hash, so a move doesn't decode again.
+    private var shownSrc: [String: Int] = [:]
+    private var imagesLoaded = false
+    /// Pictures being dragged: drawn in the floating copy instead.
+    var hiddenImages: Set<String> = [] { didSet { imageViews.forEach { $0.value.isHidden = hiddenImages.contains($0.key) } } }
     private var applying = false
     private var pendingRemote = false
     private var observation: Task<Void, Never>?
@@ -120,6 +131,8 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
         titleLabel.numberOfLines = 0
         addSubview(titleLabel)
         addSubview(blocksView)
+        imageLayer.isUserInteractionEnabled = false
+        addSubview(imageLayer)
 
         canvas.backgroundColor = .clear
         canvas.isOpaque = false
@@ -213,9 +226,10 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
     private func relayout() {
         let inkBottom = entities.values.map { StrokeCodec.bottom($0.data) }.max() ?? 0
         let textBottom = textboxes.map { ($0.data["y"]?.double ?? 0) + 120 }.max() ?? 0
+        let imageBottom = images.map { Self.frame(ofImage: $0).maxY + 200 }.max() ?? 0
         // Sections grow as you write near the bottom, so there's always room below the ink (SectionView.tsx).
         let content = blocksView.image == nil ? Self.baseHeight(section, index: index) : max(CGFloat(section.data["minHeight"]?.double ?? 0), contentHeight + 80)
-        let next = ceil(max(content, inkBottom + 360, textBottom + 200))
+        let next = ceil(max(content, inkBottom + 360, textBottom + 200, imageBottom))
         let pdfHeight = CGFloat(section.data["pdf"]?["height"]?.double ?? 0)
         paper.frame = CGRect(x: 0, y: 0, width: Self.pageWidth, height: next)
         pdfView.frame = CGRect(x: 0, y: 0, width: Self.pageWidth, height: pdfHeight)
@@ -227,6 +241,7 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
         }
         canvas.frame = CGRect(x: 0, y: 0, width: Self.pageWidth, height: next)
         canvas.contentSize = canvas.bounds.size
+        imageLayer.frame = canvas.frame
         if next != height {
             height = next
             bounds.size.height = next
@@ -280,7 +295,7 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
         observation = Task { [weak self] in
             // Track only ids and clocks; whole rows are read when something actually changed.
             let versions = ValueObservation.tracking { db in
-                try Row.fetchAll(db, sql: "SELECT id, hlc, kind FROM entity WHERE parentId = ? AND deleted = 0 AND kind IN ('stroke', 'textbox')", arguments: [id])
+                try Row.fetchAll(db, sql: "SELECT id, hlc, kind FROM entity WHERE parentId = ? AND deleted = 0 AND kind IN ('stroke', 'textbox', 'image')", arguments: [id])
                     .map { VersionRow(id: $0["id"], hlc: $0["hlc"], kind: $0["kind"]) }
             }.removeDuplicates().values(in: writer)
             do {
@@ -292,6 +307,12 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
                         self.textboxes = try await writer.read { db in try Entity.fetchAll(db, keys: boxes.map(\.id)) }
                         self.layoutTextboxes()
                     }
+                    let pictures = rows.filter { $0.kind == "image" }
+                    if pictures.map(\.hlc) != self.images.map(\.hlc) || pictures.map(\.id) != self.images.map(\.id) {
+                        self.images = try await writer.read { db in try Entity.fetchAll(db, keys: pictures.map(\.id)) }
+                        self.layoutImages()
+                    }
+                    self.imagesLoaded = true
                     guard strokes != self.known else { continue }
                     if !self.context.inking.contains(ObjectIdentifier(self.canvas)) {
                         try await self.reload(strokes: strokes)
@@ -459,7 +480,7 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
     func applyTool() {
         let tool = Tools.canvasTool(for: context.tool)
         if let tool { canvas.tool = tool }
-        canvas.drawingGestureRecognizer.isEnabled = tool != nil
+        canvas.drawingGestureRecognizer.isEnabled = tool != nil && !context.pasting
         setTextMode(context.textMode)
         showSelection()
     }
@@ -488,7 +509,7 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
     func settle(timeout: TimeInterval = 5) async {
         renderPDF(zoom: 1, displayScale: 2)
         let end = Date.now.addingTimeInterval(timeout)
-        while Date.now < end, !(strokesLoaded && blocksSettled && pdfSettled) {
+        while Date.now < end, !(strokesLoaded && blocksSettled && pdfSettled && imagesLoaded) {
             try? await Task.sleep(for: .milliseconds(50))
         }
     }
@@ -514,6 +535,62 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
             layer.render(in: ctx.cgContext)
             ink.draw(in: CGRect(origin: .zero, size: size))
         }
+    }
+
+    // MARK: Pictures
+
+    /// Where a picture sits on the page.
+    static func frame(ofImage e: Entity) -> CGRect {
+        CGRect(x: e.data["x"]?.double ?? 0, y: e.data["y"]?.double ?? 0, width: e.data["w"]?.double ?? 0, height: e.data["h"]?.double ?? 0)
+    }
+
+    /// Decoded pictures by src, shared by every section (a duplicate decodes once).
+    private static let decoded = NSCache<NSString, UIImage>()
+
+    static func image(src: String) -> UIImage? {
+        if let hit = decoded.object(forKey: src as NSString) { return hit }
+        guard let comma = src.firstIndex(of: ","), src.hasPrefix("data:image/"),
+              let data = Data(base64Encoded: String(src[src.index(after: comma)...])), let image = UIImage(data: data) else { return nil }
+        decoded.setObject(image, forKey: src as NSString)
+        return image
+    }
+
+    /// Shows image rows just written here before the store reports them: added, moved in, moved
+    /// out or deleted.
+    func mergeImages(_ rows: [Entity]) {
+        var next = images
+        for r in rows {
+            next.removeAll { $0.id == r.id }
+            if r.parentId == section.id && !r.deleted { next.append(r) }
+        }
+        images = next
+        layoutImages()
+    }
+
+    private func layoutImages() {
+        let live = Set(images.map(\.id))
+        for (id, v) in imageViews where !live.contains(id) {
+            v.removeFromSuperview()
+            imageViews[id] = nil
+            shownSrc[id] = nil
+        }
+        for e in images {
+            let v = imageViews[e.id] ?? {
+                let v = UIImageView()
+                v.contentMode = .scaleToFill
+                imageLayer.addSubview(v)
+                imageViews[e.id] = v
+                return v
+            }()
+            let src = e.data["src"]?.string ?? ""
+            if shownSrc[e.id] != src.hashValue {
+                v.image = Self.image(src: src)
+                shownSrc[e.id] = src.hashValue
+            }
+            v.frame = Self.frame(ofImage: e)
+            v.isHidden = hiddenImages.contains(e.id)
+        }
+        relayout()
     }
 
     // MARK: Text boxes

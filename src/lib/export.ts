@@ -4,7 +4,7 @@ import { paintStrokes } from "@/ink/render";
 import { studyBlockMarkdown } from "./blocks";
 import { db } from "./db";
 import { liveChildren } from "./store";
-import { PAGE_WIDTH, type SectionEntity, type StrokeEntity, type TextBoxEntity } from "./types";
+import { PAGE_WIDTH, type ImageEntity, type SectionEntity, type StrokeEntity, type TextBoxEntity } from "./types";
 
 export interface RenderOmit {
   /** Leave typed text boxes out of the image. */
@@ -27,7 +27,9 @@ export async function sectionPng(section: SectionEntity, sectionEl: HTMLElement,
   }
   const inkBottom = unionBox(strokes.map(strokeBox))?.maxY ?? 0;
   const textBottom = texts.reduce((m, t) => Math.max(m, t.data.y + 60), 0);
-  const height = Math.ceil(Math.min(sectionEl.offsetHeight, Math.max(section.data.pdf?.height ?? 0, contentBottom, inkBottom, textBottom) + 48));
+  // Pasted pictures are drawn from the page's own <img>s, like text boxes.
+  const imageBottom = (await liveChildren<ImageEntity>(section.id, "image")).reduce((m, t) => Math.max(m, t.data.y + t.data.h), 0);
+  const height = Math.ceil(Math.min(sectionEl.offsetHeight, Math.max(section.data.pdf?.height ?? 0, contentBottom, inkBottom, textBottom, imageBottom) + 48));
 
   const canvas = await toCanvas(sectionEl, {
     width: PAGE_WIDTH,

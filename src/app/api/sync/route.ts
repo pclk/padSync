@@ -11,10 +11,12 @@ import { sweepPdfsLater } from "@/server/pdf-storage";
 // This keeps committed sequence order safe for the pull cursor across devices/instances.
 
 const PULL_LIMIT = 200; // keeps responses under Vercel's 4.5 MB body limit
+/** Pasted images ride in their rows, so a page also stops once its data passes this size. */
+const PULL_BYTES = 3_000_000;
 
 const entity = z.object({
   id: z.string().min(1).max(100),
-  kind: z.enum(["notebook", "section", "stroke", "textbox", "presence", "folder"]),
+  kind: z.enum(["notebook", "section", "stroke", "textbox", "image", "presence", "folder"]),
   notebookId: z.string().max(100),
   parentId: z.string().max(100),
   data: z.record(z.string(), z.unknown()),
@@ -56,6 +58,8 @@ interface Row {
   hlc: string;
   deleted: boolean;
   seq: string;
+  /** Pull only: rows after the cursor within the row limit, before the size limit cut them. */
+  total?: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -128,15 +132,22 @@ export async function POST(req: NextRequest) {
   timing.mark("events");
   // Keep own rows in the page for cursor/limit accounting, but avoid transferring their
   // potentially large data from Neon. The version filter below removes these placeholders.
+  // The page always holds its first row, then stops before its data passes PULL_BYTES.
   const pulled = (await sql.query(
-    `select id, kind, notebook_id, parent_id,
-       case when hlc = ($3::jsonb ->> id) then null else data end as data,
-       hlc, deleted, seq from entities where seq > $1 order by seq limit $2`,
-    [since, PULL_LIMIT + 1, sentVersions],
+    `select id, kind, notebook_id, parent_id, data, hlc, deleted, seq, total from (
+       select page.*, sum(coalesce(octet_length(data::text), 0)) over (order by seq) as running,
+         row_number() over (order by seq) as n, count(*) over () as total
+       from (
+         select id, kind, notebook_id, parent_id,
+           case when hlc = ($3::jsonb ->> id) then null else data end as data,
+           hlc, deleted, seq from entities where seq > $1 order by seq limit $2
+       ) page
+     ) sized where n = 1 or running <= $4 order by seq`,
+    [since, PULL_LIMIT + 1, sentVersions, PULL_BYTES],
   )) as Row[];
   timing.mark("pull");
-  const more = pulled.length > PULL_LIMIT;
-  const page = more ? pulled.slice(0, PULL_LIMIT) : pulled;
+  const page = pulled.slice(0, PULL_LIMIT);
+  const more = page.length < Number(pulled[0]?.total ?? 0);
 
   // The caller already has what it just wrote, so those rows are not echoed back; the cursor
   // still moves past them.

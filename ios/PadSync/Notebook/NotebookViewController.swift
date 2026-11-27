@@ -45,6 +45,12 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate {
     private var loopPoints: [CGPoint] = []
     private var lassoing = false
     private let pencilLasso = PencilLassoRecognizer()
+    /// Copied ink (section coordinates, with its box), kept while the app runs, so it can be
+    /// pasted into another section or notebook.
+    private static var clipboard: (strokes: [PKStroke], images: [JSONValue], box: CGRect)?
+    /// While pasting, a tap (finger or Pencil) on the page puts the copied ink there.
+    private let pasteTap = UITapGestureRecognizer()
+    private let pasteBar = UIButton(configuration: .filled())
     /// The prompt fan a held finger points into, and where it pressed.
     private var heldFan: (press: CGPoint, far: CGFloat)?
     private var dragStart: PKDrawing?
@@ -293,7 +299,7 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate {
         super.viewDidAppear(animated)
         mountVisible()
         #if DEBUG
-        // `-demo panel|toolFan|promptFan|lasso`: shows a control after launch, for checking it in
+        // `-demo panel|editTools|toolFan|promptFan|lasso`: shows a control after launch, for checking it in
         // the simulator, which can't tap or draw.
         let args = ProcessInfo.processInfo.arguments
         if let i = args.firstIndex(of: "-demo"), i + 1 < args.count { demo(args[i + 1]) }
@@ -307,6 +313,9 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate {
             switch what {
             case "panel":
                 self.overlay.toolCircle.press?.onTap()
+            case "editTools":
+                self.overlay.toolCircle.press?.onTap()
+                self.overlay.subviews.compactMap { $0 as? CirclePanel }.first?.showToolsEditor()
             case "toolFan":
                 self.overlay.toolCircle.press?.began(at: self.overlay.toolCircle.center)
                 self.overlay.toolCircle.press?.moved(to: CGPoint(x: self.overlay.toolCircle.center.x + 80, y: self.overlay.toolCircle.center.y + 10))
@@ -709,6 +718,10 @@ extension NotebookViewController {
         pencilLasso.onEnd = { [weak self] cancelled in self?.endLoop(cancel: cancelled) }
         scrollView.addGestureRecognizer(pencilLasso)
 
+        pasteTap.isEnabled = false
+        pasteTap.addTarget(self, action: #selector(pasteTapped(_:)))
+        scrollView.addGestureRecognizer(pasteTap)
+
         // The hovering Pencil: the eraser and lasso preview, and Pencil Pro barrel roll.
         hover.allowedTouchTypes = [UITouch.TouchType.pencil.rawValue as NSNumber]
         hover.addTarget(self, action: #selector(hovered))
@@ -736,7 +749,7 @@ extension NotebookViewController {
         if t.kind != old.kind { previousKind = old.kind }
         context.tool = t
         if t.kind != .lasso && t.kind != old.kind { clearSelection() }
-        pencilLasso.isEnabled = t.kind == .lasso
+        pencilLasso.isEnabled = t.kind == .lasso && !context.pasting
         views.values.forEach { $0.applyTool() }
         overlay.refreshTool()
         settings.setTool(t)
@@ -859,7 +872,9 @@ extension NotebookViewController {
 
     private func drawLoop() {
         let path = UIBezierPath()
-        if let first = loopPoints.first {
+        if LassoShape.rectangle, let rect = loopRect(loopPoints) {
+            path.append(UIBezierPath(rect: rect))
+        } else if let first = loopPoints.first {
             path.move(to: first)
             loopPoints.dropFirst().forEach { path.addLine(to: $0) }
         }
@@ -875,8 +890,35 @@ extension NotebookViewController {
         overlay.loop.path = nil
         let loop = loopPoints
         loopPoints = []
+        if LassoShape.rectangle {
+            guard !cancel, let rect = loopRect(loop), rect.width >= 8, rect.height >= 8 else { return }
+            return select(rect: rect)
+        }
         guard !cancel, loop.count >= 3 else { return }
         select(loop: loop)
+    }
+
+    /// The rectangle from where a loop started to where it is now.
+    private func loopRect(_ loop: [CGPoint]) -> CGRect? {
+        guard let a = loop.first, let b = loop.last else { return nil }
+        return CGRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(a.x - b.x), height: abs(a.y - b.y))
+    }
+
+    /// Selects a rectangle (overlay coordinates) of the section it mostly covers, and the strokes
+    /// in it; with no ink in it, the area alone is selected.
+    private func select(rect: CGRect) {
+        let candidates = views.values.map { v in (v, overlay.convert(rect, to: v).intersection(v.bounds)) }
+            .filter { !$0.1.isNull && !$0.1.isEmpty }
+        guard let (v, area) = candidates.max(by: { $0.1.width * $0.1.height < $1.1.width * $1.1.height }) else { return }
+        let strokes = v.canvas.drawing.strokes
+        let corners = [area.origin, CGPoint(x: area.maxX, y: area.minY), CGPoint(x: area.maxX, y: area.maxY), CGPoint(x: area.minX, y: area.maxY)]
+        let picked = LassoGeometry.pick(strokes.map(LassoGeometry.shape), drawn: corners, mode: settings.settings.lasso.mode).map { strokes[$0] }
+        let pictures = Set(LassoGeometry.pickImages(imageFrames(v), drawn: corners, mode: settings.settings.lasso.mode))
+        context.selection = InkSelection(sectionId: v.section.id, keys: Set(picked.map(StrokeCodec.key)), box: area, area: area, images: pictures)
+        haptics.pathCompleted(at: overlay.convert(CGPoint(x: rect.maxX, y: rect.maxY), to: view))
+        refreshSelection(in: v)
+        showLassoCircle()
+        note(picked.isEmpty && pictures.isEmpty ? "Area selected" : Self.selectedNote(picked.count, pictures.count))
     }
 
     /// Selects the strokes the loop picks in the section it was mostly drawn on.
@@ -887,14 +929,25 @@ extension NotebookViewController {
         }), poly.contains(where: v.bounds.contains) else { return }
         let strokes = v.canvas.drawing.strokes
         let picked = LassoGeometry.pick(strokes.map(LassoGeometry.shape), drawn: poly, mode: settings.settings.lasso.mode)
-        guard !picked.isEmpty else { return }
+        let pictures = Set(LassoGeometry.pickImages(imageFrames(v), drawn: poly, mode: settings.settings.lasso.mode))
+        guard !picked.isEmpty || !pictures.isEmpty else { return }
         let chosen = picked.map { strokes[$0] }
-        guard let box = AskSelection.box(chosen) else { return }
-        context.selection = InkSelection(sectionId: v.section.id, keys: Set(chosen.map(StrokeCodec.key)), box: box)
+        context.selection = InkSelection(sectionId: v.section.id, keys: Set(chosen.map(StrokeCodec.key)), box: .zero, images: pictures)
         if let end = loop.last { haptics.pathCompleted(at: overlay.convert(end, to: view)) }
-        v.showSelection()
+        refreshSelection(in: v)
+        guard context.selection != nil else { return }
         showLassoCircle()
-        note("\(chosen.count) stroke\(chosen.count == 1 ? "" : "s") selected")
+        note(Self.selectedNote(chosen.count, pictures.count))
+    }
+
+    /// The pictures on a section, with where they are.
+    private func imageFrames(_ v: SectionView) -> [(id: String, frame: CGRect)] {
+        v.images.map { ($0.id, SectionView.frame(ofImage: $0)) }
+    }
+
+    private static func selectedNote(_ strokes: Int, _ images: Int) -> String {
+        let parts = [strokes > 0 ? "\(strokes) stroke\(strokes == 1 ? "" : "s")" : nil, images > 0 ? "\(images) image\(images == 1 ? "" : "s")" : nil]
+        return parts.compactMap { $0 }.joined(separator: " and ") + " selected"
     }
 
     func clearSelection() {
@@ -949,7 +1002,8 @@ extension NotebookViewController {
 
     private func lassoEditFan(sticky: Bool) -> FanState? {
         guard let circle = overlay.lassoCircle else { return nil }
-        let edits = settings.settings.lasso.visible.filter { $0 != .ask }
+        let area = context.selection?.area != nil
+        let edits = settings.settings.lasso.visible.filter { $0 != .ask && ($0 != .copyImage || area) }
         guard !edits.isEmpty else { return nil }
         return FanState(items: edits.map { FanItem(key: $0.rawValue, label: $0.label, symbol: $0.symbol) },
                         center: circle.editCenter(in: overlay), viewport: overlay.bounds.size, sticky: sticky)
@@ -958,10 +1012,15 @@ extension NotebookViewController {
     private func lassoAction(_ a: LassoAction) {
         switch a {
         case .delete:
+            editImages(name: "Delete") { _ in nil }
             editSelection(name: "Delete") { _ in nil }
             clearSelection()
         case .duplicate:
             duplicateSelection()
+        case .copy:
+            copySelection()
+        case .copyImage:
+            copyAreaImage()
         case .recolor:
             guard let circle = overlay.lassoCircle else { return }
             let items = ToolState.penColors.map { FanItem(key: $0, label: ToolState.penColorNames[$0] ?? $0, symbol: "circle.fill", color: $0) }
@@ -972,6 +1031,15 @@ extension NotebookViewController {
             let s = CGFloat(a == .bigger ? 1 + step : 1 - step)
             let c = CGPoint(x: sel.box.midX, y: sel.box.midY)
             let scale = CGAffineTransform(translationX: -c.x, y: -c.y).concatenating(CGAffineTransform(scaleX: s, y: s)).concatenating(CGAffineTransform(translationX: c.x, y: c.y))
+            editImages(name: a.label) { row in
+                var r = row
+                let f = SectionView.frame(ofImage: row).applying(scale)
+                r.data["x"] = .double(f.minX)
+                r.data["y"] = .double(f.minY)
+                r.data["w"] = .double(f.width)
+                r.data["h"] = .double(f.height)
+                return r
+            }
             editSelection(name: a.label) { stroke in
                 var st = stroke
                 st.transform = stroke.transform.concatenating(scale)
@@ -994,6 +1062,7 @@ extension NotebookViewController {
     /// Changes (or, returning nil, removes) each selected stroke, as one undo step.
     private func editSelection(name: String, _ change: (PKStroke) -> PKStroke?) {
         guard let sel = context.selection, let v = views[sel.sectionId] else { return }
+        guard !sel.keys.isEmpty else { return refreshSelection(in: v) }
         let before = v.canvas.drawing
         var strokes: [PKStroke] = []
         for stroke in before.strokes {
@@ -1014,10 +1083,159 @@ extension NotebookViewController {
         let copies = before.strokes.filter { sel.keys.contains(StrokeCodec.key($0)) }.map {
             PKStroke(ink: $0.ink, path: $0.path, transform: $0.transform.concatenating(shift), mask: $0.mask, randomSeed: UInt32.random(in: 1...UInt32.max))
         }
-        commit(PKDrawing(strokes: before.strokes + copies), in: v, before: before, name: "Duplicate")
+        if !copies.isEmpty { commit(PKDrawing(strokes: before.strokes + copies), in: v, before: before, name: "Duplicate") }
+        let pictures = v.images.filter { sel.images.contains($0.id) }.map { row in
+            newImage(row.data, in: v, shift: shift)
+        }
+        addImages(pictures, name: "Duplicate")
         // The copies become the selection, to drag into place.
         context.selection?.keys = Set(copies.map(StrokeCodec.key))
+        context.selection?.images = Set(pictures.map(\.id))
+        context.selection?.area = sel.area?.applying(shift)
         refreshSelection(in: v)
+    }
+
+    // MARK: Pictures
+
+    /// A new picture on `v` from another's data, moved by `shift`.
+    private func newImage(_ data: JSONValue, in v: SectionView, shift: CGAffineTransform) -> Entity {
+        var d = data
+        let f = CGRect(x: data["x"]?.double ?? 0, y: data["y"]?.double ?? 0, width: data["w"]?.double ?? 0, height: data["h"]?.double ?? 0).applying(shift)
+        d["x"] = .double(f.minX.rounded())
+        d["y"] = .double(f.minY.rounded())
+        return Entity(id: newId(), kind: .image, notebookId: context.notebookId, parentId: v.section.id, data: d, hlc: "", deleted: false, dirty: true)
+    }
+
+    /// Writes new pictures; undo deletes them.
+    private func addImages(_ rows: [Entity], name: String) {
+        guard !rows.isEmpty else { return }
+        saveImages(rows, undoTo: rows.map { var r = $0; r.deleted = true; return r }, name: name)
+    }
+
+    /// Changes (or, returning nil, deletes) each selected picture.
+    private func editImages(name: String, _ change: (Entity) -> Entity?) {
+        guard let sel = context.selection, let v = views[sel.sectionId] else { return }
+        let rows = v.images.filter { sel.images.contains($0.id) }
+        guard !rows.isEmpty else { return }
+        saveImages(rows.map { change($0) ?? { var r = $0; r.deleted = true; return r }($0) }, undoTo: rows, name: name)
+    }
+
+    /// Writes picture rows with an undo step that writes `before` back; in the same event as a
+    /// stroke change, the two are one step.
+    private func saveImages(_ rows: [Entity], undoTo before: [Entity], name: String) {
+        view.window?.undoManager?.registerUndo(withTarget: self) { vc in
+            MainActor.assumeIsolated {
+                vc.clearSelection()
+                vc.saveImages(before, undoTo: rows, name: name)
+            }
+        }
+        view.window?.undoManager?.setActionName(name)
+        guard let saved = try? context.database.save(rows) else { return }
+        for v in views.values { v.mergeImages(saved) }
+        context.sync.requestSync(reason: "image")
+    }
+
+    // MARK: Copy and paste
+
+    private func copySelection() {
+        guard let sel = context.selection, let v = views[sel.sectionId] else { return }
+        let strokes = v.canvas.drawing.strokes.filter { sel.keys.contains(StrokeCodec.key($0)) }
+        let pictures = v.images.filter { sel.images.contains($0.id) }.map(\.data)
+        guard !strokes.isEmpty || !pictures.isEmpty else { return }
+        Self.clipboard = (strokes, pictures, sel.box)
+        clearSelection()
+        setPasting(true)
+    }
+
+    /// Copies the rectangle as a picture of the page there (printed content, text and ink).
+    private func copyAreaImage() {
+        guard let sel = context.selection, let area = sel.area, let v = views[sel.sectionId] else { return }
+        let scale: CGFloat = 2
+        guard let full = v.snapshot(scale: scale).cgImage,
+              let part = full.cropping(to: CGRect(x: area.minX * scale, y: area.minY * scale, width: area.width * scale, height: area.height * scale).integral) else { return }
+        UIPasteboard.general.image = UIImage(cgImage: part, scale: scale, orientation: .up)
+        note("Copied as an image", seconds: 1.5)
+    }
+
+    /// The clipboard's picture, to be placed with a tap like copied ink (`placeImage` in
+    /// src/lib/page-images.ts: half its pixel size, so a copied area keeps its size, at most 900 wide).
+    private func pasteImage() {
+        guard let image = UIPasteboard.general.image, let (src, px) = Self.imageDataURL(image) else {
+            return note("No image to paste, or it's too large", seconds: 1.5)
+        }
+        let w = max(24, min(900, px.width / 2)), h = w * px.height / max(1, px.width)
+        let data: JSONValue = .object(["x": .double(0), "y": .double(0), "w": .double(w.rounded()), "h": .double(h.rounded()), "src": .string(src)])
+        Self.clipboard = ([], [data], CGRect(x: 0, y: 0, width: w.rounded(), height: h.rounded()))
+        clearSelection()
+        setPasting(true)
+    }
+
+    /// PNG when small (sharp text), else JPEG, at most 2400 px on its longer side and about 1.1 MB
+    /// (`encodeImage` in src/lib/page-images.ts), with its size in pixels.
+    private static func imageDataURL(_ image: UIImage) -> (String, CGSize)? {
+        let px = max(image.size.width, image.size.height) * image.scale
+        let fit = min(1, 2400 / max(px, 1))
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let size = CGSize(width: (image.size.width * image.scale * fit).rounded(), height: (image.size.height * image.scale * fit).rounded())
+        let drawn = UIGraphicsImageRenderer(size: size, format: format).image { _ in image.draw(in: CGRect(origin: .zero, size: size)) }
+        // Base64 is 4/3 the size; the web's limit counts the whole data: URL.
+        if let png = drawn.pngData(), png.count <= 800_000 { return ("data:image/png;base64," + png.base64EncodedString(), size) }
+        for q in [0.85, 0.7, 0.5] as [CGFloat] {
+            if let jpg = drawn.jpegData(compressionQuality: q), jpg.count <= 800_000 { return ("data:image/jpeg;base64," + jpg.base64EncodedString(), size) }
+        }
+        return nil
+    }
+
+    /// Paste mode: a bar says to tap where the ink goes, and cancels it.
+    private func setPasting(_ on: Bool) {
+        guard on != context.pasting, !on || Self.clipboard != nil else { return }
+        context.pasting = on
+        pasteTap.isEnabled = on
+        pencilLasso.isEnabled = !on && context.tool.kind == .lasso
+        views.values.forEach { $0.applyTool() }
+        if pasteBar.superview == nil {
+            var c = UIButton.Configuration.filled()
+            c.cornerStyle = .capsule
+            c.image = UIImage(systemName: "xmark.circle.fill")
+            c.imagePlacement = .trailing
+            c.imagePadding = 8
+            pasteBar.configuration = c
+            pasteBar.addAction(UIAction { [weak self] _ in self?.setPasting(false) }, for: .primaryActionTriggered)
+            overlay.addSubview(pasteBar)
+        }
+        let n = Self.clipboard?.strokes.count ?? 0, m = Self.clipboard?.images.count ?? 0
+        let what = [n > 0 ? "\(n) stroke\(n == 1 ? "" : "s")" : nil, m == 1 && n == 0 ? "the image" : m > 0 ? "\(m) image\(m == 1 ? "" : "s")" : nil]
+        pasteBar.configuration?.title = "Tap where to paste " + what.compactMap { $0 }.joined(separator: " and ")
+        pasteBar.accessibilityLabel = "Tap the page where to paste the copied ink, or tap here to cancel"
+        pasteBar.isHidden = !on
+        let s = pasteBar.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize)
+        pasteBar.frame = CGRect(x: (overlay.bounds.width - s.width) / 2, y: overlay.safeAreaInsets.top + 16, width: s.width, height: s.height)
+        if on { overlay.bringSubviewToFront(pasteBar) }
+    }
+
+    /// Puts the copied ink centred where the tap was, in the section under it, selected so it
+    /// can be dragged, resized or pasted again.
+    @objc private func pasteTapped(_ g: UITapGestureRecognizer) {
+        guard let clip = Self.clipboard,
+              let v = views.values.first(where: { $0.bounds.contains(g.location(in: $0)) }) else { return }
+        let p = g.location(in: v)
+        // Kept on the page's width; it may run past the bottom, like ink written there.
+        let x = min(max(p.x, clip.box.width / 2), max(clip.box.width / 2, SectionView.pageWidth - clip.box.width / 2))
+        let shift = CGAffineTransform(translationX: x - clip.box.midX, y: max(p.y, clip.box.height / 2) - clip.box.midY)
+        let before = v.canvas.drawing
+        let copies = clip.strokes.map {
+            PKStroke(ink: $0.ink, path: $0.path, transform: $0.transform.concatenating(shift), mask: $0.mask, randomSeed: UInt32.random(in: 1...UInt32.max))
+        }
+        setPasting(false)
+        if !copies.isEmpty { commit(PKDrawing(strokes: before.strokes + copies), in: v, before: before, name: "Paste") }
+        let pictures = clip.images.map { newImage($0, in: v, shift: shift) }
+        addImages(pictures, name: "Paste")
+        clearSelection()
+        context.selection = InkSelection(sectionId: v.section.id, keys: Set(copies.map(StrokeCodec.key)), box: clip.box.applying(shift), images: Set(pictures.map(\.id)))
+        refreshSelection(in: v)
+        showLassoCircle()
+        note("Pasted " + Self.selectedNote(copies.count, pictures.count).replacingOccurrences(of: " selected", with: ""))
     }
 
     /// Writes a drawing change with an undo step that puts `before` back.
@@ -1044,7 +1262,10 @@ extension NotebookViewController {
     private func refreshSelection(in v: SectionView) {
         guard let sel = context.selection else { return }
         let chosen = v.canvas.drawing.strokes.filter { sel.keys.contains(StrokeCodec.key($0)) }
-        guard let box = AskSelection.box(chosen) else { return clearSelection() }
+        let pictures = v.images.filter { sel.images.contains($0.id) }.map(SectionView.frame(ofImage:))
+        let content = (AskSelection.box(chosen).map { [$0] } ?? []) + pictures
+        let shown = content.dropFirst().reduce(content.first) { $0?.union($1) }
+        guard let box = sel.area.map({ shown?.union($0) ?? $0 }) ?? shown else { return clearSelection() }
         context.selection?.box = box
         v.showSelection()
         placeLassoCircle()
@@ -1063,9 +1284,20 @@ extension NotebookViewController {
             for f in [lassoAsk, lassoEdit, lassoColors] { f.close() }
             overlay.lassoCircle?.isHidden = true
             let picked = PKDrawing(strokes: start.strokes.filter { sel.keys.contains(StrokeCodec.key($0)) })
-            var image: UIImage?
+            var ink: UIImage?
             let scale = min(4, traitCollection.displayScale * scrollView.zoomScale)
-            UITraitCollection(userInterfaceStyle: .light).performAsCurrent { image = picked.image(from: rect, scale: scale) }
+            UITraitCollection(userInterfaceStyle: .light).performAsCurrent { ink = picked.image(from: rect, scale: scale) }
+            // The selected pictures float with the ink, under it.
+            let pictures = v.images.filter { sel.images.contains($0.id) }
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = scale
+            let image = UIGraphicsImageRenderer(size: rect.size, format: format).image { _ in
+                for p in pictures {
+                    SectionView.image(src: p.data["src"]?.string ?? "")?.draw(in: SectionView.frame(ofImage: p).offsetBy(dx: -rect.minX, dy: -rect.minY))
+                }
+                ink?.draw(in: CGRect(origin: .zero, size: rect.size))
+            }
+            v.hiddenImages = sel.images
             let float = UIImageView(image: image)
             float.frame = rect.offsetBy(dx: v.frame.minX, dy: v.frame.minY)
             float.layer.borderColor = UIColor.systemBlue.withAlphaComponent(0.6).cgColor
@@ -1091,7 +1323,21 @@ extension NotebookViewController {
                 st.transform = stroke.transform.concatenating(shift)
                 return st
             }
-            if target === v {
+            context.selection?.area = sel.area?.applying(shift)
+            let pictures = v.images.filter { sel.images.contains($0.id) }
+            let movedPictures = pictures.map { row in
+                var r = row
+                let f = SectionView.frame(ofImage: row).applying(shift)
+                r.data["x"] = .double(f.minX.rounded())
+                r.data["y"] = .double(f.minY.rounded())
+                r.parentId = target.section.id
+                return r
+            }
+            if !pictures.isEmpty { saveImages(movedPictures, undoTo: pictures, name: "Move") }
+            if sel.keys.isEmpty {
+                context.selection?.sectionId = target.section.id
+                v.showSelection()
+            } else if target === v {
                 let after = PKDrawing(strokes: start.strokes.map { stroke in
                     guard sel.keys.contains(StrokeCodec.key(stroke)) else { return stroke }
                     var st = stroke
@@ -1116,6 +1362,7 @@ extension NotebookViewController {
     }
 
     private func endDrag(_ v: SectionView) {
+        v.hiddenImages = []
         dragFloat?.removeFromSuperview()
         dragFloat = nil
         dragStart = nil
@@ -1347,11 +1594,21 @@ extension NotebookViewController {
             UIAction(title: "Move up", image: UIImage(systemName: "arrow.up"), attributes: i <= 0 ? .disabled : []) { [weak self] _ in self?.moveCurrentSection(by: -1) },
             UIAction(title: "Move down", image: UIImage(systemName: "arrow.down"), attributes: i >= count - 1 ? .disabled : []) { [weak self] _ in self?.moveCurrentSection(by: 1) },
         ])
+        let paste = UIAction(title: "Paste copied ink", image: UIImage(systemName: "doc.on.clipboard"),
+                             attributes: Self.clipboard == nil ? .disabled : []) { [weak self] _ in
+            self?.overlay.closePanel()
+            self?.setPasting(true)
+        }
         let delete = UIAction(title: "Delete page…", image: UIImage(systemName: "trash"),
                               attributes: Sections.canDelete(count: count) ? .destructive : [.destructive, .disabled]) { [weak self] _ in
             self?.confirmDelete()
         }
-        return UIMenu(children: [page, delete])
+        let pasteImage = UIAction(title: "Paste image", image: UIImage(systemName: "photo.badge.plus"),
+                                  attributes: UIPasteboard.general.hasImages ? [] : .disabled) { [weak self] _ in
+            self?.overlay.closePanel()
+            self?.pasteImage()
+        }
+        return UIMenu(children: [page, UIMenu(options: .displayInline, children: [paste, pasteImage]), delete])
     }
 
     private func confirmDelete() {
