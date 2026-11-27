@@ -115,6 +115,8 @@ export interface PresenceData {
   sectionId: string | null;
   /** Section-local y at the top of the viewport. */
   offsetY: number;
+  /** What the screen shows (src/lib/section-span.ts); checked with readView before use. */
+  view?: unknown;
   at: number;
 }
 

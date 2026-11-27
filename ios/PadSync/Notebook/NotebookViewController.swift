@@ -424,15 +424,34 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate {
         return (sections[i].id, top - tops[i])
     }
 
+    /// What the screen shows, zoom included: each section's visible part and the visible width.
+    private func screenView() -> ScreenView? {
+        let zoom = scrollView.zoomScale
+        let top = scrollView.contentOffset.y / zoom, bottom = (scrollView.contentOffset.y + scrollView.bounds.height) / zoom
+        var slices: [ScreenView.Slice] = []
+        for (i, s) in sections.enumerated() where i < tops.count {
+            let h = heights[s.id] ?? SectionView.baseHeight(s, index: i)
+            let y0 = max(top, tops[i]) - tops[i], y1 = min(bottom, tops[i] + h) - tops[i]
+            if y1 > y0 { slices.append(.init(sectionId: s.id, y0: y0, y1: y1, h: h)) }
+        }
+        guard !slices.isEmpty else { return nil }
+        // Centred when narrower than the screen, so the offset can be negative.
+        let x0 = max(0, scrollView.contentOffset.x / zoom)
+        let x1 = min(SectionView.pageWidth, (scrollView.contentOffset.x + scrollView.bounds.width) / zoom)
+        return ScreenView(slices: slices, x0: x0, x1: max(x0 + 1, x1))
+    }
+
     // MARK: Presence and position
 
     private func publishPresence() {
         guard let (sectionId, offsetY) = currentSection() else { return }
         lastPresence = .now
         let db = context.database
+        var data: [String: JSONValue] = ["device": .string(db.device), "deviceKind": .string("ipad"), "sectionId": .string(sectionId),
+                                         "offsetY": .int(Int64(offsetY.rounded())), "at": .int(Int64(Date.now.timeIntervalSince1970 * 1000))]
+        if let view = screenView() { data["view"] = view.json }
         let presence = Entity(id: "presence-\(db.device)", kind: .presence, notebookId: context.notebookId, parentId: "",
-                              data: .object(["device": .string(db.device), "deviceKind": .string("ipad"), "sectionId": .string(sectionId),
-                                             "offsetY": .int(Int64(offsetY.rounded())), "at": .int(Int64(Date.now.timeIntervalSince1970 * 1000))]),
+                              data: .object(data),
                               hlc: "", deleted: false, dirty: true)
         _ = try? db.save([presence])
         context.sync.requestSync(reason: "presence")
@@ -606,7 +625,9 @@ extension NotebookViewController {
             sendPrompt: { [unowned self] in self.sendPrompt($0, fromSelection: false) },
             close: { [unowned self] in self.onClose() },
             syncStatus: { [unowned self] in self.syncLabel },
-            pageMenu: { [unowned self] in self.pageMenu() })
+            pageMenu: { [unowned self] in self.pageMenu() },
+            sectionSpan: { [unowned self] in self.settings.settings.sectionSpan },
+            setSectionSpan: { [unowned self] in self.settings.setSectionSpan($0) })
         let overlay = ControlsOverlay(actions: actions, rail: settings.settings.rail)
         overlay.frame = view.bounds
         overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -1158,7 +1179,8 @@ extension NotebookViewController {
         let sender = PromptSender(notebookId: context.notebookId, title: notebookTitle(), sections: sections,
                                   currentSectionId: currentSection()?.id, database: context.database,
                                   render: { [weak self] s, i, scale in await self?.renderSection(s, index: i, scale: scale) },
-                                  handwriting: { [weak self] scope in await self?.handwritingNote(scope) })
+                                  handwriting: { [weak self] scope in await self?.handwritingNote(scope) },
+                                  span: settings.settings.sectionSpan, view: screenView())
         note("Sending: \(p.label)…", seconds: 30)
         Task {
             do {
@@ -1181,10 +1203,18 @@ extension NotebookViewController {
             return HandwritingReader.file(await HandwritingReader.read(ink), about: "the lassoed ink")
         case .section, .chat:
             guard let s = currentSection() else { return nil }
-            var ink = views[s.id]?.canvas.drawing
-            if ink == nil { ink = try? await context.database.writer.read { try HandwritingReader.drawing($0, sectionId: s.id) } }
-            guard let ink else { return nil }
-            return HandwritingReader.file(await HandwritingReader.read(ink), about: "the ink on this section")
+            let ids = ScreenView.ids(sections, focused: s.id, span: settings.settings.sectionSpan, view: screenView())
+            var parts: [String] = []
+            for id in ids {
+                var ink = views[id]?.canvas.drawing
+                if ink == nil { ink = try? await context.database.writer.read { try HandwritingReader.drawing($0, sectionId: id) } }
+                guard let ink else { continue }
+                let lines = await HandwritingReader.read(ink)
+                if ids.count == 1 { parts = lines } else if !lines.isEmpty, let i = sections.firstIndex(where: { $0.id == id }) {
+                    parts.append("## Section \(i + 1)\n\(lines.joined(separator: "\n"))")
+                }
+            }
+            return HandwritingReader.file(parts, about: ids.count == 1 ? "the ink on this section" : "the ink in each section sent")
         case .notebook:
             let ids = sections.map(\.id)
             guard let texts = try? await context.database.writer.read({ try HandwritingIndex.text($0, sectionIds: ids) }) else { return nil }

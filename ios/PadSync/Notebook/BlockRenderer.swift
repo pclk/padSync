@@ -92,14 +92,15 @@ final class BlockRenderer: NSObject, WKNavigationDelegate {
 
     /// Builds an Ask AI bundle with the web's `buildBundle` (ios/renderer/main.tsx), in turn with
     /// the renders: `{files, sectionIds, skipped, bytes, tokens, error?}`.
-    func bundle(input: JSONValue, scope: String, sectionId: String) async throws -> JSONValue {
+    func bundle(input: JSONValue, scope: String, sectionId: String, span: JSONValue? = nil) async throws -> JSONValue {
         let previous = queue
         let task = Task { () throws -> JSONValue in
             await previous?.value
             let web = try await self.prepare()
             let json = String(decoding: input.serialized(), as: UTF8.self)
-            let result = try await web.callAsyncJavaScript("return JSON.stringify(padsyncBundle(JSON.parse(input), scope, sectionId))",
-                                                            arguments: ["input": json, "scope": scope, "sectionId": sectionId], contentWorld: .page)
+            let spanJSON = span.map { String(decoding: $0.serialized(), as: UTF8.self) } ?? "null"
+            let result = try await web.callAsyncJavaScript("return JSON.stringify(padsyncBundle(JSON.parse(input), scope, sectionId, JSON.parse(span) ?? undefined))",
+                                                            arguments: ["input": json, "scope": scope, "sectionId": sectionId, "span": spanJSON], contentWorld: .page)
             guard let text = result as? String else { throw CocoaError(.coderReadCorrupt) }
             return try JSONValue.parse(Data(text.utf8))
         }

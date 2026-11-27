@@ -67,7 +67,12 @@ export async function addRenders(inputs: SectionInput[], sections: SectionEntity
     }
     // One at a time: rendering every section at once can exhaust memory on the iPad.
     // The render honours the toggles too: excluded notes or images must not leak through pixels.
-    const render = await sectionPng(sec, el, scale, { notes: !o.notes, images: !o.images }).then(toRaster, () => null);
+    const slice = o.view?.slices.find((v) => v.sectionId === input.id);
+    const omit = { notes: !o.notes, images: !o.images };
+    const render = await (slice
+      ? cropSection(sec, el, { minX: o.view!.x0, maxX: o.view!.x1, minY: slice.y0, maxY: slice.y1 }, 2, omit, 0)
+      : sectionPng(sec, el, scale, omit).then(toRaster)
+    ).catch(() => null);
     used += render?.base64.length ?? 0;
     out.push({ ...input, render, renderNote: render ? undefined : "could not render" });
   }
@@ -75,12 +80,16 @@ export async function addRenders(inputs: SectionInput[], sections: SectionEntity
 }
 
 /** The render cropped to the lasso box (plus a margin), so a selection shows its context. */
-export async function cropSelection(section: SectionEntity, el: HTMLElement, box: Box, scale = 2, omit: RenderOmit = {}): Promise<Raster> {
+export function cropSelection(section: SectionEntity, el: HTMLElement, box: Box, scale = 2, omit: RenderOmit = {}): Promise<Raster> {
+  return cropSection(section, el, box, scale, omit, 24);
+}
+
+/** The render cropped to `box` (page units) plus `pad`. */
+async function cropSection(section: SectionEntity, el: HTMLElement, box: Box, scale: number, omit: RenderOmit, pad: number): Promise<Raster> {
   const full = await createImageBitmap(await sectionPng(section, el, scale, omit));
   // A tall section comes back smaller than asked (the renderer caps a side at 16,384 px), so map
   // page units by the bitmap's actual scale, not the requested one.
   scale = full.width / PAGE_WIDTH;
-  const pad = 24;
   const x0 = Math.max(0, Math.floor((box.minX - pad) * scale));
   const y0 = Math.max(0, Math.floor((box.minY - pad) * scale));
   const x1 = Math.min(full.width, Math.ceil((box.maxX + pad) * scale));

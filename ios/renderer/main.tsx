@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { Blocks, MarginColumn, SectionHeader } from "@/components/SectionContent";
 import { PAGE_WIDTH, type SectionEntity } from "@/lib/types";
 import { DEFAULT_CONTEXT, buildBundle, type BundleInput, type ContextOptions } from "@/lib/context";
+import { readView } from "@/lib/section-span";
 
 // The iPad app's block renderer: an offscreen WKWebView loads this page from the app bundle,
 // calls `padsyncRender` with a section and snapshots the result behind the PencilKit canvas.
@@ -48,11 +49,13 @@ Object.assign(window, { padsyncRender });
 /** The web's own Ask AI bundle builder (src/lib/context.ts), so a prompt sent from the app carries
  *  exactly the files the web would send. `scope` is a prompt's context (section, selection,
  *  notebook); renders and the selection crop come from the app. */
-function padsyncBundle(input: BundleInput, scope: "section" | "selection" | "notebook", sectionId: string) {
+function padsyncBundle(input: BundleInput, scope: "section" | "selection" | "notebook", sectionId: string, span?: { sectionIds: string[]; view: unknown }) {
   const o: ContextOptions = {
     ...DEFAULT_CONTEXT,
     scope: scope === "selection" ? "selection" : scope === "notebook" ? "all" : "sections",
-    sectionIds: scope === "section" ? [sectionId] : [],
+    // A section prompt may cover a neighbour or the screen (src/lib/section-span.ts).
+    sectionIds: scope === "section" ? (span?.sectionIds.length ? span.sectionIds : [sectionId]) : [],
+    view: scope === "section" ? readView(span?.view) : null,
   };
   return buildBundle(input, o);
 }

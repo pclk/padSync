@@ -2,6 +2,60 @@ import AVFoundation
 import GRDB
 import UIKit
 
+/// How much a section prompt covers: the section, it and a neighbour, or what the screen shows
+/// (`SectionSpan` in src/lib/section-span.ts, the "padsync.sectionSpan" device setting).
+enum SectionSpan: String, CaseIterable, Sendable {
+    case section, above, below, viewport
+
+    var label: String {
+        switch self {
+        case .section: "Section"
+        case .above: "+ Above"
+        case .below: "+ Below"
+        case .viewport: "Screen"
+        }
+    }
+}
+
+/// What the screen shows (`ScreenView` in src/lib/section-span.ts): each section's visible part
+/// in section-local page units, with its whole height, and the visible width of the page.
+struct ScreenView: Sendable {
+    struct Slice: Sendable {
+        var sectionId: String
+        var y0: CGFloat
+        var y1: CGFloat
+        var h: CGFloat
+    }
+
+    var slices: [Slice]
+    var x0: CGFloat
+    var x1: CGFloat
+
+    var json: JSONValue {
+        .object([
+            "slices": .array(slices.map {
+                .object(["sectionId": .string($0.sectionId), "y0": .int(Int64($0.y0.rounded())), "y1": .int(Int64($0.y1.rounded())), "h": .int(Int64($0.h.rounded()))])
+            }),
+            "x0": .int(Int64(x0.rounded())), "x1": .int(Int64(x1.rounded())),
+        ])
+    }
+
+    /// `spanSectionIds`: the sections a span covers around `focused`, in notebook order.
+    static func ids(_ sections: [Entity], focused: String, span: SectionSpan, view: ScreenView?) -> [String] {
+        if span == .viewport, let view {
+            let on = Set(view.slices.map(\.sectionId))
+            let ids = sections.map(\.id).filter(on.contains)
+            if !ids.isEmpty { return ids }
+        }
+        guard let i = sections.firstIndex(where: { $0.id == focused }) else { return focused.isEmpty ? [] : [focused] }
+        switch span {
+        case .above: return sections[max(0, i - 1)...i].map(\.id)
+        case .below: return sections[i..<min(sections.count, i + 2)].map(\.id)
+        default: return [focused]
+        }
+    }
+}
+
 /// Sends a chat prompt from the notebook the way the web's composer does (`sendPrompt` in
 /// Composer.tsx): the bundle for the prompt's context, built by the web's own `buildBundle`, as
 /// a new turn in the chat the Mac has open on this notebook, so the reply shows in the Mac's side
@@ -19,6 +73,9 @@ struct PromptSender {
     let render: (Entity, Int, CGFloat) async -> (png: Data, width: Int, height: Int)?
     /// The words in the ink the scope covers, read on the iPad (HandwritingReader.file), or nil.
     var handwriting: (ChatPrompt.Context) async -> JSONValue? = { _ in nil }
+    /// How much a section prompt covers, and what the screen shows for `.viewport`.
+    var span: SectionSpan = .section
+    var view: ScreenView?
     var client = ChatClient()
 
     struct Selection {
@@ -90,10 +147,19 @@ struct PromptSender {
         }
         let current = currentSectionId ?? sections.first?.id ?? ""
         var inputs = try await gather()
+        let spanIds = ScreenView.ids(sections, focused: current, span: span, view: view)
+        let shown = span == .viewport ? view.map { v in ScreenView(slices: v.slices.filter { spanIds.contains($0.sectionId) }, x0: v.x0, x1: v.x1) } : nil
         switch scope {
         case .section:
-            if let i = sections.firstIndex(where: { $0.id == current }), let r = await render(sections[i], i, 2) {
-                inputs[i]["render"] = raster(r)
+            for id in spanIds {
+                guard let i = sections.firstIndex(where: { $0.id == id }) else { continue }
+                // On the screen, only the part showing, at full detail.
+                let slice = shown?.slices.first { $0.sectionId == id }
+                guard let r = await render(sections[i], i, spanIds.count == 1 || slice != nil ? 2 : 1) else {
+                    inputs[i]["renderNote"] = .string("could not render")
+                    continue
+                }
+                inputs[i]["render"] = raster(slice.flatMap { Self.crop(r, y0: $0.y0, y1: $0.y1, x0: shown!.x0, x1: shown!.x1) } ?? r)
             }
         case .notebook:
             var used = 0
@@ -118,13 +184,16 @@ struct PromptSender {
                                           "crop": raster((selection.png, selection.width, selection.height))])
         }
         let target = scope == .selection ? (selection?.sectionId ?? current) : current
-        let b = try await BlockRenderer.shared.bundle(input: .object(input), scope: scope.rawValue, sectionId: target)
+        let extra: JSONValue? = scope == .section
+            ? .object(["sectionIds": .array(spanIds.map(JSONValue.string)), "view": shown?.json ?? .null])
+            : nil
+        let b = try await BlockRenderer.shared.bundle(input: .object(input), scope: scope.rawValue, sectionId: target, span: extra)
         if let error = b["error"]?.string { throw Failure.bundle(error) }
         let ids = b["sectionIds"]?.array ?? []
         let tokens = b["tokens"]?.int ?? 0
         let tokenText = "~\(tokens.formatted(.number.locale(Locale(identifier: "en_US")))) tokens"
-        let label: String = if scope == .section {
-            "\(sectionTitle(target)) · \(tokenText)"
+        let label: String = if scope == .section && ids.count == 1 {
+            "\(sectionTitle(ids.first?.string ?? target)) · \(tokenText)"
         } else {
             "\(ids.count) section\(ids.count == 1 ? "" : "s") · \(tokenText)"
         }
@@ -133,6 +202,16 @@ struct PromptSender {
             "bytes": .int(b["bytes"]?.int ?? 0), "tokens": .int(tokens),
         ])
         return (b["files"]?.array ?? [], context)
+    }
+
+    /// A render cut down to a part of its section, in page units.
+    private static func crop(_ r: (png: Data, width: Int, height: Int), y0: CGFloat, y1: CGFloat, x0: CGFloat, x1: CGFloat) -> (png: Data, width: Int, height: Int)? {
+        guard let image = UIImage(data: r.png)?.cgImage else { return nil }
+        let scale = CGFloat(image.width) / SectionView.pageWidth
+        let rect = CGRect(x: x0 * scale, y: y0 * scale, width: (x1 - x0) * scale, height: (y1 - y0) * scale).integral
+            .intersection(CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        guard !rect.isEmpty, let cut = image.cropping(to: rect), let png = UIImage(cgImage: cut).pngData() else { return nil }
+        return (png, cut.width, cut.height)
     }
 
     private func raster(_ r: (png: Data, width: Int, height: Int)) -> JSONValue {

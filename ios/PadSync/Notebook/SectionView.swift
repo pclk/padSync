@@ -26,6 +26,25 @@ final class EditorContext {
     }
 }
 
+/// A canvas without PencilKit's own edit menu ("Select All | Insert Space"), which pops up on a
+/// tap or hold; the notebook has its own lasso and page menu. Undo and redo still go through.
+final class QuietCanvasView: PKCanvasView {
+    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+        let name = NSStringFromSelector(action)
+        return name == "undo:" || name == "redo:" ? super.canPerformAction(action, withSender: sender) : false
+    }
+
+    override func addInteraction(_ interaction: UIInteraction) {
+        guard !(interaction is UIEditMenuInteraction) else { return }
+        super.addInteraction(interaction)
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        for case let menu as UIEditMenuInteraction in interactions { removeInteraction(menu) }
+    }
+}
+
 /// One section of the notebook in section coordinates (1376 wide, like the web's PAGE_WIDTH):
 /// paper, PDF page, title, text boxes and a PencilKit canvas. Drawing changes become entity
 /// writes; rows that arrive from sync redraw the canvas.
@@ -51,7 +70,7 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
     private var textViews: [TextBoxView] = []
     private var editor: TextBoxEditor?
     private let textTap = UITapGestureRecognizer()
-    let canvas = PKCanvasView()
+    let canvas = QuietCanvasView()
     let selectionView = SelectionBoxView()
     /// Whether the ink, blocks and PDF page have loaded, for drawing the section off screen.
     private(set) var strokesLoaded = false

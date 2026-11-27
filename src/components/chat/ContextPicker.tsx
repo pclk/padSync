@@ -24,6 +24,17 @@ import {
 } from "@/components/ContextControls";
 import type { ContextSummary } from "@/lib/chat-types";
 import { focusedSection } from "@/lib/chat-ui";
+import { useStoredState } from "@/lib/hooks";
+import {
+  isSectionSpan,
+  readView,
+  SECTION_SPAN_KEY,
+  SECTION_SPANS,
+  spanSectionIds,
+  viewFor,
+  viewFromRects,
+  type SectionSpan,
+} from "@/lib/section-span";
 import { Icon, type IconName } from "../Icons";
 import { usePopover } from "./Popover";
 export interface ContextHandle {
@@ -71,6 +82,19 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
       p.notebookId,
     );
     const focusedId = focused.section?.id ?? "";
+    const [storedSpan, setSpan] = useStoredState<SectionSpan>(SECTION_SPAN_KEY, "section");
+    const span = isSectionSpan(storedSpan) ? storedSpan : "section";
+    // What the followed screen shows: the iPad's when following it, else this one's.
+    const screen = () =>
+      focused.fromIpad
+        ? readView(p.ipad?.data.view)
+        : viewFromRects(
+            p.sections.flatMap((s) => {
+              const el = p.sectionEl(s.id);
+              return el ? [{ id: s.id, rect: el.getBoundingClientRect() }] : [];
+            }),
+            { top: 0, bottom: window.innerHeight, left: 0, right: window.innerWidth },
+          );
     const [source, setSource] = useState("");
     useEffect(() => {
       let live = true;
@@ -86,13 +110,18 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
     const currentId = current?.id ?? "";
     const text = textAt && textAt.sectionId === currentId ? textAt.sel : null;
     const { sections, notebookTitle } = p;
-    const ctxFor = (sc: Scope): ContextOptions => ({
-      ...options,
-      scope: sc === "selection" ? "selection" : sc === "notebook" ? "all" : "sections",
-      sectionIds: sc === "section" ? [focusedId] : ids,
-    });
+    const ctxFor = (sc: Scope): ContextOptions => {
+      const view = sc === "section" && span === "viewport" ? screen() : null;
+      const sectionIds = sc === "section" ? spanSectionIds(p.sections, focusedId, span, view) : ids;
+      return {
+        ...options,
+        scope: sc === "selection" ? "selection" : sc === "notebook" ? "all" : "sections",
+        sectionIds,
+        view: sc === "section" ? viewFor(span, view, sectionIds) : null,
+      };
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    const ctx: ContextOptions = useMemo(() => ctxFor(scope), [options, scope, focusedId, ids]);
+    const ctx: ContextOptions = useMemo(() => ctxFor(scope), [options, scope, focusedId, ids, span, p.ipad, p.sections]);
     useEffect(() => {
       let live = true;
       // Nothing from the notebook needs none of its strokes read.
@@ -129,12 +158,12 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
       };
     }, [sections, notebookTitle, scope, ctx, currentId, text]);
     const scopeNow = scope;
-    const ctxNow = ctx;
     const previewNow = preview;
     // `override`: a prompt's own scope, sent as is, without the review a changed preview asks for.
     const prepare = async (sending: boolean, override?: Scope) => {
       const scope = override ?? scopeNow;
-      const ctx = override ? ctxFor(override) : ctxNow;
+      // Built afresh: what's on the screen moves after the picker last looked.
+      const ctx = ctxFor(scope);
       const preview = override ? null : previewNow;
       if (scope === "none") return { files: [], sectionIds: [], bytes: 0, tokens: 0, skipped: [] } as Bundle;
       const inputs = await gatherSections(p.sections);
@@ -209,8 +238,8 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
             label:
               scope === "none"
                 ? "No context"
-                : scope === "section"
-                  ? `${title(focused.section, p.sections)} · ~${b.tokens.toLocaleString()} tokens`
+                : scope === "section" && b.sectionIds.length === 1
+                  ? `${title(p.sections.find((s) => s.id === b.sectionIds[0]) ?? focused.section, p.sections)} · ~${b.tokens.toLocaleString()} tokens`
                   : `${b.sectionIds.length} section${b.sectionIds.length === 1 ? "" : "s"} · ~${b.tokens.toLocaleString()} tokens`,
             bytes: b.bytes,
             tokens: b.tokens,
@@ -219,12 +248,14 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
         };
       },
     }));
+    const spanNote =
+      span === "viewport" ? (focused.fromIpad ? "iPad screen" : "Screen") : span === "above" ? "+ above" : span === "below" ? "+ below" : "";
     const SCOPES: { v: Scope; icon: IconName; label: string; hint: string }[] = [
       {
         v: "section",
         icon: focused.fromIpad ? "tablet" : "file",
         label: focused.fromIpad ? "Section on the iPad" : "This section",
-        hint: title(focused.section, p.sections),
+        hint: `${title(focused.section, p.sections)}${span === "section" ? "" : `, ${spanNote}`}`,
       },
       { v: "selection", icon: "lasso", label: "Selection", hint: "Highlighted text or lassoed ink" },
       { v: "sections", icon: "layers", label: "Pick sections", hint: ids.length ? `${ids.length} chosen` : "Choose which ones" },
@@ -234,7 +265,9 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
     const active = SCOPES.find((s) => s.v === scope)!;
     const chip =
       scope === "section"
-        ? title(focused.section, p.sections)
+        ? span === "viewport"
+          ? spanNote
+          : `${title(focused.section, p.sections)}${spanNote ? ` ${spanNote}` : ""}`
         : scope === "sections"
           ? `${ids.length} section${ids.length === 1 ? "" : "s"}`
           : active.label;
@@ -279,6 +312,37 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
                 </button>
               ))}
             </div>
+            {scope === "section" && (
+              <div className="mt-1 px-1">
+                <div
+                  role="radiogroup"
+                  aria-label="How much around the section"
+                  className="flex rounded-lg border border-slate-200 bg-white p-0.5 text-xs"
+                >
+                  {SECTION_SPANS.map((s) => (
+                    <button
+                      key={s.v}
+                      role="radio"
+                      aria-checked={span === s.v}
+                      title={
+                        s.v === "viewport"
+                          ? `Exactly what ${focused.fromIpad ? "the iPad" : "this screen"} shows, zoom included`
+                          : s.v === "section"
+                            ? "Only this section"
+                            : `This section and the one ${s.v}`
+                      }
+                      className={`flex-1 rounded-md px-1.5 py-1 pointer-coarse:py-2 ${span === s.v ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"}`}
+                      onClick={() => {
+                        setSpan(s.v);
+                        setPreview(null);
+                      }}
+                    >
+                      {s.v === "viewport" && focused.fromIpad ? "iPad screen" : s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {scope !== "none" && (
               <div className="mt-2 border-t border-slate-200 px-1 pt-2">
                 <ContextControls

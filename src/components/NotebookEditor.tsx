@@ -30,6 +30,7 @@ import { PromptRecorder } from "./PromptRecorder";
 import { LassoCircle } from "./LassoCircle";
 import { DEFAULT_RAIL, normalizeRail, railFloats, railThickness, type RailLayout } from "@/lib/rail-layout";
 import { Icon } from "./Icons";
+import { viewFromRects } from "@/lib/section-span";
 
 const emitLocalText = (notebookId: string) => emitActivity({ notebookId, source: "local", kinds: ["text"], at: Date.now() });
 
@@ -672,7 +673,8 @@ function Editor({ notebookId }: { notebookId: string }) {
     const sid = currentRef.current;
     const el = sid ? els.current.get(sid) : undefined;
     const offsetY = el ? (TOOLBAR_H - el.getBoundingClientRect().top) / controller.zoom : 0;
-    const data: PresenceData = { device: deviceId(), deviceKind: kind, sectionId: sid, offsetY: Math.round(offsetY), at: Date.now() };
+    const view = viewFromRects([...els.current].map(([id, e]) => ({ id, rect: e.getBoundingClientRect() })), { top: TOOLBAR_H, bottom: window.innerHeight, left: 0, right: window.innerWidth });
+    const data: PresenceData = { device: deviceId(), deviceKind: kind, sectionId: sid, offsetY: Math.round(offsetY), ...(view ? { view } : {}), at: Date.now() };
     lastPresence.current = Date.now();
     // Stamped after the stored row, so a clock that stepped back since can't make the server keep the old place.
     const id = `presence-${deviceId()}`;

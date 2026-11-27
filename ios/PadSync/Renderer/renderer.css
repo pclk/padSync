@@ -1444,6 +1444,17 @@ input, textarea, pre, .prose-pad {
     stroke-dashoffset: 0;
   }
 }
+.chat-prose.chat-thinking-text, .side-panel .chat-prose.chat-thinking-text {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.35rem;
+}
+.chat-prose.chat-thinking-text :where(p, ul, ol) {
+  margin-block: 0.35rem;
+}
+.chat-prose.chat-thinking-text :where(strong) {
+  color: inherit;
+}
 @property --tw-space-y-reverse {
   syntax: "*";
   inherits: false;

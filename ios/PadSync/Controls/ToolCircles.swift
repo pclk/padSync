@@ -15,6 +15,9 @@ struct ControlsActions {
     var close: () -> Void
     var syncStatus: () -> String
     var pageMenu: () -> UIMenu
+    /// How much a section prompt sends.
+    var sectionSpan: () -> SectionSpan
+    var setSectionSpan: (SectionSpan) -> Void
 }
 
 /// Everything that floats over the page: the tool and prompt circles (ToolCircle.tsx), their
@@ -75,7 +78,6 @@ final class ControlsOverlay: UIView {
         colorDot.layer.borderColor = UIColor.white.cgColor
         colorDot.layer.borderWidth = 2
         toolCircle.addSubview(colorDot)
-        toolCircle.accessibilityLabel = "Tools: hold and drag to change tool, tap for colours and sizes"
         let promptIcon = UIImageView(image: UIImage(systemName: "bubble.left", withConfiguration: UIImage.SymbolConfiguration(pointSize: (rail.diameter(.prompts) * 0.4).rounded(), weight: .medium)))
         promptIcon.tintColor = UIColor(hex: "#4338ca")
         promptIcon.sizeToFit()
@@ -84,9 +86,18 @@ final class ControlsOverlay: UIView {
         promptCircle.accessibilityLabel = "Chat prompts: tap to choose, or hold and drag towards one"
 
         toolCircle.press = toolPress
-        toolPress.open = { [weak self] in self?.toolFan(sticky: false) }
-        toolPress.onPick = { [weak self] item in self?.pickTool(item.key) }
-        toolPress.onTap = { [weak self] in self?.togglePanel() }
+        toolPress.open = { [weak self] in
+            guard let self else { return nil }
+            return ToolCircleSwipe.colors ? self.colorFan() ?? self.toolFan(sticky: false) : self.toolFan(sticky: false)
+        }
+        toolPress.onPick = { [weak self] item in
+            if item.color != nil { self?.pickColor(item.key) } else { self?.pickTool(item.key) }
+        }
+        toolPress.onTap = { [weak self] in
+            guard let self else { return }
+            if !ToolCircleSwipe.colors { return self.togglePanel() }
+            self.toolPress.setFan(self.toolPress.fan == nil ? self.toolFan(sticky: true) : nil)
+        }
         toolPress.present = { [weak self] f in self?.show(f, for: self?.toolPress) }
 
         promptCircle.press = promptPress
@@ -184,6 +195,9 @@ final class ControlsOverlay: UIView {
         let d = rail.diameter(.tools)
         toolIcon.image = UIImage(systemName: tool.kind.symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: (d * 0.4).rounded(), weight: .medium))
         toolIcon.frame = toolCircle.bounds
+        toolCircle.accessibilityLabel = ToolCircleSwipe.colors
+            ? "Tools: hold and drag towards a colour to change it, tap to choose a tool"
+            : "Tools: hold and drag to change tool, tap for colours and sizes"
         let showDot = rail.showsColors && (tool.kind == .pen || tool.kind == .highlighter)
         colorDot.isHidden = !showDot
         colorDot.backgroundColor = UIColor(hex: tool.color)
@@ -198,8 +212,23 @@ final class ControlsOverlay: UIView {
     private func toolFan(sticky: Bool) -> FanState? {
         closePanel()
         let current = actions.tool().kind
-        let items = rail.tools.map { FanItem(key: $0.rawValue, label: $0.label, symbol: $0.symbol, current: $0 == current) }
+        var items = rail.tools.map { FanItem(key: $0.rawValue, label: $0.label, symbol: $0.symbol, current: $0 == current) }
+        // A tap opens this fan instead of the panel, so the panel is one more item.
+        if sticky && ToolCircleSwipe.colors {
+            items.append(FanItem(key: Self.panelKey, label: "Sizes and more", symbol: "slider.horizontal.3"))
+        }
         return FanState(items: items, center: toolCircle.center, viewport: bounds.size, sticky: sticky)
+    }
+
+    private static let panelKey = "panel"
+
+    /// The current tool's colours, or nil when it has none to show.
+    private func colorFan() -> FanState? {
+        closePanel()
+        let tool = actions.tool()
+        guard rail.showsColors, !tool.colors.isEmpty else { return nil }
+        let items = tool.colors.map { FanItem(key: $0, label: ToolState.penColorNames[$0] ?? $0, symbol: "circle.fill", current: $0 == tool.color, color: $0) }
+        return FanState(items: items, center: toolCircle.center, viewport: bounds.size)
     }
 
     /// The prompts around `at` (a gesture) or the prompt circle.
@@ -214,7 +243,15 @@ final class ControlsOverlay: UIView {
         return FanState(items: items, center: point ?? promptCircle.center, viewport: bounds.size, sticky: sticky)
     }
 
+    private func pickColor(_ c: String) {
+        var t = actions.tool()
+        t.setColor(c)
+        actions.setTool(t)
+        refreshTool()
+    }
+
     private func pickTool(_ key: String) {
+        if key == Self.panelKey { return togglePanel() }
         guard let kind = ToolKind(rawValue: key) else { return }
         var t = actions.tool()
         t.kind = kind
@@ -347,6 +384,17 @@ enum PencilGestures {
     }
 }
 
+/// Whether dragging the tool circle picks a colour (and a tap opens the tools, the panel among
+/// them) rather than a tool (and a tap opens the panel). This iPad only.
+enum ToolCircleSwipe {
+    private static let key = "padsync.toolCircleSwipeColors"
+
+    static var colors: Bool {
+        get { UserDefaults.standard.bool(forKey: key) }
+        set { UserDefaults.standard.set(newValue, forKey: key) }
+    }
+}
+
 /// The current tool's colours and sizes, from a tap on the tool circle (CirclePanel in
 /// ToolCircle.tsx), with undo, redo, the page menu, moving the circles and the way back to the
 /// library (there's no top bar).
@@ -431,23 +479,56 @@ final class CirclePanel: UIView {
         }
         stack.addArrangedSubview(row)
 
-        let gestures = UIStackView()
-        gestures.alignment = .center
-        gestures.spacing = 8
-        let gesturesLabel = UILabel()
-        gesturesLabel.text = "Pencil double tap and squeeze"
-        gesturesLabel.font = .systemFont(ofSize: 13, weight: .medium)
-        gesturesLabel.textColor = UIColor(hex: "#334155")
-        gesturesLabel.numberOfLines = 2
-        let toggle = UISwitch()
-        toggle.isOn = PencilGestures.enabled
-        toggle.accessibilityLabel = "Pencil double tap and squeeze"
-        toggle.addAction(UIAction { [weak toggle] _ in PencilGestures.enabled = toggle?.isOn ?? true }, for: .valueChanged)
-        gestures.addArrangedSubview(gesturesLabel)
-        gestures.addArrangedSubview(toggle)
-        gestures.isLayoutMarginsRelativeArrangement = true
-        gestures.layoutMargins = UIEdgeInsets(top: 0, left: 6, bottom: 0, right: 2)
-        stack.addArrangedSubview(gestures)
+        for (text, isOn, set) in [
+            ("Pencil double tap and squeeze", PencilGestures.enabled, { PencilGestures.enabled = $0 }),
+            ("Swipe the tool circle for colours, tap it for tools", ToolCircleSwipe.colors, { ToolCircleSwipe.colors = $0 }),
+        ] as [(String, Bool, (Bool) -> Void)] {
+            let row = UIStackView()
+            row.alignment = .center
+            row.spacing = 8
+            let label = UILabel()
+            label.text = text
+            label.font = .systemFont(ofSize: 13, weight: .medium)
+            label.textColor = UIColor(hex: "#334155")
+            label.numberOfLines = 0
+            // The label wraps; the switch keeps its size.
+            label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+            label.setContentHuggingPriority(.defaultLow, for: .horizontal)
+            let toggle = UISwitch()
+            toggle.setContentCompressionResistancePriority(.required, for: .horizontal)
+            toggle.setContentHuggingPriority(.required, for: .horizontal)
+            toggle.isOn = isOn
+            toggle.accessibilityLabel = text
+            toggle.addAction(UIAction { [weak self, weak toggle] _ in
+                set(toggle?.isOn ?? isOn)
+                self?.onToolChange()
+            }, for: .valueChanged)
+            row.addArrangedSubview(label)
+            row.addArrangedSubview(toggle)
+            row.isLayoutMarginsRelativeArrangement = true
+            row.layoutMargins = UIEdgeInsets(top: 0, left: 6, bottom: 0, right: 2)
+            stack.addArrangedSubview(row)
+        }
+
+        let spanLabel = UILabel()
+        spanLabel.text = "Prompts send"
+        spanLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        spanLabel.textColor = UIColor(hex: "#334155")
+        let span = UISegmentedControl(items: SectionSpan.allCases.map(\.label))
+        span.setTitleTextAttributes([.font: UIFont.systemFont(ofSize: 12, weight: .medium)], for: .normal)
+        span.apportionsSegmentWidthsByContent = true
+        span.selectedSegmentIndex = SectionSpan.allCases.firstIndex(of: actions.sectionSpan()) ?? 0
+        span.accessibilityLabel = "What a section prompt sends: this section, with the one above or below, or what's on the screen"
+        span.addAction(UIAction { [weak span] _ in
+            guard let i = span?.selectedSegmentIndex, SectionSpan.allCases.indices.contains(i) else { return }
+            actions.setSectionSpan(SectionSpan.allCases[i])
+        }, for: .valueChanged)
+        let spanRow = UIStackView(arrangedSubviews: [spanLabel, span])
+        spanRow.axis = .vertical
+        spanRow.spacing = 4
+        spanRow.isLayoutMarginsRelativeArrangement = true
+        spanRow.layoutMargins = UIEdgeInsets(top: 0, left: 6, bottom: 0, right: 2)
+        stack.addArrangedSubview(spanRow)
 
         let footer = UIStackView()
         footer.alignment = .center
@@ -533,7 +614,7 @@ final class CirclePanel: UIView {
 
     /// Beside the circle, away from the nearer edge, kept on screen.
     func place(near circle: UIView, in container: UIView) {
-        let width: CGFloat = 256
+        let width: CGFloat = 300
         let size = stack.systemLayoutSizeFitting(CGSize(width: width, height: 0), withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel)
         let c = circle.center, r = circle.bounds.width / 2 + 16
         var x = c.x < container.bounds.midX ? c.x + r : c.x - r - width

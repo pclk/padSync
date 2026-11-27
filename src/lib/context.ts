@@ -1,4 +1,5 @@
 import { maskAnswers, studyBlockMarkdown } from "./blocks";
+import { viewNote, type ScreenView } from "./section-span";
 import { SCHEMA_VERSION, type Block, type SectionData } from "./types";
 
 // What "Ask AI" sends: a small folder of files (the bundle) that the Mac bridge writes into the
@@ -21,6 +22,9 @@ export interface ContextOptions {
   allowEdits: boolean;
   /** Claude also gets Bash (sandboxed). */
   allowCode: boolean;
+  /** What the screen shows, for a "this section" context covering the screen: noted in
+   *  notebook.md, and the renders are cropped to it (src/lib/section-span.ts). */
+  view?: ScreenView | null;
 }
 
 export const DEFAULT_CONTEXT: ContextOptions = {
@@ -271,6 +275,7 @@ export function buildBundle(input: BundleInput, o: ContextOptions): Bundle {
 function notebookText(input: BundleInput, picked: SectionInput[], o: ContextOptions, kept: Set<string>, indexOf: Map<string, number>): BundleFile[] {
   const md: string[] = [`# ${input.title.trim() || "Untitled notebook"}`];
   md.push(`_Exported from padSync: ${picked.length} of ${input.sections.length} section${input.sections.length === 1 ? "" : "s"}._`);
+  if (o.view) md.push(viewNote(o.view, (id) => (indexOf.get(id) ?? 0) + 1));
   const json = {
     schemaVersion: SCHEMA_VERSION,
     title: input.title,

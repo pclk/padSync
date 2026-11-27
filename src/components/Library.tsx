@@ -24,6 +24,8 @@ import { deferredAction } from "@/lib/deferred";
 import { openNotebookNative } from "@/lib/native";
 import { NATIVE_INBOX_EVENT, nativeStore } from "@/lib/native-store";
 import { useMarquee, type MarqueeMode } from "./useMarquee";
+import { notebooksPdf } from "./PrintNotebook";
+import { downloadFile } from "@/lib/download";
 
 /** How long the "Undo" toast stays; a notebook delete is only written after it. */
 export const UNDO_MS = 6000;
@@ -571,6 +573,7 @@ export default function Library() {
       !!one && { id: "open", icon: one.kind === "folder" ? "folder" : "notebook", label: "Open", hint: "↵" },
       one?.kind === "notebook" && { id: "open-tab", icon: "globe", label: "Open in new tab" },
       !!one && { id: "rename", icon: "edit", label: "Rename", hint: "F2" },
+      all.some((i) => i.kind === "notebook") && { id: "export-pdf", icon: "download", label: "Export as PDF" },
       { id: "move", icon: "folderMove", label: "Move to…" },
       { id: "cut", icon: "copy", label: "Cut to move elsewhere", hint: "⌘X" },
       !!up.length && { id: "move-up", icon: "arrowUp", label: upLabel, hint: "⌘↑" },
@@ -581,6 +584,20 @@ export default function Library() {
       { id: "delete", icon: "trash", label: one ? "Delete" : `Delete ${plural(all.length, "item")}`, hint: "⌫", danger: true },
     ];
     return entries.filter((e): e is MenuEntry => !!e);
+  };
+  const [exporting, setExporting] = useState<string | null>(null);
+  /** The notebooks among `ids`, in library order, rendered into one PDF. */
+  const exportPdf = (ids: string[]) => {
+    const nbs = order.filter((id) => ids.includes(id) && items.get(id)?.kind === "notebook");
+    if (exporting || !nbs.length) return;
+    setExporting("Preparing…");
+    const first = items.get(nbs[0]) as NotebookEntity;
+    notebooksPdf(nbs, (done, total) => setExporting(`Exporting ${Math.min(total, Math.floor(done) + 1)} / ${total}…`))
+      .then(
+        (pdf) => downloadFile(`${nbs.length === 1 ? first.data.title.replace(/[\\/:*?"<>|]/g, "_") || "notebook" : `${nbs.length} notebooks`}.pdf`, pdf, "application/pdf"),
+        (e) => setToast({ key: Date.now(), message: `Export failed: ${(e as Error).message}` }),
+      )
+      .finally(() => setExporting(null));
   };
   const runMenu = (action: MenuAction, ids: string[]) => {
     const one = ids.length === 1 ? items.get(ids[0]) : undefined;
@@ -599,6 +616,7 @@ export default function Library() {
       case "deselect": return setSelected((s) => new Set([...s].filter((id) => !ids.includes(id))));
       case "select": setSelectMode(true); select(ids, "add"); anchor.current = ids[0]; return;
       case "delete": return setDeleting(ids);
+      case "export-pdf": return exportPdf(ids);
     }
   };
 
@@ -852,6 +870,9 @@ export default function Library() {
           onMoveUp={() => moveUp(sel)}
           onGroup={() => setNaming({ group: sel })}
           onDelete={() => setDeleting(sel)}
+          onExport={() => exportPdf(sel)}
+          exporting={exporting}
+          canExport={sel.some((id) => items.get(id)?.kind === "notebook")}
           onDone={clearSelection}
         />
       )}
@@ -871,7 +892,7 @@ export default function Library() {
 
 // -----------------------------------------------------------------------------------------------
 
-type MenuAction = "new-notebook" | "new-folder" | "select-all" | "cut" | "paste" | "open" | "open-tab" | "rename" | "move" | "move-up" | "group" | "deselect" | "select" | "delete";
+type MenuAction = "new-notebook" | "new-folder" | "select-all" | "cut" | "paste" | "open" | "open-tab" | "rename" | "move" | "move-up" | "group" | "deselect" | "select" | "delete" | "export-pdf";
 interface MenuEntry { id: MenuAction; icon: IconName; label: string; hint?: string; danger?: boolean }
 
 /** A context menu at a point, kept on screen. Closes on Escape, a press outside, scroll or resize. */
@@ -924,9 +945,9 @@ export function ItemMenu({ x, y, entries, onPick, onClose }: { x: number; y: num
   );
 }
 
-export function SelectionBar({ count, total, busy, canMoveUp, onSelectAll, onMove, onMoveUp, onGroup, onDelete, onDone }: {
-  count: number; total: number; busy: boolean; canMoveUp: boolean;
-  onSelectAll: () => void; onMove: () => void; onMoveUp: () => void; onGroup: () => void; onDelete: () => void; onDone: () => void;
+export function SelectionBar({ count, total, busy, canMoveUp, canExport, exporting, onSelectAll, onMove, onMoveUp, onGroup, onExport, onDelete, onDone }: {
+  count: number; total: number; busy: boolean; canMoveUp: boolean; canExport: boolean; exporting: string | null;
+  onSelectAll: () => void; onMove: () => void; onMoveUp: () => void; onGroup: () => void; onExport: () => void; onDelete: () => void; onDone: () => void;
 }) {
   const none = busy || !count;
   return (
@@ -937,6 +958,7 @@ export function SelectionBar({ count, total, busy, canMoveUp, onSelectAll, onMov
         <button type="button" disabled={none} onClick={onMove} className="btn btn-ghost btn-sm"><Icon name="folderMove" />Move to…</button>
         <button type="button" disabled={none || !canMoveUp} onClick={onMoveUp} className="btn btn-ghost btn-sm" title="Move to the parent folder"><Icon name="arrowUp" />Move up</button>
         <button type="button" disabled={none} onClick={onGroup} className="btn btn-ghost btn-sm"><Icon name="folderPlus" />New folder</button>
+        <button type="button" disabled={none || !canExport || !!exporting} onClick={onExport} className="btn btn-ghost btn-sm" title="Export the selected notebooks as one PDF"><Icon name="download" />{exporting ?? "Export PDF"}</button>
         <button type="button" disabled={none} onClick={onDelete} className="btn btn-ghost btn-sm !text-rose-700 hover:!bg-rose-50"><Icon name="trash" />Delete</button>
         <button type="button" onClick={onDone} aria-label="Clear selection" title="Clear selection (Esc)" className="icon-btn h-8 w-8"><Icon name="x" /></button>
       </span>

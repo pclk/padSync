@@ -413,6 +413,7 @@ struct DeviceSettings: Equatable, Sendable {
     var tuning = GestureTuning()
     var lasso = LassoSettings()
     var tool = ToolState()
+    var sectionSpan = SectionSpan.section
 
     static let railKey = "padsync.rail"
     static let promptsKey = "padsync.prompts"
@@ -420,6 +421,7 @@ struct DeviceSettings: Equatable, Sendable {
     static let tuningKey = "padsync.gestureTuning"
     static let lassoKey = "padsync.lasso"
     static let toolKey = "padsync.tool"
+    static let sectionSpanKey = "padsync.sectionSpan"
 
     init() {}
 
@@ -435,6 +437,7 @@ struct DeviceSettings: Equatable, Sendable {
         tuning = GestureTuning(json: value(Self.tuningKey))
         lasso = LassoSettings(json: value(Self.lassoKey))
         tool = ToolState(json: value(Self.toolKey))
+        sectionSpan = value(Self.sectionSpanKey)?.string.flatMap(SectionSpan.init(rawValue:)) ?? .section
     }
 }
 
@@ -470,6 +473,7 @@ final class DeviceSettingsStore {
         var next = DeviceSettings(backup: json)
         if let v = pending[DeviceSettings.toolKey] { next.tool = ToolState(json: v) }
         if let v = pending[DeviceSettings.railKey] { next.rail = RailLayout(json: v) }
+        if let v = pending[DeviceSettings.sectionSpanKey]?.string.flatMap(SectionSpan.init(rawValue:)) { next.sectionSpan = v }
         guard next != settings else { return }
         settings = next
         onChange(next)
@@ -479,6 +483,12 @@ final class DeviceSettingsStore {
         guard tool != settings.tool else { return }
         settings.tool = tool
         write(DeviceSettings.toolKey, tool.json)
+    }
+
+    func setSectionSpan(_ span: SectionSpan) {
+        guard span != settings.sectionSpan else { return }
+        settings.sectionSpan = span
+        write(DeviceSettings.sectionSpanKey, .string(span.rawValue))
     }
 
     func setRail(_ rail: RailLayout) {

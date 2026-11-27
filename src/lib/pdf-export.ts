@@ -4,9 +4,15 @@ import type { SectionEntity } from "./types";
 // CSS px to PDF points.
 const PT = 0.75;
 
+export interface PdfPage { jpeg: Uint8Array; w: number; h: number; cssW: number; cssH: number }
+
 /** One JPEG per section, each on its own page sized to the section, as a minimal PDF. */
 export async function notebookPdf(sections: SectionEntity[], sectionEl: (id: string) => HTMLElement | undefined, onProgress?: (done: number, total: number) => void): Promise<Blob> {
-  const pages: { jpeg: Uint8Array; w: number; h: number; cssW: number; cssH: number }[] = [];
+  return buildPdf(await sectionPages(sections, sectionEl, onProgress));
+}
+
+export async function sectionPages(sections: SectionEntity[], sectionEl: (id: string) => HTMLElement | undefined, onProgress?: (done: number, total: number) => void): Promise<PdfPage[]> {
+  const pages: PdfPage[] = [];
   for (const [i, s] of sections.entries()) {
     const el = sectionEl(s.id);
     if (!el) continue;
@@ -26,6 +32,10 @@ export async function notebookPdf(sections: SectionEntity[], sectionEl: (id: str
     pages.push({ jpeg: new Uint8Array(await jpeg.arrayBuffer()), w: canvas.width, h: canvas.height, cssW, cssH: (cssW * canvas.height) / canvas.width });
     onProgress?.(i + 1, sections.length);
   }
+  return pages;
+}
+
+export function buildPdf(pages: PdfPage[]): Blob {
   if (!pages.length) throw new Error("Nothing to export");
 
   const enc = new TextEncoder();
