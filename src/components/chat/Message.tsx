@@ -5,7 +5,8 @@ import type { SectionEntity } from "@/lib/types";
 import { editNeedsFork } from "@/lib/chat-ui";
 import { formatUsd, type turnCost } from "@/lib/chat-cost";
 import { VOICE_PATH_RE } from "@/lib/context";
-import { renderMarkdown } from "@/lib/markdown";
+import { renderChatMarkdown, renderMarkdown } from "@/lib/markdown";
+import { WIDGET_HEIGHT, WIDGET_MAX_HEIGHT, WIDGET_THEME } from "@/lib/widget";
 import { ReturnedFiles } from "@/components/ReturnedFiles";
 import { LatencyTrace, useIsMac } from "./LatencyTrace";
 import { Icon, type IconName } from "../Icons";
@@ -155,6 +156,52 @@ export function Message({
     });
     return () => buttons.forEach((b) => b.remove());
   }, [t.output]);
+  // Interactive blocks (lib/widget.ts): each frame takes the height its page reports, follows the
+  // app's theme, and has Reset (run it again) and Code (show what it runs).
+  useEffect(() => {
+    const root = body.current;
+    if (!root) return;
+    const frames = () => [...root.querySelectorAll<HTMLIFrameElement>("figure[data-widget] iframe")];
+    if (!frames().length) return;
+    const theme = () => (document.documentElement.dataset.theme === "dark" ? "dark" : "light");
+    const tell = (f: HTMLIFrameElement) => f.contentWindow?.postMessage({ type: WIDGET_THEME, theme: theme() }, "*");
+    const loaded = (e: Event) => tell(e.currentTarget as HTMLIFrameElement);
+    // Told now too, in case a frame finished loading before this ran.
+    frames().forEach((f) => {
+      f.addEventListener("load", loaded);
+      tell(f);
+    });
+    const sized = (e: MessageEvent) => {
+      if (e.data?.type !== WIDGET_HEIGHT || typeof e.data.height !== "number") return;
+      const f = frames().find((x) => x.contentWindow === e.source);
+      if (f) f.style.height = `${Math.min(WIDGET_MAX_HEIGHT, Math.max(48, Math.ceil(e.data.height)))}px`;
+    };
+    window.addEventListener("message", sized);
+    const themed = new MutationObserver(() => frames().forEach(tell));
+    themed.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    const click = (e: MouseEvent) => {
+      const b = (e.target as Element).closest<HTMLButtonElement>("button[data-widget-action]");
+      const fig = b?.closest("figure[data-widget]");
+      if (!b || !fig) return;
+      if (b.dataset.widgetAction === "code") {
+        const src = fig.querySelector<HTMLElement>(".chat-widget-source");
+        if (!src) return;
+        src.hidden = !src.hidden;
+        b.setAttribute("aria-expanded", String(!src.hidden));
+      } else {
+        const f = fig.querySelector("iframe");
+        // Setting srcdoc again reloads the page from scratch.
+        if (f) f.srcdoc = f.srcdoc;
+      }
+    };
+    root.addEventListener("click", click);
+    return () => {
+      frames().forEach((f) => f.removeEventListener("load", loaded));
+      window.removeEventListener("message", sized);
+      themed.disconnect();
+      root.removeEventListener("click", click);
+    };
+  }, [t.output]);
   const active = ["queued", "running", "uploading"].includes(t.status);
   const finished = ["done", "error", "cancelled"].includes(t.status);
   const voice = t.attachments.some((a) => VOICE_PATH_RE.test(a.path));
@@ -303,7 +350,7 @@ export function Message({
             <div
               ref={body}
               className="prose-pad chat-prose break-words"
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(t.output) }}
+              dangerouslySetInnerHTML={{ __html: renderChatMarkdown(t.output) }}
             />
           )}
           {t.status === "running" && t.output && <span className="chat-caret" aria-hidden="true" />}

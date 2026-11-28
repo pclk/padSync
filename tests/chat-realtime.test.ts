@@ -39,9 +39,20 @@ describe("live query endpoints", () => {
     const t = (await chat.createThread(sql, { notebookId: "nb", title: "", agent: "claude", options: {} }))!;
     const res = await threadLive(req(`/api/chat/threads/${t.id}/live`, { method: "POST", session: sessionCookie() }), params({ id: t.id }));
     expect(await res.json()).toEqual({ enabled: false });
-    expect((await threadLive(req("/api/chat/threads/nope/live", { method: "POST", session: sessionCookie() }), params({ id: "nope" }))).status).toBe(404);
+    // No thread lookup (the route must not wake the database): an unknown id seals a query that matches nothing.
+    expect((await threadLive(req("/api/chat/threads/nope/live", { method: "POST", session: sessionCookie() }), params({ id: "nope" }))).status).toBe(200);
     expect((await threadLive(req(`/api/chat/threads/${t.id}/live`, { method: "POST" }), params({ id: t.id }))).status).toBe(401);
     expect((await bridgeLive(req("/api/bridge/live", { method: "POST" }))).status).toBe(401);
+  });
+
+  it("let the bridge renew with a live pass instead of its token, and refuse a forged one", async () => {
+    const { createLivePass, LIVE_PASS_HEADER } = await import("@/server/auth");
+    const pass = createLivePass("dev_1");
+    const ok = await bridgeLive(req("/api/bridge/live", { method: "POST", headers: { [LIVE_PASS_HEADER]: pass } }));
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toMatchObject({ enabled: false, livePass: expect.any(String) });
+    const forged = pass.slice(0, -2) + (pass.endsWith("AA") ? "BB" : "AA");
+    expect((await bridgeLive(req("/api/bridge/live", { method: "POST", headers: { [LIVE_PASS_HEADER]: forged } }))).status).toBe(401);
   });
 
   it("seal a query for the thread, and for queued jobs", async () => {

@@ -2,6 +2,7 @@ import { emitActivity, hlcDevice, isInking, onInkEnd, type ActivityKind } from "
 import { deviceId } from "./db";
 import { beginSyncDebugRequest, debugNow, parseServerTiming, recordNetworkTiming, recordRemoteApplied, recordSyncDebug, syncDebugEnabled, updateSyncDebugRequest } from "./sync-debug";
 import { startRealtime, type RealtimeStatus } from "./sync-realtime";
+import { NATIVE_COVER_EVENT, pageShown } from "./native";
 import { DEFAULT_DEBOUNCE_MS, validDebounce, DEFAULT_SYNC_CONFIG, normalizeSyncConfig, type SyncConfig } from "./sync-policy";
 import { db, getMeta, setMeta } from "./db";
 import { hlcObserve } from "./hlc";
@@ -22,9 +23,16 @@ const REALTIME_RECOVERY_MS = 30000;
 // its realtime pipeline on any catalog change, and a subscription can look live through it).
 const FOLLOW_RECOVERY_MS = 5000;
 let following = false;
+// Every poll reaches Postgres, and anything more often than every 5 minutes keeps Neon from scaling
+// to zero. So once nothing has happened here for a while (no local edit, no incoming change), polls
+// slow right down. Realtime still wakes sync at once; without it, a change is noticed late.
+const IDLE_AFTER_MS = 5 * 60_000;
+const IDLE_POLL_MS = 10 * 60_000;
+let activeAt = Date.now();
 function pollDelay() {
-  const configured = typeof document === 'undefined' || document.visibilityState === 'visible' ? config.visiblePollMs : config.hiddenPollMs;
-  return realtimeStatus === 'live' ? Math.max(following ? FOLLOW_RECOVERY_MS : REALTIME_RECOVERY_MS, configured) : configured;
+  const configured = typeof document === 'undefined' || pageShown() ? config.visiblePollMs : config.hiddenPollMs;
+  const delay = realtimeStatus === 'live' ? Math.max(following ? FOLLOW_RECOVERY_MS : REALTIME_RECOVERY_MS, configured) : configured;
+  return Date.now() - activeAt > IDLE_AFTER_MS ? Math.max(delay, IDLE_POLL_MS) : delay;
 }
 /** Set while this device is following the iPad's place in an open notebook. */
 export function setSyncFollowing(value: boolean) {
@@ -63,6 +71,13 @@ let failures = 0;
 let localFailures = 0;
 let retryAt = 0;
 let configCheckedAt = -Infinity;
+// Timing changes rarely; coming back online or into view refreshes it sooner.
+const CONFIG_REFRESH_MS = 10 * 60_000;
+// The server cursor after the last applied pull, and the newest seq a notification announced while
+// a request was in flight. Every push echoes back as a notification; its own response already
+// moved the cursor past it, so fetching again would only bring back nothing.
+let syncedCursor = -1;
+let notifiedSeq = 0;
 let configLoading = false;
 const observedSince = Date.now();
 const editTimes: number[] = [];
@@ -88,7 +103,7 @@ function record(trace: number[]) {
   if (trace.length > 10000) { trace.shift(); traceTruncated = true; }
 }
 async function refreshConfig() {
-  if (configLoading || Date.now() - configCheckedAt < 60000 || !navigator.onLine) return;
+  if (configLoading || Date.now() - configCheckedAt < CONFIG_REFRESH_MS || !navigator.onLine) return;
   configLoading = true;
   configCheckedAt = Date.now();
   try {
@@ -135,10 +150,21 @@ function schedule(delay: number, reason = "poll") {
   }, Math.max(0, due - Date.now()));
 }
 export function requestSync(delay?: number, reason = delay === undefined ? "local edit" : "manual") {
+  activeAt = Date.now();
   if (typeof window === "undefined") return;
   if (delay === undefined) record(editTimes);
   recordSyncDebug("trigger", "Sync requested", { trigger: reason, delayMs: delay ?? debounceMs });
   schedule(delay ?? debounceMs, reason);
+}
+/** A realtime notification, with the newest seq it announced when the hint carried one. */
+function notified(seq?: number) {
+  if (seq !== undefined && seq <= syncedCursor) {
+    recordSyncDebug("trigger", "Realtime notification already synced", { seq, cursor: syncedCursor });
+    return;
+  }
+  // The request in flight may be the push that caused it; decide once its response is in.
+  if (seq !== undefined && running) { notifiedSeq = Math.max(notifiedSeq, seq); return; }
+  requestSync(0, "realtime notification");
 }
 /** "Retry now" from the status badge: skip the remaining backoff, like coming back online. */
 export function retrySyncNow() {
@@ -148,7 +174,7 @@ export function retrySyncNow() {
 export function startSync() {
   if (started || typeof window === "undefined") return;
   started = true;
-  stopRealtime = startRealtime(() => requestSync(0, "realtime notification"), next => {
+  stopRealtime = startRealtime(notified, next => {
     const wasLive = realtimeStatus === 'live';
     realtimeStatus = next;
     recordSyncDebug("realtime", "Realtime state", { state: next, visibility: document.visibilityState });
@@ -162,8 +188,9 @@ export function startSync() {
   window.addEventListener('blur', stateChanged);
   window.addEventListener('offline', stateChanged);
   window.addEventListener("online", wake);
-  const visible = () => { if (document.visibilityState === 'visible') wake(); };
+  const visible = () => { if (pageShown()) wake(); };
   document.addEventListener("visibilitychange", visible);
+  window.addEventListener(NATIVE_COVER_EVENT, visible);
   stopWakeListeners = () => {
     window.removeEventListener("online", wake);
     document.removeEventListener('visibilitychange', stateChanged);
@@ -171,6 +198,7 @@ export function startSync() {
     window.removeEventListener('blur', stateChanged);
     window.removeEventListener('offline', stateChanged);
     document.removeEventListener("visibilitychange", visible);
+    window.removeEventListener(NATIVE_COVER_EVENT, visible);
   };
   // A sync held for a stroke runs in the gap right after it. Re-checking on a timer instead
   // mostly landed mid-stroke during handwriting, so the iPad's uploads waited for the 3 s cap.
@@ -237,13 +265,13 @@ async function runSync(context = { trigger: "manual", queueMs: 0, timerLateMs: 0
       // The status was set before the backoff was known; let the badge show the new countdown.
       listeners.forEach((l) => l());
     }
-    const pending = again;
-    again = false;
+    const pending = again || notifiedSeq > syncedCursor;
+    again = false; notifiedSeq = 0;
     if (current !== generation) {
       // A stopped run may finish its acknowledgement, but must not continue draining.
       if (started) schedule(0, "restart");
     } else if (pending) schedule(0, "follow-up");
-    else if (started) schedule(retryAt ? Math.max(0, retryAt - Date.now()) : pollDelay(), retryAt ? "retry" : document.visibilityState === "visible" ? "visible poll" : "hidden poll");
+    else if (started) schedule(retryAt ? Math.max(0, retryAt - Date.now()) : pollDelay(), retryAt ? "retry" : pageShown() ? "visible poll" : "hidden poll");
   }
 }
 
@@ -328,11 +356,13 @@ export async function syncOnce(context = { trigger: "manual", queueMs: 0, timerL
       }
       await db.meta.put({ key: "cursor", value: body.cursor });
     });
+    syncedCursor = body.cursor;
 
     const sentContent = dirty.filter(e => e.kind !== "presence");
     const sentWalls = sentContent.map(e => Number(e.hlc.split("-")[0])).filter(Number.isFinite);
     updateSyncDebugRequest(trace, { applyMs: debugNow() - phaseStart, applied: applied.length, pushedContent: sentContent.length, sendAgeMs: sentWalls.length ? Date.now() - Math.min(...sentWalls) : undefined, phase: 'Done' });
     recordRemoteApplied(trace, applied);
+    if (applied.length) activeAt = Date.now();
     if (applied.some(e => e.kind === "stroke" || e.kind === "textbox" || e.kind === "section")) emitRemoteActivity(applied);
     completed = true;
     setStatus("synced");
@@ -359,6 +389,7 @@ export function stopSync() {
 
 export async function resetCursor() {
   await setMeta("cursor", 0);
+  syncedCursor = -1;
   requestSync(0);
 }
 

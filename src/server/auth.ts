@@ -32,6 +32,31 @@ export function createSession(login: string) {
   return `${payload}.${sign(payload)}`;
 }
 
+// A live pass lets the bridge renew its realtime query without a database lookup of its token,
+// which would wake a suspended Neon compute every minute. It only unlocks a sealed list of queued
+// job ids (src/server/live.ts), so a pass outliving a revoked token for a few hours is harmless.
+const LIVE_PASS_MS = 6 * 3_600_000;
+/** Sent by the bridge with its live renewals (bridge/lib.ts BridgeApi.live). */
+export const LIVE_PASS_HEADER = "x-padsync-live-pass";
+
+export function createLivePass(deviceId: string) {
+  const payload = Buffer.from(JSON.stringify({ live: deviceId, exp: Date.now() + LIVE_PASS_MS })).toString("base64url");
+  return `${payload}.${sign(payload)}`;
+}
+
+/** The device a live pass was issued to, or null when it is missing, forged or expired. */
+export function livePassDevice(pass: string | null): string | null {
+  if (!pass || !process.env.SESSION_SECRET) return null;
+  const [payload, sig] = pass.split(".");
+  if (!payload || !sig || !safeEqual(sig, sign(payload))) return null;
+  try {
+    const { live, exp } = JSON.parse(Buffer.from(payload, "base64url").toString()) as { live?: unknown; exp?: unknown };
+    return typeof live === "string" && typeof exp === "number" && exp > Date.now() ? live : null;
+  } catch {
+    return null;
+  }
+}
+
 export function sessionLogin(req: NextRequest): string | null {
   if (!authConfigured()) return null;
   const raw = req.cookies.get(SESSION_COOKIE)?.value;

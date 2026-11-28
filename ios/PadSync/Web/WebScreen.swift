@@ -7,6 +7,9 @@ import WebKit
 /// navigation to /notebook that still gets through is turned around here.
 struct WebScreen: UIViewRepresentable {
     let database: AppDatabase
+    /// A native notebook covers the web screens. The page can't tell (it stays "visible"), so it's
+    /// told, and syncs as if hidden instead of fetching every change the notebook pushes.
+    let covered: Bool
     /// Called after the web app writes to the native store, to push the write.
     let onStoreWrite: () -> Void
     let onOpenNotebook: (String) -> Void
@@ -40,7 +43,9 @@ struct WebScreen: UIViewRepresentable {
         return container
     }
 
-    func updateUIView(_ container: WebContainer, context: Context) {}
+    func updateUIView(_ container: WebContainer, context: Context) {
+        context.coordinator.setCovered(covered)
+    }
 
     /// Tells the web app it runs inside the native app, and that the native store answers on
     /// `padsyncStore` (`store: true`, see StoreBridge). Also reports the page's background colour on load and whenever the theme changes.
@@ -70,6 +75,7 @@ struct WebScreen: UIViewRepresentable {
         weak var container: WebContainer?
         private weak var web: WKWebView?
         private var urlObservation: NSKeyValueObservation?
+        private var covered = false
 
         init(onOpenNotebook: @escaping (String) -> Void) {
             self.onOpenNotebook = onOpenNotebook
@@ -91,6 +97,21 @@ struct WebScreen: UIViewRepresentable {
             guard Server.isServer(url), url.path == "/notebook" else { return nil }
             return URLComponents(url: url, resolvingAgainstBaseURL: false)?
                 .queryItems?.first { $0.name == "id" }?.value.flatMap { $0.isEmpty ? nil : $0 }
+        }
+
+        func setCovered(_ value: Bool) {
+            guard value != covered else { return }
+            covered = value
+            tellCovered()
+        }
+
+        /// Sent again after each load, since a reload starts the page uncovered.
+        private func tellCovered() {
+            web?.evaluateJavaScript("window.padsyncCovered = \(covered); window.dispatchEvent(new CustomEvent('padsync-native-cover'))")
+        }
+
+        func webView(_ web: WKWebView, didFinish navigation: WKNavigation!) {
+            if covered { tellCovered() }
         }
 
         // MARK: Messages from the web app

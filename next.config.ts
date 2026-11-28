@@ -20,9 +20,9 @@ const nextConfig: NextConfig = {
     },
   },
   cacheComponents: true,
-  // The AI prompt page was merged into AI import.
+  // AI import (and the prompt page before it) was removed; old links land in the library.
   async redirects() {
-    return [{ source: "/prompt", destination: "/import", permanent: false }];
+    return [{ source: "/import", destination: "/", permanent: false }, { source: "/prompt", destination: "/", permanent: false }];
   },
   partialPrefetching: true,
   turbopack: {

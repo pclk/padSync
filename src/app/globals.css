@@ -55,6 +55,16 @@
   --prose-muted: #475569;
   --prose-rule: #cbd5e1;
   --prose-code-bg: #f1f5f9;
+  /* The answer palette (lib/markdown.ts md-c-*, and the same values in interactive blocks). */
+  --md-red: #d92d20;
+  --md-orange: #e8590c;
+  --md-yellow: #b08800;
+  --md-green: #2f9e44;
+  --md-teal: #0c8599;
+  --md-blue: #1c7ed6;
+  --md-purple: #7048e8;
+  --md-pink: #d6336c;
+  --md-gray: #6b7280;
   accent-color: var(--color-brand-600);
 }
 
@@ -63,9 +73,11 @@
    shades → light) themes every Tailwind utility in the chrome without touching each component. */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --chrome-bg: #0e1117;
+  /* Pure black behind everything (OLED), surfaces included; borders and the slate steps above
+     black set panels and controls apart. */
+  --chrome-bg: #000;
   --chrome-fg: #e6e9ef;
-  --color-white: #161b23;
+  --color-white: #000;
   --color-slate-50: #1b212b;
   --color-slate-100: #222a35;
   --color-slate-200: #2d3542;
@@ -114,7 +126,7 @@
   --color-indigo-50: #1a1c3d;
   --color-indigo-700: #a5abff;
   --color-violet-800: #c7b2ff;
-  --color-canvas: #090c11;
+  --color-canvas: #000;
   --color-backdrop: rgb(0 0 0 / 0.55);
   --shadow-color-soft: rgb(0 0 0 / 0.25);
   --shadow-color: rgb(0 0 0 / 0.3);
@@ -126,6 +138,15 @@
   --prose-muted: #a5afbe;
   --prose-rule: #3b4453;
   --prose-code-bg: #222a35;
+  --md-red: #ff6b6b;
+  --md-orange: #ff922b;
+  --md-yellow: #ffd43b;
+  --md-green: #51cf66;
+  --md-teal: #3bc9db;
+  --md-blue: #4dabf7;
+  --md-purple: #b197fc;
+  --md-pink: #f783ac;
+  --md-gray: #9ca3af;
   accent-color: var(--color-brand-500);
 }
 
@@ -134,6 +155,15 @@
    above, restored for everything inside a page. */
 :root[data-theme="dark"] .paper {
   color-scheme: light;
+  --md-red: #d92d20;
+  --md-orange: #e8590c;
+  --md-yellow: #b08800;
+  --md-green: #2f9e44;
+  --md-teal: #0c8599;
+  --md-blue: #1c7ed6;
+  --md-purple: #7048e8;
+  --md-pink: #d6336c;
+  --md-gray: #6b7280;
   color: var(--chrome-fg);
   --chrome-fg: #0f172a;
   --color-white: #fff;
@@ -351,6 +381,137 @@ pre,
   position: relative;
   border: 1px solid var(--prose-rule);
 }
+/* Colour in answers and blocks (lib/markdown.ts): text, highlighter and callout boxes, from the
+   palette above, so each reads in both themes. */
+.md-c-red { color: var(--md-red); }
+.md-c-orange { color: var(--md-orange); }
+.md-c-yellow { color: var(--md-yellow); }
+.md-c-green { color: var(--md-green); }
+.md-c-teal { color: var(--md-teal); }
+.md-c-blue { color: var(--md-blue); }
+.md-c-purple { color: var(--md-purple); }
+.md-c-pink { color: var(--md-pink); }
+.md-c-gray { color: var(--md-gray); }
+.md-hl-red { background: color-mix(in srgb, var(--md-red) 22%, transparent); }
+.md-hl-orange { background: color-mix(in srgb, var(--md-orange) 22%, transparent); }
+.md-hl-yellow { background: color-mix(in srgb, var(--md-yellow) 22%, transparent); }
+.md-hl-green { background: color-mix(in srgb, var(--md-green) 22%, transparent); }
+.md-hl-teal { background: color-mix(in srgb, var(--md-teal) 22%, transparent); }
+.md-hl-blue { background: color-mix(in srgb, var(--md-blue) 22%, transparent); }
+.md-hl-purple { background: color-mix(in srgb, var(--md-purple) 22%, transparent); }
+.md-hl-pink { background: color-mix(in srgb, var(--md-pink) 22%, transparent); }
+.md-hl-gray { background: color-mix(in srgb, var(--md-gray) 22%, transparent); }
+:where(.md-hl-red, .md-hl-orange, .md-hl-yellow, .md-hl-green, .md-hl-teal, .md-hl-blue, .md-hl-purple, .md-hl-pink, .md-hl-gray) {
+  border-radius: 0.2em;
+  padding: 0 0.15em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.md-callout {
+  --tone: var(--md-blue);
+  margin-block: 0.9em;
+  border-left: 3px solid var(--tone);
+  border-radius: 0.6rem;
+  background: color-mix(in srgb, var(--tone) 9%, transparent);
+  padding: 0.55rem 0.85rem;
+}
+.md-callout > :last-child { margin-bottom: 0; }
+.md-callout > :nth-child(2) { margin-top: 0.2rem; }
+.md-callout-title {
+  margin: 0;
+  font-weight: 650;
+  color: var(--tone);
+}
+.md-callout-note { --tone: var(--md-blue); }
+.md-callout-key { --tone: var(--md-purple); }
+.md-callout-definition { --tone: var(--md-pink); }
+.md-callout-tip { --tone: var(--md-green); }
+.md-callout-example { --tone: var(--md-teal); }
+.md-callout-warn { --tone: var(--md-orange); }
+.md-callout-mistake { --tone: var(--md-red); }
+
+/* A page the chat's next message sends (SectionView): tinted and edged. While the mouse is over
+   the pages it is only a border, just outside the page (past the iPad's outline), so nothing
+   covers the writing in a screenshot or a shared screen. A part of a page (the iPad's screen)
+   keeps its top and bottom where that part starts and ends. */
+.sent-band {
+  --sent-edge: color-mix(in srgb, var(--color-brand-500) 60%, transparent);
+  background: color-mix(in srgb, var(--color-brand-500) 5%, transparent);
+  box-shadow: inset 0 0 0 var(--sent-line) var(--sent-edge);
+}
+.page-wrap:hover .sent-band {
+  left: calc(-1 * var(--sent-out));
+  right: calc(-1 * var(--sent-out));
+  background: none;
+  box-shadow: none;
+  border: var(--sent-line) solid var(--sent-edge);
+  border-radius: calc(var(--sent-out) * 0.75);
+}
+.page-wrap:hover .sent-band-whole {
+  margin-top: calc(-1 * var(--sent-out));
+  padding-bottom: calc(2 * var(--sent-out));
+  box-sizing: content-box;
+}
+.page-wrap:hover .sent-band-label {
+  display: none;
+}
+
+/* An interactive block in a chat answer (lib/widget.ts): its own small page in a sandboxed frame. */
+.chat-widget {
+  margin: 0.9em 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background: var(--surface-muted);
+}
+.chat-widget figcaption {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border);
+  padding: 0.35rem 0.5rem 0.35rem 0.8rem;
+  font-size: 12px;
+}
+.chat-widget-title {
+  margin-right: auto;
+  font-weight: 600;
+  color: var(--text);
+}
+.chat-widget figcaption button {
+  border-radius: 0.45rem;
+  padding: 0.15rem 0.55rem;
+  color: var(--text-muted);
+}
+.chat-widget figcaption button:hover,
+.chat-widget figcaption button[aria-expanded="true"] {
+  background: var(--surface-sunken);
+  color: var(--text);
+}
+.chat-widget iframe {
+  display: block;
+  width: 100%;
+  height: 160px;
+  border: 0;
+  background: transparent;
+  color-scheme: normal;
+}
+.chat-prose .chat-widget-source {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  max-height: 24rem;
+}
+.chat-widget-pending {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0.9rem;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.chat-widget-pending .chat-widget-title { margin-right: 0; }
+
 .chat-code-copy {
   position: absolute;
   top: 0.4rem;
@@ -454,6 +615,22 @@ pre,
 :where(a, button, input, select, textarea, summary):focus-visible {
   outline: 2px solid var(--color-brand-500);
   outline-offset: 3px;
+}
+
+/* The chat's message box (Composer.tsx): focus shows on the whole rounded box as a soft accent
+   glow, not as an outline around the text inside it. */
+.composer {
+  transition: border-color 180ms ease, box-shadow 220ms ease;
+}
+.composer:not([data-dragging]):focus-within {
+  border-color: color-mix(in srgb, var(--color-brand-500) 40%, transparent);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--color-brand-500) 9%, transparent),
+    0 10px 28px -10px color-mix(in srgb, var(--color-brand-500) 28%, transparent),
+    var(--shadow-card);
+}
+.composer textarea:focus-visible {
+  outline: none;
 }
 
 /* Shared chrome. Layered so Tailwind utilities on an element still win. */

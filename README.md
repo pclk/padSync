@@ -7,12 +7,6 @@ No AirDrop, no Handoff, no PDF round trip.
   continuous sections instead of fixed pages. Works fully offline and syncs when back online.
 - **Mac**: the same app in a browser, with a side panel that follows what the iPad is on, copies a
   section as an image or as question text, shows per-section activity, and reveals hidden solutions.
-- **AI import**: attach lecture notes (PDF, slides, images, Markdown) on *AI import*, choose what
-  to make (organised notes with blanks and annotation margins, explanations and worked examples,
-  concept maps, glossaries, recall questions, practice problems, timed tests), and send them
-  through the Mac bridge, or copy the prompt into any chat and paste the reply. Review the result
-  section by section, then import. The format is versioned (`schemaVersion: 2`) and old
-  `"padsync": 1` files still import. Design: [docs/ai-import-2026-11-17.md](docs/ai-import-2026-11-17.md).
 
 ## Setup (Vercel + Neon)
 
@@ -39,7 +33,7 @@ No AirDrop, no Handoff, no PDF round trip.
 
 ### Direct PDF import and Neon Object Storage
 
-Choose **Import PDF** on Library or AI import, or drop a PDF there. Each page becomes
+Choose **Import PDF** on Library, or drop a PDF there. Each page becomes
 an annotation section; Ask AI and copied section images include the original page.
 Maximum 100 MiB. PDF bytes cache on each device after first open for offline use.
 Without storage credentials, select **Local only** (original stays on that device).

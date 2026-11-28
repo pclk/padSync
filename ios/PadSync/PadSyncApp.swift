@@ -49,7 +49,7 @@ final class AppModel {
             database = try! AppDatabase.inMemory()
         }
         sync = SyncEngine(db: database)
-        realtime.onNotify = { [sync] in sync.requestSync(after: 0, reason: "realtime notification") }
+        realtime.onNotify = { [sync] seq in sync.notified(seq: seq) }
         realtime.onStatus = { [sync] status in sync.realtimeLive = status == .live }
         sync.onWake = { [realtime] reason in if reason == "online" { realtime.wake() } }
         cookieWatcher.onSessionChange = { [sync, realtime] in
@@ -186,13 +186,13 @@ struct NotebookRoute: Identifiable, Hashable {
     let id: String
 }
 
-/// The web app (library, AI import, chat, settings) with the native notebook editor over it.
+/// The web app (library, chat, settings) with the native notebook editor over it.
 struct RootView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         @Bindable var model = model
-        WebScreen(database: model.database, onStoreWrite: { [sync = model.sync] in sync.requestSync(reason: "web store write") }) { id in
+        WebScreen(database: model.database, covered: model.openNotebook != nil, onStoreWrite: { [sync = model.sync] in sync.requestSync(reason: "web store write") }) { id in
             model.openNotebook = NotebookRoute(id: id)
         }
             .ignoresSafeArea()

@@ -50,6 +50,7 @@ const PINCH_DEAD_ZONE = 0.03;
 const FOLLOW_IDLE_MS = 15000;
 
 
+const TOOL_KINDS: ToolState["kind"][] = ["pen", "highlighter", "eraser", "lasso", "text"];
 const DEFAULT_TOOL: ToolState = {
   kind: "pen",
   penColor: "#111827",
@@ -97,7 +98,9 @@ function Editor({ notebookId }: { notebookId: string }) {
   // Tool state saved by an older version lacks newer fields; its quick pen feel becomes pen overrides.
   const tool = useMemo(() => {
     const { penSmoothing, penSensitivity, ...rest } = storedTool;
-    return { ...DEFAULT_TOOL, ...rest, pen: rest.pen ?? legacyOverrides(penSmoothing, penSensitivity) };
+    // A tool only the iPad app has (its painter), restored from its settings, falls back to the pen.
+    const kind = TOOL_KINDS.includes(rest.kind) ? rest.kind : "pen";
+    return { ...DEFAULT_TOOL, ...rest, kind, pen: rest.pen ?? legacyOverrides(penSmoothing, penSensitivity) };
   }, [storedTool]);
   const [panelOpen, setPanelOpen] = useStoredState("padsync.panel", !isIpad);
   const [follow, setFollow] = useStoredState("padsync.follow", !isIpad);

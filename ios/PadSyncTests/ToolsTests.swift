@@ -51,7 +51,7 @@ struct DeviceSettingsTests {
         #expect(s.rail.order.prefix(4) == ["lasso", "pen", "prompts", "eraser"])
         #expect(s.rail.order.count == RailLayout.items.count)
         #expect(s.rail.hidden == ["text"])
-        #expect(s.rail.tools == [.lasso, .pen, .eraser, .highlighter])
+        #expect(s.rail.tools == [.lasso, .pen, .eraser, .painter, .highlighter])
         #expect(s.rail.promptsFirst == false)
         #expect(s.rail.dock == .right && s.rail.align == .end)
         #expect(s.rail.free[.tools] == CGPoint(x: 0.9, y: 0.5))
@@ -76,8 +76,20 @@ struct DeviceSettingsTests {
         let s = DeviceSettings(backup: nil)
         #expect(s.prompts.count == 7)
         #expect(s.gestures[.twoTap] == .undo && s.gestures[.fingerHold] == .lassoHold)
-        #expect(s.rail.tools == [.pen, .highlighter, .eraser, .lasso, .text])
+        #expect(s.rail.tools == [.pen, .highlighter, .eraser, .painter, .lasso, .text])
         #expect(s.tool.kind == .pen && s.tool.penSize == 3.4)
+    }
+
+    @MainActor @Test func thePainterHasItsOwnColourFromThePensPaletteAndNoWidth() {
+        var t = ToolState()
+        t.kind = .painter
+        #expect(t.colors == ToolState.penColors && t.sizes.isEmpty)
+        t.setColor("#1d4ed8")
+        #expect(t.paintColor == "#1d4ed8" && t.penColor == "#111827")
+        let back = ToolState(json: t.json)
+        #expect(back.kind == .painter && back.paintColor == "#1d4ed8")
+        // It adds no ink of its own.
+        #expect(Tools.canvasTool(for: t) == nil)
     }
 }
 

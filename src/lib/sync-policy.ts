@@ -1,7 +1,9 @@
-export const DEFAULT_DEBOUNCE_MS = 100;
+// Each send also wakes every other open device to fetch, so one per stroke multiplied the requests.
+export const DEFAULT_DEBOUNCE_MS = 2000;
 export const MIN_DEBOUNCE_MS = 0;
 export const MAX_DEBOUNCE_MS = 10000;
-export const VISIBLE_POLL_MS = 2000;
+// Realtime normally wakes sync; this only paces devices whose realtime is down.
+export const VISIBLE_POLL_MS = 5000;
 export const HIDDEN_POLL_MS = 60000;
 export function validDebounce(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= MIN_DEBOUNCE_MS && value <= MAX_DEBOUNCE_MS;

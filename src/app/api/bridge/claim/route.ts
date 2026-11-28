@@ -1,6 +1,7 @@
 import { chatJobContext } from '@/server/chat';
 import type { NextRequest } from "next/server";
 import { z } from "zod";
+import { createLivePass } from "@/server/auth";
 import { requireDevice } from "@/server/guard";
 import { AGENTS, BRIDGE_FEATURES, claimJob } from "@/server/jobs";
 
@@ -20,6 +21,7 @@ export async function POST(req: NextRequest) {
   const features = (parsed.data.features ?? []).filter((f): f is (typeof BRIDGE_FEATURES)[number] => (BRIDGE_FEATURES as readonly string[]).includes(f));
   const job = await claimJob(auth.sql, auth.device.id, parsed.data.agents, features);
   const body = { job: job ? { ...job, ...(job.kind === 'chat' ? await chatJobContext(auth.sql, job.id) : {}) } : null };
-  // serverTime lets the bridge line its clock up with ours for latency traces.
-  return Response.json({ ...body, serverTime: Date.now() }, { headers: { "cache-control": "no-store" } });
+  // serverTime lets the bridge line its clock up with ours for latency traces; livePass lets it
+  // renew its realtime query without a database round trip (src/app/api/bridge/live/route.ts).
+  return Response.json({ ...body, serverTime: Date.now(), livePass: createLivePass(auth.device.id) }, { headers: { "cache-control": "no-store" } });
 }

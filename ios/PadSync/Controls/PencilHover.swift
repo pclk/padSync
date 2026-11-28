@@ -50,10 +50,14 @@ final class HoverRingView: UIView {
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    func show(at p: CGPoint, diameter: CGFloat, dashed: Bool) {
-        let d = max(8, diameter)
+    /// A ring, grey and see-through; or with `dot`, a small solid dot in that colour (the
+    /// painter's tip, in its paint).
+    func show(at p: CGPoint, diameter: CGFloat, dashed: Bool, dot: UIColor? = nil) {
+        let d = dot == nil ? max(8, diameter) : diameter
         CATransaction.begin()
         CATransaction.setDisableActions(true)
+        ring.strokeColor = (dot == nil ? UIColor.systemGray : UIColor.white.withAlphaComponent(0.9)).cgColor
+        ring.fillColor = (dot ?? UIColor.systemGray.withAlphaComponent(0.12)).cgColor
         bounds = CGRect(x: 0, y: 0, width: d, height: d)
         center = p
         ring.frame = bounds

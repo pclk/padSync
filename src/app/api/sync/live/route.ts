@@ -1,12 +1,14 @@
 import type { NextRequest } from 'next/server';
 import { createRealtime, rawSql } from '@neon/realtime/server';
-import { requireSession } from '@/server/guard';
+import { requireLogin } from '@/server/guard';
 import { databaseUrl } from '@/server/db';
 
 // The app admits a single GitHub account and shares its notebooks across devices.
 // Only a metadata hint is sealed; notebook contents still require authenticated HTTP sync.
+// Renewed every minute by each open device, so it never touches the database: Neon can then scale
+// to zero while devices sit idle with realtime connected.
 export async function POST(req: NextRequest) {
-  const auth = await requireSession(req);
+  const auth = requireLogin(req);
   if (auth instanceof Response) return auth;
   const headers = { 'Cache-Control': 'no-store' };
   const url = process.env.NEON_REALTIME_URL;

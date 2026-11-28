@@ -231,6 +231,53 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
         }
     }
 
+    // The canvas is a window onto the page, not the whole page: about two and a half screens
+    // tall, sliding along the section as it scrolls, with the page's ink as its content.
+    // - Changing a PKCanvasView's height makes PencilKit build every tile again, and until it
+    //   has, the ink blinks, thickens and jumps; sliding it and changing its content size don't
+    //   (probed in the simulator, 2026-11-28). So the page growing as you write leaves its size be.
+    // - A canvas much over 8,000 pixels tall on screen draws all its ink (and the Pencil's hover
+    //   and new strokes) enlarged towards the bottom right until it's made again: seen with a
+    //   page-height canvas plus room, and a window kept tall while zooming in. So its height on
+    //   screen is capped at maxPixels, whatever the zoom or the page's length.
+
+    /// The tallest the canvas may be on screen, in pixels.
+    static let maxPixels: CGFloat = 6000
+
+    /// The part of this section on screen (section units) and how many pixels one unit is.
+    private var shown: (top: CGFloat, bottom: CGFloat, pixels: CGFloat)?
+
+    /// Places the canvas over the part of the section on screen, with room around it. It moves
+    /// only when the screen nears its edge, and never under the Pencil (a move then waits for the
+    /// lift); its height changes only with the zoom, in steps, and at once if over the cap.
+    func showCanvas(top: CGFloat, bottom: CGFloat, pixelsPerUnit: CGFloat) {
+        shown = (top, bottom, max(pixelsPerUnit, 0.01))
+        placeCanvas()
+    }
+
+    private func placeCanvas() {
+        guard let shown else { return }
+        let screen = max(1, shown.bottom - shown.top)
+        let cap = Self.maxPixels / shown.pixels
+        var f = canvas.frame
+        // Over the cap even mid-stroke: a canvas that tall is what goes wrong.
+        let tooTall = f.height > cap
+        guard tooTall || !context.inking.contains(ObjectIdentifier(canvas)) else { return }
+        let resize = tooTall || f.height < min(cap, screen * 1.6)
+        if resize { f.size.height = floor(min(cap, screen * 2.5)) }
+        let room = max(0, f.height - screen) / 6
+        if resize || f.width != Self.pageWidth || (f.minY > 0 && shown.top < f.minY + room) || shown.bottom > f.maxY - room {
+            f.origin.y = max(0, (shown.top - (f.height - screen) / 2).rounded())
+        }
+        f.origin.x = 0
+        f.size.width = Self.pageWidth
+        if f != canvas.frame {
+            canvas.frame = f
+            canvas.contentOffset = CGPoint(x: 0, y: f.minY)
+        }
+        canvas.contentSize = CGSize(width: Self.pageWidth, height: max(height, f.maxY))
+    }
+
     private func relayout() {
         let inkBottom = entities.values.map { StrokeCodec.bottom($0.data) }.max() ?? 0
         let textBottom = textboxes.map { ($0.data["y"]?.double ?? 0) + 120 }.max() ?? 0
@@ -247,12 +294,13 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
         if let image = blocksView.image {
             blocksView.frame = CGRect(x: 0, y: 0, width: Self.pageWidth, height: image.size.height * Self.pageWidth / max(image.size.width, 1))
         }
-        canvas.frame = CGRect(x: 0, y: 0, width: Self.pageWidth, height: next)
-        canvas.contentSize = canvas.bounds.size
-        imageLayer.frame = canvas.frame
+        canvas.contentSize = CGSize(width: Self.pageWidth, height: max(next, canvas.frame.maxY))
+        imageLayer.frame = CGRect(x: 0, y: 0, width: Self.pageWidth, height: next)
         if next != height {
             height = next
-            bounds.size.height = next
+            // The frame, not the bounds: resizing the bounds keeps the centre, so the page would
+            // jump up by half the growth until the column placed it again.
+            frame.size.height = next
             onHeightChange()
         }
     }
@@ -412,6 +460,8 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
     func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
         context.inking.remove(ObjectIdentifier(canvasView))
         if pendingRemote { Task { try? await reload() } }
+        // A move held back while the Pencil was down.
+        placeCanvas()
     }
 
     func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
@@ -499,7 +549,9 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
             selectionView.isHidden = true
             return
         }
-        selectionView.frame = sel.box.insetBy(dx: -8, dy: -8)
+        // A fixed distance on screen whatever the zoom; NotebookViewController calls this again as it zooms.
+        let pad = SelectionBoxView.padding / max(HandleView.screenScale(of: self), 0.01)
+        selectionView.frame = sel.box.insetBy(dx: -pad, dy: -pad)
         selectionView.showsHandles = !sel.keys.isEmpty || !sel.images.isEmpty
         selectionView.setNeedsLayout()
         selectionView.isHidden = false

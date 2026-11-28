@@ -11,6 +11,7 @@ import type {
   Turn,
 } from "@/lib/chat-types";
 import {
+  CHAT_IDLE_AFTER_MS,
   createPollScheduler,
   describeModel,
   exportMarkdown,
@@ -106,7 +107,14 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
     const timer = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(timer);
   }, []);
+  // When this chat last changed or was used; quiet for CHAT_IDLE_AFTER_MS, its polls slow down.
+  const activeAt = useRef(0);
+  useEffect(() => {
+    activeAt.current = Date.now();
+  }, []);
+  const idle = () => Date.now() - activeAt.current > CHAT_IDLE_AFTER_MS;
   const select = (next: string) => {
+    activeAt.current = Date.now();
     writeDraft(id, draft);
     setDraft(readDraft(next));
     selected.current = next;
@@ -118,6 +126,7 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
     since.current = undefined;
   };
   const refresh = () => {
+    activeAt.current = Date.now();
     listPoll.current?.refresh();
     detailPoll.current?.refresh();
   };
@@ -129,7 +138,8 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
   useEffect(() => {
     if (!desktop || !p.visible || !tabVisible || !id || !p.notebookId) return;
     void publishChatFocus(p.notebookId, id);
-    const timer = setInterval(() => void publishChatFocus(p.notebookId, id), 10 * 60_000);
+    // The iPad trusts a focus for 12 h (ios/PadSync/Controls/Prompts.swift); each write wakes the database.
+    const timer = setInterval(() => void publishChatFocus(p.notebookId, id), 2 * 3_600_000);
     return () => clearInterval(timer);
   }, [desktop, p.visible, tabVisible, id, p.notebookId]);
   const ping = useLiveQuery(() => (desktop && p.notebookId ? latestChatPing(p.notebookId) : undefined), [desktop, p.notebookId]);
@@ -176,8 +186,8 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
         })
         .catch(() => {});
     load();
-    // Picks up a default changed on another device without a reload.
-    const timer = setInterval(load, 60_000);
+    // Picks up a default changed on another device without a reload (showing the tab again does too).
+    const timer = setInterval(load, 10 * 60_000);
     return () => clearInterval(timer);
   }, [p.visible, tabVisible]);
   useEffect(() => {
@@ -196,14 +206,17 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
             q: query,
             archived: filter === "archived",
           });
-          setThreads(data.threads);
+          setThreads((old) => {
+            if (JSON.stringify(old) !== JSON.stringify(data.threads)) activeAt.current = Date.now();
+            return data.threads;
+          });
           setBridge(data.bridgeSeenAt);
           setNow(Date.now());
         } catch (e) {
           setError((e as Error).message);
         }
       },
-      () => pollDelay("list", false),
+      () => pollDelay("list", false, false, idle()),
       () => p.visible && tabVisible,
     );
     listPoll.current = scheduler;
@@ -232,6 +245,7 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
             if (["done", "error", "cancelled"].includes(t.status) && markLocal(t.jobId, "client.done_seen", seenAt)) reportMarks(t.jobId, { "client.done_seen": seenAt });
           }
           if (!live || selected.current !== id) return;
+          if (data.turns.length) activeAt.current = Date.now();
           setThread(data.thread);
           setTurns((old) => api.mergeTurns(old, data.turns));
           setLoadedId(id);
@@ -257,6 +271,7 @@ export function useChat(p: { notebookId: string; visible: boolean }) {
             ["queued", "running", "uploading"].includes(t.status),
           ),
           realtimeLive.current,
+          idle(),
         ),
       () => p.visible && tabVisible,
     );

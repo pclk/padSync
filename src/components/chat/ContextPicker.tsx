@@ -4,6 +4,7 @@ import {
   useEffect,
   useImperativeHandle,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { sectionSource } from "@/lib/export";
@@ -67,6 +68,8 @@ export interface ContextTarget {
   view: ScreenView | null;
 }
 type Scope = ContextSummary["scope"];
+/** The keys for SECTION_SPANS, in order: ⌥1 to ⌥4. */
+const SPAN_KEYS = ["Digit1", "Digit2", "Digit3", "Digit4"];
 const title = (s: SectionEntity | null, sections: SectionEntity[]) =>
   s ? (s.data.title ?? `Section ${sections.indexOf(s) + 1}`) : "No section";
 
@@ -142,6 +145,28 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
     const { onTarget, visible } = p;
     useEffect(() => onTarget?.(visible === false ? null : target), [onTarget, visible, target]);
     useEffect(() => () => onTarget?.(null), [onTarget]);
+    // ⌥1 to ⌥4 pick the section, + above, + below and the screen, like pressing the pills; by
+    // the key's position, as Option turns digits into symbols on a Mac. While typing too.
+    const pickSpan = (v: SectionSpan) => {
+      setSpan(v);
+      choose("section");
+    };
+    const pickRef = useRef(pickSpan);
+    useEffect(() => {
+      pickRef.current = pickSpan;
+    });
+    useEffect(() => {
+      if (visible === false) return;
+      const key = (e: KeyboardEvent) => {
+        if (!e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
+        const i = SPAN_KEYS.indexOf(e.code);
+        if (i < 0) return;
+        e.preventDefault();
+        pickRef.current(SECTION_SPANS[i].v);
+      };
+      window.addEventListener("keydown", key);
+      return () => window.removeEventListener("keydown", key);
+    }, [visible]);
     useEffect(() => {
       let live = true;
       // Nothing from the notebook needs none of its strokes read.
@@ -293,7 +318,7 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
           aria-label="Send with your message"
           className="flex shrink-0 rounded-full border border-slate-200 bg-white p-0.5 text-xs font-medium"
         >
-          {SECTION_SPANS.map((s) => {
+          {SECTION_SPANS.map((s, i) => {
             const on = scope === "section" && span === s.v;
             const label = s.v === "viewport" ? (focused.fromIpad ? "iPad" : "Screen") : s.label;
             return (
@@ -301,21 +326,20 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
                 key={s.v}
                 role="radio"
                 aria-checked={on}
-                title={
+                title={`${
                   s.v === "viewport"
                     ? `Exactly what ${focused.fromIpad ? "the iPad" : "this screen"} shows, zoom included`
                     : s.v === "section"
                       ? `Only ${sectionName}${focused.fromIpad ? ", where the iPad is" : ""}`
                       : `${sectionName} and the section ${s.v}`
-                }
+                } (⌥${i + 1})`}
                 className={`flex items-center gap-1 rounded-full px-2.5 py-1 transition-colors pointer-coarse:px-3 pointer-coarse:py-2 ${on ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-100"}`}
-                onClick={() => {
-                  setSpan(s.v);
-                  choose("section");
-                }}
+                aria-keyshortcuts={`Alt+${i + 1}`}
+                onClick={() => pickSpan(s.v)}
               >
                 {s.v === "section" && focused.fromIpad && <Icon name="tablet" className="shrink-0" />}
                 {label}
+                <span className="kbd ml-0.5 tabular-nums">⌥{i + 1}</span>
               </button>
             );
           })}

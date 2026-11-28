@@ -4,8 +4,8 @@ import Observation
 
 /// Sync timing from /api/sync-config, in ms (src/lib/sync-policy.ts).
 struct SyncConfig: Decodable, Sendable, Equatable {
-    var debounceMs = 100
-    var visiblePollMs = 2000
+    var debounceMs = 2000
+    var visiblePollMs = 5000
     var hiddenPollMs = 60000
     var retryBaseMs = 2000
 }
@@ -72,6 +72,16 @@ final class SyncEngine {
     @ObservationIgnored private var retryAt = Date.distantPast
     @ObservationIgnored private var inkHeldSince: Date?
     @ObservationIgnored private var configCheckedAt = Date.distantPast
+    /// The server cursor after the last applied pull, and the newest seq a notification announced
+    /// while a request was in flight. Every push echoes back as a notification; its own response
+    /// already moved the cursor past it, so fetching again would only bring back nothing.
+    @ObservationIgnored private var syncedCursor: Int64 = -1
+    /// The last local edit, request or incoming change. Every poll reaches Postgres, and anything more
+    /// often than every 5 minutes keeps Neon from scaling to zero, so polls slow down once it's old.
+    @ObservationIgnored private var activeAt = Date.now
+    static let idleAfter: TimeInterval = 5 * 60
+    static let idlePoll: TimeInterval = 10 * 60
+    @ObservationIgnored private var notifiedSeq: Int64 = 0
     @ObservationIgnored private var pathMonitor: NWPathMonitor?
 
     static let entityBatch = 100 // strokes are a few KB; stay under Vercel's 4.5 MB body limit
@@ -115,8 +125,17 @@ final class SyncEngine {
         requestSync(after: 0, reason: reason)
     }
 
+    /// A realtime notification, with the newest seq it announced when the hint carried one.
+    func notified(seq: Int64?) {
+        if let seq, seq <= syncedCursor { return }
+        // The request in flight may be the push that caused it; decide once its response is in.
+        if let seq, running { notifiedSeq = max(notifiedSeq, seq); return }
+        requestSync(after: 0, reason: "realtime notification")
+    }
+
     /// A local edit (default delay: the send delay) or an explicit request.
     func requestSync(after delay: TimeInterval? = nil, reason: String = "local edit") {
+        activeAt = .now
         schedule(after: delay ?? Double(config.debounceMs) / 1000, reason: reason)
     }
 
@@ -126,8 +145,8 @@ final class SyncEngine {
 
     var pollDelay: TimeInterval {
         let configured = Double(active ? config.visiblePollMs : config.hiddenPollMs) / 1000
-        guard realtimeLive else { return configured }
-        return max(active ? Self.realtimeRecovery.active : Self.realtimeRecovery.hidden, configured)
+        let delay = realtimeLive ? max(active ? Self.realtimeRecovery.active : Self.realtimeRecovery.hidden, configured) : configured
+        return Date.now.timeIntervalSince(activeAt) > Self.idleAfter ? max(delay, Self.idlePoll) : delay
     }
 
     /// A later request never postpones an earlier deadline, which bounds latency while writing.
@@ -172,8 +191,10 @@ final class SyncEngine {
             let backoff = Double(config.retryBaseMs) / 1000 * pow(2, Double(min(failures - 1, 16)))
             retryAt = Date.now.addingTimeInterval(min(60, backoff))
         }
-        if again {
-            again = false
+        let pending = again || notifiedSeq > syncedCursor
+        again = false
+        notifiedSeq = 0
+        if pending {
             schedule(after: 0, reason: "follow-up")
         } else {
             schedule(after: max(pollDelay, retryAt.timeIntervalSinceNow), reason: "poll")
@@ -181,7 +202,8 @@ final class SyncEngine {
     }
 
     private func refreshConfig() async {
-        guard Date.now.timeIntervalSince(configCheckedAt) > 60 else { return }
+        // Timing changes rarely; waking (foreground, online, sign-in) refreshes it sooner.
+        guard Date.now.timeIntervalSince(configCheckedAt) > 600 else { return }
         configCheckedAt = .now
         guard let (data, code) = try? await transport.send("GET", "/api/sync-config", body: nil), code == 200,
               let next = try? JSONDecoder().decode(SyncConfig.self, from: data) else { return }
@@ -228,6 +250,8 @@ final class SyncEngine {
         let db = db
         let sent = batch
         _ = try await Task.detached { try db.applySync(sent: sent, changes: remote, cursor: cursor) }.value
+        syncedCursor = cursor
+        if !remote.isEmpty { activeAt = .now }
         status = .synced
         lastSyncedAt = .now
         return (json["more"] as? Bool ?? false) || read == Self.entityBatch || batch.entities.count < read || batch.events.count == Self.eventBatch

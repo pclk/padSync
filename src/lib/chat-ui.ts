@@ -88,8 +88,14 @@ export function exportMarkdown(thread: ThreadSummary, turns: Turn[]) {
   );
 }
 /** With a live query (src/lib/live-query.ts) waking the open chat, polling is only a backup. */
-export const pollDelay = (kind: "list" | "thread", active: boolean, live = false) =>
+export const pollDelay = (kind: "list" | "thread", active: boolean, live = false, idle = false) =>
+  // Idle (no reply running, nothing changed for a while): every poll reaches Postgres, and anything
+  // more often than every 5 minutes keeps Neon from scaling to zero.
+  idle && !active ? CHAT_IDLE_POLL_MS :
   kind === "list" ? 30_000 : live ? (active ? 3000 : 30_000) : active ? 600 : 15_000;
+/** How long the chat goes without a change, or anything done in it, before it counts as idle. */
+export const CHAT_IDLE_AFTER_MS = 5 * 60_000;
+export const CHAT_IDLE_POLL_MS = 10 * 60_000;
 /** A completion-scheduled timer owns one request; visibility changes invalidate scheduled work. */
 export function createPollScheduler(
   request: () => Promise<unknown>,

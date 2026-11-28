@@ -89,7 +89,7 @@ describe("theme preference setting", () => {
     } as unknown as Document;
     applyTheme("dark", doc);
     expect(attrs.get("data-theme")).toBe("dark");
-    expect(metas.every((m) => m.get("content") === "#161b23")).toBe(true);
+    expect(metas.every((m) => m.get("content") === "#000000")).toBe(true);
   });
 });
 

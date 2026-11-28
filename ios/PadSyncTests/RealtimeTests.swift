@@ -69,7 +69,7 @@ struct RealtimeTests {
         let socket = FakeSocket()
         let realtime = Realtime(transport: LiveTransport([LiveTransport.enabled()]), socket: socket)
         var notes = 0, statuses: [Realtime.Status] = []
-        realtime.onNotify = { notes += 1 }
+        realtime.onNotify = { _ in notes += 1 }
         realtime.onStatus = { statuses.append($0) }
         realtime.active = true
         await settle { !socket.connects.isEmpty }
@@ -159,7 +159,7 @@ struct RealtimeTests {
     @Test func livePollsSlowerButStillPolls() {
         let sync = SyncEngine(db: try! AppDatabase.inMemory(), transport: LiveTransport([(404, "")]))
         sync.active = true
-        #expect(sync.pollDelay == 2)
+        #expect(sync.pollDelay == 5) // the 5 s default now matches the live recovery poll
         sync.realtimeLive = true
         #expect(sync.pollDelay == 5)
         sync.active = false
@@ -183,5 +183,42 @@ struct RealtimeTests {
         #expect(!snapshots.isEmpty)
         #expect(snapshots.allSatisfy { $0.generation == 7 && $0.status != "live" })
         socket.close()
+    }
+
+    @Test func readsTheAnnouncedSeq() {
+        #expect(RealtimeSnapshot(generation: 1, status: "live", signature: #"[{"id":"a","seq":"42"}]"#).latestSeq == 42)
+        #expect(RealtimeSnapshot(generation: 1, status: "live", signature: "[]").latestSeq == nil)
+        #expect(RealtimeSnapshot(generation: 1, status: "live").latestSeq == nil)
+    }
+
+    /// A push echoes back as a notification; the device already has it, so it doesn't fetch again.
+    @Test func skipsANotificationItAlreadyHas() async {
+        let transport = SyncCounter(cursor: 7)
+        let sync = SyncEngine(db: try! AppDatabase.inMemory(), transport: transport)
+        sync.start()
+        await settle { transport.syncs >= 1 && sync.status == .synced }
+        // Starting also wakes for the network coming up; let that land before counting.
+        try? await Task.sleep(for: .milliseconds(300))
+        let before = transport.syncs
+        sync.notified(seq: 7)
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(transport.syncs == before)
+        sync.notified(seq: 8)
+        await settle { transport.syncs == before + 1 }
+        #expect(transport.syncs == before + 1)
+        sync.stop()
+    }
+}
+
+/// Answers /api/sync with nothing new at a fixed cursor, and counts the calls.
+final class SyncCounter: SyncTransport, @unchecked Sendable {
+    let cursor: Int
+    var syncs = 0
+    init(cursor: Int) { self.cursor = cursor }
+
+    func send(_ method: String, _ path: String, body: Data?) async throws -> (Data, Int) {
+        guard path == "/api/sync" else { return (Data(), 404) }
+        syncs += 1
+        return (Data(#"{"changes":[],"cursor":\#(cursor),"more":false}"#.utf8), 200)
     }
 }

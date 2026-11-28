@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  COLOR_GUIDE,
   CONTEXT_FILE,
   IMAGE_FILE,
   JOB_DIR_PREFIX,
@@ -123,7 +124,8 @@ describe("path-only prompt", () => {
     expect(p).toContain(files.image);
     expect(p).toContain(files.context);
     expect(p).toMatch(/Read tool/);
-    expect(p.length).toBeLessThan(1500);
+    // Short apart from the fixed formatting guide: the inputs are named, not pasted in.
+    expect(p.length - COLOR_GUIDE.length).toBeLessThan(1500);
   });
 
   it("codex: the image is attached, so the prompt says not to open it again", () => {

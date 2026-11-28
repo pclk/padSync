@@ -45,6 +45,14 @@ struct RealtimeSnapshot: Equatable, Sendable {
     var error: String?
     /// The live rows as JSON; a change means the server has something new.
     var signature: String?
+
+    /// The newest entity seq the rows announce (the query's one row, `[{"id":…,"seq":"…"}]`).
+    var latestSeq: Int64? {
+        guard let data = signature?.data(using: .utf8),
+              let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+              let seq = rows.first?["seq"] else { return nil }
+        return (seq as? String).flatMap { Int64($0) } ?? (seq as? NSNumber)?.int64Value
+    }
 }
 
 /// Holds the realtime socket: the web's own Neon client in a hidden web view, a fake in tests.
@@ -65,7 +73,7 @@ final class Realtime {
     }
 
     private(set) var status: Status = .suspended
-    var onNotify: () -> Void = {}
+    var onNotify: (Int64?) -> Void = { _ in }
     var onStatus: (Status) -> Void = { _ in }
 
     /// Foreground with a notebook open. Turning it on connects; off closes the socket.
@@ -209,7 +217,7 @@ final class Realtime {
             failures = 0
             if !wasLive || snapshot.signature != signature {
                 signature = snapshot.signature
-                onNotify()
+                onNotify(snapshot.latestSeq)
             }
         default:
             publish(.connecting)

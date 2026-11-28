@@ -146,8 +146,8 @@ final class SelectionBoxView: UIView {
     var onDrag: (CGPoint, UIGestureRecognizer.State) -> Void = { _, _ in }
     /// A handle dragged by (section units) so far.
     var onResize: (BoxHandle, CGPoint, UIGestureRecognizer.State) -> Void = { _, _, _ in }
-    /// The eight resize handles, on the box (8 pt inside this view's edges); off for a selection
-    /// that holds nothing to resize.
+    /// The eight resize handles, just outside the dashed border (this view's edges), so the whole
+    /// box drags the selection; off for a selection that holds nothing to resize.
     private let handles = BoxHandle.allCases.map { HandleView($0) }
     var showsHandles = true { didSet { setNeedsLayout() } }
 
@@ -170,13 +170,19 @@ final class SelectionBoxView: UIView {
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
+    /// Air between the selection and its border, in screen points (SectionView.showSelection).
+    static let padding: CGFloat = 8
+
+    // The border and handles are controls, not part of the page: the same on screen at any zoom.
     override func layoutSubviews() {
         super.layoutSubviews()
+        let scale = max(HandleView.screenScale(of: self), 0.01)
         border.path = UIBezierPath(rect: bounds).cgPath
-        let box = bounds.insetBy(dx: 8, dy: 8), scale = HandleView.screenScale(of: self)
+        border.lineWidth = 1.5 / scale
+        border.lineDashPattern = [NSNumber(value: Double(6 / scale)), NSNumber(value: Double(4 / scale))]
         for h in handles {
-            h.isHidden = !showsHandles || !HandleView.shows(h.handle, on: box, scale: scale)
-            h.layOut(on: box, scale: scale)
+            h.isHidden = !showsHandles || !HandleView.shows(h.handle, on: bounds, scale: scale, minSide: 32)
+            h.layOut(on: bounds, scale: scale, outside: true)
         }
     }
 

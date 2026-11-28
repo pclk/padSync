@@ -289,3 +289,20 @@ describe("runAgent (with fake agent processes)", () => {
     expect(r).toMatchObject({ status: "error", error: "usage limit" });
   });
 });
+
+describe("answer formatting guide", () => {
+  it("teaches colour in every prompt and interactive pages in the chat's", async () => {
+    const { buildAgentPrompt, buildBundlePrompt, COLOR_GUIDE, INTERACTIVE_GUIDE } = await import("../bridge/lib");
+    const chat = buildBundlePrompt("Why?", { dir: "/tmp/job", files: [], out: undefined }, "claude");
+    expect(chat).toContain(COLOR_GUIDE);
+    expect(chat).toContain(INTERACTIVE_GUIDE);
+    // The syntax taught is the syntax the chat renders (src/lib/markdown.ts).
+    expect(COLOR_GUIDE).toContain("[text]{.blue}");
+    expect(COLOR_GUIDE).toContain(":::key");
+    expect(COLOR_GUIDE).toContain("\\red{");
+    expect(INTERACTIVE_GUIDE).toContain("```interactive");
+    const ask = buildAgentPrompt("Q?", {});
+    expect(ask).toContain(COLOR_GUIDE);
+    expect(ask).not.toContain(INTERACTIVE_GUIDE);
+  });
+});

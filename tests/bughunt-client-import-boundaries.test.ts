@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { renderMarkdown } from "@/lib/markdown";
 import { parseReturnedNotebook } from "@/lib/roundtrip";
-import { checkLimits } from "@/lib/attachments";
-import { MAX_TOTAL_BYTES } from "@/lib/uploads";
 
 describe("import boundaries", () => {
   it("escapes raw HTML inside link labels", () => {
@@ -12,9 +10,6 @@ describe("import boundaries", () => {
     const result = parseReturnedNotebook(JSON.stringify({ sections: [{ id: "deleted-section", blocks: [] }] }), []);
     expect(result.changes).toEqual([]);
     expect(result.problems.length).toBeGreaterThan(0);
-  });
-  it("accounts for padding of each file at the aggregate upload limit", () => {
-    expect(checkLimits([{ name: "a", size: 1 }, { name: "b", size: MAX_TOTAL_BYTES / 2 - 1 }, { name: "c", size: MAX_TOTAL_BYTES / 2 }]).length).toBeGreaterThan(0);
   });
 });
 

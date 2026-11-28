@@ -3,7 +3,7 @@ import { debugNow, recordSyncPaint, registerDebugProbe } from "@/lib/sync-debug"
 import { renderFlag } from "@/lib/render-flags";
 
 import { useLiveQuery } from "dexie-react-hooks";
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { InkController, Selection, SectionHandle } from "@/ink/controller";
 import { strokeBox, unionBox, type Box } from "@/ink/geometry";
 import { paintStrokes } from "@/ink/render";
@@ -211,15 +211,17 @@ export const SectionView = memo(function SectionView(p: Props) {
         </div>
       )}
       {p.sent && (
-        // Tinted, edged in the accent: what goes to the AI with the next message.
+        // Tinted, edged in the accent: what goes to the AI with the next message. With the mouse
+        // over the pages it becomes a border outside the page instead (globals.css .sent-band), so
+        // a screenshot or a shared screen shows the page as it is.
         <div
           aria-hidden
           data-sent-to-ai
           data-page-overlay
-          className="pointer-events-none absolute inset-x-0 z-10 bg-brand-500/[0.05]"
-          style={{ top: p.sentY0 ?? 0, height: (p.sentY1 ?? height) - (p.sentY0 ?? 0), boxShadow: `inset 0 0 0 ${2 / p.zoom}px color-mix(in srgb, var(--color-brand-500) 60%, transparent)` }}
+          className={`sent-band pointer-events-none absolute inset-x-0 z-10 ${p.sentY0 === undefined ? "sent-band-whole" : ""}`}
+          style={{ top: p.sentY0 ?? 0, height: (p.sentY1 ?? height) - (p.sentY0 ?? 0), "--sent-line": `${2 / p.zoom}px`, "--sent-out": `${12 / p.zoom}px` } as CSSProperties}
         >
-          <span className="absolute right-0 top-0 origin-top-right whitespace-nowrap rounded-bl-md bg-brand-600 px-1.5 py-0.5 text-[11px] font-semibold text-white" style={{ transform: `scale(${1 / p.zoom})` }}>
+          <span className="sent-band-label absolute right-0 top-0 origin-top-right whitespace-nowrap rounded-bl-md bg-brand-600 px-1.5 py-0.5 text-[11px] font-semibold text-white" style={{ transform: `scale(${1 / p.zoom})` }}>
             Sent to AI
           </span>
         </div>

@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { EXAMPLE_PAYLOAD, buildPrompt, parsePayload, payloadToSections } from "@/lib/payload";
 import { MAX_PAYLOAD_CHARS, MIGRATIONS, SCHEMA_VERSION, extractJson, migrate, parsePayloadText, parsePayloadValue } from "@/lib/schema";
 
 // The v2 payload schema: validation, tolerance of AI output, unknown fields, old versions,
@@ -9,15 +8,6 @@ const v2 = (sections: unknown[], extra: Record<string, unknown> = {}) => ({ sche
 const one = (blocks: unknown[], section: Record<string, unknown> = {}) => parsePayloadValue(v2([{ title: "S", blocks, ...section }]));
 
 describe("valid payloads", () => {
-  it("accepts the example (every block type the prompt teaches) without warnings", () => {
-    const r = parsePayloadValue(EXAMPLE_PAYLOAD);
-    expect(r.errors).toEqual([]);
-    expect(r.warnings).toEqual([]);
-    expect(r.payload!.sections).toHaveLength(EXAMPLE_PAYLOAD.sections.length);
-    const types = new Set(r.payload!.sections.flatMap((s) => s.blocks.map((b) => b.type)));
-    for (const t of ["callout", "steps", "cloze", "rewrite", "glossary", "markdown", "space", "recall", "checkpoint"]) expect(types).toContain(t);
-  });
-
   it("accepts every study block and section field", () => {
     const r = one(
       [
@@ -78,13 +68,6 @@ describe("old versions and migration", () => {
     expect(r.ok).toBe(true);
     expect(r.warnings.join("\n")).toMatch(/newer padSync \(schemaVersion 7\)/);
     expect(r.payload!.sections[0].blocks[1]).toEqual({ type: "markdown", text: "fancy" });
-  });
-
-  it("parsePayload (all or nothing) still works for old callers", () => {
-    const ok = parsePayload(JSON.stringify(v1));
-    expect(ok.ok).toBe(true);
-    const bad = parsePayload(JSON.stringify({ padsync: 1, title: "x", sections: [{ blocks: [{ type: "markdown" }] }, { blocks: [] }] }));
-    expect(bad.ok).toBe(false);
   });
 });
 
@@ -208,28 +191,5 @@ describe("extracting JSON from a chat reply", () => {
     expect(extractJson("Sure! " + json + " Hope it helps")).toBe(json);
     expect(extractJson("﻿" + json)).toBe(json);
     expect(parsePayloadText("Sure:\n```JSON\n" + json + "\n```").ok).toBe(true);
-  });
-});
-
-describe("the prompt", () => {
-  it("teaches every block type and section field, with goals and files", () => {
-    const p = buildPrompt({ request: "Lecture 9", goals: ["skeleton", "practice"], files: ["L9 slides.pdf"], delivery: "chat" });
-    for (const t of ["markdown", "code", "image", "space", "divider", "callout", "steps", "glossary", "conceptMap", "cloze", "recall", "rewrite", "prompt", "checkpoint"]) expect(p).toContain(`"type": "${t}"`);
-    for (const f of ['"kind"', '"objectives"', '"margin"', '"schemaVersion": 2', "blankWhy", "hideDefinitions"]) expect(p).toContain(f);
-    expect(p).toContain("Note skeleton for handwriting");
-    expect(p).toContain("1. L9 slides.pdf");
-    expect(p).toMatch(/Reply with only the JSON/);
-    expect(buildPrompt({ request: "", delivery: "file" })).toMatch(/figures\/graph\.png/);
-    // The embedded example must parse with the schema it teaches.
-    const example = p.slice(p.indexOf("EXAMPLE\n") + 8);
-    expect(parsePayloadText(example).warnings).toEqual([]);
-  });
-
-  it("maps sections to notebook data with sensible defaults", () => {
-    const secs = payloadToSections(EXAMPLE_PAYLOAD);
-    expect(secs[0]).toMatchObject({ kind: "notes", template: "lines", objectives: expect.any(Array), margin: { side: "right" } });
-    expect(secs[2]).toMatchObject({ kind: "problem", template: "plain", marks: 3 });
-    expect(secs[2].minHeight).toBeGreaterThan(secs[0].minHeight);
-    expect(payloadToSections({ sections: [{ blocks: [] }] })[0]).not.toHaveProperty("kind");
   });
 });

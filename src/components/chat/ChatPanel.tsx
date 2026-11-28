@@ -23,9 +23,12 @@ export function ChatPanel(
   const running = turns.some((t) =>
     ["queued", "running", "uploading"].includes(t.status),
   );
+  // A connected bridge claims a new turn within a second or two; it no longer checks in on a timer
+  // (that kept Neon from scaling to zero), so a turn left queued is what says it's away. A turn
+  // behind one still running is only waiting its turn.
   const bridgeAway =
-    turns.some((t) => t.status === "queued") &&
-    (!c.bridge || c.now - Date.parse(c.bridge) > 30000);
+    !turns.some((t) => t.status === "running" || t.status === "uploading") &&
+    turns.some((t) => t.status === "queued" && c.now - Date.parse(t.createdAt) > 15000);
   const threadActions: [string, IconName, string, () => void][] = thread
     ? [
         [
@@ -61,7 +64,7 @@ export function ChatPanel(
                       latencyReport(thread, turns, {
                         device: navigator.userAgent,
                         pollMs: { active: pollDelay("thread", true, c.realtime()), idle: pollDelay("thread", false, c.realtime()) },
-                        bridgePollMs: 3000, // bridge/padsync-bridge.ts POLL_MS (10 s once its own live query connects)
+                        bridgePollMs: 3000, // bridge/padsync-bridge.ts POLL_MS (30 min once its own live query connects)
                         realtime: c.realtime(),
                       }),
                     ),

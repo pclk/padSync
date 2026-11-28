@@ -12,7 +12,6 @@ import { startDeviceSettings } from "@/lib/device-settings";
 const views = {
   library: dynamic(() => import("./Library"), { ssr: false }),
   notebook: dynamic(() => import("./NotebookEditor"), { ssr: false }),
-  import: dynamic(() => import("./AiImportView"), { ssr: false }),
   settings: dynamic(() => import("./SettingsView"), { ssr: false }),
   "pencil-lab": dynamic(() => import("./PencilLab"), { ssr: false }),
   "pencil-test": dynamic(() => import("./PencilTestView"), { ssr: false }),

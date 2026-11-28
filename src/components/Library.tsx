@@ -735,7 +735,6 @@ export default function Library() {
           </div>
           <SyncBadge align="start" />
           <nav aria-label="Library" className="ml-auto flex flex-wrap items-center gap-1.5">
-            <Link href="/import" className="btn btn-ghost"><Icon name="sparkles" className="text-brand-600" />AI import</Link>
             <Link href="/settings" className="icon-btn" aria-label="Settings" title="Settings"><Icon name="settings" className="text-lg" /></Link>
             <button disabled={busy} onClick={() => setNaming({})} className="btn btn-secondary"><Icon name="folderPlus" />New folder</button>
             <button disabled={busy} onClick={newBlank} className="btn btn-primary"><Icon name="plus" />{busy ? "Saving…" : "New notebook"}</button>
@@ -799,7 +798,7 @@ export default function Library() {
             <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-2xl text-brand-600"><Icon name="notebook" /></span>
             <p className="mb-2 text-lg font-semibold text-slate-900">Start your first notebook</p>
             <p className="mx-auto max-w-md text-sm text-slate-500">
-              Import PDFs above, drop your lecture notes into <Link href="/import" className="font-medium text-brand-700 hover:underline">AI import</Link> to get notes and practice to write on, or start a blank notebook.
+              Import PDFs above to write on, or start a blank notebook.
             </p>
             <button disabled={busy} onClick={newBlank} className="btn btn-primary mt-6"><Icon name="plus" />New notebook</button>
           </div>

@@ -200,7 +200,7 @@ final class ControlsOverlay: UIView {
         toolCircle.accessibilityLabel = ToolCircleSwipe.colors
             ? "Tools: hold and drag towards a colour to change it, tap to choose a tool"
             : "Tools: hold and drag to change tool, tap for colours and sizes"
-        let showDot = rail.showsColors && (tool.kind == .pen || tool.kind == .highlighter)
+        let showDot = rail.showsColors && !tool.colors.isEmpty
         colorDot.isHidden = !showDot
         colorDot.backgroundColor = UIColor(hex: tool.color)
         let dot = d / 5

@@ -5,7 +5,7 @@ import { SCHEMA_VERSION } from "./types";
 // `schemaVersion`; v1 files ("padsync": 1) are migrated. Parsing is forgiving on purpose: AI output
 // is normalised first (aliases, unknown block types, out-of-range numbers), unknown fields are
 // dropped with a warning, and each section is validated on its own so one bad section doesn't sink
-// the rest. See docs/ai-import-2026-11-17.md.
+// the rest.
 
 export { SCHEMA_VERSION };
 export const MAX_PAYLOAD_CHARS = 8_000_000;

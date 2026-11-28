@@ -640,30 +640,13 @@ export class InkController {
     void logEvent(this.notebookId, sec.id, "lasso_paste", { ids, dx, dy });
   }
 
-  /** Selected pictures reaching outside the drawn rectangle, with the part of each to keep. */
-  croppable(): { row: ImageEntity; keep: Box }[] {
-    const sel = this.selection;
-    const box = sel?.area ?? sel?.bounds;
-    const sec = sel && this.sectionById(sel.sectionId);
-    if (!sel || !box || !sec) return [];
-    return (sec.images?.() ?? []).flatMap((row) => {
-      if (!sel.ids.has(row.id)) return [];
-      const f = imageBox(row.data);
-      const keep = { minX: Math.max(f.minX, box.minX), minY: Math.max(f.minY, box.minY), maxX: Math.min(f.maxX, box.maxX), maxY: Math.min(f.maxY, box.maxY) };
-      const same = Math.round(keep.minX) === Math.round(f.minX) && Math.round(keep.minY) === Math.round(f.minY) && Math.round(keep.maxX) === Math.round(f.maxX) && Math.round(keep.maxY) === Math.round(f.maxY);
-      return keep.maxX - keep.minX >= 8 && keep.maxY - keep.minY >= 8 && !same ? [{ row, keep }] : [];
-    });
-  }
-
   /**
-   * The selected picture the crop frame opens on, and where its frame starts: the part inside the
-   * drawn rectangle when one reaches past it, else the whole picture.
+   * The selected picture the crop frame opens on, and where its frame starts: the whole picture,
+   * whatever the lasso drew around it, so the crop is set by dragging the frame alone.
    */
   cropCandidate(): { sectionId: string; row: ImageEntity; keep: Box } | null {
     const sel = this.selection;
     if (!sel) return null;
-    const cut = this.croppable()[0];
-    if (cut) return { sectionId: sel.sectionId, ...cut };
     const row = (this.sectionById(sel.sectionId)?.images?.() ?? []).find((r) => sel.ids.has(r.id));
     return row ? { sectionId: sel.sectionId, row, keep: imageBox(row.data) } : null;
   }

@@ -1,12 +1,14 @@
 import { debugNow, recordSyncDebug } from "./sync-debug";
+import { NATIVE_COVER_EVENT, pageShown } from "./native";
 import { createRealtimeClient, type MaterializedLiveQuerySubscription, type RealtimeClient, type SealedLiveQuery } from '@neon/realtime/client';
 
 export type RealtimeStatus = 'connecting' | 'live' | 'fallback' | 'disabled' | 'suspended';
 type Hint = { id: string; seq: string };
 type Capability = { enabled: true; url: string; login: string; query: SealedLiveQuery<Hint> } | { enabled: false };
 
-/** Notifications only wake HTTP reconciliation. Never use their sequence as the HTTP cursor. */
-export function startRealtime(onNotify: () => void, onStatus: (status: RealtimeStatus) => void) {
+/** Notifications only wake HTTP reconciliation. Never use their sequence as the HTTP cursor; it only
+ * tells a device that already holds that change (its own push, usually) to skip the fetch. */
+export function startRealtime(onNotify: (seq?: number) => void, onStatus: (status: RealtimeStatus) => void) {
   let stopped = false;
   let generation = 0;
   let client: RealtimeClient | undefined;
@@ -17,7 +19,7 @@ export function startRealtime(onNotify: () => void, onStatus: (status: RealtimeS
   let failures = 0;
   let status: RealtimeStatus = 'connecting';
   const publish = (next: RealtimeStatus) => { status = next; onStatus(next); };
-  const active = () => !stopped && navigator.onLine && document.visibilityState === 'visible';
+  const active = () => !stopped && navigator.onLine && pageShown();
   function clear() {
     generation++;
     clearTimeout(timer);
@@ -88,7 +90,7 @@ export function startRealtime(onNotify: () => void, onStatus: (status: RealtimeS
         const wasLive = status === 'live';
         publish('live'); failures = 0;
         const nextSignature = JSON.stringify(snapshot.data);
-        if (!wasLive || signature !== nextSignature) { signature = nextSignature; onNotify(); }
+        if (!wasLive || signature !== nextSignature) { signature = nextSignature; onNotify(latestSeq(snapshot.data)); }
       });
       renewAt(next.query.expiresAt);
     } catch { if (current === generation) failed(); }
@@ -101,6 +103,7 @@ export function startRealtime(onNotify: () => void, onStatus: (status: RealtimeS
   window.addEventListener('pageshow', wake);
   window.addEventListener('pagehide', suspend);
   document.addEventListener('visibilitychange', visibility);
+  window.addEventListener(NATIVE_COVER_EVENT, visibility);
   void connect();
   return () => {
     stopped = true; clear();
@@ -109,5 +112,11 @@ export function startRealtime(onNotify: () => void, onStatus: (status: RealtimeS
     window.removeEventListener('pageshow', wake);
     window.removeEventListener('pagehide', suspend);
     document.removeEventListener('visibilitychange', visibility);
+    window.removeEventListener(NATIVE_COVER_EVENT, visibility);
   };
+}
+
+function latestSeq(rows: readonly Hint[] | undefined) {
+  const seq = rows?.length ? Number(rows[0].seq) : NaN;
+  return Number.isFinite(seq) ? seq : undefined;
 }

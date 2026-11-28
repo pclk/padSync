@@ -48,8 +48,8 @@ export interface UploadSpec {
 
 export interface ClaimedJob {
   id: string;
-  /** "import": make a padSync notebook from the attached lecture files. Default "ask". */
-  kind?: "ask" | "import" | "chat";
+  /** Default "ask". */
+  kind?: "ask" | "chat";
   thread?: { agent: Agent; agent_session: {agent: Agent; sessionId: string; account?: string | null} | null };
   history?: {question:string;output:string}[];
   notebookId: string;
@@ -349,10 +349,6 @@ export function attachedImages(files: JobDir["files"]): string[] {
 }
 
 const FILE_ROLES: [RegExp, string][] = [
-  [/^INSTRUCTIONS\.md$/, "the padSync format and how to use it; read it first and follow it exactly"],
-  [/^request\.md$/, "what I asked for, and the original names of the attached files"],
-  [/^lectures\/.*\.(pptx|docx)$/, "lecture material (an Office file: a zip of XML; extract its text and images with a command)"],
-  [/^lectures\//, "lecture material"],
   [/^README\.md$/, "what each file is and how to return changes; read it first"],
   [/^notebook\.md$/, "the chosen sections: printed content, my typed notes, and possibly reference solutions I have NOT seen"],
   [/^notebook\.json$/, "the same sections in padSync's format, with ids"],
@@ -376,6 +372,26 @@ export function inlineTexts(files: JobFile[] = []): { path: string; text: string
   }
   return out;
 }
+
+/**
+ * How answers may use colour (src/lib/markdown.ts renders each of these; anything else shows as
+ * typed). Colour is for meaning, used the same way through an answer, never decoration.
+ */
+export const COLOR_GUIDE = [
+  "- Use colour to make the explanation clearer, the way a good teacher uses coloured chalk: give each key quantity, term or step its own colour and keep it the same everywhere it appears (prose, equations, diagrams), so I can follow it through the working. Colour a few things that matter, not whole paragraphs.",
+  "  - Coloured text: `[text]{.blue}`. Highlighter behind text: `[text]{.hl-yellow}`. Markdown and $maths$ work inside the brackets.",
+  "  - Coloured maths: `\\red{...}`, `\\blue{...}` and so on, inside $...$ or $$...$$ (e.g. $\\blue{F} = m\\red{a}$). Don't use \\color or \\textcolor.",
+  "  - Colours: red, orange, yellow, green, teal, blue, purple, pink, gray. They adapt to light and dark mode by themselves.",
+  "  - A callout box for something to remember, on its own lines: `:::key Optional title`, then the content, then `:::`. Kinds: note, key (the key idea), definition, tip, example, warn (a trap to watch for), mistake (an error in my work or a common one).",
+].join("\n");
+
+/** Interactive pages in a chat answer (src/lib/widget.ts runs them). */
+export const INTERACTIVE_GUIDE = [
+  "- When something is easier to understand by playing with it (a parameter to vary, a process to step through, a graph to explore, a quick self-check quiz), you may add a small interactive page: a fenced code block opened with a line like ```` ```interactive Projectile range ```` (the word interactive, then a short title) and closed with ```` ``` ````. Use it when it genuinely helps understanding, not for every answer, and still explain the point in words.",
+  "  - Write only the page's body: HTML, a <style> and a <script>. It runs in a sandboxed frame about as wide as the chat (assume 320–700 px, so let it wrap), with no network access and no storage; libraries may be loaded with <script src> from cdn.jsdelivr.net, cdnjs.cloudflare.com or unpkg.com (pinned versions). Plain JS with <canvas> or inline <svg> is usually enough.",
+  "  - Style it with the provided CSS variables so it matches light and dark mode: --fg, --muted, --border, --surface, --surface-2, --accent, --on-accent, and the palette --red, --orange, --yellow, --green, --teal, --blue, --purple, --pink, --gray (the same colours as the text colours above, so the colour of a quantity in the page matches the answer). Buttons, sliders and inputs are already styled; `class=\"primary\"` makes an accent button. The background is transparent: don't set one on body.",
+  "  - Keep it self-contained and small (well under 300 lines), label its controls, show the current values, and make it work straight away with sensible defaults.",
+].join("\n");
 
 /**
  * Prompt for a bundle job: names every file by absolute path and includes the `inline` texts. The
@@ -402,6 +418,8 @@ export function buildBundlePrompt(question: string, d: Pick<JobDir, "dir" | "fil
       "- Answer the question directly and refer to specific parts of my work.",
       "- If a reference solution is provided, use it to check me, but do not reveal it in full unless I ask for the solution. Point to the first mistake and give a hint instead.",
       "- Format with Markdown; write maths in LaTeX using $...$ and $$...$$.",
+      COLOR_GUIDE,
+      INTERACTIVE_GUIDE,
       edits
         ? "- If my request needs changes to the material, do not edit the files in place: write changed copies to `" + d.out + "/` under the same relative path (e.g. `" + d.out + "/notebook.json`, keeping each section's id). Put any other files you make there too, and say in your answer what you wrote. Write nothing outside that folder."
         : "- Do not create or modify any files.",
@@ -409,38 +427,6 @@ export function buildBundlePrompt(question: string, d: Pick<JobDir, "dir" | "fil
     ]
       .filter(Boolean)
       .join("\n"),
-  ].join("\n\n");
-}
-
-export const IMPORT_RESULT = "padsync.json";
-export const IMPORT_FIGURES = "figures";
-
-/** Prompt for an import job: read the lecture files and INSTRUCTIONS.md, write out/padsync.json. */
-export function buildImportPrompt(question: string, d: Pick<JobDir, "dir" | "files" | "out">, agent: Agent, options: JobOptions = {}) {
-  const attached = new Set(agent === "codex" ? attachedImages(d.files) : []);
-  const files = d.files ?? [];
-  const list = files.map((f) => {
-    const role = FILE_ROLES.find(([re]) => re.test(f.path))?.[1] ?? "input";
-    return "- `" + join(d.dir, f.path) + "`: " + role + (attached.has(f.path) ? " (also attached)" : "");
-  });
-  const out = d.out ?? join(d.dir, OUT_DIR);
-  const canRun = agent === "codex" || options.allowCode === true;
-  const office = files.some((f) => /\.(pptx|docx)$/.test(f.path));
-  return [
-    "You are preparing study material for me (a university student) in padSync, an iPad app where I write with an Apple Pencil on top of what you make.",
-    `The material is in files in your working directory \`${d.dir}\`:\n${list.join("\n")}\n` +
-      "Read request.md first and honor its selected PDF page ranges; use only those pages when a selection is supplied, otherwise read all pages. Read the relevant images and slides before you start. Preserve original filenames and page references in your explanations and worked examples. The files are not repeated in this message." +
-      (agent === "codex" ? " If you cannot read a PDF directly, extract its text with a command (e.g. `pdftotext -layout`, or Python)." : "") +
-      (office && !canRun ? " Office files (.pptx/.docx) need a command to extract, which you may not run here: say so in your answer if you could not read one." : ""),
-    `My request:\n${question}`,
-    [
-      "What to produce:",
-      "- ONE JSON object in the format described in INSTRUCTIONS.md, written to `" + join(out, IMPORT_RESULT) + "`. Do not paste the JSON into your reply.",
-      "- To include a figure from the material, save it as PNG or JPEG under `" + join(out, IMPORT_FIGURES) + "/` and reference it as \"" + IMPORT_FIGURES + "/<name>.png\" in an image block.",
-      "- Do not modify the input files, and write nothing outside `" + out + "/`.",
-      canRun ? "- Before finishing, check that the file parses as JSON (e.g. `python3 -m json.tool` or `node -e`)." : "- Double-check the JSON escaping (backslashes in LaTeX) before finishing.",
-      "- Then reply with a short summary: the sections you made, and anything you could not read.",
-    ].join("\n"),
   ].join("\n\n");
 }
 
@@ -469,6 +455,7 @@ export function buildAgentPrompt(question: string, files: Omit<JobDir, "dir">, a
       "- Answer the question directly and refer to specific lines of my working.",
       "- If a reference solution is provided, use it to check me, but do not reveal it in full unless I ask for the solution. Point to the first mistake and give a hint instead.",
       "- Format with Markdown; write maths in LaTeX using $...$ and $$...$$.",
+      COLOR_GUIDE,
       "- Do not create or modify any files.",
     ].join("\n"),
   ]
@@ -922,6 +909,8 @@ export class BridgeApi {
   server: string;
   private token: string;
   private fetchImpl: typeof fetch;
+  /** From the last claim or live renewal: lets renewals skip padSync's database (src/server/auth.ts). */
+  private livePass?: string;
 
   constructor(cfg: Pick<BridgeConfig, "server" | "token">, fetchImpl: typeof fetch = fetch) {
     this.server = cfg.server;
@@ -929,11 +918,11 @@ export class BridgeApi {
     this.fetchImpl = fetchImpl;
   }
 
-  private async call<T>(method: string, path: string, body?: unknown, opts: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<T> {
+  private async call<T>(method: string, path: string, body?: unknown, opts: { signal?: AbortSignal; timeoutMs?: number; headers?: Record<string, string> } = {}): Promise<T> {
     const timeout = AbortSignal.timeout(opts.timeoutMs ?? 30_000);
     const res = await this.fetchImpl(this.server + path, {
       method,
-      headers: { authorization: `Bearer ${this.token}`, "content-type": "application/json" },
+      headers: { authorization: `Bearer ${this.token}`, "content-type": "application/json", ...opts.headers },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout,
       redirect: "error", // never forward the token to another host
@@ -947,15 +936,19 @@ export class BridgeApi {
     return this.call<{ device: { id: string; name: string } }>("GET", "/api/bridge/whoami");
   }
 
-  claim(agents: Agent[], info: { hostname?: string; version?: string }, features?: string[]) {
-    // "import": this bridge fetches uploads and runs import jobs (older bridges don't get them).
+  async claim(agents: Agent[], info: { hostname?: string; version?: string }, features?: string[]) {
     // "voice": it transcribes voice messages, so it may claim a turn whose question is still empty.
-    return this.call<{ job: ClaimedJob | null; serverTime?: number }>("POST", "/api/bridge/claim", { agents, info, features: features ?? ["import", "chat"] });
+    const res = await this.call<{ job: ClaimedJob | null; serverTime?: number; livePass?: string }>("POST", "/api/bridge/claim", { agents, info, features: features ?? ["chat"] });
+    if (res.livePass) this.livePass = res.livePass;
+    return res;
   }
 
   /** A sealed live query on queued jobs (src/lib/live-query.ts), so a new one is claimed at once. */
-  live(opts?: { signal?: AbortSignal }) {
-    return this.call<LiveCapability>("POST", "/api/bridge/live", {}, opts);
+  async live(opts?: { signal?: AbortSignal }) {
+    const headers = this.livePass ? { "x-padsync-live-pass": this.livePass } : undefined;
+    const res = await this.call<LiveCapability & { livePass?: string }>("POST", "/api/bridge/live", {}, { ...opts, headers });
+    if (res.livePass) this.livePass = res.livePass;
+    return res;
   }
 
   /** What this Mac can run, for padSync's model picker (bridge/catalog.ts). */

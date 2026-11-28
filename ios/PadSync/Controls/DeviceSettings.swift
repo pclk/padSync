@@ -7,13 +7,14 @@ import Foundation
 // iPad web app, and writes back what it changes (a moved circle, the tool).
 
 enum ToolKind: String, Codable, CaseIterable, Sendable {
-    case pen, highlighter, eraser, lasso, text
+    case pen, highlighter, eraser, painter, lasso, text
 
     var label: String {
         switch self {
         case .pen: "Pen"
         case .highlighter: "Highlighter"
         case .eraser: "Eraser"
+        case .painter: "Painter"
         case .lasso: "Lasso"
         case .text: "Text"
         }
@@ -25,6 +26,7 @@ enum ToolKind: String, Codable, CaseIterable, Sendable {
         case .pen: "pencil"
         case .highlighter: "highlighter"
         case .eraser: "eraser"
+        case .painter: "paintbrush.pointed"
         case .lasso: "lasso"
         case .text: "textformat"
         }
@@ -39,6 +41,9 @@ struct ToolState: Equatable, Sendable {
     var hlColor = "#facc15"
     var hlSize = 22.0
     var eraserSize = 24.0
+    /// The painter: the colour it turns the strokes its tip touches. iPad only; the web keeps the
+    /// field as it is. It has no width: like the eraser, it's a point.
+    var paintColor = "#dc2626"
     /// Fields this app doesn't use (the pen feel), kept so writing back doesn't drop them.
     var extra: [String: JSONValue] = [:]
 
@@ -50,7 +55,8 @@ struct ToolState: Equatable, Sendable {
     static let hlSizes = [14.0, 22, 32]
     static let eraserSizes = [12.0, 24, 48]
 
-    var colors: [String] { kind == .highlighter ? Self.hlColors : kind == .pen ? Self.penColors : [] }
+    /// The painter uses the pen's palette.
+    var colors: [String] { kind == .highlighter ? Self.hlColors : kind == .pen || kind == .painter ? Self.penColors : [] }
     var sizes: [Double] {
         switch kind {
         case .pen: Self.penSizes
@@ -59,7 +65,7 @@ struct ToolState: Equatable, Sendable {
         default: []
         }
     }
-    var color: String { kind == .highlighter ? hlColor : penColor }
+    var color: String { kind == .highlighter ? hlColor : kind == .painter ? paintColor : penColor }
     var size: Double {
         switch kind {
         case .highlighter: hlSize
@@ -69,7 +75,11 @@ struct ToolState: Equatable, Sendable {
     }
 
     mutating func setColor(_ c: String) {
-        if kind == .highlighter { hlColor = c } else { penColor = c }
+        switch kind {
+        case .highlighter: hlColor = c
+        case .painter: paintColor = c
+        default: penColor = c
+        }
     }
 
     mutating func setSize(_ s: Double) {
@@ -84,13 +94,14 @@ struct ToolState: Equatable, Sendable {
 
     init(json: JSONValue?) {
         guard case .object(let o)? = json else { return }
-        extra = o.filter { !["kind", "penColor", "penSize", "hlColor", "hlSize", "eraserSize"].contains($0.key) }
+        extra = o.filter { !["kind", "penColor", "penSize", "hlColor", "hlSize", "eraserSize", "paintColor"].contains($0.key) }
         if let k = o["kind"]?.string.flatMap(ToolKind.init(rawValue:)) { kind = k }
         if let c = o["penColor"]?.string, c.hasPrefix("#") { penColor = c }
         if let c = o["hlColor"]?.string, c.hasPrefix("#") { hlColor = c }
         if let v = o["penSize"]?.double, v.isFinite, v > 0 { penSize = v }
         if let v = o["hlSize"]?.double, v.isFinite, v > 0 { hlSize = v }
         if let v = o["eraserSize"]?.double, v.isFinite, v > 0 { eraserSize = v }
+        if let c = o["paintColor"]?.string, c.hasPrefix("#") { paintColor = c }
     }
 
     var json: JSONValue {
@@ -101,6 +112,7 @@ struct ToolState: Equatable, Sendable {
         o["hlColor"] = .string(hlColor)
         o["hlSize"] = .double(hlSize)
         o["eraserSize"] = .double(eraserSize)
+        o["paintColor"] = .string(paintColor)
         return .object(o)
     }
 }
@@ -113,7 +125,7 @@ struct RailLayout: Equatable, Sendable {
     enum Dock: String, Sendable { case left, right, bottom }
     enum Align: String, Sendable { case start, center, end }
 
-    static let items = ["pen", "highlighter", "eraser", "lasso", "text", "colors", "sizes", "history", "prompts"]
+    static let items = ["pen", "highlighter", "eraser", "painter", "lasso", "text", "colors", "sizes", "history", "prompts"]
     static let sizeRange: [CircleKey: ClosedRange<Double>] = [.tools: 44...112, .prompts: 36...96]
 
     var order = RailLayout.items
@@ -172,7 +184,10 @@ struct RailLayout: Equatable, Sendable {
         extra = o.filter { !["order", "hidden", "dock", "align", "free", "size"].contains($0.key) }
         var order: [String] = []
         for v in o["order"]?.array ?? [] { if let s = v.string, Self.items.contains(s), !order.contains(s) { order.append(s) } }
-        for item in Self.items where !order.contains(item) { order.append(item) }
+        for item in Self.items where !order.contains(item) {
+            // The painter came later: a layout from before it gets it beside the eraser.
+            if item == "painter", let at = order.firstIndex(of: "eraser") { order.insert(item, at: at + 1) } else { order.append(item) }
+        }
         self.order = order
         var hidden: [String] = []
         for v in o["hidden"]?.array ?? [] { if let s = v.string, Self.items.contains(s), s != "pen", !hidden.contains(s) { hidden.append(s) } }

@@ -45,6 +45,10 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate {
     private var loopPoints: [CGPoint] = []
     private var lassoing = false
     private let pencilLasso = PencilLassoRecognizer()
+    /// The painter: the Pencil recolours the strokes it passes over.
+    private let pencilPaint = PencilLassoRecognizer()
+    /// A painter stroke under way: each section's ink before it, and where the Pencil was last.
+    private var paint: (before: [String: PKDrawing], last: CGPoint?)?
     /// Copied ink (section coordinates, with its box), kept while the app runs, so it can be
     /// pasted into another section or notebook.
     private static var clipboard: (strokes: [PKStroke], images: [JSONValue], box: CGRect)?
@@ -223,11 +227,17 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate {
 
     private static let addButtonHeight: CGFloat = 60
 
-    private func layoutColumn() {
+    /// `holding`: a section that just changed height. While any of it is on screen it is what's
+    /// held still, so writing at its bottom grows it downwards without moving the ink under the
+    /// Pencil (holding the next section instead scrolled the page up by the growth).
+    private func layoutColumn(holding: String? = nil) {
         // What's on screen now, to hold in place: the section under a line 30% down the viewport.
         let zoom = scrollView.zoomScale
+        let visibleTop = scrollView.contentOffset.y / zoom, visibleBottom = visibleTop + scrollView.bounds.height / zoom
         let probe = (scrollView.contentOffset.y + scrollView.bounds.height * 0.3) / zoom
-        let anchor = sections.map(\.id).filter { laidOut[$0] != nil }.last { laidOut[$0]! <= probe }
+        let held = holding.flatMap { id in laidOut[id].map { (id, $0) } }
+            .flatMap { id, top in top < visibleBottom && top + (heights[id] ?? 0) > visibleTop ? id : nil }
+        let anchor = held ?? sections.map(\.id).filter { laidOut[$0] != nil }.last { laidOut[$0]! <= probe }
         var y: CGFloat = Self.gap
         tops = sections.enumerated().map { i, s in
             defer { y += (heights[s.id] ?? SectionView.baseHeight(s, index: i)) + Self.gap }
@@ -280,7 +290,7 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate {
                     self.measured.insert(v.section.id)
                     guard self.heights[v.section.id] != v.height else { return }
                     self.heights[v.section.id] = v.height
-                    self.layoutColumn()
+                    self.layoutColumn(holding: v.section.id)
                 }
                 // A section measured before keeps that height while its ink loads again; only an
                 // estimate is replaced by the new view's.
@@ -301,6 +311,15 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate {
         }
         // A mounted section can be taller than its estimate; move the ones below (and the add button).
         if resized { layoutColumn() }
+        placeCanvases()
+    }
+
+    /// Each mounted section's canvas over the part of it on screen (SectionView.showCanvas).
+    private func placeCanvases() {
+        let zoom = scrollView.zoomScale
+        let top = scrollView.contentOffset.y / zoom, bottom = top + scrollView.bounds.height / zoom
+        let pixels = zoom * traitCollection.displayScale
+        for v in views.values { v.showCanvas(top: top - v.frame.minY, bottom: bottom - v.frame.minY, pixelsPerUnit: pixels) }
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -397,8 +416,10 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate {
     func scrollViewDidZoom(_ scrollView: UIScrollView) {
         centerColumn()
         placeLassoCircle()
+        // Mid-pinch too, so a page zoomed out never shows past its canvas.
+        placeCanvases()
         // Handles keep their size on screen.
-        if let id = context.selection?.sectionId { views[id]?.selectionView.setNeedsLayout() }
+        if let id = context.selection?.sectionId { views[id]?.showSelection() }
         crop?.view.setNeedsLayout()
         // A pinch that starts zooming isn't a tap.
         watcher.logic.consume()
@@ -740,6 +761,16 @@ extension NotebookViewController {
         pencilLasso.onEnd = { [weak self] cancelled in self?.endLoop(cancel: cancelled) }
         scrollView.addGestureRecognizer(pencilLasso)
 
+        pencilPaint.allowedTouchTypes = [UITouch.TouchType.pencil.rawValue as NSNumber]
+        pencilPaint.isEnabled = context.tool.kind == .painter
+        pencilPaint.onBegin = { [weak self] p in
+            self?.paint = ([:], nil)
+            self?.paint(along: [p])
+        }
+        pencilPaint.onMove = { [weak self] ps in self?.paint(along: ps) }
+        pencilPaint.onEnd = { [weak self] cancelled in self?.endPaint(cancel: cancelled) }
+        scrollView.addGestureRecognizer(pencilPaint)
+
         pasteTap.isEnabled = false
         pasteTap.addTarget(self, action: #selector(pasteTapped(_:)))
         scrollView.addGestureRecognizer(pasteTap)
@@ -772,6 +803,7 @@ extension NotebookViewController {
         context.tool = t
         if t.kind != .lasso && t.kind != old.kind { clearSelection() }
         pencilLasso.isEnabled = t.kind == .lasso && !context.pasting
+        pencilPaint.isEnabled = t.kind == .painter && !context.pasting
         views.values.forEach { $0.applyTool() }
         overlay.refreshTool()
         settings.setTool(t)
@@ -1199,20 +1231,9 @@ extension NotebookViewController {
         setPasting(true)
     }
 
-    /// Selected pictures that reach outside the drawn rectangle, with the part of each to keep.
-    private func croppable() -> [(row: Entity, keep: CGRect)] {
-        guard let sel = context.selection, let box = sel.area ?? sel.bounds, let v = views[sel.sectionId] else { return [] }
-        return v.images.filter { sel.images.contains($0.id) }.compactMap { row in
-            let f = SectionView.frame(ofImage: row), keep = f.intersection(box)
-            guard !keep.isNull, keep.width >= 8, keep.height >= 8, keep.integral != f.integral else { return nil }
-            return (row, keep)
-        }
-    }
-
-    /// The selected picture the crop frame opens on, and where its frame starts: the part inside
-    /// the drawn rectangle when one reaches past it, else the whole picture.
+    /// The selected picture the crop frame opens on, and where its frame starts: the whole
+    /// picture, whatever the lasso drew around it, so the crop is set by dragging the frame alone.
     private func cropCandidate() -> (row: Entity, keep: CGRect)? {
-        if let cut = croppable().first { return cut }
         guard let sel = context.selection, let v = views[sel.sectionId],
               let row = v.images.first(where: { sel.images.contains($0.id) }) else { return nil }
         return (row, SectionView.frame(ofImage: row))
@@ -1358,6 +1379,7 @@ extension NotebookViewController {
         context.pasting = on
         pasteTap.isEnabled = on
         pencilLasso.isEnabled = !on && context.tool.kind == .lasso
+        pencilPaint.isEnabled = !on && context.tool.kind == .painter
         views.values.forEach { $0.applyTool() }
         if pasteBar.superview == nil {
             var c = UIButton.Configuration.filled()
@@ -1764,14 +1786,80 @@ extension NotebookViewController {
 
     private func showHoverRing(at p: CGPoint) {
         let kind = context.tool.kind
-        guard UIPencilInteraction.prefersHoverToolPreview, kind == .eraser || kind == .lasso, roll?.start == nil,
+        // The eraser has PencilKit's own preview (its X), so nothing is added for it here.
+        guard UIPencilInteraction.prefersHoverToolPreview, kind == .lasso || kind == .painter, roll?.start == nil,
               let v = views.values.first(where: { $0.bounds.contains(overlay.convert(p, to: $0)) }) else { return hoverRing.hide() }
-        // The page's scale on screen (the zoom), from the section to the overlay.
-        let scale = v.convert(CGRect(x: 0, y: 0, width: 100, height: 0), to: overlay).width / 100
-        if kind == .eraser {
-            hoverRing.show(at: p, diameter: CGFloat(context.tool.eraserSize) * scale, dashed: false)
+        if kind == .painter {
+            hoverRing.show(at: p, diameter: Self.paintDot, dashed: false, dot: UIColor(hex: context.tool.paintColor))
         } else {
             hoverRing.show(at: p, diameter: 18, dashed: true)
+        }
+    }
+
+    // MARK: Painter
+
+    /// The painter's tip on screen, while hovering and painting (points).
+    private static let paintDot: CGFloat = 7
+
+    /// Recolours the strokes the Pencil's tip passes over (scroll view points) to the paint colour,
+    /// on screen at once; endPaint writes them as one undo step. Like the eraser it's a point: a
+    /// stroke changes only where the tip crosses its line. A stroke already that colour is left alone.
+    private func paint(along points: [CGPoint]) {
+        guard var state = paint, let color = UIColor(hex: context.tool.paintColor) else { return }
+        let hex = context.tool.paintColor.lowercased()
+        // Just enough slack for a hairline to be hit; no brush width.
+        let r: CGFloat = 1.5
+        for p in points {
+            guard let v = views.values.first(where: { $0.bounds.contains(scrollView.convert(p, to: $0)) }) else {
+                state.last = nil
+                continue
+            }
+            let q = scrollView.convert(p, to: v)
+            // Points along the move a radius apart at most, so a fast stroke misses nothing.
+            let from = state.last.map { scrollView.convert($0, to: v) } ?? q
+            let steps = max(1, Int(ceil(hypot(q.x - from.x, q.y - from.y) / 2)))
+            let path = (1...steps).map { i in CGPoint(x: from.x + (q.x - from.x) * CGFloat(i) / CGFloat(steps), y: from.y + (q.y - from.y) * CGFloat(i) / CGFloat(steps)) }
+            let drawing = v.canvas.drawing
+            var changed = false
+            let strokes = drawing.strokes.map { stroke -> PKStroke in
+                guard stroke.ink.color.hex.lowercased() != hex, Self.touches(stroke, path, radius: r) else { return stroke }
+                changed = true
+                var st = stroke
+                st.ink = PKInk(stroke.ink.inkType, color: color)
+                return st
+            }
+            if changed {
+                if state.before[v.section.id] == nil { state.before[v.section.id] = drawing }
+                v.setDrawing(PKDrawing(strokes: strokes), save: false)
+            }
+            state.last = p
+            hoverRing.show(at: scrollView.convert(p, to: overlay), diameter: Self.paintDot, dashed: false, dot: color)
+        }
+        paint = state
+    }
+
+    /// Whether any of `points` (section coordinates) comes within `radius` of the stroke's line.
+    private static func touches(_ stroke: PKStroke, _ points: [CGPoint], radius: CGFloat) -> Bool {
+        let bounds = stroke.renderBounds.insetBy(dx: -radius, dy: -radius)
+        let near = points.filter(bounds.contains)
+        guard !near.isEmpty else { return false }
+        for sample in stroke.path.interpolatedPoints(by: .distance(2)) {
+            let at = sample.location.applying(stroke.transform)
+            let reach = radius + CGFloat(StrokeCodec.width(forPointSize: Double(sample.size.width), marker: stroke.ink.inkType == .marker)) / 2
+            if near.contains(where: { hypot($0.x - at.x, $0.y - at.y) <= reach }) { return true }
+        }
+        return false
+    }
+
+    private func endPaint(cancel: Bool) {
+        guard let state = paint else { return }
+        paint = nil
+        hoverRing.hide()
+        let changes = state.before.compactMap { id, before in views[id].map { (id, before, $0.canvas.drawing) } }
+        if cancel {
+            for (id, before, _) in changes { views[id]?.setDrawing(before, save: false) }
+        } else if !changes.isEmpty {
+            commit(changes.map { (id: $0.0, before: $0.1, after: $0.2) }, name: "Paint")
         }
     }
 

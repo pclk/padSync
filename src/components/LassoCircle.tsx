@@ -18,7 +18,7 @@ interface Props {
   prompts: ChatPrompt[];
   /** Delete, duplicate, bigger, smaller. */
   onAction: (a: LassoAction) => void;
-  /** Actions that apply to this selection (Copy image needs a drawn rectangle, Crop an image reaching past it). */
+  /** Actions that apply to this selection (Copy image needs a drawn rectangle, Crop a selected image). */
   available?: (a: LassoAction) => boolean;
   onRecolor: (color: string) => void;
   /** A prompt picked from Ask AI, to send with the selection. */

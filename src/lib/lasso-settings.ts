@@ -11,7 +11,7 @@ export const LASSO_ACTIONS: { action: LassoAction; label: string; icon: IconName
   { action: "duplicate", label: "Duplicate", icon: "copy", hint: "A copy just below and to the right, selected to drag into place." },
   { action: "copy", label: "Copy", icon: "copy", hint: "Copies the ink and images; then click or tap where to paste them (⌘C and ⌘V work too)." },
   { action: "copyImage", label: "Copy image", icon: "image", hint: "A picture of the rectangle you drew (around a free lasso's loop), page and all, to paste here or anywhere." },
-  { action: "crop", label: "Crop", icon: "crop", hint: "Opens a crop frame on a selected image: drag its edges and corners, or slide it, then crop. Starts at the rectangle you drew when the image reaches outside it." },
+  { action: "crop", label: "Crop", icon: "crop", hint: "Opens a crop frame on a selected image, starting at the whole image: drag its edges and corners, or slide it, then crop." },
   { action: "recolor", label: "Colour", icon: "sparkles", hint: "Fans out the pen colours; the one you pick colours all of it." },
   { action: "bigger", label: "Bigger", icon: "plus", hint: "Scale up by the step below, line widths too." },
   { action: "smaller", label: "Smaller", icon: "minus", hint: "Scale down by the step below." },

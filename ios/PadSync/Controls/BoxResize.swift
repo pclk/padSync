@@ -94,11 +94,14 @@ final class HandleView: UIView {
     required init?(coder: NSCoder) { fatalError("not used") }
 
     /// Centres the handle on its point of `box` (the superview's coordinates), `scale` being how
-    /// many screen points one of those units is.
-    func layOut(on box: CGRect, scale: CGFloat) {
+    /// many screen points one of those units is. `outside`: the handle sits beyond the box, its
+    /// whole touch area clear of it, so the box itself is free to drag however small it is.
+    func layOut(on box: CGRect, scale: CGFloat, outside: Bool = false) {
         let s = Swift.max(scale, 0.01)
         let size = Self.hit / s, k = Self.knobSize / s
-        frame = CGRect(x: box.minX + handle.at.x * box.width - size / 2, y: box.minY + handle.at.y * box.height - size / 2, width: size, height: size)
+        let out = outside ? size / 2 : 0
+        let cx = box.minX + handle.at.x * box.width + handle.sx * out, cy = box.minY + handle.at.y * box.height + handle.sy * out
+        frame = CGRect(x: cx - size / 2, y: cy - size / 2, width: size, height: size)
         knob.lineWidth = 2 / s
         knob.path = UIBezierPath(roundedRect: CGRect(x: (size - k) / 2, y: (size - k) / 2, width: k, height: k), cornerRadius: 3 / s).cgPath
     }
@@ -131,9 +134,11 @@ final class HandleView: UIView {
         handles.contains { !$0.isHidden && $0.frame.contains(p) }
     }
 
-    /// Below this on screen a side's middle handle would crowd its corners, so only corners show.
-    static func shows(_ h: BoxHandle, on box: CGRect, scale: CGFloat) -> Bool {
-        h.isCorner || (h == .n || h == .s ? box.width : box.height) * scale >= 88
+    /// Below `minSide` on screen a side's middle handle would crowd its corners, so only corners
+    /// show. Handles inside the box need room for three touch areas along a side; outside it
+    /// they never overlap, so only the look limits them.
+    static func shows(_ h: BoxHandle, on box: CGRect, scale: CGFloat, minSide: CGFloat = 88) -> Bool {
+        h.isCorner || (h == .n || h == .s ? box.width : box.height) * scale >= minSide
     }
 }
 

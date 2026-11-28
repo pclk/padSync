@@ -49,12 +49,12 @@ describe("rectangle lasso", () => {
     expect(c.selection?.area).toEqual({ minX: 600, minY: 600, maxX: 700, maxY: 650 });
   });
 
-  it("picks the ink and images inside, and offers Crop for an image reaching outside", async () => {
+  it("picks the ink and images inside, and crops an image from its whole frame, not the rectangle", async () => {
     const { c } = await setup();
     c.setLassoShape("rect");
     drag(c, [90, 90], [400, 380]);
     expect([...c.selection!.ids].sort()).toEqual(["a", "img"]);
-    expect(c.croppable().map((x) => x.keep)).toEqual([{ minX: 300, minY: 300, maxX: 400, maxY: 380 }]);
+    expect(c.cropCandidate()?.keep).toEqual({ minX: 300, minY: 300, maxX: 500, maxY: 400 });
   });
 });
 

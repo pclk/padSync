@@ -166,6 +166,10 @@ describe("Chat poll scheduler", () => {
     expect(pollDelay("thread", true)).toBe(600);
     expect(pollDelay("thread", false)).toBe(15000);
     expect(pollDelay("list", true)).toBe(30000);
+    // Idle and nothing running: slow enough for Neon to scale to zero.
+    expect(pollDelay("list", false, true, true)).toBe(600_000);
+    expect(pollDelay("thread", false, false, true)).toBe(600_000);
+    expect(pollDelay("thread", true, false, true)).toBe(600);
   });
   it("never overlaps, pauses while hidden and stops cleanly", async () => {
     vi.useFakeTimers();

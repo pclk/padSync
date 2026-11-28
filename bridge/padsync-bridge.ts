@@ -27,7 +27,6 @@ import {
   attachedImages,
   buildAgentPrompt,
   buildBundlePrompt,
-  buildImportPrompt,
   cleanOptions,
   collectOutFiles,
   configPath,
@@ -50,15 +49,17 @@ import {
 import { discoverCatalog, type Catalog } from "./catalog.ts";
 import { Speech, uvVersion } from "./speech.ts";
 import type { LiveStatus } from "./live-query.ts";
+import { STEADY_MS, watchWake } from "./wake.ts";
 
 const VERSION = "0.5.0";
 const POLL_MS = 3000;
 // For a while after a job, poll faster: a follow-up question in the same chat is likely.
 const FOLLOW_UP_POLL_MS = 1000;
 const FOLLOW_UP_MS = 5 * 60_000;
-// With the live query connected a new job wakes the bridge at once, so polling is a backup. A claim
-// is also the bridge's heartbeat, and padSync calls a bridge silent for 30 s offline.
-const LIVE_POLL_MS = 10_000;
+// With the live query connected a new job wakes the bridge at once, so polling is only a rare
+// backup: every claim reaches padSync's database, and anything more often than every 5 minutes keeps
+// Neon from scaling to zero. padSync tells the bridge is away from a turn left queued, not from claims.
+const LIVE_POLL_MS = 30 * 60_000;
 const MAX_BACKOFF_MS = 60_000;
 // How often new text goes to padSync while the agent writes (only the new part is sent).
 const FLUSH_MS = 250;
@@ -66,8 +67,6 @@ const FLUSH_MS = 250;
 // and it keeps the job from looking stale (and being reclaimed) during long thinking.
 const HEARTBEAT_MS = 5000;
 const JOB_TIMEOUT_MS = 15 * 60_000;
-// Reading a whole lecture and writing notes takes longer than answering a question.
-const IMPORT_TIMEOUT_MS = 30 * 60_000;
 // A job directory this old cannot belong to a live job (they time out after JOB_TIMEOUT_MS).
 const STALE_JOB_DIR_MS = 60 * 60_000;
 // On SIGTERM/SIGINT: how long the "bridge stopped" report may take, and the hard exit after that.
@@ -135,10 +134,10 @@ async function status() {
  * Watches padSync's queued jobs over Neon Realtime and calls `onChange` when they change. Falls back
  * to polling alone when Realtime isn't configured or its client can't load on this Mac.
  */
-async function watchJobs(api: BridgeApi, origin: string, onChange: () => void, onStatus: (s: LiveStatus) => void) {
+async function watchJobs(api: BridgeApi, origin: string, onChange: () => void, onStatus: (s: LiveStatus) => void, ready: (signal: AbortSignal) => Promise<void>) {
   try {
     const { watchLive } = await import("./live-query.ts");
-    return watchLive({ capability: (signal) => api.live({ signal }), onChange, onStatus, origin });
+    return watchLive({ capability: (signal) => api.live({ signal }), onChange, onStatus, origin, ready });
   } catch (e) {
     log(`realtime: unavailable (${(e as Error).message}), polling only`);
     return () => {};
@@ -190,10 +189,8 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob, tra
     trace["bridge.update_ms"] += Date.now() - sentAt;
     return r;
   };
-  const isImport = job.kind === "import";
-  // An import's result is a file in out/, so it may always write there.
-  const o = cleanOptions(job.agent, isImport ? { ...job.options, allowEdits: true } : job.options);
-  const how = [isImport && "import", o.model, o.effort && `effort ${o.effort}`, o.webSearch && "web search", o.allowEdits && "edits", o.allowCode && "code", (job.files?.length || job.uploads?.length) && `${(job.files?.length ?? 0) + (job.uploads?.length ?? 0)} files`].filter(Boolean).join(", ");
+  const o = cleanOptions(job.agent, job.options);
+  const how = [o.model, o.effort && `effort ${o.effort}`, o.webSearch && "web search", o.allowEdits && "edits", o.allowCode && "code", (job.files?.length || job.uploads?.length) && `${(job.files?.length ?? 0) + (job.uploads?.length ?? 0)} files`].filter(Boolean).join(", ");
   log(`job ${job.id} (${job.agent}${how ? `: ${how}` : ""}): ${job.question.slice(0, 80)}`);
   const profileHome = job.agent === "claude"
     ? (o.account === "claude_work" ? catalog.claudeWorkHome : undefined)
@@ -287,8 +284,7 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob, tra
       if (session?.agent !== job.agent || !sameLogin) session = null;
       // In the prompt rather than a file, which would cost the agent a tool round trip to read.
       const historyPrompt = () => `The conversation so far:\n<conversation>\n${chatHistory(job.history ?? [])}\n</conversation>\n\n`;
-      // An import's lecture notes are long and read selectively, so only chats and asks inline them.
-      const basePrompt = isImport ? buildImportPrompt(job.question, d, job.agent, runOpts) : bundle ? buildBundlePrompt(job.question, d, job.agent, runOpts, inlineTexts(job.files)) : buildAgentPrompt(job.question, d, job.agent);
+      const basePrompt = bundle ? buildBundlePrompt(job.question, d, job.agent, runOpts, inlineTexts(job.files)) : buildAgentPrompt(job.question, d, job.agent);
       const command = agentCommand(job.agent, { ...cfg, claudeThinking }, bundle ? attachedImages(d.files) : !!d.image, runOpts);
       const run = (resume: boolean, prefix: string) => {
         mark("agent_spawn");
@@ -296,7 +292,7 @@ async function handleJob(api: BridgeApi, cfg: BridgeConfig, job: ClaimedJob, tra
         cwd: d.dir,
         prompt: prefix + basePrompt,
         command: resume && session ? resumeCommand(command, job.agent, session.sessionId) : command,
-        timeoutMs: isImport ? IMPORT_TIMEOUT_MS : JOB_TIMEOUT_MS,
+        timeoutMs: JOB_TIMEOUT_MS,
         onText: (t) => {
           mark("first_text");
           // When the answer itself began (it restarts after a preamble moves to thinking): the chat's "Thought for".
@@ -387,7 +383,7 @@ async function run() {
     log(`speech: ${uv}, loading the voice model`);
     void speech.start().catch(() => {});
   } else log(speechCfg ? "speech: uv not found, voice messages are off (brew install uv)" : "speech: turned off in the config");
-  const features = ["import", "chat", ...(speech ? ["voice"] : [])];
+  const features = ["chat", ...(speech ? ["voice"] : [])];
   const swept = await sweepStaleJobDirs(STALE_JOB_DIR_MS);
   if (swept) log(`removed ${swept} job folder(s) left over from an earlier run`);
   // One poll: the claim and, if it returned a job, running it. Shutdown waits for the whole of it,
@@ -442,6 +438,8 @@ async function run() {
         resolve();
       }
     });
+  // Nothing reaches padSync during a Power Nap wake (bridge/wake.ts).
+  const wake = watchWake();
   const stopWatching = await watchJobs(
     api,
     cfg.server,
@@ -453,15 +451,21 @@ async function run() {
       if ((s === "live") !== live) log(s === "live" ? "realtime: live, new jobs start at once" : `realtime: ${s}, polling every ${POLL_MS / 1000}s`);
       live = s === "live";
     },
+    (signal) => wake.steady(signal),
   );
   shutdown.signal.addEventListener("abort", () => {
     stopWatching();
+    wake.stop();
     endNap?.();
   });
 
   let backoff = POLL_MS;
   let lastJobAt = 0;
   while (!shutdown.signal.aborted) {
+    const before = wake.sinceWake();
+    await wake.steady(shutdown.signal).catch(() => {});
+    if (shutdown.signal.aborted) break;
+    if (before < STEADY_MS) log("awake again, back to work");
     if (Date.now() - catalogAt > CATALOG_MS) await refreshCatalog();
     woken = false;
     try {

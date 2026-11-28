@@ -19,3 +19,16 @@ export function openNotebookNative(id: string): boolean {
   h.postMessage({ type: "openNotebook", id });
   return true;
 }
+
+/** The app fires this when a native notebook covers the web screens or uncovers them. */
+export const NATIVE_COVER_EVENT = "padsync-native-cover";
+
+/** A native notebook covers the web screens. The page still reports itself visible, but nobody sees it. */
+export function nativeCovered() {
+  return typeof window !== "undefined" && (window as { padsyncCovered?: boolean }).padsyncCovered === true;
+}
+
+/** Visible, and not under a native notebook: the web screens should sync and listen as if in front. */
+export function pageShown() {
+  return typeof document !== "undefined" && document.visibilityState === "visible" && !nativeCovered();
+}

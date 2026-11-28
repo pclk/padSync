@@ -12,8 +12,8 @@ import type { Sql } from "./db";
 export const AGENTS = ["claude", "codex"] as const;
 export type Agent = (typeof AGENTS)[number];
 export type JobStatus = "uploading" | "queued" | "running" | "done" | "error" | "cancelled";
-/** "ask": a question about notebook sections. "import": make a new notebook from lecture files. */
-export const JOB_KINDS = ["ask", "import", "chat"] as const;
+/** "ask": a question about notebook sections. "chat": a turn in a chat thread. */
+export const JOB_KINDS = ["ask", "chat"] as const;
 export type JobKind = (typeof JOB_KINDS)[number];
 
 /** A running job whose bridge went quiet this long is handed to the next claim. The bridge
@@ -85,7 +85,6 @@ export const uploadSchema = z
 
 export const newJobSchema = z.object({
   kind: z.enum(JOB_KINDS).default("ask"),
-  /** Empty for an import, which has no notebook yet. */
   notebookId: z.string().max(100).default(""),
   sectionId: z.string().min(1).max(100).nullable().default(null),
   agent: z.enum(AGENTS),
@@ -102,8 +101,8 @@ export const newJobSchema = z.object({
   uploads: z.array(uploadSchema).max(MAX_UPLOAD_FILES).default([]),
   options: jobOptionsSchema.default({}),
 })
-  .refine((j) => j.kind === "import" || j.notebookId.length > 0, { path: ["notebookId"], message: "required for a question" })
-  .refine((j) => j.kind === "import" || !j.uploads.length, { path: ["uploads"], message: "only imports send uploads" })
+  .refine((j) => j.notebookId.length > 0, { path: ["notebookId"], message: "required for a question" })
+  .refine((j) => !j.uploads.length, { path: ["uploads"], message: "questions send files inline, not as uploads" })
   .refine((j) => j.uploads.reduce((n, u) => n + u.size, 0) <= MAX_TOTAL_CHARS, { path: ["uploads"], message: `uploads may total at most ${MAX_TOTAL_CHARS} base64 characters` })
   .refine((j) => new Set([...j.files, ...j.uploads].map((f) => f.path.toLowerCase())).size === j.files.length + j.uploads.length, { path: ["uploads"], message: "file paths must be unique" });
 
@@ -242,10 +241,8 @@ export async function createJob(
   return toJob(rows[0]);
 }
 
-export async function listJobs(sql: Sql, filter: { sectionId?: string; notebookId?: string; kind?: JobKind }, limit = 20): Promise<Job[]> {
-  const rows = filter.kind === "import"
-    ? await sql.query<Row>(`select ${PUBLIC_COLS} from jobs where kind = 'import' order by created_at desc limit $1`, [limit])
-    : filter.sectionId
+export async function listJobs(sql: Sql, filter: { sectionId?: string; notebookId?: string }, limit = 20): Promise<Job[]> {
+  const rows = filter.sectionId
     ? await sql.query<Row>(`select ${PUBLIC_COLS} from jobs where thread_id is null and section_id = $1 order by created_at desc limit $2`, [filter.sectionId, limit])
     : await sql.query<Row>(`select ${PUBLIC_COLS} from jobs where thread_id is null and notebook_id = $1 order by created_at desc limit $2`, [filter.notebookId ?? "", limit]);
   return rows.map((r) => toJob(r));
@@ -288,8 +285,8 @@ export async function cancelJob(sql: Sql, id: string): Promise<Job | null> {
 /** A chat turn with a voice message the bridge still has to transcribe (src/lib/context.ts VOICE_PATH_RE). */
 const NEEDS_TRANSCRIPT = `(not transcribed and exists (select 1 from jsonb_array_elements(coalesce(attachments, '[]'::jsonb)) a where a->>'path' ~ '^voice-message\\.'))`;
 
-/** What a bridge can run beyond plain questions; an older bridge sends none and never gets imports. */
-export const BRIDGE_FEATURES = ["import", "chat", "voice"] as const;
+/** What a bridge can run beyond plain questions; an older bridge sends none and never gets chats. */
+export const BRIDGE_FEATURES = ["chat", "voice"] as const;
 
 /** Atomically hands the oldest runnable job to this device (or reclaims a stale one). */
 export async function claimJob(sql: Sql, deviceId: string, agents: readonly Agent[], features: readonly string[] = []): Promise<ClaimedJob | null> {

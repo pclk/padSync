@@ -68,6 +68,23 @@ export function Composer(
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
   }, [p.draft]);
+  // The mouse coming onto the chat puts the cursor in the message box, ready to type, unless
+  // something else is being typed in or a drag (ink, a selection) is crossing over.
+  useEffect(() => {
+    const panel = picker.current?.closest("[data-chat-root]");
+    if (!panel || !p.visible) return;
+    const enter = (event: Event) => {
+      const e = event as PointerEvent;
+      const el = area.current;
+      if (e.pointerType !== "mouse" || e.buttons !== 0 || !el || el.disabled) return;
+      const active = document.activeElement as HTMLElement | null;
+      if (active && active !== el && active.closest("input, textarea, select, [contenteditable]")) return;
+      if (window.getSelection()?.toString()) return;
+      el.focus({ preventScroll: true });
+    };
+    panel.addEventListener("pointerenter", enter);
+    return () => panel.removeEventListener("pointerenter", enter);
+  }, [p.visible]);
   useEffect(() => {
     const panel = picker.current?.closest("[data-chat-root]");
     let depth = 0;
@@ -220,7 +237,8 @@ export function Composer(
   return (
     <div className="@container shrink-0 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1">
       <div
-        className={`relative mx-auto max-w-[48rem] rounded-[1.4rem] border bg-white shadow-card transition-[border-color,box-shadow] focus-within:border-slate-300 focus-within:shadow-lift ${dragging ? "border-brand-500 ring-4 ring-brand-100" : "border-slate-200"}`}
+        data-dragging={dragging || undefined}
+        className={`composer relative mx-auto max-w-[48rem] rounded-[1.4rem] border bg-white shadow-card ${dragging ? "border-brand-500 ring-4 ring-brand-100" : "border-slate-200"}`}
       >
         {dragging && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[1.4rem] bg-brand-50/90 text-sm font-medium text-brand-700">

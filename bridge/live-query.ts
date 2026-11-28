@@ -15,6 +15,8 @@ export function watchLive(o: {
   onStatus?: (status: LiveStatus) => void;
   /** Node only: the Origin to send, one the Realtime endpoint allows (browsers send their own). */
   origin?: string;
+  /** Awaited before each connect, outside the capability timeout (the bridge waits out dark wakes). */
+  ready?: (signal: AbortSignal) => Promise<void>;
 }): () => void {
   let stopped = false;
   let generation = 0;
@@ -59,6 +61,11 @@ export function watchLive(o: {
     status("connecting");
     const current = generation;
     try {
+      if (o.ready) {
+        request = new AbortController();
+        await o.ready(request.signal);
+        if (current !== generation) return;
+      }
       const cap = await fetchCapability();
       if (current !== generation) return;
       if (!cap.enabled) {

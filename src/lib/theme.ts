@@ -10,7 +10,7 @@ export type Theme = "light" | "dark";
 export const THEME_DEFAULT: ThemePreference = "system";
 export const DARK_QUERY = "(prefers-color-scheme: dark)";
 /** Browser/status bar colour per theme; matches the white (light) or dark surface of the top bars. */
-export const THEME_COLORS: Record<Theme, string> = { light: "#ffffff", dark: "#161b23" };
+export const THEME_COLORS: Record<Theme, string> = { light: "#ffffff", dark: "#000000" };
 
 export const isThemePreference = (v: unknown): v is ThemePreference => (THEME_PREFERENCES as readonly unknown[]).includes(v);
 

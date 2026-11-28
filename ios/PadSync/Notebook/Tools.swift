@@ -1,7 +1,7 @@
 import PencilKit
 import UIKit
 
-/// The web's tools (pen, highlighter, eraser, lasso, text) on PencilKit canvases.
+/// The web's tools (pen, highlighter, eraser, lasso, text), and the iPad's painter, on PencilKit canvases.
 @MainActor
 enum Tools {
     /// What a canvas draws with for the tool, or nil when the canvas takes no ink (lasso, text).
@@ -16,7 +16,8 @@ enum Tools {
         case .eraser:
             // Whole strokes only: strokes sync whole. The web's eraser size is its diameter.
             return PKEraserTool(.vector, width: CGFloat(t.eraserSize))
-        case .lasso, .text:
+        case .painter, .lasso, .text:
+            // The painter recolours strokes it touches (NotebookViewController's painter), it adds none.
             return nil
         }
     }
