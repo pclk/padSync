@@ -2,7 +2,7 @@ import { emitActivity, setInking, whenIdle } from "@/lib/activity";
 import { renderFlag } from "@/lib/render-flags";
 import { db, deviceId } from "@/lib/db";
 import { logEvent, moveStrokes, newEntity, putEntities, setDeleted } from "@/lib/store";
-import { imageBox, imageElement, lassoImages, placeImage } from "@/lib/page-images";
+import { cropImage, imageBox, imageElement, lassoImages, placeImage } from "@/lib/page-images";
 import { PAGE_WIDTH, STROKE_STRIDE, type ImageData, type ImageEntity, type StrokeData, type StrokeEntity } from "@/lib/types";
 import { isStrayDot, type Contact } from "./filters";
 import { dataBox, hitStrokes, lassoStrokes, strokeBox, unionBox, type Box, type LassoMode } from "./geometry";
@@ -69,7 +69,22 @@ export interface Selection {
   /** Strokes and pictures. */
   ids: Set<string>;
   box: Box;
+  /** A rectangle lasso's rectangle: it stays selected with or without ink in it. */
+  area?: Box;
+  /** The rectangle around what was drawn (the free lasso's loop, or the rectangle): what Copy
+   *  image takes and Crop keeps. */
+  bounds?: Box;
 }
+
+/** Copied strokes and pictures (section units), to paste elsewhere (Copy, ⌘C). */
+export interface InkClip {
+  strokes: StrokeData[];
+  images: ImageData[];
+  box: Box;
+}
+
+/** How the lasso is drawn: a free loop, or a rectangle from where it started to where it is. */
+export type LassoShape = "free" | "rect";
 
 type Gesture =
   | { type: "ink"; sec: SectionHandle; rect: DOMRect; data: StrokeData; predicted: number[]; t0: number; contact: Contact; pointerId: number }
@@ -118,6 +133,13 @@ export class InkController {
   readonly undo = new UndoStack();
   /** How the lasso picks strokes (Settings → Lasso). */
   private lassoMode: LassoMode = "touch";
+  private lassoShape: LassoShape = "free";
+  /** What Copy or ⌘C took, kept while the page is open (any notebook). */
+  static clipboard: InkClip | null = null;
+
+  setLassoShape(shape: LassoShape) {
+    this.lassoShape = shape;
+  }
 
   setLassoMode(mode: LassoMode) {
     this.lassoMode = mode;
@@ -520,7 +542,7 @@ export class InkController {
     const pictureCopies = pictures.map((s) => newEntity<"image", ImageData>("image", this.notebookId, sec.id, { ...s.data, x: s.data.x + dx, y: s.data.y + dy }));
     await putEntities([...pictureCopies, ...copies]);
     const ids = [...copies, ...pictureCopies].map((s) => s.id);
-    const copySel = { sectionId: sec.id, ids: new Set(ids), box: shift(sel.box, dx, dy) };
+    const copySel = { sectionId: sec.id, ids: new Set(ids), box: shift(sel.box, dx, dy), area: sel.area && shift(sel.area, dx, dy), bounds: sel.bounds && shift(sel.bounds, dx, dy) };
     this.setSelection(copySel);
     emitActivity({ notebookId: this.notebookId, source: "local", kinds: ["stroke"], at: Date.now() });
     this.undo.push({
@@ -533,6 +555,84 @@ export class InkController {
       redo: () => setDeleted(ids, false),
     });
     void logEvent(this.notebookId, sec.id, "lasso_duplicate", { from: [...sel.ids], ids, dx, dy });
+  }
+
+  /** Copies the selected strokes and pictures (Copy, ⌘C); false when nothing is selected. */
+  copySelection() {
+    const sel = this.selection;
+    const sec = sel && this.sectionById(sel.sectionId);
+    if (!sel || !sec) return false;
+    const strokes = sec.strokes().filter((s) => sel.ids.has(s.id)).sort((a, b) => a.data.t0 - b.data.t0).map((s) => s.data);
+    const images = (sec.images?.() ?? []).filter((s) => sel.ids.has(s.id)).map((s) => s.data);
+    if (!strokes.length && !images.length) return false;
+    InkController.clipboard = { strokes, images, box: sel.box };
+    return true;
+  }
+
+  /** Pastes what was copied centred on (x, y), kept on the page's width, selected so it can be
+   *  moved straight away. One undoable step. */
+  async pasteClip(sec: SectionHandle, x: number, y: number) {
+    const clip = InkController.clipboard;
+    if (!clip || !this.persist) return;
+    const w = clip.box.maxX - clip.box.minX, h = clip.box.maxY - clip.box.minY;
+    const dx = Math.min(Math.max(x, w / 2), Math.max(w / 2, PAGE_WIDTH - w / 2)) - (clip.box.minX + w / 2);
+    const dy = Math.max(y, h / 2) - (clip.box.minY + h / 2);
+    const now = this.now();
+    const strokes = clip.strokes.map((d, i, all) => newEntity<"stroke", StrokeData>("stroke", this.notebookId, sec.id, { ...d, t0: now - (all.length - 1 - i), pts: shiftPts(d.pts, dx, dy) }));
+    const images = clip.images.map((d) => newEntity<"image", ImageData>("image", this.notebookId, sec.id, { ...d, x: d.x + dx, y: d.y + dy }));
+    await putEntities([...images, ...strokes]);
+    const ids = [...strokes, ...images].map((s) => s.id);
+    const pasted = { sectionId: sec.id, ids: new Set(ids), box: shift(clip.box, dx, dy) };
+    this.setSelection(pasted);
+    emitActivity({ notebookId: this.notebookId, source: "local", kinds: ["stroke"], at: Date.now() });
+    this.undo.push({
+      label: "paste",
+      undo: async () => {
+        if (this.selection?.ids === pasted.ids) this.setSelection(null);
+        await setDeleted(ids, true);
+      },
+      redo: () => setDeleted(ids, false),
+    });
+    void logEvent(this.notebookId, sec.id, "lasso_paste", { ids, dx, dy });
+  }
+
+  /** Selected pictures reaching outside the drawn rectangle, with the part of each to keep. */
+  croppable(): { row: ImageEntity; keep: Box }[] {
+    const sel = this.selection;
+    const box = sel?.area ?? sel?.bounds;
+    const sec = sel && this.sectionById(sel.sectionId);
+    if (!sel || !box || !sec) return [];
+    return (sec.images?.() ?? []).flatMap((row) => {
+      if (!sel.ids.has(row.id)) return [];
+      const f = imageBox(row.data);
+      const keep = { minX: Math.max(f.minX, box.minX), minY: Math.max(f.minY, box.minY), maxX: Math.min(f.maxX, box.maxX), maxY: Math.min(f.maxY, box.maxY) };
+      const same = Math.round(keep.minX) === Math.round(f.minX) && Math.round(keep.minY) === Math.round(f.minY) && Math.round(keep.maxX) === Math.round(f.maxX) && Math.round(keep.maxY) === Math.round(f.maxY);
+      return keep.maxX - keep.minX >= 8 && keep.maxY - keep.minY >= 8 && !same ? [{ row, keep }] : [];
+    });
+  }
+
+  /** Cuts each selected picture down to the part inside the drawn rectangle, as one undoable step. */
+  async cropSelection() {
+    const sel = this.selection;
+    if (!sel || !this.persist) return 0;
+    const cuts = await Promise.all(
+      this.croppable().map(async ({ row, keep }) => {
+        const src = await cropImage(row.data, keep);
+        return src ? { row, data: { ...row.data, src, x: Math.round(keep.minX), y: Math.round(keep.minY), w: Math.round(keep.maxX - keep.minX), h: Math.round(keep.maxY - keep.minY) } } : null;
+      }),
+    );
+    const done = cuts.filter((c): c is NonNullable<typeof c> => !!c);
+    if (!done.length) return 0;
+    const write = async (to: (c: (typeof done)[number]) => ImageData) => {
+      const rows = (await db.entities.bulkGet(done.map((c) => c.row.id))) as (ImageEntity | undefined)[];
+      await putEntities(done.flatMap((c, i) => (rows[i] ? [{ ...rows[i]!, data: to(c) }] : [])));
+      await this.refreshSelectionBox();
+    };
+    await write((c) => c.data);
+    emitActivity({ notebookId: this.notebookId, source: "local", kinds: ["stroke"], at: Date.now() });
+    this.undo.push({ label: "crop", undo: () => write((c) => c.row.data), redo: () => write((c) => c.data) });
+    void logEvent(this.notebookId, sel.sectionId, "image_crop", { ids: done.map((c) => c.row.id) });
+    return done.length;
   }
 
   /**
@@ -578,6 +678,9 @@ export class InkController {
     const scaled = { minX: cx + (sel.box.minX - cx) * k, maxX: cx + (sel.box.maxX - cx) * k, minY: cy + (sel.box.minY - cy) * k, maxY: cy + (sel.box.maxY - cy) * k };
     const dx = scaled.minX < 0 ? -scaled.minX : scaled.maxX > PAGE_WIDTH ? Math.max(-scaled.minX, PAGE_WIDTH - scaled.maxX) : 0;
     const dy = scaled.minY < 0 ? -scaled.minY : 0;
+    // The drawn rectangle grows and shrinks with what it holds.
+    const scaleBox = (b?: Box) => b && { minX: cx + (b.minX - cx) * k + dx, maxX: cx + (b.maxX - cx) * k + dx, minY: cy + (b.minY - cy) * k + dy, maxY: cy + (b.maxY - cy) * k + dy };
+    if (sel.area || sel.bounds) this.setSelection({ ...sel, area: scaleBox(sel.area), bounds: scaleBox(sel.bounds) });
     return this.restyleSelection(
       k > 1 ? "enlarge" : "shrink",
       (d) => {
@@ -625,7 +728,7 @@ export class InkController {
     const sel = this.selection;
     if (!sel) return;
     const rows = (await db.entities.bulkGet([...sel.ids])).filter((r): r is StrokeEntity | ImageEntity => !!r && !r.deleted && (r.kind === "stroke" || r.kind === "image"));
-    const box = unionBox(rows.map((r) => (r.kind === "image" ? imageBox(r.data) : dataBox(r.data))));
+    const box = unionBox([...rows.map((r) => (r.kind === "image" ? imageBox(r.data) : dataBox(r.data))), ...(sel.area ? [sel.area] : [])]);
     // Only if it is still the same selection once the rows have been read.
     if (box && this.selection === sel) this.setSelection({ ...sel, box });
   }
@@ -693,11 +796,16 @@ export class InkController {
   }
 
   private commitLasso(g: Extract<Gesture, { type: "lasso" }>) {
-    const picked = lassoStrokes(g.sec.strokes(), g.poly, this.lassoMode);
-    const pictures = lassoImages(g.sec.images?.() ?? [], g.poly, this.lassoMode);
-    if (!picked.length && !pictures.length) return;
-    const box = unionBox([...picked.map(strokeBox), ...pictures.map((p) => imageBox(p.data))])!;
-    this.setSelection({ sectionId: g.sec.id, ids: new Set([...picked, ...pictures].map((s) => s.id)), box });
+    const rect = this.lassoShape === "rect";
+    const poly = rect ? rectPoly(g.poly) : g.poly;
+    // What was drawn, kept on the page: the area Copy image takes and Crop keeps.
+    const drawn = clipBox(unionBox(poly.map(([x, y]) => ({ minX: x, maxX: x, minY: y, maxY: y })))!, g.rect.height / this.zoom);
+    const picked = lassoStrokes(g.sec.strokes(), poly, this.lassoMode);
+    const pictures = lassoImages(g.sec.images?.() ?? [], poly, this.lassoMode);
+    const area = rect && drawn && drawn.maxX - drawn.minX >= 8 && drawn.maxY - drawn.minY >= 8 ? drawn : undefined;
+    if (!picked.length && !pictures.length && !area) return;
+    const box = unionBox([...picked.map(strokeBox), ...pictures.map((p) => imageBox(p.data)), ...(area ? [area] : [])])!;
+    this.setSelection({ sectionId: g.sec.id, ids: new Set([...picked, ...pictures].map((s) => s.id)), box, area, bounds: drawn ?? undefined });
   }
 
   private async commitDrag(g: Extract<Gesture, { type: "drag" }>) {
@@ -710,7 +818,7 @@ export class InkController {
     await moveStrokes(strokes, dx, dy);
     if (images.length) await moveImages(images, dx, dy);
     this.cb.onDragging(null);
-    if (sel) this.setSelection({ ...sel, box: shift(sel.box, dx, dy) });
+    if (sel) this.setSelection({ ...sel, box: shift(sel.box, dx, dy), area: sel.area && shift(sel.area, dx, dy), bounds: sel.bounds && shift(sel.bounds, dx, dy) });
     const ids = [...strokes, ...images].map((s) => s.id);
     // The selection box follows the ink back and forth, if those strokes are still selected.
     const current = async (ddx: number, ddy: number) => {
@@ -784,7 +892,9 @@ export class InkController {
     } else if (g?.type === "lasso") {
       toSection(g.rect);
       ctx.beginPath();
-      g.poly.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      const poly = this.lassoShape === "rect" ? rectPoly(g.poly) : g.poly;
+      poly.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      if (this.lassoShape === "rect") ctx.closePath();
       ctx.setLineDash([6 / this.zoom, 5 / this.zoom]);
       ctx.strokeStyle = "#2563eb";
       ctx.lineWidth = 1.5 / this.zoom;
@@ -850,6 +960,19 @@ function holds(d: Record<string, unknown>, fields: Record<string, unknown>) {
 
 async function moveImages(images: ImageEntity[], dx: number, dy: number) {
   if (images.length) await putEntities(images.map((p) => ({ ...p, data: { ...p.data, x: p.data.x + dx, y: p.data.y + dy } })));
+}
+
+/** The rectangle from a loop's first point to its last, as a loop. */
+function rectPoly(poly: number[][]): number[][] {
+  if (!poly.length) return poly;
+  const [[x0, y0], [x1, y1]] = [poly[0], poly[poly.length - 1]];
+  return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+}
+
+/** A box kept on a page `height` tall; null when nothing of it is. */
+function clipBox(b: Box, height: number): Box | null {
+  const c = { minX: Math.max(0, b.minX), minY: Math.max(0, b.minY), maxX: Math.min(PAGE_WIDTH, b.maxX), maxY: Math.min(height, b.maxY) };
+  return c.maxX > c.minX && c.maxY > c.minY ? c : null;
 }
 
 function shiftPts(src: number[], dx: number, dy: number) {

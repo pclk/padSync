@@ -611,7 +611,11 @@ extension NotebookViewController: UIPencilInteractionDelegate {
             // Palettes: the tool fan where the Pencil hovers, else around the tool circle.
             let at = point ?? overlay.toolCircle.center
             let current = context.tool.kind
-            let items = settings.settings.rail.tools.map { FanItem(key: $0.rawValue, label: $0.label, symbol: $0.symbol, current: $0 == current) }
+            let items = settings.settings.rail.tools.map {
+                $0 == .lasso
+                    ? FanItem(key: $0.rawValue, label: LassoShape.rectangle ? "Rectangle" : $0.label, symbol: LassoShape.symbol)
+                    : FanItem(key: $0.rawValue, label: $0.label, symbol: $0.symbol, current: $0 == current)
+            }
             pencilFan.setFan(FanState(items: items, center: at, viewport: overlay.bounds.size, sticky: true))
         }
     }
@@ -636,7 +640,8 @@ extension NotebookViewController {
             syncStatus: { [unowned self] in self.syncLabel },
             pageMenu: { [unowned self] in self.pageMenu() },
             sectionSpan: { [unowned self] in self.settings.settings.sectionSpan },
-            setSectionSpan: { [unowned self] in self.settings.setSectionSpan($0) })
+            setSectionSpan: { [unowned self] in self.settings.setSectionSpan($0) },
+            switchLassoShape: { [unowned self] in self.switchLassoShape() })
         let overlay = ControlsOverlay(actions: actions, rail: settings.settings.rail)
         overlay.frame = view.bounds
         overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -651,7 +656,9 @@ extension NotebookViewController {
         }
         pencilFan.onPick = { [weak self] item in
             self?.tick()
-            ToolKind(rawValue: item.key).map { self?.setKind($0) }
+            guard let self, let kind = ToolKind(rawValue: item.key) else { return }
+            if kind == .lasso { return self.switchLassoShape() }
+            self.setKind(kind)
         }
         gestureFan.onPick = { [weak self] item in self?.pickPrompt(item.key, fromSelection: false) }
         lassoAsk.open = { [weak self] in self?.lassoPromptFan(sticky: false) }
@@ -753,6 +760,20 @@ extension NotebookViewController {
         views.values.forEach { $0.applyTool() }
         overlay.refreshTool()
         settings.setTool(t)
+    }
+
+    /// The wheel's lasso item: the lasso is for a held finger, so picking it switches that lasso's
+    /// shape (free or rectangle) and leaves the Pencil with its tool, or its previous one if it
+    /// had the lasso.
+    func switchLassoShape() {
+        LassoShape.rectangle.toggle()
+        if context.tool.kind == .lasso {
+            var t = context.tool
+            t.kind = previousKind == .lasso ? .pen : previousKind
+            setTool(t)
+        }
+        overlay.refreshTool()
+        overlay.note.show(LassoShape.rectangle ? "Hold a finger to lasso a rectangle" : "Hold a finger to lasso", seconds: 1.5)
     }
 
     func setKind(_ k: ToolKind) {
@@ -914,7 +935,7 @@ extension NotebookViewController {
         let corners = [area.origin, CGPoint(x: area.maxX, y: area.minY), CGPoint(x: area.maxX, y: area.maxY), CGPoint(x: area.minX, y: area.maxY)]
         let picked = LassoGeometry.pick(strokes.map(LassoGeometry.shape), drawn: corners, mode: settings.settings.lasso.mode).map { strokes[$0] }
         let pictures = Set(LassoGeometry.pickImages(imageFrames(v), drawn: corners, mode: settings.settings.lasso.mode))
-        context.selection = InkSelection(sectionId: v.section.id, keys: Set(picked.map(StrokeCodec.key)), box: area, area: area, images: pictures)
+        context.selection = InkSelection(sectionId: v.section.id, keys: Set(picked.map(StrokeCodec.key)), box: area, area: area, bounds: area, images: pictures)
         haptics.pathCompleted(at: overlay.convert(CGPoint(x: rect.maxX, y: rect.maxY), to: view))
         refreshSelection(in: v)
         showLassoCircle()
@@ -932,7 +953,9 @@ extension NotebookViewController {
         let pictures = Set(LassoGeometry.pickImages(imageFrames(v), drawn: poly, mode: settings.settings.lasso.mode))
         guard !picked.isEmpty || !pictures.isEmpty else { return }
         let chosen = picked.map { strokes[$0] }
-        context.selection = InkSelection(sectionId: v.section.id, keys: Set(chosen.map(StrokeCodec.key)), box: .zero, images: pictures)
+        let drawn = poly.reduce(CGRect.null) { $0.union(CGRect(origin: $1, size: .zero)) }.intersection(v.bounds)
+        context.selection = InkSelection(sectionId: v.section.id, keys: Set(chosen.map(StrokeCodec.key)), box: .zero,
+                                         bounds: drawn.isNull || drawn.isEmpty ? nil : drawn, images: pictures)
         if let end = loop.last { haptics.pathCompleted(at: overlay.convert(end, to: view)) }
         refreshSelection(in: v)
         guard context.selection != nil else { return }
@@ -1002,8 +1025,9 @@ extension NotebookViewController {
 
     private func lassoEditFan(sticky: Bool) -> FanState? {
         guard let circle = overlay.lassoCircle else { return nil }
-        let area = context.selection?.area != nil
-        let edits = settings.settings.lasso.visible.filter { $0 != .ask && ($0 != .copyImage || area) }
+        let drawn = context.selection?.bounds != nil
+        let crops = !croppable().isEmpty
+        let edits = settings.settings.lasso.visible.filter { $0 != .ask && ($0 != .copyImage || drawn) && ($0 != .crop || crops) }
         guard !edits.isEmpty else { return nil }
         return FanState(items: edits.map { FanItem(key: $0.rawValue, label: $0.label, symbol: $0.symbol) },
                         center: circle.editCenter(in: overlay), viewport: overlay.bounds.size, sticky: sticky)
@@ -1021,6 +1045,8 @@ extension NotebookViewController {
             copySelection()
         case .copyImage:
             copyAreaImage()
+        case .crop:
+            cropImages()
         case .recolor:
             guard let circle = overlay.lassoCircle else { return }
             let items = ToolState.penColors.map { FanItem(key: $0, label: ToolState.penColorNames[$0] ?? $0, symbol: "circle.fill", color: $0) }
@@ -1031,6 +1057,9 @@ extension NotebookViewController {
             let s = CGFloat(a == .bigger ? 1 + step : 1 - step)
             let c = CGPoint(x: sel.box.midX, y: sel.box.midY)
             let scale = CGAffineTransform(translationX: -c.x, y: -c.y).concatenating(CGAffineTransform(scaleX: s, y: s)).concatenating(CGAffineTransform(translationX: c.x, y: c.y))
+            // The drawn rectangle grows and shrinks with what it holds.
+            context.selection?.area = sel.area?.applying(scale)
+            context.selection?.bounds = sel.bounds?.applying(scale)
             editImages(name: a.label) { row in
                 var r = row
                 let f = SectionView.frame(ofImage: row).applying(scale)
@@ -1092,6 +1121,7 @@ extension NotebookViewController {
         context.selection?.keys = Set(copies.map(StrokeCodec.key))
         context.selection?.images = Set(pictures.map(\.id))
         context.selection?.area = sel.area?.applying(shift)
+        context.selection?.bounds = sel.bounds?.applying(shift)
         refreshSelection(in: v)
     }
 
@@ -1147,20 +1177,56 @@ extension NotebookViewController {
         setPasting(true)
     }
 
+    /// Selected pictures that reach outside the drawn rectangle, with the part of each to keep.
+    private func croppable() -> [(row: Entity, keep: CGRect)] {
+        guard let sel = context.selection, let box = sel.area ?? sel.bounds, let v = views[sel.sectionId] else { return [] }
+        return v.images.filter { sel.images.contains($0.id) }.compactMap { row in
+            let f = SectionView.frame(ofImage: row), keep = f.intersection(box)
+            guard !keep.isNull, keep.width >= 8, keep.height >= 8, keep.integral != f.integral else { return nil }
+            return (row, keep)
+        }
+    }
+
+    /// Cuts each selected picture down to the part inside the drawn rectangle (the free lasso's
+    /// box, or the rectangle lasso's), as one undo step.
+    private func cropImages() {
+        let cuts = croppable()
+        let cropped = cuts.compactMap { row, keep -> Entity? in
+            let f = SectionView.frame(ofImage: row)
+            guard let cg = SectionView.image(src: row.data["src"]?.string ?? "")?.cgImage else { return nil }
+            let sx = CGFloat(cg.width) / f.width, sy = CGFloat(cg.height) / f.height
+            let px = CGRect(x: (keep.minX - f.minX) * sx, y: (keep.minY - f.minY) * sy, width: keep.width * sx, height: keep.height * sy).integral
+            guard let part = cg.cropping(to: px), let (src, _) = Self.imageDataURL(UIImage(cgImage: part)) else { return nil }
+            var r = row
+            r.data["x"] = .double(keep.minX.rounded())
+            r.data["y"] = .double(keep.minY.rounded())
+            r.data["w"] = .double(keep.width.rounded())
+            r.data["h"] = .double(keep.height.rounded())
+            r.data["src"] = .string(src)
+            return r
+        }
+        guard !cropped.isEmpty, let sel = context.selection, let v = views[sel.sectionId] else { return note("Nothing to crop", seconds: 1.5) }
+        saveImages(cropped, undoTo: cuts.map(\.row).filter { r in cropped.contains { $0.id == r.id } }, name: "Crop")
+        refreshSelection(in: v)
+        note("Cropped \(cropped.count) image\(cropped.count == 1 ? "" : "s")", seconds: 1.2)
+    }
+
     /// Copies the rectangle as a picture of the page there (printed content, text and ink).
     private func copyAreaImage() {
-        guard let sel = context.selection, let area = sel.area, let v = views[sel.sectionId] else { return }
+        guard let sel = context.selection, let area = sel.area ?? sel.bounds, let v = views[sel.sectionId] else { return }
         let scale: CGFloat = 2
         guard let full = v.snapshot(scale: scale).cgImage,
               let part = full.cropping(to: CGRect(x: area.minX * scale, y: area.minY * scale, width: area.width * scale, height: area.height * scale).integral) else { return }
-        UIPasteboard.general.image = UIImage(cgImage: part, scale: scale, orientation: .up)
-        note("Copied as an image", seconds: 1.5)
+        let image = UIImage(cgImage: part, scale: scale, orientation: .up)
+        UIPasteboard.general.image = image
+        // Ready to place straight away, like copied ink; it stays on the clipboard for other apps.
+        pasteImage(image)
     }
 
     /// The clipboard's picture, to be placed with a tap like copied ink (`placeImage` in
     /// src/lib/page-images.ts: half its pixel size, so a copied area keeps its size, at most 900 wide).
-    private func pasteImage() {
-        guard let image = UIPasteboard.general.image, let (src, px) = Self.imageDataURL(image) else {
+    private func pasteImage(_ copied: UIImage? = nil) {
+        guard let image = copied ?? UIPasteboard.general.image, let (src, px) = Self.imageDataURL(image) else {
             return note("No image to paste, or it's too large", seconds: 1.5)
         }
         let w = max(24, min(900, px.width / 2)), h = w * px.height / max(1, px.width)
@@ -1324,6 +1390,7 @@ extension NotebookViewController {
                 return st
             }
             context.selection?.area = sel.area?.applying(shift)
+            context.selection?.bounds = sel.bounds?.applying(shift)
             let pictures = v.images.filter { sel.images.contains($0.id) }
             let movedPictures = pictures.map { row in
                 var r = row

@@ -32,6 +32,11 @@ import { DEFAULT_RAIL, normalizeRail, railFloats, railThickness, type RailLayout
 import { Icon } from "./Icons";
 import { viewFromRects } from "@/lib/section-span";
 import { encodeImage } from "@/lib/page-images";
+import { cropPng } from "@/lib/ask-bundle";
+import type { LassoAction } from "@/lib/lasso-settings";
+
+/** Put on the system clipboard by Copy and ⌘C, so ⌘V knows the ink copied here is the newest thing. */
+const INK_MARK = "padsync:ink";
 import { toLocal } from "@/ink/samples";
 
 const emitLocalText = (notebookId: string) => emitActivity({ notebookId, source: "local", kinds: ["text"], at: Date.now() });
@@ -98,7 +103,7 @@ function Editor({ notebookId }: { notebookId: string }) {
   const variant = toolbarVariant(kind);
   const [sidebarOpen, setSidebarOpen] = useStoredState("padsync.toolSidebar", true);
   const [storedRail, setRail] = useStoredState<RailLayout>("padsync.rail", DEFAULT_RAIL);
-  const [lasso] = useLassoSettings(isIpad);
+  const [lasso, setLasso] = useLassoSettings(isIpad);
   const rail = useMemo(() => normalizeRail(storedRail), [storedRail]);
   const gutter = gutterFor(kind);
   const viewport = useViewport();
@@ -164,7 +169,8 @@ function Editor({ notebookId }: { notebookId: string }) {
   useLayoutEffect(() => {
     controller.configure(tool, zoom);
     controller.setLassoMode(lasso.mode);
-  }, [controller, tool, zoom, lasso.mode]);
+    controller.setLassoShape(lasso.shape);
+  }, [controller, tool, zoom, lasso.mode, lasso.shape]);
   useEffect(
     () =>
       registerDebugProbe("Editor", () => ({
@@ -196,6 +202,11 @@ function Editor({ notebookId }: { notebookId: string }) {
   const previousKind = useRef<ToolState["kind"]>("pen");
   const setTool = useCallback(
     (t: ToolState) => {
+      // Picking the lasso again switches its shape (free loop or rectangle).
+      if (t.kind === "lasso" && tool.kind === "lasso" && JSON.stringify(t) === JSON.stringify(tool)) {
+        setLasso({ ...lasso, shape: lasso.shape === "rect" ? "free" : "rect" });
+        return;
+      }
       if (t.kind !== tool.kind) {
         controller.setSelection(null);
         previousKind.current = tool.kind;
@@ -207,7 +218,7 @@ function Editor({ notebookId }: { notebookId: string }) {
         void logEvent(notebookId, null, "tool", { kind: t.kind, color });
       }
     },
-    [controller, notebookId, setToolState, tool],
+    [controller, notebookId, setToolState, tool, lasso, setLasso],
   );
 
   const undo = useCallback(async () => {
@@ -327,6 +338,14 @@ function Editor({ notebookId }: { notebookId: string }) {
   const gestureAction = useRef<(g: GestureKind) => GestureAction>(() => "none");
   const gestureTuning = useRef(tuning);
   const note = useCallback((text: string) => setGestureNote((prev) => (gestureTuning.current.showNote ? { text, n: (prev?.n ?? 0) + 1 } : null)), []);
+
+  // Says which lasso shape picking the lasso again switched to.
+  const shownShape = useRef(lasso.shape);
+  useEffect(() => {
+    if (shownShape.current === lasso.shape) return;
+    shownShape.current = lasso.shape;
+    note(lasso.shape === "rect" ? "Rectangle lasso" : "Lasso");
+  }, [lasso.shape, note]);
 
   // --- the prompt menu: ready-made chat prompts in a circle, from the toolbar or a gesture ----
   const prompts = usePrompts();
@@ -603,41 +622,84 @@ function Editor({ notebookId }: { notebookId: string }) {
     };
   }, [controller, measureZoom, commitZoom, note, holdRing, setPromptFan, lasso.lens, lasso.lensSize, lasso.lensZoom]);
 
-  // --- pasting a picture ---------------------------------------------------------------------
-  // ⌘V with an image on the clipboard, then a click (or tap) on the page puts it there, under the
-  // ink, selected so it can be moved or resized (src/lib/page-images.ts).
-  const [pasting, setPasting] = useState<{ src: string; width: number; height: number } | null>(null);
+  // --- copying and pasting -------------------------------------------------------------------
+  // A clipboard image (⌘V) or copied ink and images (Copy, ⌘C then ⌘V) go where the pointer is over
+  // the page, selected so they can be moved straight away; with the pointer off the page, or after
+  // the lasso's Copy, a click (or tap) on the page places them (src/lib/page-images.ts).
+  type Picture = { src: string; width: number; height: number };
+  const [pasting, setPasting] = useState<Picture | "ink" | null>(null);
+  const pointerAt = useRef<[number, number] | null>(null);
+  /** Pastes at a point in the window; false when no page is there. */
+  const pasteAt = useCallback(
+    (clientX: number, clientY: number, what: Picture | "ink") => {
+      for (const [sid, el] of els.current) {
+        const r = el.getBoundingClientRect();
+        if (clientX < r.left || clientX > r.right || clientY < r.top || clientY > r.bottom) continue;
+        const sec = controller.sectionById(sid);
+        if (!sec) return false;
+        const [x, y] = toLocal(clientX, clientY, r, controller.zoom);
+        void (what === "ink" ? controller.pasteClip(sec, x, y) : controller.pasteImage(sec, x, y, what));
+        return true;
+      }
+      return false;
+    },
+    [controller],
+  );
   useEffect(() => {
+    // Only a hovering mouse or Pencil says where it is; a finger's last touch doesn't count.
+    const onMove = (e: PointerEvent) => {
+      pointerAt.current = e.pointerType === "touch" ? null : [e.clientX, e.clientY];
+    };
+    const onLeave = () => (pointerAt.current = null);
+    window.addEventListener("pointermove", onMove, { passive: true });
+    document.documentElement.addEventListener("pointerleave", onLeave);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      document.documentElement.removeEventListener("pointerleave", onLeave);
+    };
+  }, []);
+  const placeOrAsk = useCallback(
+    (what: Picture | "ink") => {
+      const at = pointerAt.current;
+      if (!at || !pasteAt(at[0], at[1], what)) setPasting(what);
+    },
+    [pasteAt],
+  );
+  useEffect(() => {
+    const editable = (t: HTMLElement) => t.tagName === "TEXTAREA" || t.tagName === "INPUT" || t.isContentEditable;
+    const onCopy = (e: ClipboardEvent) => {
+      if (editable(e.target as HTMLElement) || !controller.copySelection()) return;
+      // A marker on the system clipboard, so a later ⌘V pastes this ink rather than an older image.
+      e.clipboardData?.setData("text/plain", INK_MARK);
+      e.preventDefault();
+      note("Copied");
+    };
     const onPaste = (e: ClipboardEvent) => {
-      const t = e.target as HTMLElement;
-      if (t.tagName === "TEXTAREA" || t.tagName === "INPUT" || t.isContentEditable) return;
+      if (editable(e.target as HTMLElement)) return;
+      if (e.clipboardData?.getData("text/plain") === INK_MARK && InkController.clipboard) {
+        e.preventDefault();
+        return placeOrAsk("ink");
+      }
       const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
       if (!file) return;
       e.preventDefault();
-      void encodeImage(file).then((pic) => {
-        if (pic) setPasting(pic);
-        else note("That image is too large to paste");
-      });
+      void encodeImage(file).then((pic) => (pic ? placeOrAsk(pic) : note("That image is too large to paste")));
     };
+    window.addEventListener("copy", onCopy);
     window.addEventListener("paste", onPaste);
-    return () => window.removeEventListener("paste", onPaste);
-  }, [note]);
+    return () => {
+      window.removeEventListener("copy", onCopy);
+      window.removeEventListener("paste", onPaste);
+    };
+  }, [controller, note, placeOrAsk]);
   useEffect(() => {
     if (!pasting) return;
     const onDown = (e: PointerEvent) => {
       if ((e.target as HTMLElement).closest("[data-paste-bar]")) return;
-      for (const [sid, el] of els.current) {
-        const r = el.getBoundingClientRect();
-        if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) continue;
-        const sec = controller.sectionById(sid);
-        if (!sec) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const [x, y] = toLocal(e.clientX, e.clientY, r, controller.zoom);
-        setPasting(null);
-        void controller.pasteImage(sec, x, y, pasting);
-        return;
-      }
+      if (!pasteAt(e.clientX, e.clientY, pasting)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setPasting(null);
     };
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setPasting(null);
     window.addEventListener("pointerdown", onDown, true);
@@ -646,7 +708,47 @@ function Editor({ notebookId }: { notebookId: string }) {
       window.removeEventListener("pointerdown", onDown, true);
       window.removeEventListener("keydown", onKey);
     };
-  }, [pasting, controller]);
+  }, [pasting, pasteAt]);
+
+  /** The lasso's actions beyond moving it: from the lasso circle or the bar over a selection. */
+  const lassoAction = useCallback(
+    (a: LassoAction) => {
+      const sel = controller.selection;
+      if (!sel) return;
+      const k = 1 + lasso.step / 100;
+      if (a === "delete") void controller.deleteSelection();
+      else if (a === "duplicate") {
+        const sec = controller.sectionById(sel.sectionId);
+        if (sec) void controller.duplicateSelection(sec);
+      } else if (a === "bigger") void controller.scaleSelection(k);
+      else if (a === "smaller") void controller.scaleSelection(1 / k);
+      else if (a === "copy") {
+        if (!controller.copySelection()) return;
+        void navigator.clipboard?.writeText(INK_MARK).catch(() => {});
+        controller.setSelection(null);
+        setPasting("ink");
+      } else if (a === "crop") void controller.cropSelection().then((n) => note(n ? `Cropped ${n} image${n === 1 ? "" : "s"}` : "Nothing to crop"));
+      else if (a === "copyImage") {
+        const box = sel.area ?? sel.bounds;
+        const section = sections?.find((x) => x.id === sel.sectionId);
+        const el = els.current.get(sel.sectionId);
+        if (!box || !section || !el) return;
+        const png = cropPng(section, el, box);
+        // Safari wants the clipboard item made inside the click, holding a promise.
+        void navigator.clipboard?.write([new ClipboardItem({ "image/png": png })]).catch(() => {});
+        void png.then(encodeImage).then((pic) => {
+          if (!pic) return note("That area is too large to copy");
+          controller.setSelection(null);
+          setPasting(pic);
+        });
+      }
+    },
+    [controller, lasso.step, note, sections],
+  );
+  const canLasso = useCallback(
+    (a: LassoAction) => (a === "copyImage" ? !!(controller.selection?.area ?? controller.selection?.bounds) : a === "crop" ? controller.croppable().length > 0 : true),
+    [controller],
+  );
 
   // --- keyboard (Mac) ---------------------------------------------------------------------
   useEffect(() => {
@@ -1007,6 +1109,8 @@ function Editor({ notebookId }: { notebookId: string }) {
             selection={selection?.sectionId === it.section.id ? selection : null}
             draggingIds={selection?.sectionId === it.section.id ? dragging : null}
             selectionBar={!lasso.circle}
+            onLassoAction={lassoAction}
+            canLasso={canLasso}
             editingTextId={editingText}
             setEditingTextId={setEditingText}
             registerEl={registerEl}
@@ -1026,8 +1130,8 @@ function Editor({ notebookId }: { notebookId: string }) {
       {pasting && (
         <div data-paste-bar className="fixed left-1/2 top-4 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full bg-brand-600 py-2 pl-4 pr-2 text-sm font-medium text-white shadow-lift" role="status">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={pasting.src} alt="" className="h-7 max-w-12 rounded object-contain" />
-          Click where to paste the image
+          {pasting !== "ink" && <img src={pasting.src} alt="" className="h-7 max-w-12 rounded object-contain" />}
+          {pasting === "ink" ? "Click where to paste" : "Click where to paste the image"}
           <button className="rounded-full px-2 py-1 hover:bg-white/15" aria-label="Cancel pasting" onClick={() => setPasting(null)}>
             <Icon name="x" />
           </button>
@@ -1041,15 +1145,8 @@ function Editor({ notebookId }: { notebookId: string }) {
           zoom={zoom}
           settings={lasso}
           prompts={prompts}
-          onAction={(a) => {
-            const k = 1 + lasso.step / 100;
-            if (a === "delete") void controller.deleteSelection();
-            else if (a === "duplicate") {
-              const sec = controller.sectionById(selection.sectionId);
-              if (sec) void controller.duplicateSelection(sec);
-            } else if (a === "bigger") void controller.scaleSelection(k);
-            else if (a === "smaller") void controller.scaleSelection(1 / k);
-          }}
+          onAction={lassoAction}
+          available={canLasso}
           onRecolor={(color) => void controller.recolorSelection(color)}
           // The chat's own context choice becomes the selection: that is what was asked about.
           onPrompt={(pr) => sendPrompt({ ...pr, context: pr.context === "chat" ? "selection" : pr.context })}

@@ -18,6 +18,8 @@ interface Props {
   prompts: ChatPrompt[];
   /** Delete, duplicate, bigger, smaller. */
   onAction: (a: LassoAction) => void;
+  /** Actions that apply to this selection (Copy image needs a drawn rectangle, Crop an image reaching past it). */
+  available?: (a: LassoAction) => boolean;
   onRecolor: (color: string) => void;
   /** A prompt picked from Ask AI, to send with the selection. */
   onPrompt: (p: ChatPrompt) => void;
@@ -38,7 +40,7 @@ export function LassoCircle(p: Props) {
   const d = settings.size;
   const visible = visibleLassoActions(settings);
   const ask = visible.includes("ask");
-  const edits = visible.filter((a) => a !== "ask");
+  const edits = visible.filter((a) => a !== "ask" && (p.available?.(a) ?? true));
   // The Ask AI segment fits its icon and label; ⋯ (or the lone circle) is a circle of the set size.
   const askW = ask ? Math.round(d * 2.1) : 0;
   const editW = edits.length || !ask ? d : 0;

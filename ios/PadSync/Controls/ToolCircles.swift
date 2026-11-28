@@ -18,6 +18,8 @@ struct ControlsActions {
     /// How much a section prompt sends.
     var sectionSpan: () -> SectionSpan
     var setSectionSpan: (SectionSpan) -> Void
+    /// The wheel's lasso item: switches the held finger's lasso shape, keeping the Pencil's tool.
+    var switchLassoShape: () -> Void
 }
 
 /// Everything that floats over the page: the tool and prompt circles (ToolCircle.tsx), their
@@ -212,14 +214,11 @@ final class ControlsOverlay: UIView {
     private func toolFan(sticky: Bool) -> FanState? {
         closePanel()
         let current = actions.tool().kind
-        let rect = LassoShape.rectangle
-        var items: [FanItem] = []
-        for t in rail.tools {
-            items.append(FanItem(key: t.rawValue, label: t.label, symbol: t.symbol, current: t == current && !(t == .lasso && rect)))
-            // The rectangle lasso sits beside the lasso, a tool of its own.
-            if t == .lasso {
-                items.append(FanItem(key: Self.rectLassoKey, label: "Rectangle", symbol: "rectangle.dashed", current: current == .lasso && rect))
-            }
+        // The lasso item shows the finger lasso's shape and switches it; it's never the Pencil's tool.
+        var items = rail.tools.map { t in
+            t == .lasso
+                ? FanItem(key: t.rawValue, label: LassoShape.rectangle ? "Rectangle" : t.label, symbol: LassoShape.symbol)
+                : FanItem(key: t.rawValue, label: t.label, symbol: t.symbol, current: t == current)
         }
         // A tap opens this fan instead of the panel, so the panel is one more item.
         if sticky && ToolCircleSwipe.colors {
@@ -229,7 +228,6 @@ final class ControlsOverlay: UIView {
     }
 
     private static let panelKey = "panel"
-    private static let rectLassoKey = "lassoRect"
 
     /// The current tool's colours, or nil when it has none to show.
     private func colorFan() -> FanState? {
@@ -261,13 +259,9 @@ final class ControlsOverlay: UIView {
 
     private func pickTool(_ key: String) {
         if key == Self.panelKey { return togglePanel() }
-        let rect = key == Self.rectLassoKey
-        guard let kind = rect ? .lasso : ToolKind(rawValue: key) else { return }
+        guard let kind = ToolKind(rawValue: key) else { return }
+        if kind == .lasso { return actions.switchLassoShape() }
         var t = actions.tool()
-        if kind == .lasso {
-            LassoShape.rectangle = rect
-            refreshTool()
-        }
         t.kind = kind
         actions.setTool(t)
     }
@@ -631,8 +625,7 @@ final class CirclePanel: UIView {
             let toggle = UISwitch()
             toggle.isOn = shown
             toggle.isEnabled = tool != .pen
-            // The rectangle lasso shows and hides with the lasso.
-            toggle.accessibilityLabel = tool == .pen ? "The pen always shows" : tool == .lasso ? "Show Lasso and Rectangle" : "Show \(tool.label)"
+            toggle.accessibilityLabel = tool == .pen ? "The pen always shows" : "Show \(tool.label)"
             toggle.setContentCompressionResistancePriority(.required, for: .horizontal)
             toggle.addAction(UIAction { [weak self, weak toggle] _ in
                 self?.changeRail(self?.rail.showingTool(tool, toggle?.isOn ?? shown))

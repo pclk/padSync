@@ -134,6 +134,11 @@ export function usePrompts(): ChatPrompt[] {
 const isStored = (v: unknown): v is unknown => v !== undefined;
 
 /** The lasso's settings on this device (see lasso-settings.ts), normalised on read. */
+/** The lasso tool's icon for its shape (a loop, or a dashed rectangle). */
+export function useLassoIcon(): "lasso" | "rectSelect" {
+  return useLassoSettings(false)[0].shape === "rect" ? "rectSelect" : "lasso";
+}
+
 export function useLassoSettings(ipad: boolean): [LassoSettings, (v: LassoSettings) => void] {
   const [raw, set] = useSetting<unknown>(LASSO_KEY, null, isStored);
   return [useMemo(() => normalizeLasso(raw, ipad), [raw, ipad]), set];

@@ -118,6 +118,9 @@ struct InkSelection: Equatable {
     /// The rectangle a rectangle lasso drew (section coordinates): it stays selected with or
     /// without ink in it, and can be copied as a picture.
     var area: CGRect?
+    /// The rectangle around what was drawn (the free lasso's loop, or the rectangle itself), in
+    /// section coordinates: what Copy image takes and Crop keeps.
+    var bounds: CGRect?
     /// Pictures on the page that are selected too (image entity ids).
     var images: Set<String> = []
 }

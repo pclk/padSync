@@ -23,6 +23,18 @@ export function LassoSettingsPanel({ ipad, compact = false }: { ipad: boolean; c
   return (
     <div className="space-y-4">
       <div>
+        <p className="mb-1 text-xs font-medium text-slate-700">The lasso draws</p>
+        <div role="group" aria-label="The lasso draws" className="segmented flex w-full [&>button]:flex-1">
+          <button aria-pressed={s.shape === "free"} onClick={() => update({ shape: "free" })}>
+            A free loop
+          </button>
+          <button aria-pressed={s.shape === "rect"} onClick={() => update({ shape: "rect" })}>
+            A rectangle
+          </button>
+        </div>
+        <p className={`mt-1 ${hint} text-slate-500`}>Picking the lasso tool again switches. A rectangle can select empty page, to copy it as an image.</p>
+      </div>
+      <div>
         <p className="mb-1 text-xs font-medium text-slate-700">The lasso selects</p>
         <div role="group" aria-label="The lasso selects" className="segmented flex w-full [&>button]:flex-1">
           <button aria-pressed={s.mode === "touch"} onClick={() => update({ mode: "touch" })}>

@@ -5,6 +5,7 @@ import type { ToolKind, ToolState } from "@/ink/controller";
 import type { ChatPrompt } from "@/lib/prompts";
 import { clampPlace, isTool, visibleItems, visibleTools, type CircleKey, type RailDock, type RailLayout } from "@/lib/rail-layout";
 import { Icon } from "./Icons";
+import { useLassoIcon } from "@/lib/settings";
 import { anchorOf, useDismiss, usePopoverBox, type PopoverAnchor } from "./popover";
 import { RadialFan, fanAt, promptItems, useFanPress } from "./RadialFan";
 import { dockStrip, tapZonePadding } from "./rail-dock";
@@ -55,6 +56,7 @@ const centerOf = (el: HTMLElement): [number, number] => {
  * them to be tapped.
  */
 export function ToolCircle(p: Props) {
+  const lassoIcon = useLassoIcon();
   const circleRef = useRef<HTMLElement>(null);
   const promptRef = useRef<HTMLElement>(null);
   const [panel, setPanel] = useState<PopoverAnchor | null>(null);
@@ -111,7 +113,7 @@ export function ToolCircle(p: Props) {
     open: () => {
       if (!circleRef.current) return null;
       setPanel(null);
-      const items = visibleTools(p.rail).map((k) => ({ key: k, label: RAIL_ITEM_INFO[k].label, icon: RAIL_ITEM_INFO[k].icon!, current: k === p.tool.kind }));
+      const items = visibleTools(p.rail).map((k) => ({ key: k, label: RAIL_ITEM_INFO[k].label, icon: k === "lasso" ? lassoIcon : RAIL_ITEM_INFO[k].icon!, current: k === p.tool.kind }));
       return fanAt(items, centerOf(circleRef.current));
     },
     onPick: (item) => p.selectTool(item.key as ToolKind),
@@ -157,7 +159,7 @@ export function ToolCircle(p: Props) {
           aria-expanded={panel !== null}
           onClick={(e) => e.detail === 0 && togglePanel()}
         >
-          <Icon name={RAIL_ITEM_INFO[p.tool.kind].icon!} />
+          <Icon name={p.tool.kind === "lasso" ? lassoIcon : RAIL_ITEM_INFO[p.tool.kind].icon!} />
           {p.showColors && (
             <span className="absolute rounded-full ring-2 ring-white" style={{ background: p.color, width: p.rail.size.tools / 5, height: p.rail.size.tools / 5, right: p.rail.size.tools / 10, bottom: p.rail.size.tools / 10 }} />
           )}

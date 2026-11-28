@@ -361,7 +361,7 @@ struct GestureTuning: Equatable, Sendable {
 // MARK: Lasso (src/lib/lasso-settings.ts)
 
 enum LassoAction: String, CaseIterable, Sendable {
-    case delete, duplicate, copy, copyImage, recolor, bigger, smaller, ask
+    case delete, duplicate, copy, copyImage, crop, recolor, bigger, smaller, ask
 
     var label: String {
         switch self {
@@ -369,6 +369,7 @@ enum LassoAction: String, CaseIterable, Sendable {
         case .duplicate: "Duplicate"
         case .copy: "Copy"
         case .copyImage: "Copy image"
+        case .crop: "Crop"
         case .recolor: "Colour"
         case .bigger: "Bigger"
         case .smaller: "Smaller"
@@ -382,6 +383,7 @@ enum LassoAction: String, CaseIterable, Sendable {
         case .duplicate: "plus.square.on.square"
         case .copy: "doc.on.doc"
         case .copyImage: "photo.on.rectangle"
+        case .crop: "crop"
         case .recolor: "paintpalette"
         case .bigger: "plus"
         case .smaller: "minus"

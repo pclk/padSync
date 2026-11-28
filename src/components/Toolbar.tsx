@@ -5,6 +5,7 @@ import { useCallback, useRef, useState, type PointerEvent as ReactPointerEvent }
 import type { ToolKind, ToolState } from "@/ink/controller";
 import { SyncBadge } from "./SyncBadge";
 import { Icon, type IconName } from "./Icons";
+import { useLassoIcon } from "@/lib/settings";
 import { PenSettings } from "./PenSettings";
 import { RailSettings } from "./RailSettings";
 import { anchorOf, type PopoverAnchor } from "./popover";
@@ -287,6 +288,7 @@ export function nearestButton(root: HTMLElement, x: number, y: number): HTMLButt
 }
 
 function ToolRail({ tool, colors, color, sizes, size, showColors, showSizes, penMenuOpen, pick, setColor, setSize, canUndo, canRedo, onUndo, onRedo, rail, rightInset, settingsOpen, onSettings, prompts, onPrompt, onNoPrompts }: ToolControls & HistoryControls & RailControls) {
+  const lassoIcon = useLassoIcon();
   const row = rail.dock === "bottom";
   const taps = useGenerousTaps();
   // Runs of tools stay together; colours, sizes and undo/redo are each their own group.
@@ -363,7 +365,7 @@ function ToolRail({ tool, colors, color, sizes, size, showColors, showSizes, pen
               onClick={(e) => pick(t.kind, e.currentTarget)}
               className={`flex h-11 w-11 items-center justify-center rounded-xl text-xl transition-colors ${tool.kind === t.kind ? "bg-brand-600 text-on-accent shadow-sm" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"}`}
             >
-              <Icon name={t.icon} />
+              <Icon name={t.kind === "lasso" ? lassoIcon : t.icon} />
             </button>
           );
         })}
@@ -462,6 +464,7 @@ function PromptButton({ prompts, onPrompt, onEmpty }: { prompts: ChatPrompt[]; o
  * tool and shows colours and sizes; collapsed it keeps the tools and undo/redo as icons.
  */
 function ToolSidebar({ tool, colors, color, sizes, size, showColors, showSizes, penMenuOpen, pick, setColor, setSize, canUndo, canRedo, onUndo, onRedo, open, onToggle, ...nav }: ToolControls & HistoryControls & NavControls & { open: boolean; onToggle?: () => void }) {
+  const lassoIcon = useLassoIcon();
   return (
     <aside
       className="tool-sidebar fixed bottom-0 left-0 top-0 z-40 flex flex-col gap-2 overflow-y-auto overflow-x-hidden border-r border-slate-200/80 bg-white/95 p-1.5 backdrop-blur-md transition-[width] duration-250 motion-reduce:transition-none"
@@ -496,7 +499,7 @@ function ToolSidebar({ tool, colors, color, sizes, size, showColors, showSizes, 
             onClick={(e) => pick(t.kind, e.currentTarget)}
             className={`flex h-10 shrink-0 items-center gap-2.5 rounded-xl text-sm transition-colors ${open ? "px-2.5" : "w-10 justify-center self-center"} ${tool.kind === t.kind ? "bg-brand-600 text-on-accent shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
           >
-            <Icon name={t.icon} className="shrink-0 text-xl" />
+            <Icon name={t.kind === "lasso" ? lassoIcon : t.icon} className="shrink-0 text-xl" />
             {open && <><span className="flex-1 truncate text-left font-medium">{t.label}</span><kbd className="text-xs opacity-60">{t.key}</kbd></>}
           </button>
         ))}

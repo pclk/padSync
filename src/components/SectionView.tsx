@@ -12,6 +12,7 @@ import { renderMarkdown } from "@/lib/markdown";
 import { liveChildren, logEvent, putEntities, setDeleted, updateData } from "@/lib/store";
 import { PAGE_WIDTH, type ImageEntity, type SectionEntity, type StrokeEntity, type TextBoxData, type TextBoxEntity } from "@/lib/types";
 
+import type { LassoAction } from "@/lib/lasso-settings";
 import { PdfBackground } from "./PdfBackground";
 import { Blocks, MarginColumn, SectionHeader } from "./SectionContent";
 
@@ -25,6 +26,9 @@ interface Props {
   draggingIds: Set<string> | null;
   /** The bar of Delete, Duplicate and Done over a selection; off when the lasso circle shows instead. */
   selectionBar?: boolean;
+  /** The bar's other actions (Copy, Copy image, Crop), and whether each applies now. */
+  onLassoAction?: (a: LassoAction) => void;
+  canLasso?: (a: LassoAction) => boolean;
   editingTextId: string | null;
   setEditingTextId: (id: string | null) => void;
   registerEl: (id: string, el: HTMLElement | null) => void;
@@ -174,6 +178,14 @@ export const SectionView = memo(function SectionView(p: Props) {
             <button className="rounded px-3 py-1 hover:bg-slate-700" onPointerDown={(e) => e.stopPropagation()} onClick={() => controller.duplicateSelection(handle)}>
               Duplicate
             </button>
+            {p.onLassoAction &&
+              ([["copy", "Copy"], ["copyImage", "Copy image"], ["crop", "Crop"]] as const)
+                .filter(([a]) => p.canLasso?.(a) ?? true)
+                .map(([a, label]) => (
+                  <button key={a} className="whitespace-nowrap rounded px-3 py-1 hover:bg-slate-700" onPointerDown={(e) => e.stopPropagation()} onClick={() => p.onLassoAction!(a)}>
+                    {label}
+                  </button>
+                ))}
           </div>}
         </div>
       )}

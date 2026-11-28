@@ -67,3 +67,20 @@ export function imageElement(src: string): HTMLImageElement {
   }
   return img;
 }
+
+/** The part of a picture inside `keep` (page units), as a data: URL small enough to sync. */
+export async function cropImage(d: Pick<ImageData, "x" | "y" | "w" | "h" | "src">, keep: Box): Promise<string | null> {
+  const img = imageElement(d.src);
+  try {
+    await img.decode();
+  } catch {
+    return null;
+  }
+  const sx = img.naturalWidth / d.w, sy = img.naturalHeight / d.h;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round((keep.maxX - keep.minX) * sx));
+  canvas.height = Math.max(1, Math.round((keep.maxY - keep.minY) * sy));
+  canvas.getContext("2d")!.drawImage(img, (keep.minX - d.x) * sx, (keep.minY - d.y) * sy, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
+  const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/png"));
+  return blob ? ((await encodeImage(blob))?.src ?? null) : null;
+}

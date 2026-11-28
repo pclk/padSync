@@ -2,12 +2,16 @@
 // settings): how it picks strokes, and the circle of actions that appears above a selection.
 import type { IconName } from "@/components/Icons";
 import type { LassoMode } from "@/ink/geometry";
+import type { LassoShape } from "@/ink/controller";
 
-export type LassoAction = "delete" | "duplicate" | "recolor" | "bigger" | "smaller" | "ask";
+export type LassoAction = "delete" | "duplicate" | "copy" | "copyImage" | "crop" | "recolor" | "bigger" | "smaller" | "ask";
 
 export const LASSO_ACTIONS: { action: LassoAction; label: string; icon: IconName; hint: string }[] = [
   { action: "delete", label: "Delete", icon: "trash", hint: "Remove the selected ink." },
   { action: "duplicate", label: "Duplicate", icon: "copy", hint: "A copy just below and to the right, selected to drag into place." },
+  { action: "copy", label: "Copy", icon: "copy", hint: "Copies the ink and images; then click or tap where to paste them (⌘C and ⌘V work too)." },
+  { action: "copyImage", label: "Copy image", icon: "image", hint: "A picture of the rectangle you drew (around a free lasso's loop), page and all, to paste here or anywhere." },
+  { action: "crop", label: "Crop", icon: "crop", hint: "Cuts selected images down to the rectangle you drew. Shown when an image reaches outside it." },
   { action: "recolor", label: "Colour", icon: "sparkles", hint: "Fans out the pen colours; the one you pick colours all of it." },
   { action: "bigger", label: "Bigger", icon: "plus", hint: "Scale up by the step below, line widths too." },
   { action: "smaller", label: "Smaller", icon: "minus", hint: "Scale down by the step below." },
@@ -19,6 +23,8 @@ export interface LassoSettings {
   lensSize: number;
   lensZoom: number;
   mode: LassoMode;
+  /** A free loop or a rectangle; picking the lasso tool again switches. */
+  shape: LassoShape;
   /** The circle of actions above a selection; off, the bar of buttons shows instead. */
   circle: boolean;
   /** The circle's actions, in fan order, and those hidden. */
@@ -40,6 +46,7 @@ export const defaultLasso = (ipad: boolean): LassoSettings => ({
   lensSize: 104,
   lensZoom: 2,
   mode: "touch",
+  shape: "free",
   circle: ipad,
   order: LASSO_ACTIONS.map((a) => a.action),
   hidden: [],
@@ -62,6 +69,7 @@ export function normalizeLasso(raw: unknown, ipad: boolean): LassoSettings {
     lensSize: num(r.lensSize, { min: 72, max: 160 }, d.lensSize),
     lensZoom: num(r.lensZoom, { min: 2, max: 4 }, d.lensZoom),
     mode: r.mode === "enclose" || r.mode === "touch" ? r.mode : d.mode,
+    shape: r.shape === "rect" || r.shape === "free" ? r.shape : d.shape,
     circle: typeof r.circle === "boolean" ? r.circle : d.circle,
     order,
     hidden: [...new Set((Array.isArray(r.hidden) ? r.hidden : []).filter(isAction))],

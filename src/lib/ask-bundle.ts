@@ -86,6 +86,11 @@ export function cropSelection(section: SectionEntity, el: HTMLElement, box: Box,
 
 /** The render cropped to `box` (page units) plus `pad`. */
 async function cropSection(section: SectionEntity, el: HTMLElement, box: Box, scale: number, omit: RenderOmit, pad: number): Promise<Raster> {
+  return toRaster(await cropPng(section, el, box, scale, omit, pad));
+}
+
+/** The section's picture (page, text and ink) inside `box` (page units) plus `pad`, as a PNG. */
+export async function cropPng(section: SectionEntity, el: HTMLElement, box: Box, scale = 2, omit: RenderOmit = {}, pad = 0): Promise<Blob> {
   const full = await createImageBitmap(await sectionPng(section, el, scale, omit));
   // A tall section comes back smaller than asked (the renderer caps a side at 16,384 px), so map
   // page units by the bitmap's actual scale, not the requested one.
@@ -99,6 +104,5 @@ async function cropSection(section: SectionEntity, el: HTMLElement, box: Box, sc
   canvas.height = Math.max(1, y1 - y0);
   canvas.getContext("2d")!.drawImage(full, x0, y0, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
   full.close();
-  const blob = await new Promise<Blob>((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error("toBlob failed"))), "image/png"));
-  return toRaster(blob);
+  return new Promise<Blob>((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error("toBlob failed"))), "image/png"));
 }

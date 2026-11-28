@@ -65,7 +65,7 @@ struct DeviceSettingsTests {
         #expect(s.gestures[.fingerDoubleTap] == .tool(.eraser))
         #expect(s.gestures[.fingerHold] == .lassoHold)
         #expect(s.tuning.holdMs == 200 && !s.tuning.showNote)
-        #expect(s.lasso.mode == .enclose && s.lasso.visible == [.delete, .duplicate, .copy, .copyImage, .recolor, .bigger, .smaller] && s.lasso.step == 10)
+        #expect(s.lasso.mode == .enclose && s.lasso.visible == [.delete, .duplicate, .copy, .copyImage, .crop, .recolor, .bigger, .smaller] && s.lasso.step == 10)
         #expect(s.tool.kind == .highlighter && s.tool.hlColor == "#4ade80")
         // Fields the app doesn't use survive a write back.
         #expect(s.tool.json["pen"]?["thinning"]?.double == 0.5)

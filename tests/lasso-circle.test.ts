@@ -43,7 +43,8 @@ describe("lasso settings", () => {
     expect(s.mode).toBe("enclose");
     // "done" was an action once; settings saved then drop it with the other unknowns.
     expect(s.order.slice(0, 2)).toEqual(["smaller", "delete"]);
-    expect(s.order).toHaveLength(6);
+    expect(s.order).toHaveLength(9);
+    expect(s.shape).toBe("free");
     expect(visibleLassoActions(s)).not.toContain("ask");
     expect(s.size).toBe(96);
     expect(s.step).toBe(5);
