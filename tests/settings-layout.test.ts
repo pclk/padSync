@@ -35,8 +35,8 @@ it("keeps both Pencil tools in one section, each with its purpose", async () => 
   expect(tools[0]).toContain("how padSync draws it");
 });
 
-it("explains the layout idle delay in terms of Auto layout", async () => {
+it("has no idle delay now that the layout has no Auto mode", async () => {
   const notebook = sections(await render()).find((s) => s.includes(">Notebook</h2>"))!;
-  expect(notebook).toContain('aria-label="Layout idle delay"');
-  expect(notebook).toContain("Auto layout: switch to chat after 15 s");
+  expect(notebook).not.toContain("Layout idle delay");
+  expect(notebook).not.toContain("Auto layout");
 });

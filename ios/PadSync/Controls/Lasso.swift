@@ -144,6 +144,12 @@ enum LassoShape {
 final class SelectionBoxView: UIView {
     private let border = CAShapeLayer()
     var onDrag: (CGPoint, UIGestureRecognizer.State) -> Void = { _, _ in }
+    /// A handle dragged by (section units) so far.
+    var onResize: (BoxHandle, CGPoint, UIGestureRecognizer.State) -> Void = { _, _, _ in }
+    /// The eight resize handles, on the box (8 pt inside this view's edges); off for a selection
+    /// that holds nothing to resize.
+    private let handles = BoxHandle.allCases.map { HandleView($0) }
+    var showsHandles = true { didSet { setNeedsLayout() } }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -156,6 +162,10 @@ final class SelectionBoxView: UIView {
         let pan = UIPanGestureRecognizer(target: self, action: #selector(panned(_:)))
         pan.maximumNumberOfTouches = 1
         addGestureRecognizer(pan)
+        for h in handles {
+            h.onPan = { [weak self] k, d, state in self?.onResize(k, d, state) }
+            addSubview(h)
+        }
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -163,6 +173,22 @@ final class SelectionBoxView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         border.path = UIBezierPath(rect: bounds).cgPath
+        let box = bounds.insetBy(dx: 8, dy: 8), scale = HandleView.screenScale(of: self)
+        for h in handles {
+            h.isHidden = !showsHandles || !HandleView.shows(h.handle, on: box, scale: scale)
+            h.layOut(on: box, scale: scale)
+        }
+    }
+
+    /// A press on a handle resizes; only the rest of the box moves the selection.
+    override func gestureRecognizerShouldBegin(_ g: UIGestureRecognizer) -> Bool {
+        guard g.view === self, let p = HandleView.pressedAt(g, in: self) else { return super.gestureRecognizerShouldBegin(g) }
+        return !HandleView.any(handles, at: p)
+    }
+
+    /// The handles reach past the box; their whole hit area counts.
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        super.point(inside: point, with: event) || handles.contains { !$0.isHidden && $0.frame.contains(point) }
     }
 
     @objc private func panned(_ g: UIPanGestureRecognizer) {

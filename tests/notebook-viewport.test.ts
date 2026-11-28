@@ -66,11 +66,11 @@ describe("toolbar per device", () => {
 
 describe("panel width beside the notebook", () => {
   it("keeps the 50/50 and 25/75 split where the window has room", () => {
-    expect(panelWidth("drawing", 1440)).toBe(720);
+    expect(panelWidth("half", 1440)).toBe(720);
     expect(panelWidth("chat", 2560)).toBe(1920);
     expect(panelWidth("chat", 1440)).toBe(1440 - MIN_NOTEBOOK_VIEW);
     expect(panelWidth("chat", 1440, SIDEBAR_W.expanded)).toBe(1440 - SIDEBAR_W.expanded - MIN_NOTEBOOK_VIEW);
-    expect(panelWidth("drawing", 901)).toBe(451);
+    expect(panelWidth("half", 901)).toBe(451);
   });
 
   it("leaves a whole 25% page beside chat with the sidebar either way", () => {
@@ -91,21 +91,21 @@ describe("panel width beside the notebook", () => {
   it("still gives the panel a usable width in a narrow window", () => {
     expect(panelWidth("chat", 800)).toBe(800 - MIN_NOTEBOOK_VIEW);
     expect(panelWidth("chat", 600, SIDEBAR_W.expanded)).toBe(320);
-    expect(panelWidth("drawing", 500, SIDEBAR_W.expanded)).toBe(250);
+    expect(panelWidth("half", 500, SIDEBAR_W.expanded)).toBe(250);
   });
 });
 
-type Case = { kind: DeviceKind; vw: number; vh: number; sidebarOpen: boolean; panel: "closed" | "drawing" | "chat"; zoom: number };
+type Case = { kind: DeviceKind; vw: number; vh: number; sidebarOpen: boolean; panel: "closed" | "half" | "chat"; zoom: number };
 function cases(): Case[] {
   const out: Case[] = [];
   const zooms = [MIN_ZOOM, 0.4, 0.5, 0.75, 1, 1.5, 2, MAX_ZOOM];
   for (const vw of [1024, 1280, 1440, 1728])
     for (const sidebarOpen of [true, false])
-      for (const panel of ["closed", "drawing", "chat"] as const)
+      for (const panel of ["closed", "half", "chat"] as const)
         for (const zoom of zooms) out.push({ kind: "desktop", vw, vh: 860, sidebarOpen, panel, zoom });
   // iPad Pro 13" landscape and portrait, iPad Air 11" landscape; the iPad panel is 360 px.
   for (const [vw, vh] of [[1376, 1032], [1032, 1376], [1180, 820]])
-    for (const panel of ["closed", "drawing"] as const)
+    for (const panel of ["closed", "half"] as const)
       for (const zoom of zooms) out.push({ kind: "ipad", vw, vh, sidebarOpen: true, panel, zoom });
   return out;
 }
@@ -201,9 +201,9 @@ describe("ink coordinates under the new layout", () => {
     const page = [[40, 30], [700, 120], [PAGE_WIDTH - 10, 400]];
     const combos: Case[] = [
       { kind: "desktop", vw: 1440, vh: 900, sidebarOpen: true, panel: "chat", zoom: MIN_ZOOM },
-      { kind: "desktop", vw: 1440, vh: 900, sidebarOpen: false, panel: "drawing", zoom: 1.5 },
+      { kind: "desktop", vw: 1440, vh: 900, sidebarOpen: false, panel: "half", zoom: 1.5 },
       { kind: "ipad", vw: 1376, vh: 1032, sidebarOpen: true, panel: "closed", zoom: 1 },
-      { kind: "ipad", vw: 1032, vh: 1376, sidebarOpen: true, panel: "drawing", zoom: 2 },
+      { kind: "ipad", vw: 1032, vh: 1376, sidebarOpen: true, panel: "half", zoom: 2 },
     ];
     for (const c of combos) {
       const { layout } = setup(c);
@@ -278,13 +278,13 @@ describe("toolbar markup per device", () => {
   });
 
   it("has no top bar: the Mac's sidebar holds the way back, title, zoom, layout and panel", async () => {
-    const layout = { mode: "auto" as const, effective: "drawing" as const, setMode() {} };
+    const layout = { mode: "half" as const, setMode() {} };
     const open = await render({ variant: "sidebar", sidebarOpen: true, title: "MA1301 Pack 4", layout, onToggleQuestions() {} });
     expect(open).not.toContain("<header");
     expect(open).not.toContain("AI &amp; PDFs");
-    for (const text of [">Library</span>", ">MA1301 Pack 4</div>", ">25%<", ">Auto", ">Questions only</span>", ">Panel</span>"]) expect(open).toContain(text);
+    for (const text of [">Library</span>", ">MA1301 Pack 4</div>", ">25%<", ">Half", ">Drawing", ">Chat", ">Questions only</span>", ">Panel</span>"]) expect(open).toContain(text);
     const closed = await render({ variant: "sidebar", sidebarOpen: false, layout });
-    for (const label of ["Library", "Layout: auto"]) expect(closed).toContain(`aria-label="${label}"`);
+    for (const label of ["Library", "Layout: half"]) expect(closed).toContain(`aria-label="${label}"`);
     expect(closed).toContain('title="Toggle side panel"');
     // The iPad's rail gets a floating pill instead.
     const ipad = await render({});

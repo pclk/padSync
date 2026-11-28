@@ -33,6 +33,7 @@ import {
   spanSectionIds,
   viewFor,
   viewFromRects,
+  type ScreenView,
   type SectionSpan,
 } from "@/lib/section-span";
 import { Icon, type IconName } from "../Icons";
@@ -55,6 +56,15 @@ export interface ContextProps {
   sectionEl(id: string): HTMLElement | undefined;
   /** Where the iPad is: "This section" follows it while it is in this notebook. */
   ipad: PresenceEntity | null;
+  /** The chat is on screen; while it isn't, nothing is marked as sent. */
+  visible?: boolean;
+  /** What a message would send from the notebook, for the editor to mark on the pages. */
+  onTarget?: (t: ContextTarget | null) => void;
+}
+/** The sections a message sends, and (for the iPad's screen) the part of each it shows. */
+export interface ContextTarget {
+  sectionIds: string[];
+  view: ScreenView | null;
 }
 type Scope = ContextSummary["scope"];
 const title = (s: SectionEntity | null, sections: SectionEntity[]) =>
@@ -122,6 +132,16 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const ctx: ContextOptions = useMemo(() => ctxFor(scope), [options, scope, focusedId, ids, span, p.ipad, p.sections]);
+    // Marked on the pages: a selection shows as its own lasso box, and this screen's own view
+    // is already what is in front of you, so only the iPad's screen is marked part by part.
+    const target = useMemo((): ContextTarget | null => {
+      if (scope === "none" || scope === "selection") return null;
+      if (scope === "notebook") return { sectionIds: p.sections.map((x) => x.id), view: null };
+      return { sectionIds: ctx.sectionIds ?? [], view: focused.fromIpad ? (ctx.view ?? null) : null };
+    }, [scope, ctx, p.sections, focused.fromIpad]);
+    const { onTarget, visible } = p;
+    useEffect(() => onTarget?.(visible === false ? null : target), [onTarget, visible, target]);
+    useEffect(() => () => onTarget?.(null), [onTarget]);
     useEffect(() => {
       let live = true;
       // Nothing from the notebook needs none of its strokes read.
@@ -263,27 +283,59 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
       { v: "none", icon: "x", label: "No context", hint: "Just chat" },
     ];
     const active = SCOPES.find((s) => s.v === scope)!;
-    const chip =
-      scope === "section"
-        ? span === "viewport"
-          ? spanNote
-          : `${title(focused.section, p.sections)}${spanNote ? ` ${spanNote}` : ""}`
-        : scope === "sections"
-          ? `${ids.length} section${ids.length === 1 ? "" : "s"}`
-          : active.label;
+    const chip = scope === "sections" ? `${ids.length} section${ids.length === 1 ? "" : "s"}` : active.label;
+    const sectionName = title(focused.section, p.sections);
     return (
-      <div ref={box} className="static min-w-0">
+      <div ref={box} className="static flex min-w-0 flex-1 items-center gap-1.5">
+        {/* The section and what's around it, one press away; the rest are under More. */}
+        <div
+          role="radiogroup"
+          aria-label="Send with your message"
+          className="flex shrink-0 rounded-full border border-slate-200 bg-white p-0.5 text-xs font-medium"
+        >
+          {SECTION_SPANS.map((s) => {
+            const on = scope === "section" && span === s.v;
+            const label = s.v === "viewport" ? (focused.fromIpad ? "iPad" : "Screen") : s.label;
+            return (
+              <button
+                key={s.v}
+                role="radio"
+                aria-checked={on}
+                title={
+                  s.v === "viewport"
+                    ? `Exactly what ${focused.fromIpad ? "the iPad" : "this screen"} shows, zoom included`
+                    : s.v === "section"
+                      ? `Only ${sectionName}${focused.fromIpad ? ", where the iPad is" : ""}`
+                      : `${sectionName} and the section ${s.v}`
+                }
+                className={`flex items-center gap-1 rounded-full px-2.5 py-1 transition-colors pointer-coarse:px-3 pointer-coarse:py-2 ${on ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-100"}`}
+                onClick={() => {
+                  setSpan(s.v);
+                  choose("section");
+                }}
+              >
+                {s.v === "section" && focused.fromIpad && <Icon name="tablet" className="shrink-0" />}
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        {scope === "section" && span !== "viewport" && (
+          <span className="min-w-0 truncate text-xs text-slate-500" title={summary}>
+            {sectionName}
+          </span>
+        )}
         <button
           data-popover-trigger
           aria-haspopup="dialog"
           aria-expanded={open}
-          aria-label={`Context: ${active.label}${scope === "section" ? `, ${chip}` : ""}`}
+          aria-label={scope === "section" ? "More context options" : `Context: ${chip}. More context options`}
           title={summary}
-          className={`flex h-8 min-w-0 max-w-[14rem] items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors aria-expanded:bg-slate-100 pointer-coarse:h-10 pointer-coarse:text-[13px] ${scope === "none" ? "border-slate-200 text-slate-500 hover:bg-slate-100" : "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100"}`}
+          className={`ml-auto flex h-8 min-w-0 max-w-[12rem] shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors aria-expanded:bg-slate-100 pointer-coarse:h-10 pointer-coarse:text-[13px] ${scope === "section" ? "border-slate-200 text-slate-500 hover:bg-slate-100" : scope === "none" ? "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200" : "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100"}`}
           onClick={() => setOpen(!open)}
         >
-          <Icon name={active.icon} className="shrink-0" />
-          <span className="truncate">{chip}</span>
+          <Icon name={scope === "section" ? "chevronDown" : active.icon} className="shrink-0" />
+          <span className="truncate">{scope === "section" ? "More" : chip}</span>
         </button>
         {open && (
           <div
@@ -293,7 +345,7 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
           >
             <p className="px-2 pb-1 pt-0.5 text-xs font-semibold text-slate-700">Send with your message</p>
             <div role="radiogroup" aria-label="Context scope" className="grid gap-0.5">
-              {SCOPES.map((s) => (
+              {SCOPES.filter((s) => s.v !== "section").map((s) => (
                 <button
                   key={s.v}
                   role="radio"
@@ -312,37 +364,6 @@ export const ContextPicker = forwardRef<ContextHandle, ContextProps>(
                 </button>
               ))}
             </div>
-            {scope === "section" && (
-              <div className="mt-1 px-1">
-                <div
-                  role="radiogroup"
-                  aria-label="How much around the section"
-                  className="flex rounded-lg border border-slate-200 bg-white p-0.5 text-xs"
-                >
-                  {SECTION_SPANS.map((s) => (
-                    <button
-                      key={s.v}
-                      role="radio"
-                      aria-checked={span === s.v}
-                      title={
-                        s.v === "viewport"
-                          ? `Exactly what ${focused.fromIpad ? "the iPad" : "this screen"} shows, zoom included`
-                          : s.v === "section"
-                            ? "Only this section"
-                            : `This section and the one ${s.v}`
-                      }
-                      className={`flex-1 rounded-md px-1.5 py-1 pointer-coarse:py-2 ${span === s.v ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"}`}
-                      onClick={() => {
-                        setSpan(s.v);
-                        setPreview(null);
-                      }}
-                    >
-                      {s.v === "viewport" && focused.fromIpad ? "iPad screen" : s.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
             {scope !== "none" && (
               <div className="mt-2 border-t border-slate-200 px-1 pt-2">
                 <ContextControls

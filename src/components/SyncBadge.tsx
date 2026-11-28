@@ -10,9 +10,9 @@ import { Icon } from "./Icons";
 // Self-contained: it subscribes to the sync engine and ticks its own countdown, so a status change
 // re-renders only this badge, never the toolbar or the editor around it.
 
-/** `side`: the details open beside the badge, fixed, so a scrolling sidebar doesn't clip them.
- *  `showLabel`: always name the state, not only on wide screens. */
-export function SyncBadge({ align = "end", side = false, showLabel = false }: { align?: "start" | "end"; side?: boolean; showLabel?: boolean }) {
+/** A single icon; the state's name is in its tooltip and details. `side`: the details open beside
+ *  the badge, fixed, so a scrolling sidebar doesn't clip them. */
+export function SyncBadge({ align = "end", side = false }: { align?: "start" | "end"; side?: boolean }) {
   const state = useSyncStatus();
   const [tick, setTick] = useState(() => Date.now());
   const [open, setOpen] = useState(false);
@@ -52,7 +52,7 @@ export function SyncBadge({ align = "end", side = false, showLabel = false }: { 
     <div ref={wrap} className="relative">
       <button
         type="button"
-        className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+        className="icon-btn shrink-0 text-lg"
         title={tooltip}
         aria-label={`Sync status: ${d.label}. ${d.lastSynced}. Show details`}
         aria-expanded={open}
@@ -60,8 +60,7 @@ export function SyncBadge({ align = "end", side = false, showLabel = false }: { 
         data-sync-view={d.view}
         onClick={() => { setTick(Date.now()); if (side) setPlace(sidePlace(wrap.current)); setOpen(o => !o); }}
       >
-        <Icon name={d.icon} className={`text-sm ${d.tone} ${d.view === "syncing" ? "motion-safe:animate-spin" : ""}`} />
-        <span className={`tabular-nums ${showLabel ? "" : "hidden lg:inline"}`}>{d.label}</span>
+        <Icon name={d.icon} className={`${d.tone} ${d.view === "syncing" ? "motion-safe:animate-spin" : ""}`} />
       </button>
       <span role="status" aria-live="polite" className="sr-only">
         {announced ? syncAnnouncement(announced) : ""}

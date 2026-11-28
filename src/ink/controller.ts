@@ -10,6 +10,7 @@ import { penOverrides, withOverrides, type PenParams } from "./pen-feel";
 import { paintStroke, strokePath, cachedPath, seedPath } from "./render";
 import { appendPoint, toLocal } from "./samples";
 import { UndoStack } from "./undo";
+import { boxMap, isCorner, mapBox, resizeBox, type Handle } from "./resize";
 
 // Turns pointer input on a section into strokes, erasures and lasso moves. The in-progress
 // gesture is drawn on one viewport-sized overlay canvas; committed ink lives in each section's
@@ -48,6 +49,9 @@ export interface InkPointer {
   timeStamp: number;
   altitudeAngle?: number;
   azimuthAngle?: number;
+  /** Modifier keys, read while resizing the selection. */
+  shiftKey?: boolean;
+  altKey?: boolean;
   preventDefault(): void;
   getCoalescedEvents?(): InkPointer[];
   getPredictedEvents?(): InkPointer[];
@@ -55,6 +59,9 @@ export interface InkPointer {
 
 /** Which controller entry point an input reached: the page surface or the selection's grab box. */
 export type InputKind = "down" | "move" | "up" | "lost" | "grab";
+
+/** The smallest a resize leaves the selection on either side (page units). */
+const MIN_RESIZE = 8;
 
 export interface SectionHandle {
   id: string;
@@ -90,7 +97,8 @@ type Gesture =
   | { type: "ink"; sec: SectionHandle; rect: DOMRect; data: StrokeData; predicted: number[]; t0: number; contact: Contact; pointerId: number }
   | { type: "erase"; sec: SectionHandle; rect: DOMRect; last: [number, number]; erased: Set<string>; at: [number, number]; pointerId: number }
   | { type: "lasso"; sec: SectionHandle; rect: DOMRect; poly: number[][]; pointerId: number }
-  | { type: "drag"; sec: SectionHandle; rect: DOMRect; start: [number, number]; dx: number; dy: number; strokes: StrokeEntity[]; images: ImageEntity[]; pointerId: number };
+  | { type: "drag"; sec: SectionHandle; rect: DOMRect; start: [number, number]; dx: number; dy: number; strokes: StrokeEntity[]; images: ImageEntity[]; pointerId: number }
+  | { type: "resize"; sec: SectionHandle; rect: DOMRect; handle: Handle; start: [number, number]; from: Box; to: Box; strokes: StrokeEntity[]; images: ImageEntity[]; pointerId: number };
 
 interface Pending {
   data: StrokeData;
@@ -381,6 +389,15 @@ export class InkController {
     } else if (g.type === "drag") {
       const [x, y] = this.local(e, g.rect);
       [g.dx, g.dy] = this.selection ? clampMove(this.selection.box, x - g.start[0], y - g.start[1], g.rect.height / this.zoom) : [x - g.start[0], y - g.start[1]];
+    } else if (g.type === "resize") {
+      const [x, y] = this.local(e, g.rect);
+      // Corners keep the proportions, sides stretch; Shift swaps that, Option grows about the centre.
+      g.to = resizeBox(g.from, g.handle, x - g.start[0], y - g.start[1], {
+        keepRatio: isCorner(g.handle) !== !!e.shiftKey,
+        fromCentre: !!e.altKey,
+        min: MIN_RESIZE,
+        within: { minX: 0, minY: 0, maxX: PAGE_WIDTH, maxY: g.rect.height / this.zoom },
+      });
     }
     this.requestFrame();
   }
@@ -405,6 +422,32 @@ export class InkController {
     const [x, y] = this.local(e, rect);
     this.hover = null;
     this.startDrag(sec, rect, x, y, e.pointerId);
+  }
+
+  /**
+   * Starts resizing the selection from a press on one of its handles (SectionView). Like grab(),
+   * any pointer may do it; the corner or side pressed decides which edges move.
+   */
+  grabHandle(e: InkPointer, sec: SectionHandle, target: Pick<Element, "setPointerCapture">, handle: Handle) {
+    this.cb.onInput?.("grab", e, sec);
+    const sel = this.selection;
+    if (!sel || sel.sectionId !== sec.id || !sel.ids.size) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (this.gesture) this.end(this.gesture, null);
+    e.preventDefault();
+    try {
+      target.setPointerCapture(e.pointerId);
+    } catch {
+      // The pointer is already gone; the resize still follows any moves that arrive.
+    }
+    const rect = sec.el.getBoundingClientRect();
+    const [x, y] = this.local(e, rect);
+    this.hover = null;
+    const strokes = sec.strokes().filter((s) => sel.ids.has(s.id));
+    const images = (sec.images?.() ?? []).filter((s) => sel.ids.has(s.id));
+    this.setGesture({ type: "resize", sec, rect, handle, start: [x, y], from: sel.box, to: sel.box, strokes, images, pointerId: e.pointerId });
+    this.cb.onDragging(sel.ids);
+    this.requestFrame();
   }
 
   private startDrag(sec: SectionHandle, rect: DOMRect, x: number, y: number, pointerId: number) {
@@ -500,6 +543,7 @@ export class InkController {
     else if (g.type === "erase") this.commitErase(g);
     else if (g.type === "lasso") this.commitLasso(g);
     else if (g.type === "drag") void this.commitDrag(g);
+    else if (g.type === "resize") void this.commitResize(g);
     this.requestFrame();
   }
 
@@ -611,12 +655,36 @@ export class InkController {
     });
   }
 
-  /** Cuts each selected picture down to the part inside the drawn rectangle, as one undoable step. */
-  async cropSelection() {
+  /**
+   * The selected picture the crop frame opens on, and where its frame starts: the part inside the
+   * drawn rectangle when one reaches past it, else the whole picture.
+   */
+  cropCandidate(): { sectionId: string; row: ImageEntity; keep: Box } | null {
     const sel = this.selection;
-    if (!sel || !this.persist) return 0;
+    if (!sel) return null;
+    const cut = this.croppable()[0];
+    if (cut) return { sectionId: sel.sectionId, ...cut };
+    const row = (this.sectionById(sel.sectionId)?.images?.() ?? []).find((r) => sel.ids.has(r.id));
+    return row ? { sectionId: sel.sectionId, row, keep: imageBox(row.data) } : null;
+  }
+
+  /**
+   * Cuts one picture down to `keep` (page units, inside the picture), as one undoable step: what
+   * the crop frame (CropFrame.tsx) sets by dragging.
+   */
+  cropImageTo(sectionId: string, id: string, keep: Box) {
+    const row = (this.sectionById(sectionId)?.images?.() ?? []).find((r) => r.id === id);
+    if (!row) return Promise.resolve(0);
+    const f = imageBox(row.data);
+    const k = { minX: Math.max(f.minX, keep.minX), minY: Math.max(f.minY, keep.minY), maxX: Math.min(f.maxX, keep.maxX), maxY: Math.min(f.maxY, keep.maxY) };
+    const whole = (["minX", "minY", "maxX", "maxY"] as const).every((e) => Math.abs(k[e] - f[e]) < 0.5);
+    return whole || k.maxX - k.minX < 1 || k.maxY - k.minY < 1 ? Promise.resolve(0) : this.cropImages([{ row, keep: k }]);
+  }
+
+  private async cropImages(parts: { row: ImageEntity; keep: Box }[]) {
+    if (!this.persist || !parts.length) return 0;
     const cuts = await Promise.all(
-      this.croppable().map(async ({ row, keep }) => {
+      parts.map(async ({ row, keep }) => {
         const src = await cropImage(row.data, keep);
         return src ? { row, data: { ...row.data, src, x: Math.round(keep.minX), y: Math.round(keep.minY), w: Math.round(keep.maxX - keep.minX), h: Math.round(keep.maxY - keep.minY) } } : null;
       }),
@@ -631,7 +699,7 @@ export class InkController {
     await write((c) => c.data);
     emitActivity({ notebookId: this.notebookId, source: "local", kinds: ["stroke"], at: Date.now() });
     this.undo.push({ label: "crop", undo: () => write((c) => c.row.data), redo: () => write((c) => c.data) });
-    void logEvent(this.notebookId, sel.sectionId, "image_crop", { ids: done.map((c) => c.row.id) });
+    void logEvent(this.notebookId, done[0].row.parentId, "image_crop", { ids: done.map((c) => c.row.id) });
     return done.length;
   }
 
@@ -678,20 +746,31 @@ export class InkController {
     const scaled = { minX: cx + (sel.box.minX - cx) * k, maxX: cx + (sel.box.maxX - cx) * k, minY: cy + (sel.box.minY - cy) * k, maxY: cy + (sel.box.maxY - cy) * k };
     const dx = scaled.minX < 0 ? -scaled.minX : scaled.maxX > PAGE_WIDTH ? Math.max(-scaled.minX, PAGE_WIDTH - scaled.maxX) : 0;
     const dy = scaled.minY < 0 ? -scaled.minY : 0;
+    return this.transformSelection(sel.box, shift(scaled, dx, dy), k > 1 ? "enlarge" : "shrink");
+  }
+
+  /**
+   * Stretches the selection from the box `from` onto `to`, as one undoable step. Line widths
+   * scale by the mean of the two stretches, so a squashed stroke keeps a sensible weight.
+   */
+  transformSelection(from: Box, to: Box, label = "resize") {
+    const sel = this.selection;
+    if (!sel) return;
+    const m = boxMap(from, to);
+    const k = Math.sqrt(m.kx * m.ky);
     // The drawn rectangle grows and shrinks with what it holds.
-    const scaleBox = (b?: Box) => b && { minX: cx + (b.minX - cx) * k + dx, maxX: cx + (b.maxX - cx) * k + dx, minY: cy + (b.minY - cy) * k + dy, maxY: cy + (b.maxY - cy) * k + dy };
-    if (sel.area || sel.bounds) this.setSelection({ ...sel, area: scaleBox(sel.area), bounds: scaleBox(sel.bounds) });
+    if (sel.area || sel.bounds) this.setSelection({ ...sel, area: sel.area && mapBox(sel.area, m), bounds: sel.bounds && mapBox(sel.bounds, m) });
     return this.restyleSelection(
-      k > 1 ? "enlarge" : "shrink",
+      label,
       (d) => {
         const pts = d.pts.slice();
         for (let i = 0; i < pts.length; i += STROKE_STRIDE) {
-          pts[i] = cx + (pts[i] - cx) * k + dx;
-          pts[i + 1] = cy + (pts[i + 1] - cy) * k + dy;
+          pts[i] = pts[i] * m.kx + m.ox;
+          pts[i + 1] = pts[i + 1] * m.ky + m.oy;
         }
         return { pts, size: d.size * k };
       },
-      (d) => ({ x: cx + (d.x - cx) * k + dx, y: cy + (d.y - cy) * k + dy, w: d.w * k, h: d.h * k }),
+      (d) => ({ x: d.x * m.kx + m.ox, y: d.y * m.ky + m.oy, w: d.w * m.kx, h: d.h * m.ky }),
     );
   }
 
@@ -832,6 +911,13 @@ export class InkController {
     whenIdle(() => void logEvent(this.notebookId, g.sec.id, "lasso_move", { ids, dx, dy }));
   }
 
+  private async commitResize(g: Extract<Gesture, { type: "resize" }>) {
+    const same = (["minX", "minY", "maxX", "maxY"] as const).every((k) => Math.abs(g.to[k] - g.from[k]) < 0.5);
+    if (!same && this.persist && this.selection) await this.transformSelection(g.from, g.to);
+    this.cb.onDragging(null);
+    if (!same) whenIdle(() => void logEvent(this.notebookId, g.sec.id, "lasso_resize", { handle: g.handle, from: g.from, to: g.to }));
+  }
+
   requestFrame() {
     // No overlay attached (headless replay, tests): draw() would have nothing to draw on.
     if (this.frame || !this.live) return;
@@ -908,6 +994,34 @@ export class InkController {
         if (img.complete) ctx.drawImage(img, p.data.x, p.data.y, p.data.w, p.data.h);
       }
       for (const s of g.strokes) paintStroke(ctx, s.data, cachedPath(s));
+    } else if (g?.type === "resize") {
+      toSection(g.rect);
+      const m = boxMap(g.from, g.to);
+      ctx.save();
+      ctx.transform(m.kx, 0, 0, m.ky, m.ox, m.oy);
+      for (const p of g.images) {
+        const img = imageElement(p.data.src);
+        if (img.complete) ctx.drawImage(img, p.data.x, p.data.y, p.data.w, p.data.h);
+      }
+      for (const s of g.strokes) paintStroke(ctx, s.data, cachedPath(s));
+      ctx.restore();
+      // The box as it will be, and its size, as Figma shows them.
+      const { minX, minY, maxX, maxY } = g.to;
+      ctx.strokeStyle = "#3b82f6";
+      ctx.lineWidth = 1.5 / this.zoom;
+      ctx.strokeRect(minX, minY, maxX - minX, maxY - minY);
+      const label = `${Math.round(maxX - minX)} × ${Math.round(maxY - minY)}`;
+      const f = 11 / this.zoom;
+      ctx.font = `600 ${f}px ui-sans-serif, system-ui, sans-serif`;
+      const tw = ctx.measureText(label).width + f;
+      const lx = (minX + maxX) / 2 - tw / 2, ly = maxY + f * 0.8;
+      ctx.fillStyle = "#3b82f6";
+      ctx.beginPath();
+      ctx.roundRect(lx, ly, tw, f * 1.8, f * 0.4);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, lx + f / 2, ly + f * 0.9);
     }
 
     const hoverEl = this.hover?.sec.el as HTMLElement | null | undefined;

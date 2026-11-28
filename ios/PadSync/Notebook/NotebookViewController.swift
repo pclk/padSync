@@ -56,6 +56,13 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate {
     private var dragStart: PKDrawing?
     /// The selected ink, floating above the page while it's dragged.
     private var dragFloat: UIImageView?
+    /// A handle resize under way: where the box is now, whether it sits snapped at its first size,
+    /// and the size shown beside it.
+    private var resizeTo: CGRect?
+    private var resizeSnapped = false
+    private var sizeReadout: UILabel?
+    /// The open crop frame, the picture it crops, and its bar of Reset, Cancel and Crop.
+    private var crop: (view: CropView, sectionId: String, imageId: String, bar: UIView)?
     private let lassoAsk = FanPress()
     private let lassoEdit = FanPress()
     private let lassoColors = FanPress()
@@ -122,6 +129,7 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate {
         context.tool = settings.settings.tool
         context.sync.isInking = { [weak context] in !(context?.inking.isEmpty ?? true) }
         context.onSelectionDrag = { [weak self] v, d, state in self?.dragSelection(v, by: d, state: state) }
+        context.onSelectionResize = { [weak self] v, h, d, state in self?.resizeSelection(v, h, by: d, state: state) }
         setUpControls()
         view.addInteraction(pencil)
         observeSections()
@@ -389,6 +397,9 @@ final class NotebookViewController: UIViewController, UIScrollViewDelegate {
     func scrollViewDidZoom(_ scrollView: UIScrollView) {
         centerColumn()
         placeLassoCircle()
+        // Handles keep their size on screen.
+        if let id = context.selection?.sectionId { views[id]?.selectionView.setNeedsLayout() }
+        crop?.view.setNeedsLayout()
         // A pinch that starts zooming isn't a tap.
         watcher.logic.consume()
     }
@@ -689,7 +700,7 @@ extension NotebookViewController {
         watcher.isOnPage = { [weak self] p in
             guard let self else { return false }
             let hit = self.scrollView.hitTest(p, with: nil)
-            let control = hit is SelectionBoxView || hit is TextBoxView || hit?.superview is TextBoxView || hit is TextBoxEditor
+            let control = hit is SelectionBoxView || hit is HandleView || hit is CropView || hit is TextBoxView || hit?.superview is TextBoxView || hit is TextBoxEditor
             return !control && self.overlay.isOnPage(self.scrollView.convert(p, to: self.overlay))
         }
         let logic = watcher.logic
@@ -706,7 +717,11 @@ extension NotebookViewController {
                 self.overlay.holdRing.stop()
             }
         }
-        logic.onPageTap = { [weak self] in self?.clearSelection() }
+        // A tap elsewhere crops to the open frame, as in Figma; otherwise it drops the selection.
+        logic.onPageTap = { [weak self] in
+            guard let self else { return }
+            if self.crop != nil { self.finishCrop(apply: true) } else { self.clearSelection() }
+        }
         logic.emit = { [weak self] g, at in self?.gesture(g, at: at) }
         watcher.onHeldMove = { [weak self] touch, event in self?.heldMove(touch, event: event) }
         watcher.onHeldEnd = { [weak self] touch, lifted in self?.heldEnd(touch, lifted: lifted) }
@@ -974,6 +989,7 @@ extension NotebookViewController {
     }
 
     func clearSelection() {
+        finishCrop(apply: false)
         guard context.selection != nil else { return }
         cancelRoll()
         let id = context.selection?.sectionId
@@ -999,7 +1015,7 @@ extension NotebookViewController {
     /// Just above the selection, or below it when there's no room above (LassoCircle.tsx).
     private func placeLassoCircle() {
         guard let circle = overlay?.lassoCircle else { return }
-        guard let sel = context.selection, let v = views[sel.sectionId] else {
+        guard let sel = context.selection, let v = views[sel.sectionId], crop == nil else {
             circle.isHidden = true
             return
         }
@@ -1026,7 +1042,7 @@ extension NotebookViewController {
     private func lassoEditFan(sticky: Bool) -> FanState? {
         guard let circle = overlay.lassoCircle else { return nil }
         let drawn = context.selection?.bounds != nil
-        let crops = !croppable().isEmpty
+        let crops = cropCandidate() != nil
         let edits = settings.settings.lasso.visible.filter { $0 != .ask && ($0 != .copyImage || drawn) && ($0 != .crop || crops) }
         guard !edits.isEmpty else { return nil }
         return FanState(items: edits.map { FanItem(key: $0.rawValue, label: $0.label, symbol: $0.symbol) },
@@ -1046,7 +1062,7 @@ extension NotebookViewController {
         case .copyImage:
             copyAreaImage()
         case .crop:
-            cropImages()
+            beginCrop()
         case .recolor:
             guard let circle = overlay.lassoCircle else { return }
             let items = ToolState.penColors.map { FanItem(key: $0, label: ToolState.penColorNames[$0] ?? $0, symbol: "circle.fill", color: $0) }
@@ -1057,25 +1073,31 @@ extension NotebookViewController {
             let s = CGFloat(a == .bigger ? 1 + step : 1 - step)
             let c = CGPoint(x: sel.box.midX, y: sel.box.midY)
             let scale = CGAffineTransform(translationX: -c.x, y: -c.y).concatenating(CGAffineTransform(scaleX: s, y: s)).concatenating(CGAffineTransform(translationX: c.x, y: c.y))
-            // The drawn rectangle grows and shrinks with what it holds.
-            context.selection?.area = sel.area?.applying(scale)
-            context.selection?.bounds = sel.bounds?.applying(scale)
-            editImages(name: a.label) { row in
-                var r = row
-                let f = SectionView.frame(ofImage: row).applying(scale)
-                r.data["x"] = .double(f.minX)
-                r.data["y"] = .double(f.minY)
-                r.data["w"] = .double(f.width)
-                r.data["h"] = .double(f.height)
-                return r
-            }
-            editSelection(name: a.label) { stroke in
-                var st = stroke
-                st.transform = stroke.transform.concatenating(scale)
-                return st
-            }
+            transformSelection(scale, name: a.label)
         case .ask:
             lassoAsk.setFan(lassoPromptFan(sticky: true))
+        }
+    }
+
+    /// Moves and scales the selected ink and pictures by `t`, line widths too, as one undo step.
+    private func transformSelection(_ t: CGAffineTransform, name: String) {
+        guard let sel = context.selection else { return }
+        // The drawn rectangle grows and shrinks with what it holds.
+        context.selection?.area = sel.area?.applying(t)
+        context.selection?.bounds = sel.bounds?.applying(t)
+        editImages(name: name) { row in
+            var r = row
+            let f = SectionView.frame(ofImage: row).applying(t)
+            r.data["x"] = .double(f.minX)
+            r.data["y"] = .double(f.minY)
+            r.data["w"] = .double(f.width)
+            r.data["h"] = .double(f.height)
+            return r
+        }
+        editSelection(name: name) { stroke in
+            var st = stroke
+            st.transform = stroke.transform.concatenating(t)
+            return st
         }
     }
 
@@ -1187,10 +1209,87 @@ extension NotebookViewController {
         }
     }
 
-    /// Cuts each selected picture down to the part inside the drawn rectangle (the free lasso's
-    /// box, or the rectangle lasso's), as one undo step.
-    private func cropImages() {
-        let cuts = croppable()
+    /// The selected picture the crop frame opens on, and where its frame starts: the part inside
+    /// the drawn rectangle when one reaches past it, else the whole picture.
+    private func cropCandidate() -> (row: Entity, keep: CGRect)? {
+        if let cut = croppable().first { return cut }
+        guard let sel = context.selection, let v = views[sel.sectionId],
+              let row = v.images.first(where: { sel.images.contains($0.id) }) else { return nil }
+        return (row, SectionView.frame(ofImage: row))
+    }
+
+    /// Opens a crop frame on the selected picture (CropView): its edges, corners and inside drag;
+    /// the bar at the top crops, resets or cancels, and a tap elsewhere crops too.
+    private func beginCrop() {
+        guard let sel = context.selection, let v = views[sel.sectionId], let c = cropCandidate() else { return }
+        finishCrop(apply: false)
+        for f in [lassoAsk, lassoEdit, lassoColors] { f.close() }
+        let frame = CropView(image: SectionView.frame(ofImage: c.row), keep: c.keep)
+        v.addSubview(frame)
+        context.cropping = c.row.id
+        v.showSelection()
+
+        let size = UILabel()
+        size.font = .monospacedDigitSystemFont(ofSize: 15, weight: .medium)
+        size.textColor = UIColor.white.withAlphaComponent(0.75)
+        let show = { (r: CGRect) in size.text = "\(Int(r.width.rounded())) × \(Int(r.height.rounded()))" }
+        show(frame.keep)
+        func button(_ title: String, prominent: Bool, _ act: @escaping () -> Void) -> UIButton {
+            var conf: UIButton.Configuration = prominent ? .filled() : .plain()
+            conf.title = title
+            conf.baseForegroundColor = .white
+            conf.cornerStyle = .capsule
+            if prominent { conf.baseBackgroundColor = .systemBlue }
+            return UIButton(configuration: conf, primaryAction: UIAction { _ in act() })
+        }
+        let stack = UIStackView(arrangedSubviews: [
+            size,
+            button("Reset", prominent: false) { [weak frame] in frame.map { $0.setKeep($0.image) } },
+            button("Cancel", prominent: false) { [weak self] in self?.finishCrop(apply: false) },
+            button("Crop", prominent: true) { [weak self] in self?.finishCrop(apply: true) },
+        ])
+        stack.spacing = 4
+        stack.alignment = .center
+        stack.isLayoutMarginsRelativeArrangement = true
+        stack.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 6)
+        let bar = UIView()
+        bar.backgroundColor = UIColor(white: 0.1, alpha: 0.92)
+        bar.overrideUserInterfaceStyle = .dark
+        bar.accessibilityLabel = "Crop: drag the frame's edges and corners, or slide it"
+        bar.addSubview(stack)
+        let fit = stack.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize)
+        // Room for a wider size readout, so the bar doesn't jump as it changes.
+        let barSize = CGSize(width: fit.width + 40, height: fit.height)
+        stack.frame = CGRect(origin: .zero, size: barSize)
+        bar.frame = CGRect(x: (overlay.bounds.width - barSize.width) / 2, y: overlay.safeAreaInsets.top + 16, width: barSize.width, height: barSize.height)
+        bar.layer.cornerRadius = barSize.height / 2
+        bar.autoresizingMask = [.flexibleLeftMargin, .flexibleRightMargin]
+        overlay.insertSubview(bar, belowSubview: overlay.note)
+        frame.onChange = show
+        crop = (frame, v.section.id, c.row.id, bar)
+        placeLassoCircle()
+    }
+
+    /// Closes the crop frame, cropping the picture to it when `apply`.
+    private func finishCrop(apply: Bool) {
+        guard let c = crop else { return }
+        crop = nil
+        context.cropping = nil
+        c.view.removeFromSuperview()
+        c.bar.removeFromSuperview()
+        let v = views[c.sectionId]
+        if apply, let v, let row = v.images.first(where: { $0.id == c.imageId }) {
+            let keep = c.view.keep
+            if keep.integral != SectionView.frame(ofImage: row).integral, keep.width >= 1, keep.height >= 1 {
+                cropImages([(row, keep)])
+            }
+        }
+        v?.showSelection()
+        placeLassoCircle()
+    }
+
+    /// Cuts each picture down to its `keep` rectangle, as one undo step.
+    private func cropImages(_ cuts: [(row: Entity, keep: CGRect)]) {
         let cropped = cuts.compactMap { row, keep -> Entity? in
             let f = SectionView.frame(ofImage: row)
             guard let cg = SectionView.image(src: row.data["src"]?.string ?? "")?.cgImage else { return nil }
@@ -1205,10 +1304,10 @@ extension NotebookViewController {
             r.data["src"] = .string(src)
             return r
         }
-        guard !cropped.isEmpty, let sel = context.selection, let v = views[sel.sectionId] else { return note("Nothing to crop", seconds: 1.5) }
+        guard !cropped.isEmpty else { return note("Couldn't crop that image", seconds: 1.5) }
         saveImages(cropped, undoTo: cuts.map(\.row).filter { r in cropped.contains { $0.id == r.id } }, name: "Crop")
-        refreshSelection(in: v)
-        note("Cropped \(cropped.count) image\(cropped.count == 1 ? "" : "s")", seconds: 1.2)
+        if let sel = context.selection, let v = views[sel.sectionId] { refreshSelection(in: v) }
+        note("Cropped", seconds: 1.2)
     }
 
     /// Copies the rectangle as a picture of the page there (printed content, text and ink).
@@ -1345,36 +1444,7 @@ extension NotebookViewController {
         let rect = sel.box.insetBy(dx: -8, dy: -8)
         switch state {
         case .began:
-            let start = v.canvas.drawing
-            dragStart = start
-            for f in [lassoAsk, lassoEdit, lassoColors] { f.close() }
-            overlay.lassoCircle?.isHidden = true
-            let picked = PKDrawing(strokes: start.strokes.filter { sel.keys.contains(StrokeCodec.key($0)) })
-            var ink: UIImage?
-            let scale = min(4, traitCollection.displayScale * scrollView.zoomScale)
-            UITraitCollection(userInterfaceStyle: .light).performAsCurrent { ink = picked.image(from: rect, scale: scale) }
-            // The selected pictures float with the ink, under it.
-            let pictures = v.images.filter { sel.images.contains($0.id) }
-            let format = UIGraphicsImageRendererFormat()
-            format.scale = scale
-            let image = UIGraphicsImageRenderer(size: rect.size, format: format).image { _ in
-                for p in pictures {
-                    SectionView.image(src: p.data["src"]?.string ?? "")?.draw(in: SectionView.frame(ofImage: p).offsetBy(dx: -rect.minX, dy: -rect.minY))
-                }
-                ink?.draw(in: CGRect(origin: .zero, size: rect.size))
-            }
-            v.hiddenImages = sel.images
-            let float = UIImageView(image: image)
-            float.frame = rect.offsetBy(dx: v.frame.minX, dy: v.frame.minY)
-            float.layer.borderColor = UIColor.systemBlue.withAlphaComponent(0.6).cgColor
-            float.layer.borderWidth = 1
-            float.isUserInteractionEnabled = false
-            column.addSubview(float)
-            dragFloat?.removeFromSuperview()
-            dragFloat = float
-            v.setDrawing(PKDrawing(strokes: start.strokes.filter { !sel.keys.contains(StrokeCodec.key($0)) }), save: false)
-            // Still tracking the drag; the floating copy shows where it is.
-            v.selectionView.alpha = 0
+            liftSelection(v, sel)
         case .changed:
             dragFloat?.frame = rect.offsetBy(dx: v.frame.minX + d.x, dy: v.frame.minY + d.y)
         case .ended:
@@ -1428,7 +1498,118 @@ extension NotebookViewController {
         }
     }
 
+    /// Floats a picture of the selected ink and pictures above the page and hides them on it, for
+    /// a drag or a resize to move; endDrag puts things back.
+    private func liftSelection(_ v: SectionView, _ sel: InkSelection) {
+        let rect = sel.box.insetBy(dx: -8, dy: -8)
+        let start = v.canvas.drawing
+        dragStart = start
+        for f in [lassoAsk, lassoEdit, lassoColors] { f.close() }
+        overlay.lassoCircle?.isHidden = true
+        let picked = PKDrawing(strokes: start.strokes.filter { sel.keys.contains(StrokeCodec.key($0)) })
+        var ink: UIImage?
+        let scale = min(4, traitCollection.displayScale * scrollView.zoomScale)
+        UITraitCollection(userInterfaceStyle: .light).performAsCurrent { ink = picked.image(from: rect, scale: scale) }
+        // The selected pictures float with the ink, under it.
+        let pictures = v.images.filter { sel.images.contains($0.id) }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale
+        let image = UIGraphicsImageRenderer(size: rect.size, format: format).image { _ in
+            for p in pictures {
+                SectionView.image(src: p.data["src"]?.string ?? "")?.draw(in: SectionView.frame(ofImage: p).offsetBy(dx: -rect.minX, dy: -rect.minY))
+            }
+            ink?.draw(in: CGRect(origin: .zero, size: rect.size))
+        }
+        v.hiddenImages = sel.images
+        let float = UIImageView(image: image)
+        float.frame = rect.offsetBy(dx: v.frame.minX, dy: v.frame.minY)
+        float.layer.borderColor = UIColor.systemBlue.withAlphaComponent(0.6).cgColor
+        float.layer.borderWidth = 1
+        float.isUserInteractionEnabled = false
+        column.addSubview(float)
+        dragFloat?.removeFromSuperview()
+        dragFloat = float
+        v.setDrawing(PKDrawing(strokes: start.strokes.filter { !sel.keys.contains(StrokeCodec.key($0)) }), save: false)
+        // Still tracking the gesture; the floating copy shows where it is.
+        v.selectionView.alpha = 0
+    }
+
+    /// Dragging a handle on the selection box stretches the ink and pictures, Figma style: a
+    /// corner scales them in proportion from the opposite corner, a side stretches one way. Near
+    /// the size it started at it snaps there (a tick on the Pencil Pro). The floating copy and a
+    /// size readout follow the finger; letting go writes it as one undo step.
+    private func resizeSelection(_ v: SectionView, _ h: BoxHandle, by d: CGPoint, state: UIGestureRecognizer.State) {
+        guard let sel = context.selection, sel.sectionId == v.section.id else { return }
+        let from = sel.box
+        switch state {
+        case .began:
+            cancelRoll()
+            liftSelection(v, sel)
+            resizeTo = from
+            resizeSnapped = true
+        case .changed:
+            guard dragStart != nil, from.width > 0, from.height > 0 else { return }
+            let page = CGRect(x: 0, y: 0, width: SectionView.pageWidth, height: v.bounds.height)
+            var to = BoxResize.resize(from, h, by: d, keepRatio: h.isCorner, min: 8, within: page)
+            let snapped = h.isCorner && abs(to.width / from.width - 1) < 0.04
+            if snapped { to = from }
+            if snapped && !resizeSnapped, let float = dragFloat {
+                haptics.alignmentOccurred(at: lastPencil ?? column.convert(CGPoint(x: float.frame.midX, y: float.frame.midY), to: view))
+            }
+            resizeSnapped = snapped
+            resizeTo = to
+            let t = BoxResize.map(from, to: to)
+            let shown = from.insetBy(dx: -8, dy: -8).applying(t).offsetBy(dx: v.frame.minX, dy: v.frame.minY)
+            dragFloat?.frame = shown
+            let k = to.width / from.width
+            let size = "\(Int(to.width.rounded())) × \(Int(to.height.rounded()))"
+            showSizeReadout(h.isCorner ? "\(size)  ·  \(Int((k * 100).rounded()))%" : size, under: column.convert(shown, to: overlay))
+        case .ended:
+            guard let start = dragStart else { return }
+            let to = resizeTo ?? from
+            endDrag(v)
+            v.setDrawing(start, save: false)
+            if to != from {
+                transformSelection(BoxResize.map(from, to: to), name: "Resize")
+            } else {
+                v.showSelection()
+                placeLassoCircle()
+            }
+        default:
+            if let start = dragStart { v.setDrawing(start, save: false) }
+            endDrag(v)
+            v.showSelection()
+            placeLassoCircle()
+        }
+    }
+
+    /// The size pill under a resizing selection (overlay coordinates).
+    private func showSizeReadout(_ text: String, under r: CGRect) {
+        let label = sizeReadout ?? {
+            let l = UILabel()
+            l.font = .monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
+            l.textColor = .white
+            l.textAlignment = .center
+            l.backgroundColor = UIColor(hex: "#3b82f6")
+            l.layer.cornerRadius = 6
+            l.layer.masksToBounds = true
+            overlay.insertSubview(l, belowSubview: overlay.note)
+            sizeReadout = l
+            return l
+        }()
+        label.text = text
+        let s = label.sizeThatFits(CGSize(width: 400, height: 40))
+        let w = s.width + 16, hgt = s.height + 8
+        let x = min(max(8, r.midX - w / 2), overlay.bounds.width - w - 8)
+        let below = r.maxY + 8
+        let y = below + hgt <= overlay.bounds.height - 8 ? below : max(overlay.safeAreaInsets.top + 8, r.minY - hgt - 8)
+        label.frame = CGRect(x: x, y: y, width: w, height: hgt)
+    }
+
     private func endDrag(_ v: SectionView) {
+        sizeReadout?.removeFromSuperview()
+        sizeReadout = nil
+        resizeTo = nil
         v.hiddenImages = []
         dragFloat?.removeFromSuperview()
         dragFloat = nil
@@ -1698,7 +1879,7 @@ final class PencilLassoRecognizer: UIGestureRecognizer {
     var onEnd: (Bool) -> Void = { _ in }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
-        guard state == .possible, let t = touches.first, !(t.view is SelectionBoxView) else {
+        guard state == .possible, let t = touches.first, !(t.view is SelectionBoxView || t.view is HandleView || t.view is CropView) else {
             if state == .possible { state = .failed }
             return
         }

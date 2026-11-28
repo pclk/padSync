@@ -19,6 +19,10 @@ final class EditorContext {
     /// Waiting for a tap to paste copied ink: the Pencil doesn't draw meanwhile.
     var pasting = false
     var onSelectionDrag: (SectionView, CGPoint, UIGestureRecognizer.State) -> Void = { _, _, _ in }
+    /// A handle on the selection box dragged by (section units) so far.
+    var onSelectionResize: (SectionView, BoxHandle, CGPoint, UIGestureRecognizer.State) -> Void = { _, _, _, _ in }
+    /// The picture whose crop frame is open: its frame stands in for the selection box.
+    var cropping: String?
 
     init(notebookId: String, database: AppDatabase, sync: SyncEngine, tool: ToolState = ToolState()) {
         self.notebookId = notebookId
@@ -146,6 +150,10 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
         selectionView.onDrag = { [weak self] d, state in
             guard let self else { return }
             self.context.onSelectionDrag(self, d, state)
+        }
+        selectionView.onResize = { [weak self] h, d, state in
+            guard let self else { return }
+            self.context.onSelectionResize(self, h, d, state)
         }
         addSubview(selectionView)
 
@@ -487,11 +495,13 @@ final class SectionView: UIView, PKCanvasViewDelegate, UIGestureRecognizerDelega
 
     /// The dashed box when the selection is in this section.
     func showSelection() {
-        guard let sel = context.selection, sel.sectionId == section.id else {
+        guard let sel = context.selection, sel.sectionId == section.id, context.cropping == nil else {
             selectionView.isHidden = true
             return
         }
         selectionView.frame = sel.box.insetBy(dx: -8, dy: -8)
+        selectionView.showsHandles = !sel.keys.isEmpty || !sel.images.isEmpty
+        selectionView.setNeedsLayout()
         selectionView.isHidden = false
         bringSubviewToFront(selectionView)
     }

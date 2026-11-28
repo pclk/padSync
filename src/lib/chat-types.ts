@@ -145,5 +145,5 @@ export interface NewTurn<F = unknown, U = unknown> {
   trace?: Record<string, number>;
 }
 
-/** Layout of the Mac side panel (src/lib/layout-mode.ts decides it). */
+/** Width class of the Mac side panel: "chat" is the wide 75% layout (src/lib/layout-mode.ts). */
 export type PanelMode = "drawing" | "chat";

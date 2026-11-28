@@ -5,7 +5,7 @@ import { renderFlag } from "@/lib/render-flags";
 import { useLiveQuery } from "dexie-react-hooks";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { InkController, Selection, SectionHandle } from "@/ink/controller";
-import { strokeBox, unionBox } from "@/ink/geometry";
+import { strokeBox, unionBox, type Box } from "@/ink/geometry";
 import { paintStrokes } from "@/ink/render";
 import { paintDelta, planTiles, sameVersions, tileScale } from "@/ink/tiles";
 import { renderMarkdown } from "@/lib/markdown";
@@ -15,6 +15,8 @@ import { PAGE_WIDTH, type ImageEntity, type SectionEntity, type StrokeEntity, ty
 import type { LassoAction } from "@/lib/lasso-settings";
 import { PdfBackground } from "./PdfBackground";
 import { Blocks, MarginColumn, SectionHeader } from "./SectionContent";
+import { CropFrame } from "./CropFrame";
+import { ResizeHandles } from "./ResizeHandles";
 
 interface Props {
   section: SectionEntity;
@@ -33,6 +35,16 @@ interface Props {
   setEditingTextId: (id: string | null) => void;
   registerEl: (id: string, el: HTMLElement | null) => void;
   textMode: boolean;
+  /** The picture being cropped here, and the frame it starts at (NotebookEditor). */
+  cropping?: { imageId: string; initial: Box } | null;
+  /** The crop frame closed: the part to keep, or null to leave the picture be. */
+  onCropDone?: (keep: Box | null) => void;
+  /** The iPad is on this page: it is outlined, always. */
+  ipadHere?: boolean;
+  /** The chat's next message sends this page: all of it, or from sentY0 to sentY1 (the iPad's screen). */
+  sent?: boolean;
+  sentY0?: number;
+  sentY1?: number;
 }
 
 export const SectionView = memo(function SectionView(p: Props) {
@@ -87,7 +99,9 @@ export const SectionView = memo(function SectionView(p: Props) {
   const margin = section.data.margin;
   const marginPx = margin ? Math.round(PAGE_WIDTH * (margin.width ?? 0.3)) : 0;
 
-  const sel = p.selection;
+  const cropImage = p.cropping ? images.find((im) => im.id === p.cropping!.imageId) : undefined;
+  // While a picture is cropped its frame stands in for the selection box.
+  const sel = cropImage ? null : p.selection;
   const { registerEl } = p;
   const sectionRef = useCallback((el: HTMLElement | null) => registerEl(section.id, el), [registerEl, section.id]);
 
@@ -159,6 +173,7 @@ export const SectionView = memo(function SectionView(p: Props) {
         // The box is the drag handle: press anywhere in it (Pencil, mouse or finger) and move. It
         // stays mounted, just invisible, while dragging so it keeps the pointer capture.
         <div
+          data-page-overlay
           className={`ink-grab absolute cursor-move touch-none rounded border-2 border-dashed border-blue-500/80 bg-blue-500/5 ${p.draggingIds ? "opacity-0" : ""}`}
           style={{ left: sel.box.minX, top: sel.box.minY, width: sel.box.maxX - sel.box.minX, height: sel.box.maxY - sel.box.minY }}
           onPointerDown={(e) => {
@@ -169,8 +184,14 @@ export const SectionView = memo(function SectionView(p: Props) {
           onPointerUp={(e) => controller.up(e.nativeEvent, handle)}
           onPointerCancel={(e) => controller.up(e.nativeEvent, handle)}
           onLostPointerCapture={(e) => controller.lostCapture(e.nativeEvent, handle)}
-          title="Drag to move"
+          // Double-clicking a selected picture crops it.
+          onDoubleClick={() => (p.canLasso?.("crop") ?? false) && p.onLassoAction?.("crop")}
+          title="Drag to move, or a handle to resize"
         >
+          {/* Kept mounted while resizing (hidden with the box), as the pressed one holds the pointer. */}
+          {sel.ids.size > 0 && (
+            <ResizeHandles w={sel.box.maxX - sel.box.minX} h={sel.box.maxY - sel.box.minY} zoom={p.zoom} onDown={(k, e) => controller.grabHandle(e.nativeEvent, handle, e.currentTarget, k)} />
+          )}
           {p.selectionBar !== false && <div className="pointer-events-auto absolute -top-11 left-0 flex gap-1 rounded-xl bg-slate-900 p-1 text-sm text-white shadow-lg">
             <button className="rounded px-3 py-1 hover:bg-slate-700" onPointerDown={(e) => e.stopPropagation()} onClick={() => controller.deleteSelection()}>
               Delete
@@ -188,6 +209,43 @@ export const SectionView = memo(function SectionView(p: Props) {
                 ))}
           </div>}
         </div>
+      )}
+      {p.sent && (
+        // Tinted, edged in the accent: what goes to the AI with the next message.
+        <div
+          aria-hidden
+          data-sent-to-ai
+          data-page-overlay
+          className="pointer-events-none absolute inset-x-0 z-10 bg-brand-500/[0.05]"
+          style={{ top: p.sentY0 ?? 0, height: (p.sentY1 ?? height) - (p.sentY0 ?? 0), boxShadow: `inset 0 0 0 ${2 / p.zoom}px color-mix(in srgb, var(--color-brand-500) 60%, transparent)` }}
+        >
+          <span className="absolute right-0 top-0 origin-top-right whitespace-nowrap rounded-bl-md bg-brand-600 px-1.5 py-0.5 text-[11px] font-semibold text-white" style={{ transform: `scale(${1 / p.zoom})` }}>
+            Sent to AI
+          </span>
+        </div>
+      )}
+      {p.ipadHere && (
+        // Just outside the page, so it never covers the writing.
+        <div
+          aria-hidden
+          data-ipad-here
+          data-page-overlay
+          className="pointer-events-none absolute z-10 border-amber-500"
+          style={{ inset: -6 / p.zoom, borderWidth: 2.5 / p.zoom, borderStyle: "solid", borderRadius: 8 / p.zoom }}
+        >
+          <span className="absolute bottom-full left-0 origin-bottom-left whitespace-nowrap rounded-md bg-amber-500 px-1.5 py-0.5 text-[11px] font-semibold text-white" style={{ transform: `scale(${1 / p.zoom})`, marginBottom: 3 / p.zoom }}>
+            iPad
+          </span>
+        </div>
+      )}
+      {cropImage && p.onCropDone && (
+        <CropFrame
+          key={cropImage.id}
+          image={{ minX: cropImage.data.x, minY: cropImage.data.y, maxX: cropImage.data.x + cropImage.data.w, maxY: cropImage.data.y + cropImage.data.h }}
+          initial={p.cropping!.initial}
+          zoom={p.zoom}
+          onDone={p.onCropDone}
+        />
       )}
     </section>
     </div>

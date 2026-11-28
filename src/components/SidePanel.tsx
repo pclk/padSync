@@ -17,6 +17,7 @@ import type { Selection } from "@/ink/controller";
 import type { PresenceEntity, SectionEntity } from "@/lib/types";
 import { EarlierQuestions } from "./AskPanel";
 import { ChatPanel } from "./chat/ChatPanel";
+import type { ContextTarget } from "./chat/ContextPicker";
 import { LecternPanel } from "./LecternPanel";
 import { MaterialPanel } from "./MaterialPanel";
 import type { PackPage } from "@/lib/pack";
@@ -38,6 +39,8 @@ interface Props {
   onJump: (id: string) => void;
   /** Annotation packs: each section's page in its PDF's page map (lib/pack.ts). */
   packMap?: Map<string, PackPage>;
+  /** What the chat would send, for the notebook to mark (ContextPicker). */
+  onTarget?: (t: ContextTarget | null) => void;
 }
 
 function fmt(ms: number) {

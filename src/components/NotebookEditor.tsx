@@ -6,6 +6,8 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import { InkController, type Selection, type ToolState } from "@/ink/controller";
+import type { Box } from "@/ink/geometry";
+import type { ContextTarget } from "./chat/ContextPicker";
 import { legacyOverrides } from "@/ink/pen-feel";
 import { emitActivity } from "@/lib/activity";
 import { db, deviceId, deviceKind } from "@/lib/db";
@@ -110,6 +112,10 @@ function Editor({ notebookId }: { notebookId: string }) {
   // A first guess until the layout mode knows the panel width; the refit below corrects it.
   const [zoom, setZoom] = useState(() => (isIpad ? 1 : fitZoom(viewport.w, overlayInsets({ kind, sidebarOpen, panelWidth: panelOpen ? viewport.w / 2 : 0 }), gutter, PAGE_WIDTH)));
   const [selection, setSelection] = useState<Selection | null>(null);
+  /** What the chat would send now (ContextPicker), marked on those pages. */
+  const [contextTarget, setContextTarget] = useState<ContextTarget | null>(null);
+  /** The picture whose crop frame is open (SectionView), and the frame it opened at. */
+  const [cropping, setCropping] = useState<{ sectionId: string; imageId: string; initial: Box } | null>(null);
   const [dragging, setDragging] = useState<Set<string> | null>(null);
   const [editingText, setEditingText] = useState<string | null>(null);
   const [currentId, setCurrentId] = useState<string | null>(null);
@@ -149,15 +155,22 @@ function Editor({ notebookId }: { notebookId: string }) {
     [notebookId],
   );
   const sidebarW = variant === "sidebar" ? (sidebarOpen ? SIDEBAR_W.expanded : SIDEBAR_W.collapsed) : 0;
-  const layout = useLayoutMode(notebookId, controller, sidebarW);
+  const layout = useLayoutMode(sidebarW);
   const panelWidth = isIpad ? 360 : layout.width;
+  // The drawing layout hides the panel; opening it from there splits the window in half.
+  const panelShown = panelOpen && panelWidth > 0;
+  const openPanel = () => {
+    setPanelOpen(true);
+    if (!isIpad && layout.mode === "drawing") layout.setMode("half");
+  };
+  const togglePanel = () => (panelShown ? setPanelOpen(false) : openPanel());
   // What covers the window around the page, and where the page sits so every part of it can be
   // panned clear of the header, the tools and the side panel (see notebook-viewport).
   const floating = railFloats(rail);
   const railInset = railThickness(rail, RAIL_INSET);
   const insets = useMemo(
-    () => overlayInsets({ kind, sidebarOpen, panelWidth: panelOpen ? panelWidth : 0, railDock: rail.dock, railFloating: floating, railInset }),
-    [kind, sidebarOpen, panelOpen, panelWidth, rail.dock, floating, railInset],
+    () => overlayInsets({ kind, sidebarOpen, panelWidth: panelShown ? panelWidth : 0, railDock: rail.dock, railFloating: floating, railInset }),
+    [kind, sidebarOpen, panelShown, panelWidth, rail.dock, floating, railInset],
   );
   const column = columnLayout(viewport.w, PAGE_WIDTH * zoom, insets, gutter);
   const vpad = verticalPadding(insets, gutter);
@@ -184,11 +197,11 @@ function Editor({ notebookId }: { notebookId: string }) {
         scrollX: Math.round(window.scrollX),
         pageHeight: document.documentElement.scrollHeight,
         pageWidth: document.documentElement.scrollWidth,
-        panelOpen,
+        panelOpen: panelShown,
         sidebarOpen: variant === "sidebar" ? sidebarOpen : null,
         insets: `${insets.top} ${insets.right} ${insets.bottom} ${insets.left}`,
       })),
-    [controller, panelOpen, sidebarOpen, variant, insets],
+    [controller, panelShown, sidebarOpen, variant, insets],
   );
 
   const undoState = useSyncExternalStore(
@@ -363,7 +376,7 @@ function Editor({ notebookId }: { notebookId: string }) {
   const closeRecorder = useCallback(() => setRecording(null), []);
   const sendPrompt = (pr: ChatPrompt, audio?: Blob) => {
     if (pr.voice && !audio) return setRecording(pr);
-    if (!panelOpen) setPanelOpen(true);
+    if (!panelShown) openPanel();
     queuePrompt(notebookId, pr, audio);
     note(audio ? `Sent: ${pr.label}` : pr.send ? `Asked: ${pr.label}` : `${pr.label}: finish it in the chat`);
   };
@@ -396,7 +409,7 @@ function Editor({ notebookId }: { notebookId: string }) {
       if (action === "undo") void undo();
       else if (action === "redo") void redo();
       else if (action === "previousTool") setTool({ ...tool, kind: previousKind.current === tool.kind ? "pen" : previousKind.current });
-      else if (action === "togglePanel") setPanelOpen(!panelOpen);
+      else if (action === "togglePanel") togglePanel();
       else if (action === "resetZoom") resetZoom();
       else setTool({ ...tool, kind: action.slice(5) as ToolState["kind"] });
       // A short note of what the gesture did, so a stray tap is noticed.
@@ -727,7 +740,10 @@ function Editor({ notebookId }: { notebookId: string }) {
         void navigator.clipboard?.writeText(INK_MARK).catch(() => {});
         controller.setSelection(null);
         setPasting("ink");
-      } else if (a === "crop") void controller.cropSelection().then((n) => note(n ? `Cropped ${n} image${n === 1 ? "" : "s"}` : "Nothing to crop"));
+      } else if (a === "crop") {
+        const c = controller.cropCandidate();
+        if (c) setCropping({ sectionId: c.sectionId, imageId: c.row.id, initial: c.keep });
+      }
       else if (a === "copyImage") {
         const box = sel.area ?? sel.bounds;
         const section = sections?.find((x) => x.id === sel.sectionId);
@@ -745,8 +761,18 @@ function Editor({ notebookId }: { notebookId: string }) {
     },
     [controller, lasso.step, note, sections],
   );
+  const cropDone = useCallback(
+    (keep: Box | null) => {
+      setCropping(null);
+      if (!cropping || !keep) return;
+      void controller.cropImageTo(cropping.sectionId, cropping.imageId, keep).then((n) => note(n ? "Cropped the image" : "Nothing cropped"));
+    },
+    [controller, cropping, note],
+  );
+  // The frame goes with the selection it was opened from (undo, a tool change, another lasso).
+  if (cropping && selection?.sectionId !== cropping.sectionId) setCropping(null);
   const canLasso = useCallback(
-    (a: LassoAction) => (a === "copyImage" ? !!(controller.selection?.area ?? controller.selection?.bounds) : a === "crop" ? controller.croppable().length > 0 : true),
+    (a: LassoAction) => (a === "copyImage" ? !!(controller.selection?.area ?? controller.selection?.bounds) : a === "crop" ? !!controller.cropCandidate() : true),
     [controller],
   );
 
@@ -1057,7 +1083,7 @@ function Editor({ notebookId }: { notebookId: string }) {
   if (!notebook || notebook.deleted) return <Missing />;
 
   const current = sections.find((s) => s.id === currentId) ?? sections[0] ?? null;
-  const showPanel = panelOpen;
+  const showPanel = panelShown;
 
   return (
     <div className="editor min-h-screen bg-canvas" style={{ paddingTop: vpad.top, minWidth: column.contentWidth }} data-variant={variant}>
@@ -1074,7 +1100,7 @@ function Editor({ notebookId }: { notebookId: string }) {
         zoom={zoom}
         onZoomReset={resetZoom}
         panelOpen={showPanel}
-        onTogglePanel={() => setPanelOpen(!panelOpen)}
+        onTogglePanel={togglePanel}
         questionsOnly={questionsOnly}
         onToggleQuestions={packMap.size ? () => setQuestionsOnly(!questionsOnly) : undefined}
         variant={variant}
@@ -1109,6 +1135,10 @@ function Editor({ notebookId }: { notebookId: string }) {
             selection={selection?.sectionId === it.section.id ? selection : null}
             draggingIds={selection?.sectionId === it.section.id ? dragging : null}
             selectionBar={!lasso.circle}
+            cropping={cropping?.sectionId === it.section.id ? cropping : null}
+            ipadHere={!isIpad && ipad?.notebookId === notebookId && ipad.data.sectionId === it.section.id}
+            {...sentPart(contextTarget, it.section.id)}
+            onCropDone={cropDone}
             onLassoAction={lassoAction}
             canLasso={canLasso}
             editingTextId={editingText}
@@ -1138,7 +1168,7 @@ function Editor({ notebookId }: { notebookId: string }) {
         </div>
       )}
       <HoldRing store={holdRing} holdMs={tuning.holdMs} label={gestures.fingerHold === "lassoHold" ? "Hold to lasso" : `Hold: ${actionLabel(gestures.fingerHold)}`} />
-      {lasso.circle && selection && !dragging && (
+      {lasso.circle && selection && !dragging && !cropping && (
         <LassoCircle
           selection={selection}
           sectionEl={sectionEl}
@@ -1172,7 +1202,7 @@ function Editor({ notebookId }: { notebookId: string }) {
       {showPanel && (
         <SidePanel
           notebookId={notebookId}
-          mode={isIpad ? "drawing" : layout.effective}
+          mode={!isIpad && layout.mode === "chat" ? "chat" : "drawing"}
           width={panelWidth}
           notebookTitle={notebook.data.title}
           selection={selection}
@@ -1183,11 +1213,19 @@ function Editor({ notebookId }: { notebookId: string }) {
           setFollow={setFollow}
           ipad={ipad}
           onJump={jump}
+          onTarget={setContextTarget}
           packMap={packMap}
         />
       )}
     </div>
   );
+}
+
+/** Whether a page goes with the chat's next message, and which part of it (the iPad's screen). */
+function sentPart(t: ContextTarget | null, id: string): { sent: boolean; sentY0?: number; sentY1?: number } {
+  if (!t?.sectionIds.includes(id)) return { sent: false };
+  const slice = t.view?.slices.find((s) => s.sectionId === id);
+  return slice ? { sent: true, sentY0: slice.y0, sentY1: slice.y1 } : { sent: true };
 }
 
 /** Window width in CSS px, without the vertical scrollbar where one takes up room. */

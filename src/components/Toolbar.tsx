@@ -15,6 +15,7 @@ import { RadialFan, fanAt, promptItems, useFanPress } from "./RadialFan";
 import type { ChatPrompt } from "@/lib/prompts";
 import { SIDEBAR_W, TOOLBAR_H, type ToolbarVariant } from "@/lib/notebook-viewport";
 import { DEFAULT_RAIL, visibleItems, type RailItem, type RailLayout } from "@/lib/rail-layout";
+import { LAYOUT_MODES, type LayoutMode } from "@/lib/layout-mode";
 
 export const PEN_COLORS = ["#111827", "#1d4ed8", "#dc2626", "#047857", "#7c3aed"];
 /** The pen colours by name, for the lasso's colour fan. */
@@ -24,6 +25,9 @@ const PEN_SIZES = [2.2, 3.4, 5.5];
 const HL_SIZES = [14, 22, 32];
 const ERASER_SIZES = [12, 24, 48];
 const COLOR_SLOTS = Math.max(PEN_COLORS.length, HL_COLORS.length);
+const LAYOUT_LABEL: Record<LayoutMode, string> = { drawing: "Drawing", half: "Half", chat: "Chat" };
+// The collapsed sidebar's button is 40px wide.
+const LAYOUT_SHORT: Record<LayoutMode, string> = { drawing: "Draw", half: "Half", chat: "Chat" };
 
 const TOOLS: { kind: ToolKind; label: string; icon: IconName; key: string }[] = [
   { kind: "pen", label: "Pen", icon: "pen", key: "P" },
@@ -34,7 +38,7 @@ const TOOLS: { kind: ToolKind; label: string; icon: IconName; key: string }[] = 
 ];
 
 interface Props {
-  layout?: { mode: "auto" | "drawing" | "chat"; effective: "drawing" | "chat"; setMode: (mode: "auto" | "drawing" | "chat") => void };
+  layout?: { mode: LayoutMode; setMode: (mode: LayoutMode) => void };
   notebookId?: string;
   title: string;
   tool: ToolState;
@@ -485,7 +489,7 @@ function ToolSidebar({ tool, colors, color, sizes, size, showColors, showSizes, 
         <button className={`btn btn-ghost btn-sm tabular-nums text-slate-500 ${open ? "" : "px-0 text-[11px]"}`} onClick={nav.onZoomReset} title="Reset zoom">
           {Math.round(nav.zoom * 100)}%
         </button>
-        <SyncBadge align="start" side showLabel={open} />
+        <SyncBadge align="start" side />
       </div>
 
       <div className="flex flex-col gap-0.5">
@@ -548,16 +552,16 @@ function ToolSidebar({ tool, colors, color, sizes, size, showColors, showSizes, 
       <div className={`mt-auto flex flex-col gap-1 border-t border-slate-100 pt-2 ${open ? "" : "items-center"}`}>
         {nav.layout && (open ? (
           <div role="group" aria-label="Layout" className="segmented w-full [&>button]:flex-1">
-            {(["auto", "drawing", "chat"] as const).map((mode) => <button key={mode} aria-pressed={nav.layout!.mode === mode} onClick={() => nav.layout!.setMode(mode)}>{mode === "auto" ? "Auto" : mode === "drawing" ? "Drawing" : "Chat"}{mode === "auto" && nav.layout!.mode === "auto" && <span aria-label={nav.layout!.effective} title={nav.layout!.effective} className={`inline-block h-1.5 w-1.5 rounded-full ${nav.layout!.effective === "drawing" ? "bg-brand-500" : "bg-emerald-500"}`} />}</button>)}
+            {LAYOUT_MODES.map((mode) => <button key={mode} aria-pressed={nav.layout!.mode === mode} onClick={() => nav.layout!.setMode(mode)}>{LAYOUT_LABEL[mode]}</button>)}
           </div>
         ) : (
           <button
             className="icon-btn h-10 w-10 text-[11px] font-semibold"
-            onClick={() => nav.layout!.setMode(nav.layout!.mode === "auto" ? "drawing" : nav.layout!.mode === "drawing" ? "chat" : "auto")}
+            onClick={() => nav.layout!.setMode(LAYOUT_MODES[(LAYOUT_MODES.indexOf(nav.layout!.mode) + 1) % LAYOUT_MODES.length])}
             title={`Layout: ${nav.layout.mode} (click to change)`}
             aria-label={`Layout: ${nav.layout.mode}`}
           >
-            {nav.layout.mode === "auto" ? "Auto" : nav.layout.mode === "drawing" ? "Draw" : "Chat"}
+            {LAYOUT_SHORT[nav.layout.mode]}
           </button>
         ))}
         {nav.onToggleQuestions && (

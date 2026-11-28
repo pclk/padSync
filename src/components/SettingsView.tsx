@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { deviceId, deviceKind } from "@/lib/db";
-import { useStoredState, useSyncStatus } from "@/lib/hooks";
+import { useSyncStatus } from "@/lib/hooks";
 import { LECTERN_URL_DEFAULT, useLecternUrl } from "@/lib/lectern";
 import { useGestureBindings, useGestureTuning, useShowCopyButtons, useSyncDebug, useThemePreference } from "@/lib/settings";
 import { DEFAULT_GESTURES, DEFAULT_TUNING, GESTURES, TUNING_RANGES, actionsFor, type GestureAction } from "@/lib/touch-gestures";
@@ -30,7 +30,6 @@ interface CanvasCheck {
 }
 
 export default function SettingsView() {
-  const [idleMs, setIdleMs] = useStoredState("padsync.layoutIdleMs", 15000);
   const sync = useSyncStatus();
   const [showCopy, setShowCopy] = useShowCopyButtons();
   const [syncDebug, setSyncDebug] = useSyncDebug();
@@ -115,11 +114,6 @@ export default function SettingsView() {
 
       <section className="card mb-5 space-y-4 p-5">
         <h2 className="text-base font-semibold text-slate-900">Notebook</h2>
-        <label className="block">
-          <span className="block text-slate-800">Auto layout: switch to chat after {idleMs / 1000} s</span>
-          <span className="block text-xs text-slate-500">With the notebook layout on Auto, the side panel widens for chat once you stop writing for this long, and makes room for the page again when you write.</span>
-          <input aria-label="Layout idle delay" type="range" min="5" max="120" value={idleMs / 1000} onChange={e => setIdleMs(Number(e.target.value) * 1000)} className="mt-2 block w-full" />
-        </label>
         <Setting label title="Show copy buttons" hint={<>&ldquo;Copy as image&rdquo; and &ldquo;Copy question text&rdquo; in the side panel, for pasting into a chat by hand. Ask AI through the Mac bridge doesn&rsquo;t need them.</>}>
           <input type="checkbox" className="switch" checked={showCopy} onChange={(e) => setShowCopy(e.target.checked)} />
         </Setting>

@@ -39,7 +39,7 @@ export async function sectionPng(section: SectionEntity, sectionEl: HTMLElement,
     style: { boxShadow: "none", ...(section.data.pdf ? { backgroundColor: "transparent" } : {}) },
     filter: (node) =>
       !(node instanceof HTMLCanvasElement) &&
-      !(node instanceof HTMLElement && (node.hasAttribute("data-pdf-background") || node.classList.contains("ink-surface") || (omit.notes && node.dataset.textbox) || (omit.images && node.dataset.blockImage))),
+      !(node instanceof HTMLElement && (node.hasAttribute("data-pdf-background") || node.classList.contains("ink-surface") || node.hasAttribute("data-page-overlay") || (omit.notes && node.dataset.textbox) || (omit.images && node.dataset.blockImage))),
   });
   const ctx = canvas.getContext("2d")!;
   ctx.setTransform(canvas.width / PAGE_WIDTH, 0, 0, canvas.width / PAGE_WIDTH, 0, 0);

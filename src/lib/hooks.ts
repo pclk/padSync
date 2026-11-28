@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useReducer, useState, useSyncExternalStore, type RefObject } from "react";
+import { useEffect, useState, useSyncExternalStore, type RefObject } from "react";
 import { getSyncState, subscribeSync } from "./sync";
 import { noteSettingWrite, subscribeSettings } from "./device-settings";
 
-import { onActivity } from "@/lib/activity";
-import type { InkController } from "@/ink/controller";
-import { layoutReducer, nextTickDelay, panelWidth, type LayoutMode, type LayoutState, type LayoutEvent } from "@/lib/layout-mode";
+import { isLayoutMode, panelWidth, type LayoutMode } from "@/lib/layout-mode";
 
 let snapshot = getSyncState();
 const subscribe = (fn: () => void) =>
@@ -73,10 +71,10 @@ export function usePencilNoScroll(ref: RefObject<HTMLElement | null>) {
   }, [ref]);
 }
 
-export function useLayoutMode(notebookId: string, controller: InkController, leftInset = 0) {
-  const [mode, persistMode] = useStoredState<LayoutMode>("padsync.layoutMode", "auto");
-  const [idleMs] = useStoredState("padsync.layoutIdleMs", 15000);
-  const [state, dispatch] = useReducer((s: LayoutState, e: LayoutEvent) => layoutReducer(s, e, idleMs), { mode, effective: mode === "drawing" ? "drawing" : "chat", lastActivityAt: 0, drawingSince: 0 });
+export function useLayoutMode(leftInset = 0) {
+  const [stored, setMode] = useStoredState<LayoutMode>("padsync.layoutMode", "half");
+  // A mode this version doesn't know (the old "auto") falls back to the split.
+  const mode = isLayoutMode(stored) ? stored : "half";
   const [viewport, setViewport] = useState(1024);
   useEffect(() => {
     const resize = () => setViewport(window.innerWidth);
@@ -84,21 +82,5 @@ export function useLayoutMode(notebookId: string, controller: InkController, lef
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
   }, []);
-  useEffect(() => onActivity(e => { if (e.notebookId === notebookId) dispatch({ type: "activity", at: e.at }); }), [notebookId]);
-  useEffect(() => {
-    const delay = nextTickDelay(state, Date.now(), idleMs);
-    if (delay === null) return;
-    let timer: ReturnType<typeof setTimeout>;
-    const tick = () => {
-      if (controller.isDrawing()) return;
-      dispatch({ type: "tick", now: Date.now(), drawing: false });
-    };
-    const ended = () => { clearTimeout(timer); timer = setTimeout(tick, Math.max(0, nextTickDelay(state, Date.now(), idleMs) ?? 0)); };
-    window.addEventListener("pointerup", ended);
-    window.addEventListener("pointercancel", ended);
-    timer = setTimeout(tick, delay);
-    return () => { clearTimeout(timer); window.removeEventListener("pointerup", ended); window.removeEventListener("pointercancel", ended); };
-  }, [state, idleMs, controller]);
-  const setMode = (value: LayoutMode) => { persistMode(value); dispatch({ type: "setMode", mode: value, now: Date.now() }); };
-  return { mode, effective: state.effective, setMode, width: panelWidth(state.effective, viewport, leftInset) };
+  return { mode, setMode, width: panelWidth(mode, viewport, leftInset) };
 }

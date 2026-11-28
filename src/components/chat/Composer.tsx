@@ -227,6 +227,10 @@ export function Composer(
             Drop images or PDFs to attach
           </div>
         )}
+        {/* What goes with the message, chosen in one press (ContextPicker). */}
+        <div className="flex min-w-0 items-center gap-1 border-b border-slate-100 px-2 py-1.5">
+          <ContextPicker {...p} ref={ctx} />
+        </div>
         {voice.state !== "idle" && (
           <div role="status" className="flex items-start gap-2 px-4 pt-3 text-sm">
             <span className="mt-1.5 h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-rose-500 motion-reduce:animate-none" aria-hidden="true" />
@@ -343,7 +347,6 @@ export function Composer(
               </div>
             )}
           </div>
-          <ContextPicker {...p} ref={ctx} />
           {toggle("webSearch", "globe", "Search", "Web search.")}
           {toggle("allowCode", "code", "Code", "Run code in a sandbox (Claude: Bash; Codex always can).")}
           <div className="ml-auto flex min-w-0 items-center gap-1">
